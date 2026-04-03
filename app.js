@@ -1,4 +1,4 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby8xW-vWxyyrDUzsRq328SsP1LIErgTLZKNxNLPN_G4v7jAHrhW3-u3k9aRIQhoX7hb/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby5kbduFzJC4vXkYdyKieuWca39NYaOxHXa1kUXEZxHEVCHaFKnKRS97FBsZNbwuuK8/exec";
 
 window.onload = () => {
     if(localStorage.getItem('orgue_user')) showApp();
