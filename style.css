@@ -1,47 +1,13 @@
-:root { --primary: #2c3e50; --accent: #27ae60; --danger: #e74c3c; --orange: #f39c12; --bg: #f4f7f6; --white: #ffffff; }
+body { margin: 0; font-family: sans-serif; background: #f8f9fa; }
+.container { display: flex; justify-content: center; align-items: center; height: 100vh; }
+.card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 90%; max-width: 400px; }
+input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+button { width: 100%; padding: 12px; background: #27ae60; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
 
-html, body { height: 100%; margin: 0; font-family: -apple-system, sans-serif; background: var(--bg); overflow: hidden; position: fixed; width: 100%; }
+.header { background: #2c3e50; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
 
-.header { height: 50px; background: var(--primary); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 15px; font-weight: bold; }
-.icon-refresh svg { width: 24px; height: 24px; fill: white; cursor: pointer; }
-
-.container { height: calc(100% - 50px); width: 100%; overflow-y: auto; }
-
-.card { background: white; padding: 25px; border-radius: 15px; margin: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-.login-title { font-size: 1.1rem; color: var(--primary); margin-bottom: 25px; text-align: center; }
-
-input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
-
-.password-wrapper { position: relative; width: 100%; }
-.eye-btn { position: absolute; right: 0; top: 0; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0.5; z-index: 10; }
-.eye-btn svg { width: 22px; fill: var(--primary); }
-
-.remember-container { display: flex; align-items: center; justify-content: flex-start; margin: 15px 0; gap: 10px; }
-.remember-container input { width: 20px; height: 20px; margin: 0; }
-
-button { width: 100%; background: var(--accent); color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; }
-.btn-secondary { background: #95a5a6; margin-top: 8px; }
-
-/* Distinction dans la liste des cours */
-.event-item-card { 
-    display: flex; justify-content: space-between; align-items: center; 
-    background: #fff; padding: 12px; margin-bottom: 10px; 
-    border-radius: 10px; border-left: 8px solid var(--orange);
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-}
-.event-info { font-size: 14px; color: var(--primary); }
-.btn-del { width: auto; padding: 8px 12px; background: var(--danger); font-size: 12px; margin: 0; }
-
-.calendar-container { height: calc(100vh - 120px); width: 100%; background: white; }
-iframe { width: 100%; height: 100%; border: none; }
-
-.tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 70px; background: white; display: flex; border-top: 1px solid #ddd; padding-bottom: env(safe-area-inset-bottom); }
-.tab-item { flex: 1; background: none; border: none; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; color: var(--primary); }
-.tab-item svg { width: 24px; height: 24px; fill: var(--primary); margin-bottom: 4px; }
-.tab-item-add { color: var(--accent); font-weight: bold; }
-.tab-item-add svg { fill: var(--accent); width: 28px; height: 28px; }
-
-.modal { position: fixed; bottom: 70px; left: 0; right: 0; background: white; padding: 20px; border-radius: 20px 20px 0 0; display: none; z-index: 100; border-top: 4px solid var(--accent); box-shadow: 0 -5px 15px rgba(0,0,0,0.1); max-height: 70vh; overflow-y: auto; }
-.time-row { display: flex; gap: 10px; }
-.time-col { flex: 1; }
-.time-selects { display: flex; gap: 5px; }
+/* Styles pour le calendrier */
+#calendar { background: white; padding: 10px; }
+.fc-event { cursor: pointer; border: none !important; }
+.fc-toolbar-title { font-size: 16px !important; }
+.fc-v-event { background-color: #3498db; } /* Couleur par défaut */
