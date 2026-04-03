@@ -12,38 +12,50 @@ window.onload = () => {
 };
 
 function login() {
-    const email = document.getElementById('userEmail').value.toLowerCase().trim();
-    const pass = document.getElementById('userPass').value.trim();
+    const emailInput = document.getElementById('userEmail').value;
+    const passInput = document.getElementById('userPass').value;
     const remember = document.getElementById('rememberMe').checked;
     const btn = document.getElementById('btnLogin');
 
-    if(!email || !pass) return alert("Veuillez remplir tous les champs.");
+    if(!emailInput || !passInput) return alert("Champs vides");
+
+    const email = emailInput.toLowerCase().trim();
+    const pass = passInput.trim();
 
     btn.disabled = true;
-    btn.innerText = "Vérification...";
+    btn.innerText = "Connexion en cours...";
 
-    // On utilise l'action list pour vérifier les identifiants
-    fetch(`${SCRIPT_URL}?action=login&email=${email}&password=${pass}`)
-    .then(r => r.json())
+    // Utilisation de URLSearchParams pour éviter les erreurs de caractères spéciaux
+    const params = new URLSearchParams({
+        action: 'login',
+        email: email,
+        password: pass
+    });
+
+    fetch(`${SCRIPT_URL}?${params.toString()}`)
+    .then(response => {
+        if (!response.ok) throw new Error('Erreur réseau');
+        return response.json();
+    })
     .then(data => {
         if(data.result === "success") {
-            if(remember) {
-                localStorage.setItem('orgue_user', email);
-                localStorage.setItem('orgue_pass', pass);
-            } else {
-                // Session temporaire (s'efface à la fermeture de l'onglet si on voulait, 
-                // mais ici on garde au moins pour la navigation actuelle)
-                sessionStorage.setItem('orgue_user', email);
-                sessionStorage.setItem('orgue_pass', pass);
-            }
-            showApp();
+            // On stocke les identifiants
+            localStorage.setItem('orgue_user', email);
+            localStorage.setItem('orgue_pass', pass);
+            // On affiche l'app
+            showApp(); 
         } else {
-            alert("Email ou mot de passe incorrect.");
+            alert("Identifiants incorrects");
             btn.disabled = false;
             btn.innerText = "Se connecter";
         }
     })
-    .catch(() => alert("Erreur de connexion au serveur."));
+    .catch(error => {
+        console.error('Erreur:', error);
+        alert("Le serveur ne répond pas. Vérifiez votre connexion.");
+        btn.disabled = false;
+        btn.innerText = "Se connecter";
+    });
 }
 
 function getUser() { return localStorage.getItem('orgue_user') || sessionStorage.getItem('orgue_user'); }
