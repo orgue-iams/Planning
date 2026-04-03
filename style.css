@@ -1,214 +1,90 @@
-/* --- CONFIGURATION GÉNÉRALE --- */
 :root {
     --primary-color: #007aff;
     --success-color: #34c759;
     --danger-color: #ff3b30;
-    --warning-color: #ff9500;
-    --bg-color: #f2f2f7;
-    --card-bg: rgba(255, 255, 255, 0.8);
+    --mine-color: #ff8c00; /* Orange soutenu */
+    --others-color: #0056b3; /* Bleu franc */
+    --bg-pastel: #fdf5e6; /* Beige clair pastel (OldLace) */
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: var(--bg-color);
+    font-family: -apple-system, sans-serif;
+    background-color: var(--bg-pastel);
     margin: 0;
-    color: #1c1c1e;
+    font-size: 13px; /* Police globale plus petite */
 }
 
-/* --- SECTION CONNEXION --- */
+/* --- CONNEXION --- */
 .login-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    background: linear-gradient(135deg, #007aff 0%, #5856d6 100%);
+    display: flex; justify-content: center; align-items: center; height: 100vh;
+    background: #5d4037;
 }
-
 .login-card {
-    background: var(--card-bg);
-    backdrop-filter: blur(10px);
-    padding: 2rem;
-    border-radius: 20px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-    width: 90%;
-    max-width: 350px;
-    text-align: center;
+    background: white; padding: 1.5rem; border-radius: 15px; width: 85%; max-width: 300px; text-align: center;
 }
+.login-card input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; box-sizing: border-box; }
 
-.login-card input {
-    width: 100%;
-    padding: 12px;
-    margin: 10px 0;
-    border: 1px solid #d1d1d6;
-    border-radius: 10px;
-    box-sizing: border-box;
-    font-size: 16px;
-}
-
-.password-group { position: relative; }
-.toggle-password {
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    cursor: pointer;
-}
-
-button {
-    width: 100%;
-    padding: 14px;
-    border: none;
-    border-radius: 12px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-#btnLogin {
-    background-color: var(--primary-color);
-    color: white;
-    margin-top: 10px;
-}
-
-#btnLogin:active { transform: scale(0.98); }
-
-/* --- HEADER APP --- */
+/* --- HEADER --- */
 .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 15px 20px;
-    background: white;
-    border-bottom: 1px solid #d1d1d6;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 15px; background: white; border-bottom: 1px solid #ddd;
 }
+.header span { font-weight: bold; font-size: 0.9rem; }
+.btn-logout { width: auto; padding: 5px 10px; font-size: 11px; background: #eee; border-radius: 5px; }
 
-.header span { font-weight: 700; font-size: 1.2rem; }
-
-.btn-logout {
-    width: auto;
-    padding: 8px 15px;
-    background: #e5e5ea;
-    font-size: 14px;
-    border-radius: 8px;
-}
-
-/* --- PERSONNALISATION FULLCALENDAR --- */
+/* --- CALENDRIER --- */
 #calendar {
-    padding: 10px;
-    background: white;
+    background-color: var(--bg-pastel) !important;
+    padding: 5px;
 }
 
-/* Événements des autres (Gris doux) */
+/* Polices du calendrier */
+.fc { font-size: 11px !important; }
+.fc-toolbar-title { font-size: 1.1rem !important; }
+
+/* Heures sur le côté */
+.fc-timegrid-slot-label-cushion {
+    font-size: 10px;
+    color: #555;
+    text-transform: lowercase;
+}
+
+/* Événements des autres (Bleu franc, pas transparent) */
 .fc-v-event {
-    background-color: #e5e5ea !important;
+    background-color: var(--others-color) !important;
     border: none !important;
-    border-left: 4px solid #8e8e93 !important;
-    border-radius: 6px !important;
+    opacity: 1 !important;
 }
-
 .fc-v-event .fc-event-title {
-    color: #1c1c1e !important;
-    font-weight: 500;
-    padding-left: 5px;
-}
-
-/* Mes événements (Orange/Orgue) */
-.fc-event-mine {
-    background-color: #fff3e0 !important;
-    border-left: 4px solid var(--warning-color) !important;
-}
-
-.fc-event-mine .fc-event-title-custom {
-    color: #e65100 !important;
-    font-weight: 700;
-}
-
-/* Bouton supprimer (X) sur mes événements */
-.delete-event-btn {
-    position: absolute;
-    top: 2px;
-    right: 5px;
-    background: rgba(255, 59, 48, 0.1);
-    color: var(--danger-color);
-    border-radius: 50%;
-    width: 18px;
-    height: 18px;
-    font-size: 12px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
+    color: white !important;
     font-weight: bold;
 }
 
-/* Grille et heures */
-.fc-timegrid-slot { height: 40px !important; }
-.fc-theme-standard td, .fc-theme-standard th { border-color: #f2f2f7 !important; }
+/* Mes événements (Orange soutenu) */
+.fc-event-mine {
+    background-color: var(--mine-color) !important;
+    border: 1px solid #cc7000 !important;
+    z-index: 5 !important;
+}
+.fc-event-mine .fc-event-title-custom {
+    color: white !important;
+    font-weight: 900;
+    padding-left: 3px;
+}
+
+/* Bouton X blanc pour trancher sur l'orange */
+.delete-event-btn {
+    position: absolute; top: 1px; right: 2px;
+    background: white; color: var(--danger-color);
+    border-radius: 50%; width: 14px; height: 14px;
+    font-size: 10px; display: flex; justify-content: center; align-items: center;
+    cursor: pointer;
+}
 
 /* --- MODALES --- */
-.modal {
-    display: none;
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.5);
-    z-index: 9999;
-    justify-content: center;
-    align-items: center;
-}
+.modal-content { font-size: 12px; border-radius: 10px; }
+.modal-content h3 { margin-top: 0; }
+.modal-content input { padding: 8px; font-size: 12px; }
 
-.modal-content {
-    background: white;
-    padding: 25px;
-    border-radius: 20px;
-    width: 85%;
-    max-width: 400px;
-}
-
-.modal-content input {
-    width: 100%;
-    padding: 12px;
-    margin: 10px 0;
-    border: 1px solid #d1d1d6;
-    border-radius: 10px;
-}
-
-.time-row { display: flex; gap: 10px; }
-
-.modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
-
-.btn-save { background: var(--success-color); color: white; }
-.btn-cancel { background: #e5e5ea; color: #1c1c1e; }
-
-/* Popup de consultation */
-.popup-info {
-    display: none;
-    position: fixed;
-    bottom: 20px; left: 50%;
-    transform: translateX(-50%);
-    background: white;
-    padding: 20px;
-    border-radius: 15px;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.2);
-    z-index: 10000;
-    width: 80%;
-    max-width: 300px;
-    text-align: center;
-}
-
-.btn-close-popup {
-    margin-top: 15px;
-    background: var(--primary-color);
-    color: white;
-    padding: 10px;
-}
-
-/* --- MOBILE OPTIMIZATION --- */
-@media (max-width: 600px) {
-    .fc-header-toolbar {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-    }
-    .fc-toolbar-title { font-size: 1.1rem !important; }
-}
+/* Grille plus fine */
+.fc-timegrid-slot { height: 35px !important; }
