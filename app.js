@@ -1,4 +1,4 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyjAOy5X9-8hIKA14rj_EIWb0dlGIbRzzq-Ge9olyOVbgkCGBH0Hq2XVQI3s7KtYMG8/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyH_lzWvIabW8YebNnoRfJRzmi_7pQmbOSMq5dHjEseOPBMvUUOCp7p_JKHg96I10g-/exec";
 
 window.onload = () => {
     const savedUser = localStorage.getItem('orgue_user');
