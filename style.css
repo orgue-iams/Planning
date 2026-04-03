@@ -1,120 +1,53 @@
 :root {
     --bg-gray: #f8f9fa; 
     --google-blue: #1a73e8;
-    --btn-blue: #1a73e8;
     --text-black: #202124;
     --text-gray: #5f6368;
-    --others-blue-dark: #0747a6; /* Bleu plus soutenu pour les autres */
-    --others-bg: #deebff;        /* Fond bleu clair lisible */
+    --others-blue-dark: #0747a6;
+    --others-bg: #deebff;
     --mine-orange: #f4511e;
 }
 
-body { font-family: "Google Sans", Roboto, sans-serif; background-color: var(--bg-gray); margin: 0; }
+body { font-family: "Google Sans", Roboto, sans-serif; background-color: var(--bg-gray); margin: 0; font-weight: 400; }
 
-/* --- BARRE DE TITRE & BOUTONS --- */
-.fc-header-toolbar {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    padding: 10px !important;
-    background: white;
-    margin-bottom: 0 !important;
-    border-bottom: 1px solid #dadce0;
-}
+/* --- BARRE D'OUTILS --- */
+.fc-header-toolbar { display: flex !important; align-items: center !important; padding: 10px !important; background: white; border-bottom: 1px solid #dadce0; font-weight: 400 !important; }
+.fc-toolbar-title { font-size: 14px !important; font-weight: 400 !important; color: var(--text-black) !important; margin: 0 10px !important; text-transform: capitalize; }
 
-.fc-toolbar-title {
-    font-size: 14px !important;
-    font-weight: 600 !important;
-    color: var(--text-black) !important;
-    margin: 0 10px !important;
-    white-space: nowrap;
-}
-
-/* Boutons de navigation et de vue (Design Bleu & Rond) */
 .fc-button {
     background-color: transparent !important;
-    border: 1px solid var(--btn-blue) !important;
-    color: var(--btn-blue) !important;
-    border-radius: 20px !important; /* Design pilule */
-    padding: 5px 12px !important;
-    font-size: 12px !important;
-    font-weight: 500 !important;
-    transition: all 0.2s;
+    border: 1.5px solid var(--google-blue) !important;
+    color: var(--google-blue) !important;
+    border-radius: 30px !important;
+    padding: 4px 12px !important;
+    font-size: 11px !important;
+    font-weight: 400 !important;
+    box-shadow: none !important;
 }
+.fc-button-active { background-color: var(--google-blue) !important; color: white !important; }
 
-.fc-button:hover {
-    background-color: #e8f0fe !important;
-}
+/* --- EN-TÊTES SANS GRAS --- */
+.fc-theme-standard th { border: none !important; font-weight: 400 !important; }
+.day-name { font-size: 9px; color: var(--text-gray); margin-bottom: 2px; font-weight: 400 !important; }
+.day-number { font-size: 26px; color: var(--text-black); width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; font-weight: 400 !important; }
 
-.fc-button-active {
-    background-color: var(--btn-blue) !important;
-    color: white !important;
-}
-
-/* Groupement des boutons pour éviter les espaces inutiles */
-.fc-button-group { margin-right: 5px !important; }
-
-/* --- EN-TÊTES DE COLONNES --- */
-.custom-header-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 4px 0;
-}
-
-.day-name {
-    font-size: 9px; /* Plus petit que les heures */
-    font-weight: 700;
-    color: var(--text-gray);
-    margin-bottom: 2px;
-}
-
-.day-number {
-    font-size: 26px;
-    font-weight: 400;
-    color: var(--text-black);
-    width: 42px;
-    height: 42px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* JOUR ACTUEL : Rond bleu uniquement sur le chiffre */
-.fc-day-today .day-number {
-    background-color: var(--google-blue);
-    color: white;
-    border-radius: 50%;
-}
-.fc-day-today .day-name { color: var(--google-blue); }
+/* JOUR ACTUEL : Rond bleu, texte normal */
+.fc-day-today .day-number { background-color: var(--google-blue); color: white; border-radius: 50%; }
+.fc-day-today .day-name { color: var(--google-blue); font-weight: 400 !important; }
 
 /* --- RÉSERVATIONS --- */
-.fc-v-event { border-radius: 8px !important; border: none !important; }
+.fc-v-event { border-radius: 8px !important; border: none !important; font-weight: 400 !important; }
+.fc-event-others { background-color: var(--others-bg) !important; border-left: 5px solid var(--others-blue-dark) !important; }
+.fc-event-others .fc-event-title-custom { color: var(--others-blue-dark) !important; font-weight: 400 !important; padding-left: 5px; }
+.fc-event-mine { background-color: var(--mine-orange) !important; }
+.fc-event-mine .fc-event-title-custom { color: white !important; font-weight: 400 !important; padding-left: 5px; }
 
-/* Autres Utilisateurs : Bleu plus foncé et fond contrasté */
-.fc-event-others {
-    background-color: var(--others-bg) !important;
-    border-left: 5px solid var(--others-blue-dark) !important;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-}
-.fc-event-others .fc-event-title-custom {
-    color: var(--others-blue-dark) !important;
-    font-weight: 700;
-    font-size: 12px;
-    padding-left: 5px;
-}
-
-/* Mes Réservations */
-.fc-event-mine {
-    background-color: var(--mine-orange) !important;
-}
-.fc-event-mine .fc-event-title-custom {
-    color: white !important;
-    font-weight: 700;
-    font-size: 12px;
-    padding-left: 5px;
-}
-
-/* Suppression formulaire en bas */
-#appSection { display: flex; flex-direction: column; height: 100vh; }
-#calendar { flex-grow: 1; }
+/* --- MODALES --- */
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(32, 33, 36, 0.6); z-index: 9999; justify-content: center; align-items: center; }
+.modal-card { background: white; width: 90%; max-width: 400px; border-radius: 12px; overflow: hidden; font-weight: 400; }
+.modal-header { padding: 16px 20px; border-bottom: 1px solid #dadce0; }
+.modal-header h3 { margin: 0; font-size: 16px; font-weight: 400; }
+.input-group label { font-size: 11px; color: var(--text-gray); text-transform: uppercase; font-weight: 400; }
+.input-group input { padding: 10px; border: 1px solid #dadce0; border-radius: 6px; font-weight: 400; }
+.btn-save { background: var(--google-blue); color: white; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: 400; }
+.btn-cancel { background: white; color: var(--text-gray); border: 1px solid #dadce0; padding: 8px 20px; border-radius: 6px; font-weight: 400; }
