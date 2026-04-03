@@ -1,91 +1,35 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <link rel="stylesheet" href="style.css">
-  <title>Planning Orgue IAMS</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Réservation Orgue</title>
+    <link rel="stylesheet" href="style.css">
+    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet' />
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js'></script>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales/fr.js'></script>
 </head>
 <body>
-  
-  <div class="header">
-    <span>PLANNING ORGUE</span>
-    <div class="icon-refresh" onclick="refreshCalendar()">
-        <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-    </div>
-  </div>
-  
-  <div class="container">
-    <div id="loginSection" class="card">
-      <h2 class="login-title">Planning orgue G.Bancells de l'IAMS</h2>
-      <input type="email" id="userEmail" placeholder="Email">
-      <div class="password-wrapper">
-        <input type="password" id="userPass" placeholder="Mot de passe">
-        <div class="eye-btn" onclick="togglePassword()">
-            <svg id="eyeIcon" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+    <div id="loginSection" class="container">
+        <div class="card">
+            <h2 class="login-title">Accès Étudiants</h2>
+            <input type="email" id="userEmail" placeholder="Email">
+            <div class="password-wrapper">
+                <input type="password" id="userPass" placeholder="Mot de passe">
+            </div>
+            <button id="btnLogin" onclick="login()">Se connecter</button>
         </div>
-      </div>
-      <div class="remember-container">
-        <input type="checkbox" id="rememberMe">
-        <label for="rememberMe">Se souvenir de moi</label>
-      </div>
-      <button onclick="login()" id="btnLogin">Se connecter</button>
     </div>
 
     <div id="appSection" style="display:none;">
-      <div class="calendar-container">
-        <iframe id="googleCal" src="https://calendar.google.com/calendar/embed?src=orgue.iams@gmail.com&ctz=Europe%2FParis&mode=WEEK&showTabs=1&showNav=1&showTitle=0" frameborder="0"></iframe>
-      </div>
-
-      <div id="modalResa" class="modal">
-        <h3>Nouvelle Réservation</h3>
-        <label>Titre de la réservation</label>
-        <input type="text" id="eventTitle">
-        <label>Date</label>
-        <input type="date" id="resDay">
-        <div class="time-row">
-            <div class="time-col">
-                <label>Début</label>
-                <div class="time-selects">
-                    <select id="startH"></select>
-                    <select id="startM"><option>00</option><option>15</option><option>30</option><option>45</option></select>
-                </div>
-            </div>
-            <div class="time-col">
-                <label>Fin</label>
-                <div class="time-selects">
-                    <select id="endH"></select>
-                    <select id="endM"><option>00</option><option>15</option><option>30</option><option>45</option></select>
-                </div>
-            </div>
+        <div class="header">
+            <span>Planning Orgue</span>
+            <div onclick="logout()" style="font-size:12px; cursor:pointer;">Déconnexion</div>
         </div>
-        <button onclick="sendReservation()" id="btnResa">Confirmer</button>
-        <button onclick="closeModals()" class="btn-secondary">Annuler</button>
-      </div>
-
-      <div id="modalListe" class="modal">
-        <h3>Mes Réservations</h3>
-        <div id="mesEventsList"></div>
-        <button onclick="closeModals()" class="btn-secondary">Fermer</button>
-      </div>
+        
+        <div id="calendar"></div>
     </div>
-  </div>
 
-  <nav id="navBar" class="tab-bar" style="display:none;">
-    <button class="tab-item" onclick="logout()">
-        <svg viewBox="0 0 24 24"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
-        <span>Quitter</span>
-    </button>
-    <button class="tab-item" onclick="showMyEvents()">
-        <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
-        <span>Mes cours</span>
-    </button>
-    <button class="tab-item tab-item-add" onclick="prepareReservation()">
-        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-        <span>Réserver</span>
-    </button>
-  </nav>
-
-  <script src="app.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
