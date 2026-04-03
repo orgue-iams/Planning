@@ -21,21 +21,16 @@
     <div id="loginSection" class="card">
       <h2>Espace Élève</h2>
       <input type="email" id="userEmail" placeholder="Email">
-      
       <div class="password-container">
         <input type="password" id="userPass" placeholder="Mot de passe">
         <div class="toggle-password" onclick="togglePassword()">
-            <svg id="eyeIcon" viewBox="0 0 24 24">
-                <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-            </svg>
+            <svg id="eyeIcon" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
         </div>
       </div>
-      
       <div class="remember-box">
         <input type="checkbox" id="rememberMe">
         <label for="rememberMe">Se souvenir de moi</label>
       </div>
-
       <button onclick="login()" id="btnLogin">Se connecter</button>
     </div>
 
@@ -43,23 +38,27 @@
       <div class="calendar-container">
         <iframe id="googleCal" src="https://calendar.google.com/calendar/embed?src=orgue.iams@gmail.com&ctz=Europe%2FParis&mode=WEEK&showTabs=1&showNav=1&showTitle=0&showPrint=0" frameborder="0"></iframe>
       </div>
-
       <div class="help-link">
-        <a href="https://calendar.google.com/calendar/u/0/embed?src=orgue.iams@gmail.com&ctz=Europe/Paris" target="_blank">
-          Ouvrir l'agenda en plein écran ↗
-        </a>
+        <a href="https://calendar.google.com/calendar/u/0/embed?src=orgue.iams@gmail.com&ctz=Europe/Paris" target="_blank">Ouvrir en plein écran ↗</a>
       </div>
 
       <div id="modalResa" class="modal">
         <h3>Nouvelle Réservation</h3>
-        <label>Début</label><input type="datetime-local" id="eventStart">
-        <label>Fin</label><input type="datetime-local" id="eventEnd">
+        <label>Titre (votre nom par défaut)</label>
+        <input type="text" id="eventTitle">
+        
+        <label>Début (par 15 min)</label>
+        <input type="datetime-local" id="eventStart" step="900">
+        
+        <label>Fin (par 15 min)</label>
+        <input type="datetime-local" id="eventEnd" step="900">
+        
         <button onclick="sendReservation()" id="btnResa">Confirmer</button>
         <button onclick="closeModals()" class="btn-secondary" style="margin-top:10px;">Annuler</button>
       </div>
 
       <div id="modalListe" class="modal">
-        <h3>Mes Réservations (30j)</h3>
+        <h3>Mes Réservations</h3>
         <div id="mesEventsList">Chargement...</div>
         <button onclick="closeModals()" class="btn-secondary" style="margin-top:20px;">Fermer</button>
       </div>
@@ -75,7 +74,7 @@
         <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
         <span>Mes cours</span>
     </button>
-    <button class="tab-item tab-item-add" onclick="openModal('modalResa')">
+    <button class="tab-item tab-item-add" onclick="prepareReservation()">
         <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
         <span>Réserver</span>
     </button>
