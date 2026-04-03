@@ -1,74 +1,67 @@
 :root { 
-    --primary: #2c3e50; /* Bleu sombre - Fond Header */
-    --accent: #27ae60;  /* Vert - Bouton Réserver (Optionnel) */
-    --bg: #f4f7f6;      /* Gris très clair - Fond de page */
-    --text-on-primary: #ffffff; /* Blanc - Icônes et texte Header */
-    --tab-icon-color: #2c3e50;   /* Bleu sombre - Icônes Barre basse */
+    --primary: #2c3e50; --accent: #27ae60; --bg: #f4f7f6; 
 }
 
-body { font-family: -apple-system, sans-serif; margin: 0; background: var(--bg); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+html, body {
+    height: 100%; margin: 0; padding: 0; overflow: hidden;
+    font-family: -apple-system, system-ui, sans-serif;
+    background: var(--bg); width: 100%; position: fixed;
+}
 
-/* Header Épuré */
 .header { 
-    background: var(--primary); 
-    color: var(--text-on-primary); 
-    padding: env(safe-area-inset-top) 15px 12px 15px; 
-    display: flex; justify-content: space-between; align-items: center;
-    font-weight: bold; font-size: 1.1rem; z-index: 101;
+    height: 50px; background: var(--primary); color: white; 
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 15px; font-weight: bold;
 }
 
-/* Style pour l'icône de rafraîchissement dans le header */
-.icon-refresh {
-    fill: var(--text-on-primary); /* Icône blanche */
-    width: 24px; height: 24px;
-    cursor: pointer; padding: 5px;
+.container { 
+    height: calc(100% - 50px); width: 100%; display: flex; flex-direction: column; 
 }
 
-.container { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 80px; }
+#appSection {
+    height: calc(100% - 75px); /* On enlève la barre du bas */
+    display: flex; flex-direction: column; width: 100%;
+}
 
-/* Calendar fullscreen */
-.calendar-container { height: 100%; width: 100%; background: white; border: none; }
-iframe { width: 100%; height: 100%; border: none; display: block; }
+.calendar-container { 
+    flex: 1; width: 100%; position: relative; background: white;
+}
 
-/* Tab Bar Basse Épurée */
+iframe { 
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; 
+}
+
+.help-link { 
+    height: 25px; text-align: center; font-size: 11px; background: white; line-height: 25px;
+}
+
+.help-link a { color: var(--primary); text-decoration: none; opacity: 0.6; }
+
+/* Login Styles */
+.card { background: white; padding: 25px; border-radius: 15px; margin: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; box-sizing: border-box; }
+
+.password-container { position: relative; width: 100%; }
+.toggle-password { position: absolute; right: 12px; top: 22px; cursor: pointer; font-size: 18px; }
+
+.remember-box { display: flex; align-items: center; margin: 15px 0; font-size: 14px; }
+.remember-box input { width: 20px; margin: 0 10px 0 0; }
+
+button { width: 100%; background: var(--accent); color: white; border: none; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; }
+.btn-secondary { background: #95a5a6; }
+
+/* Navigation */
 .tab-bar { 
     position: fixed; bottom: 0; left: 0; right: 0; height: 75px; 
     background: white; display: flex; justify-content: space-around; 
-    align-items: center; border-top: 1px solid #ddd; 
-    padding-bottom: env(safe-area-inset-bottom); z-index: 100; 
+    align-items: center; border-top: 1px solid #ddd; padding-bottom: env(safe-area-inset-bottom);
 }
+.tab-item { background: none; border: none; font-size: 11px; color: var(--primary); display: flex; flex-direction: column; align-items: center; }
+.tab-item svg { fill: var(--primary); width: 24px; height: 24px; margin-bottom: 4px; }
+.tab-item-add { color: var(--accent); font-weight: bold; }
+.tab-item-add svg { fill: var(--accent); width: 30px; height: 30px; }
 
-.tab-item { 
-    background: none; border: none; font-size: 11px; 
-    color: var(--primary); 
-    display: flex; flex-direction: column; align-items: center; 
-    padding: 5px; text-decoration: none; cursor: pointer;
-}
-
-/* Style pour les icônes de la barre basse */
-.tab-item svg { 
-    fill: var(--tab-icon-color); /* Icônes bleues sombres */
-    width: 26px; height: 26px; 
-    margin-bottom: 5px; 
-}
-
-/* Style spécifique pour le bouton Réserver (⊕) */
-.tab-item-add {
-    color: var(--accent);
-    font-weight: bold;
-}
-.tab-item-add svg {
-    fill: var(--accent); /* Icône verte */
-    width: 32px; height: 32px;
-}
-
-/* Modals, Cards, Inputs, Buttons (Inchangés mais nets) */
-.modal { position: fixed; bottom: 75px; left: 0; right: 0; background: white; padding: 20px; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.15); display: none; z-index: 99; }
-.card { background: white; padding: 20px; border-radius: 15px; margin: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; box-sizing: border-box; }
-button { width: 100%; background: var(--accent); color: white; border: none; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; }
-.btn-secondary { background: #95a5a6; } /* Gris pour Annuler/Fermer */
-
-/* Liste des créneaux (Inchangée) */
-.event-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; }
-.btn-del { background: #ff7675; width: auto; padding: 5px 12px; font-size: 13px; }
+/* Modals */
+.modal { position: fixed; bottom: 75px; left: 0; right: 0; background: white; padding: 20px; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.1); display: none; z-index: 100; }
+.event-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #eee; }
+.btn-del { background: #ff7675; width: auto; padding: 5px 10px; font-size: 12px; }
