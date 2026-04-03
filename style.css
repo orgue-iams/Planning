@@ -1,110 +1,103 @@
 :root {
-    --bg-gray: #f1f3f4; 
+    --bg-gray: #f8f9fa; 
     --google-blue: #1a73e8;
     --text-black: #202124;
     --text-gray: #5f6368;
-    --others-blue: #039be5;
+    --others-dark-blue: #0277bd; /* Bleu plus foncé demandé */
+    --others-bg: #e1f5fe;
     --mine-orange: #f4511e;
 }
 
-body { font-family: "Google Sans", Roboto, Arial, sans-serif; background-color: var(--bg-gray); margin: 0; }
+body { font-family: "Google Sans", Roboto, Arial, sans-serif; background-color: var(--bg-gray); margin: 0; overflow-x: hidden; }
 
 /* --- HEADER --- */
-.header-app { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: white; border-bottom: 1px solid #dadce0; }
-.header-right { display: flex; align-items: center; gap: 12px; }
+.header-app { display: flex; justify-content: space-between; align-items: center; padding: 5px 15px; background: white; border-bottom: 1px solid #dadce0; }
+.app-title { font-size: 16px; color: var(--text-gray); }
+.btn-logout-icon { background: none; border: none; cursor: pointer; padding: 5px; display: flex; align-items: center; }
 
-/* Menu déroulant compact */
-.view-dropdown {
-    padding: 6px 12px;
-    border: 1px solid #dadce0;
-    border-radius: 4px;
-    background-color: white;
-    font-family: inherit;
-    font-size: 13px;
-    color: var(--text-black);
-    cursor: pointer;
+/* --- CALENDAR TOOLBAR (Mode compact) --- */
+.fc-header-toolbar { 
+    display: flex !important; 
+    flex-wrap: nowrap !important; 
+    align-items: center !important; 
+    padding: 5px !important;
+    margin-bottom: 10px !important;
 }
 
-.btn-logout { background: none; border: 1px solid #dadce0; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; color: var(--text-gray); }
+.fc-toolbar-title { 
+    font-size: 14px !important; 
+    margin-right: 10px !important; 
+    white-space: nowrap;
+}
 
-/* --- CALENDRIER --- */
-#calendar { background-color: var(--bg-gray) !important; padding: 10px; }
+.fc-button { padding: 4px 8px !important; font-size: 11px !important; text-transform: capitalize !important; }
 
-.fc-toolbar-title { font-size: 15px !important; font-weight: 500 !important; color: var(--text-gray) !important; text-transform: capitalize; }
-
-/* Boutons Navigation */
-.fc-button-primary { background-color: white !important; border: 1px solid #dadce0 !important; color: #3c4043 !important; }
-.fc-button-primary:hover { background-color: #f8f9fa !important; }
-
-/* --- EN-TÊTES DE COLONNES (Fix Safari & Chrome) --- */
+/* --- EN-TÊTES DE COLONNES --- */
 .fc-theme-standard th { border: none !important; }
 
-.fc-col-header-cell-cushion {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important; /* Centrage Safari */
-    justify-content: center !important;
-    text-align: center !important;
-    width: 100% !important;
-    text-decoration: none !important;
-    color: var(--text-black) !important;
-    padding: 8px 0 !important;
+.custom-header-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 0;
 }
 
-/* Nom du jour (Taille réduite, un peu plus gros que l'heure) */
-.fc-col-header-cell-cushion::first-line {
-    font-size: 12px !important; 
-    font-weight: 700 !important;
-    text-transform: uppercase !important;
+.day-name {
+    font-size: 10px; /* Plus petit que les heures */
+    font-weight: 700;
+    color: var(--text-gray);
+    margin-bottom: 2px;
 }
 
-/* Numéro du jour (26px) */
-.fc-col-header-cell-cushion {
-    font-size: 26px !important;
-    font-weight: 400 !important;
-    line-height: 1;
-    margin-top: 4px;
+.day-number {
+    font-size: 26px;
+    font-weight: 400;
+    color: var(--text-black);
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-/* JOUR ACTUEL : Rond Bleu autour du NUMÉRO seulement */
-.fc-day-today .fc-col-header-cell-cushion {
-    color: var(--google-blue) !important; /* Nom du jour en bleu */
-}
-
-/* On crée le rond bleu via un élément spécifique pour ne pas englober le texte du haut */
-.fc-day-today .fc-col-header-cell-cushion {
-    position: relative;
-}
-
-/* Style spécifique pour forcer le rond sur le numéro uniquement sans casser Safari */
-.fc-day-today .fc-col-header-cell-cushion {
-    background: transparent !important;
-}
-
-.fc-day-today .fc-col-header-cell-cushion::after {
-    content: "";
-    position: absolute;
-    bottom: -2px;
-    width: 42px;
-    height: 42px;
+/* JOUR ACTUEL : Rond bleu sur le CHIFFRE uniquement */
+.fc-day-today .day-name { color: var(--google-blue); }
+.fc-day-today .day-number {
     background-color: var(--google-blue);
+    color: white;
     border-radius: 50%;
-    z-index: -1;
 }
 
-/* On change la couleur du numéro en blanc quand il est sur le rond */
-.fc-day-today .fc-col-header-cell-cushion {
-    color: white !important; 
-    /* Mais attention, la first-line (nom du jour) doit rester bleue */
-}
-
-/* Ajustement spécifique pour que seul le chiffre soit blanc */
-.fc-day-today .fc-col-header-cell-cushion {
-    text-shadow: none;
-    color: white !important;
-}
+/* --- HEURES --- */
+.fc-timegrid-slot-label-cushion { font-size: 11px; color: var(--text-gray); }
 
 /* --- RÉSERVATIONS --- */
-.fc-v-event { border-radius: 10px !important; border: none !important; }
-.fc-event-others { background-color: #e1f5fe !important; border-left: 5px solid var(--others-blue) !important; }
+.fc-v-event { border-radius: 8px !important; border: none !important; }
+
+/* Autres (Bleu foncé sur fond pastel) */
+.fc-event-others {
+    background-color: var(--others-bg) !important;
+    border-left: 5px solid var(--others-dark-blue) !important;
+}
+.fc-event-others .fc-event-title-custom { 
+    color: var(--others-dark-blue) !important; 
+    font-weight: 600; 
+    padding-left: 4px;
+}
+
+/* Les miennes */
 .fc-event-mine { background-color: var(--mine-orange) !important; }
+.fc-event-mine .fc-event-title-custom { color: white !important; font-weight: 700; padding-left: 4px; }
+
+/* --- MOBILE LANDSCAPE OPTIMIZATION --- */
+@media screen and (max-height: 500px) {
+    .header-app { display: none; } /* On cache le titre app pour gagner de la place */
+    #calendar { padding: 0; }
+    .fc-toolbar-title { font-size: 12px !important; }
+}
+
+.delete-event-btn { position: absolute; right: 4px; top: 2px; color: white; cursor: pointer; font-size: 12px; }
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+.modal-content { background: white; padding: 20px; border-radius: 8px; width: 300px; }
+.popup-info { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 1001; }
