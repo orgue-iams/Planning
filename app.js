@@ -1,4 +1,4 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyG1SYO_2jbVZbEJZBm15T_ydJe3P7jnvIUGCYF_icFXpFU5YfVKQyztm1DfN6XWF5d/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyfUgkPbQofGALRfUHRSU-1UPLPOevxiUyt6HH63C2EmroZO0dMRACSl1hoUZCaFoc/exec";
 
 window.onload = () => {
     const user = localStorage.getItem('orgue_user') || sessionStorage.getItem('orgue_user');
@@ -67,6 +67,7 @@ async function sendReservation() {
     const end = new Date(`${day}T${document.getElementById('endH').value}:${document.getElementById('endM').value}:00`);
 
     if(end <= start) return alert("L'heure de fin doit être après le début.");
+    
     const btn = document.getElementById('btnResa');
     btn.disabled = true; btn.innerText = "Envoi...";
 
@@ -80,9 +81,18 @@ async function sendReservation() {
     try {
         const r = await fetch(`${SCRIPT_URL}?${params.toString()}`);
         const res = await r.json();
-        if(res.result === "success") { alert("Réservé !"); closeModals(); refreshCalendar(); }
-        else alert(res.message);
-    } catch(e) { alert("Erreur réseau"); }
+        
+        if(res.result === "success") { 
+            closeModals(); // On ferme tout de suite
+            refreshCalendar();
+            setTimeout(() => { alert("Réservation confirmée !"); }, 500);
+        } else { 
+            alert(res.message); 
+        }
+    } catch(e) { 
+        alert("La requête a pris trop de temps, mais vérifiez le calendrier car elle a pu passer."); 
+    }
+    
     btn.disabled = false; btn.innerText = "Confirmer";
 }
 
@@ -127,5 +137,5 @@ async function deleteEvent(id) {
 }
 
 function closeModals() { document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); }
-function refreshCalendar() { const ifr = document.getElementById('googleCal'); ifr.src = ifr.src; }
+function refreshCalendar() { const ifr = document.getElementById('googleCal'); if(ifr) ifr.src = ifr.src; }
 function logout() { localStorage.clear(); sessionStorage.clear(); location.reload(); }
