@@ -11,7 +11,7 @@
 
     <div id="loginSection" class="login-container">
         <div class="login-card">
-            <h2>Planning de l'orgue G.Bancells de l'IAMS</h2>
+            <h2>Planning Orgue IAMS</h2>
             <input type="email" id="userEmail" placeholder="Email">
             <div class="password-group">
                 <input type="password" id="userPass" placeholder="Mot de passe">
@@ -21,14 +21,19 @@
             </div>
             <button id="btnLogin" onclick="login()">Se connecter</button>
             <div id="loginMessage" class="status-msg"></div>
-            <p class="forgot-link" onclick="forgotPassword()">Mot de passe oublié ?</p>
         </div>
     </div>
 
     <div id="appSection" style="display:none;">
         <div class="header-app">
             <span>Planning Orgue</span>
-            <button class="btn-logout" onclick="logout()">Quitter</button>
+            <div class="header-right">
+                <select id="viewSelector" class="view-dropdown" onchange="changeView(this.value)">
+                    <option value="timeGridWeek">Semaine</option>
+                    <option value="dayGridMonth">Mois</option>
+                </select>
+                <button class="btn-logout" onclick="logout()">Quitter</button>
+            </div>
         </div>
         <div id="calendar"></div>
     </div>
