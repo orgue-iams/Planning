@@ -1,4 +1,4 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbtervtORATCnDZ02BYj0nKg4LHGyl_HjMjKcOXBBB3VvMtQWBcZe0SI5l8DBXSpT6/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwk8lxyTHBFKIsFybMLH-E861B6rRDTj5VvVTbvpq2Q3tE3FPcp8r8esyGz2nl_cZE3/exec";
 
 window.onload = () => {
     const savedUser = localStorage.getItem('orgue_user');
@@ -14,12 +14,69 @@ function showApp() {
 }
 
 function prepareReservation() {
-    // On met le nom de l'élève par défaut dans le titre
-    const userName = localStorage.getItem('orgue_name') || sessionStorage.getItem('orgue_name') || "Élève";
-    document.getElementById('eventTitle').value = "🎹 " + userName;
+    // 1. Nom complet de l'élève (sans icône)
+    const userName = localStorage.getItem('orgue_name') || sessionStorage.getItem('orgue_name') || "";
+    document.getElementById('eventTitle').value = userName;
+
+    // 2. Date du jour par défaut
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('resDay').value = today;
+
+    // 3. Générer les menus Heures (08 à 22)
+    const hSelects = [document.getElementById('startH'), document.getElementById('endH')];
+    hSelects.forEach(sel => {
+        sel.innerHTML = "";
+        for (let h = 8; h <= 22; h++) {
+            let val = h < 10 ? '0' + h : h;
+            sel.innerHTML += `<option value="${val}">${val}h</option>`;
+        }
+    });
+
     openModal('modalResa');
 }
 
+function sendReservation() {
+    const title = document.getElementById('eventTitle').value;
+    const day = document.getElementById('resDay').value;
+    
+    const sH = document.getElementById('startH').value;
+    const sM = document.getElementById('startM').value;
+    const eH = document.getElementById('endH').value;
+    const eM = document.getElementById('endM').value;
+
+    if(!day || !title) return alert("Veuillez remplir tous les champs.");
+
+    // Construction des dates ISO
+    const start = new Date(`${day}T${sH}:${sM}:00`);
+    const end = new Date(`${day}T${eH}:${eM}:00`);
+
+    if (end <= start) return alert("L'heure de fin doit être après le début.");
+
+    const btn = document.getElementById('btnResa');
+    btn.disabled = true; btn.innerText = "Envoi...";
+
+    const data = { 
+        action: "reserve", 
+        email: getUser(), 
+        password: getPass(), 
+        title: title,
+        start: start.toISOString(), 
+        end: end.toISOString() 
+    };
+
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(data) })
+    .then(r => r.json())
+    .then(res => {
+        if(res.result === "error") alert(res.message);
+        else { alert("Réservé !"); closeModals(); setTimeout(refreshCalendar, 1000); }
+        btn.disabled = false; btn.innerText = "Confirmer la réservation";
+    }).catch(() => {
+        alert("Erreur réseau");
+        btn.disabled = false; btn.innerText = "Confirmer la réservation";
+    });
+}
+
+// --- Login & Session ---
 function login() {
     const email = document.getElementById('userEmail').value.toLowerCase().trim();
     const pass = document.getElementById('userPass').value.trim();
@@ -38,50 +95,16 @@ function login() {
             const storage = remember ? localStorage : sessionStorage;
             storage.setItem('orgue_user', email);
             storage.setItem('orgue_pass', pass);
-            storage.setItem('orgue_name', data.name); // On stocke le vrai nom
+            storage.setItem('orgue_name', data.name);
             showApp();
         } else {
-            alert("Email ou mot de passe incorrect");
+            alert("Erreur d'identification");
             btn.disabled = false; btn.innerText = "Se connecter";
         }
-    }).catch(() => { alert("Erreur serveur"); btn.disabled = false; });
+    }).catch(() => { alert("Serveur injoignable"); btn.disabled = false; });
 }
 
-function sendReservation() {
-    const title = document.getElementById('eventTitle').value;
-    const start = document.getElementById('eventStart').value;
-    const end = document.getElementById('eventEnd').value;
-    
-    if(!start || !end || !title) return alert("Veuillez remplir tous les champs.");
-
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-
-    if (endDate <= startDate) return alert("L'heure de fin est incohérente.");
-    if ((endDate - startDate) / 60000 < 15) return alert("Minimum 15 minutes.");
-
-    const btn = document.getElementById('btnResa');
-    btn.disabled = true; btn.innerText = "Vérification...";
-
-    const data = { 
-        action: "reserve", 
-        email: getUser(), 
-        password: getPass(), 
-        title: title,
-        start: startDate.toISOString(), 
-        end: endDate.toISOString() 
-    };
-
-    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(data) })
-    .then(r => r.json())
-    .then(res => {
-        if(res.result === "error") alert(res.message);
-        else { alert("Réservé !"); closeModals(); setTimeout(refreshCalendar, 1000); }
-        btn.disabled = false; btn.innerText = "Confirmer";
-    });
-}
-
-// --- Fonctions Utilitaires ---
+// --- Utilitaires ---
 function togglePassword() {
     const passInput = document.getElementById('userPass');
     const eyePath = document.querySelector('#eyeIcon path');
@@ -95,9 +118,9 @@ function togglePassword() {
 }
 function getUser() { return localStorage.getItem('orgue_user') || sessionStorage.getItem('orgue_user'); }
 function getPass() { return localStorage.getItem('orgue_pass') || sessionStorage.getItem('orgue_pass'); }
-function refreshCalendar() { const cal = document.getElementById('googleCal'); if(cal){ const url = new URL(cal.src); url.searchParams.set('t', Date.now()); cal.src = url.toString(); } }
 function openModal(id) { closeModals(); document.getElementById(id).style.display = 'block'; }
 function closeModals() { document.getElementById('modalResa').style.display = 'none'; document.getElementById('modalListe').style.display = 'none'; }
+function refreshCalendar() { const cal = document.getElementById('googleCal'); if(cal){ cal.src = cal.src.split('&t=')[0] + '&t=' + Date.now(); } }
 function showMyEvents() {
     openModal('modalListe');
     const listDiv = document.getElementById('mesEventsList');
