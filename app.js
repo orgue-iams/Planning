@@ -217,7 +217,6 @@ function logout() {
     localStorage.clear();
     location.reload();
 }
-
 // Auto-login au chargement
 window.onload = () => {
     if(localStorage.getItem('orgue_user')) {
