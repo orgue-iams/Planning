@@ -1,4 +1,4 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxB91NR5jUeizC6zsMj1TTYxIjaEQt-hiCzaQZe3dbUy0G-LnXfiu_IXHuySjaPehzq/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyjAOy5X9-8hIKA14rj_EIWb0dlGIbRzzq-Ge9olyOVbgkCGBH0Hq2XVQI3s7KtYMG8/exec";
 
 window.onload = () => {
     // Vérification de la connexion automatique
