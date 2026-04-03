@@ -1,60 +1,54 @@
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyjAOy5X9-8hIKA14rj_EIWb0dlGIbRzzq-Ge9olyOVbgkCGBH0Hq2XVQI3s7KtYMG8/exec";
 
 window.onload = () => {
-    // Vérification de la connexion automatique
     const savedUser = localStorage.getItem('orgue_user');
     const savedPass = localStorage.getItem('orgue_pass');
-    
-    if(savedUser && savedPass) {
-        showApp();
-    }
+    if(savedUser && savedPass) showApp();
     setInterval(refreshCalendar, 60000);
 };
 
+function togglePassword() {
+    const passInput = document.getElementById('userPass');
+    const toggleIcon = document.querySelector('.toggle-password');
+    if (passInput.type === "password") {
+        passInput.type = "text";
+        toggleIcon.innerText = "🙈";
+    } else {
+        passInput.type = "password";
+        toggleIcon.innerText = "👁️";
+    }
+}
+
 function login() {
-    const emailInput = document.getElementById('userEmail').value;
-    const passInput = document.getElementById('userPass').value;
+    const email = document.getElementById('userEmail').value.toLowerCase().trim();
+    const pass = document.getElementById('userPass').value.trim();
     const remember = document.getElementById('rememberMe').checked;
     const btn = document.getElementById('btnLogin');
 
-    if(!emailInput || !passInput) return alert("Champs vides");
+    if(!email || !pass) return alert("Champs vides");
+    btn.disabled = true; btn.innerText = "Vérification...";
 
-    const email = emailInput.toLowerCase().trim();
-    const pass = passInput.trim();
-
-    btn.disabled = true;
-    btn.innerText = "Connexion en cours...";
-
-    // Utilisation de URLSearchParams pour éviter les erreurs de caractères spéciaux
-    const params = new URLSearchParams({
-        action: 'login',
-        email: email,
-        password: pass
-    });
+    const params = new URLSearchParams({ action: 'login', email: email, password: pass });
 
     fetch(`${SCRIPT_URL}?${params.toString()}`)
-    .then(response => {
-        if (!response.ok) throw new Error('Erreur réseau');
-        return response.json();
-    })
+    .then(r => r.json())
     .then(data => {
         if(data.result === "success") {
-            // On stocke les identifiants
-            localStorage.setItem('orgue_user', email);
-            localStorage.setItem('orgue_pass', pass);
-            // On affiche l'app
-            showApp(); 
+            if(remember) {
+                localStorage.setItem('orgue_user', email);
+                localStorage.setItem('orgue_pass', pass);
+            } else {
+                sessionStorage.setItem('orgue_user', email);
+                sessionStorage.setItem('orgue_pass', pass);
+            }
+            showApp();
         } else {
-            alert("Identifiants incorrects");
-            btn.disabled = false;
-            btn.innerText = "Se connecter";
+            alert("Email ou mot de passe incorrect");
+            btn.disabled = false; btn.innerText = "Se connecter";
         }
-    })
-    .catch(error => {
-        console.error('Erreur:', error);
-        alert("Le serveur ne répond pas. Vérifiez votre connexion.");
-        btn.disabled = false;
-        btn.innerText = "Se connecter";
+    }).catch(() => {
+        alert("Erreur serveur");
+        btn.disabled = false; btn.innerText = "Se connecter";
     });
 }
 
@@ -63,7 +57,7 @@ function getPass() { return localStorage.getItem('orgue_pass') || sessionStorage
 
 function showApp() {
     document.getElementById('loginSection').style.display = 'none';
-    document.getElementById('appSection').style.display = 'block';
+    document.getElementById('appSection').style.display = 'flex';
     document.getElementById('navBar').style.display = 'flex';
 }
 
@@ -91,25 +85,15 @@ function sendReservation() {
     if(!start || !end) return alert("Dates manquantes");
 
     const btn = document.getElementById('btnResa');
-    btn.disabled = true; btn.innerText = "⏳ Vérification...";
+    btn.disabled = true; btn.innerText = "Envoi...";
 
-    const data = { 
-        action: "reserve", 
-        email: getUser(), 
-        password: getPass(), 
-        start: start, 
-        end: end 
-    };
+    const data = { action: "reserve", email: getUser(), password: getPass(), start: start, end: end };
 
     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(data) })
     .then(r => r.json())
     .then(res => {
         if(res.result === "error") alert(res.message);
-        else {
-            alert("Réservé !");
-            closeModals();
-            setTimeout(refreshCalendar, 1500);
-        }
+        else { alert("Réservé !"); closeModals(); setTimeout(refreshCalendar, 1000); }
         btn.disabled = false; btn.innerText = "Confirmer";
     });
 }
@@ -117,36 +101,19 @@ function sendReservation() {
 function showMyEvents() {
     openModal('modalListe');
     const listDiv = document.getElementById('mesEventsList');
-    listDiv.innerHTML = "Recherche...";
-    
+    listDiv.innerHTML = "Chargement...";
     fetch(`${SCRIPT_URL}?action=list&email=${getUser()}&password=${getPass()}`)
     .then(r => r.json())
     .then(data => {
-        if(!data.events || data.events.length === 0) {
-            listDiv.innerHTML = "Aucun cours réservé."; return;
-        }
-        listDiv.innerHTML = data.events.map(ev => `
-            <div class="event-item">
-                <span>${ev.start}</span>
-                <button class="btn-del" onclick="deleteEvent('${ev.id}')">Suppr.</button>
-            </div>
-        `).join('');
+        if(!data.events || data.events.length === 0) listDiv.innerHTML = "Aucun cours.";
+        else listDiv.innerHTML = data.events.map(ev => `<div class="event-item"><span>${ev.start}</span><button class="btn-del" onclick="deleteEvent('${ev.id}')">Suppr.</button></div>`).join('');
     });
 }
 
 function deleteEvent(id) {
-    if(!confirm("Supprimer ce créneau ?")) return;
+    if(!confirm("Supprimer ?")) return;
     const data = { action: "delete", id: id, email: getUser(), password: getPass() };
-    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(data) })
-    .then(() => {
-        alert("Supprimé !");
-        closeModals();
-        setTimeout(refreshCalendar, 1500);
-    });
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(data) }).then(() => { closeModals(); setTimeout(refreshCalendar, 1000); });
 }
 
-function logout() {
-    localStorage.clear();
-    sessionStorage.clear();
-    location.reload();
-}
+function logout() { localStorage.clear(); sessionStorage.clear(); location.reload(); }
