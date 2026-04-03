@@ -1,36 +1,43 @@
-:root { --primary: #2c3e50; --accent: #007aff; --mine: #ff9500; --danger: #ff3b30; --bg: #f2f2f7; --card: #ffffff; }
-body { margin: 0; font-family: -apple-system, sans-serif; background: var(--bg); color: #1c1c1e; overflow-x: hidden; }
+:root { --primary: #1d1d1f; --accent: #0071e3; --mine: #ff9500; --other: #f5f5f7; --danger: #ff3b30; --border: #e5e5e7; }
+body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #fff; color: var(--primary); }
 
 /* LOGIN */
-.login-container { display: flex; justify-content: center; align-items: center; height: 100vh; }
-.login-card { background: var(--card); padding: 40px 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); width: 90%; max-width: 350px; text-align: center; }
-input { width: 100%; padding: 14px; margin: 10px 0; border: 1px solid #d1d1d6; border-radius: 12px; font-size: 16px; box-sizing: border-box; }
+.login-container { display: flex; justify-content: center; align-items: center; height: 100vh; background: #f5f5f7; }
+.login-card { background: #fff; padding: 40px 30px; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.05); width: 90%; max-width: 350px; text-align: center; }
+input { width: 100%; padding: 14px; margin: 10px 0; border: 1px solid var(--border); border-radius: 12px; font-size: 16px; box-sizing: border-box; }
 .password-group { position: relative; }
-.toggle-password { position: absolute; right: 12px; top: 22px; cursor: pointer; opacity: 0.5; }
-button { width: 100%; padding: 16px; background: var(--accent); color: white; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; margin-top: 15px; }
-.status-msg { margin-top: 10px; font-size: 14px; min-height: 1.2em; }
-.forgot-link { margin-top: 20px; font-size: 13px; color: #8e8e93; cursor: pointer; }
+.toggle-password { position: absolute; right: 14px; top: 24px; cursor: pointer; opacity: 0.4; }
+button { width: 100%; padding: 16px; background: var(--accent); color: white; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; font-size: 16px; }
 
-/* APP & HEADER */
-.header { background: var(--card); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #d1d1d6; position: sticky; top:0; z-index:100; }
-.btn-logout { width: auto; padding: 6px 12px; font-size: 12px; background: #8e8e93; margin: 0; }
+/* APP HEADER */
+.header { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.header span { font-size: 20px; font-weight: 700; }
+.btn-logout { width: auto; padding: 8px 15px; font-size: 12px; background: #8e8e93; margin: 0; border-radius: 8px; }
 
-/* CALENDAR CUSTOM */
-#calendar { background: white; margin: 10px; padding: 10px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-.fc-toolbar-title { font-size: 1.1rem !important; font-weight: 700; }
-.fc-button { background: #e9e9eb !important; border: none !important; color: var(--primary) !important; border-radius: 8px !important; font-weight: 600 !important; font-size: 12px !important; }
+/* CALENDAR MODERN LOOK */
+#calendar { margin: 10px; border: none; }
+.fc-theme-standard td, .fc-theme-standard th { border: 1px solid #f9f9fb !important; }
+.fc-scrollgrid { border: none !important; }
+
+/* TOOLBAR ALIGN RIGHT */
+.fc-toolbar-chunk:last-child { display: flex; gap: 4px; }
+.fc-button { background: #f5f5f7 !important; border: none !important; color: var(--primary) !important; border-radius: 10px !important; font-weight: 600 !important; font-size: 12px !important; padding: 8px 12px !important; }
 .fc-button-active { background: var(--primary) !important; color: white !important; }
-.fc-v-event { border: none !important; border-radius: 8px !important; box-shadow: 0 2px 5px rgba(0,0,0,0.1); padding: 2px; }
+
+/* EVENTS */
+.fc-v-event { border: none !important; border-radius: 10px !important; padding: 4px !important; box-shadow: 0 4px 6px rgba(0,0,0,0.03); background-color: var(--other) !important; color: var(--primary) !important; }
+.fc-event-mine { background-color: var(--mine) !important; color: white !important; }
+.fc-event-title-custom { font-size: 12px; font-weight: 600; padding-right: 20px; overflow: hidden; text-overflow: ellipsis; }
 
 /* BOUTON X */
-.delete-event-btn { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; background: rgba(255,255,255,0.3); border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: white; cursor: pointer; z-index: 20; }
+.delete-event-btn { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; background: rgba(0,0,0,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: white; cursor: pointer; z-index: 10; }
 .delete-event-btn:hover { background: var(--danger); }
 
-/* MODALES & POPUPS */
-.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 2000; }
-.modal-content { background: white; padding: 25px; border-radius: 20px; width: 85%; max-width: 350px; }
-.popup-info { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--primary); color: white; padding: 25px; border-radius: 15px; display: none; z-index: 2001; text-align: center; }
+/* MODALES */
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); display: none; align-items: center; justify-content: center; z-index: 2000; }
+.modal-content { background: white; padding: 30px; border-radius: 24px; width: 85%; max-width: 350px; box-shadow: 0 20px 60px rgba(0,0,0,0.1); }
+.popup-info { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--primary); color: white; padding: 25px; border-radius: 20px; display: none; z-index: 2001; text-align: center; }
 .time-row { display: flex; gap: 10px; }
-.modal-buttons button { margin-top: 10px; }
+.modal-buttons { display: flex; flex-direction: column; gap: 8px; margin-top: 15px; }
 .btn-cancel { background: #8e8e93; }
-.btn-close-popup { background: rgba(255,255,255,0.2); border: none; color: white; padding: 10px; border-radius: 8px; cursor: pointer; margin-top: 15px; }
+.btn-close-popup { background: rgba(255,255,255,0.2); border: none; color: white; padding: 10px; border-radius: 10px; margin-top: 15px; width: 100%; }
