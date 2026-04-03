@@ -1,49 +1,91 @@
-:root { --primary: #2c3e50; --accent: #27ae60; --bg: #f4f7f6; }
-
-body { 
-  font-family: -apple-system, system-ui, sans-serif; 
-  margin: 0; background: var(--bg); color: #333; 
-  height: 100vh; display: flex; flex-direction: column; overflow: hidden; 
+:root {
+    --primary: #2c3e50;
+    --accent: #27ae60;
+    --bg: #f4f7f6;
 }
 
-.header { 
-  background: var(--primary); 
-  padding: env(safe-area-inset-top) 20px 15px 20px; 
-  text-align: center; color: white; font-weight: bold; 
+/* On s'assure que le fond ne crée pas de bandes blanches */
+html, body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg);
+    height: 100%;
+    width: 100%;
+    overflow: hidden; /* Empêche le rebond bizarre sur iOS */
 }
 
-.container { padding: 15px; flex: 1; overflow-y: auto; }
-
-.card { 
-  background: white; padding: 20px; border-radius: 20px; 
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 15px; 
+.header {
+    background: var(--primary);
+    color: white;
+    padding: env(safe-area-inset-top) 20px 15px 20px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 1.1rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
-input { 
-  width: 100%; padding: 12px; margin: 8px 0; 
-  border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; 
-  font-size: 16px; 
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
-button { 
-  width: 100%; background: var(--accent); color: white; 
-  border: none; padding: 15px; border-radius: 12px; 
-  font-size: 16px; font-weight: bold; cursor: pointer; 
-}
-
-.btn-secondary { background: #95a5a6; margin-top: 20px; }
-
+/* L'AGENDA : Bord à bord total */
 .calendar-container {
     height: 60vh;
     min-height: 400px;
-    width: 100%; 
-    border-radius: 0px; 
-    overflow: hidden;
-    /* Ajouts pour la fluidité Safari */
-    -webkit-overflow-scrolling: touch; 
-    border-bottom: 1px solid #ddd; 
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: white;
+    border-bottom: 1px solid #ddd;
 }
 
-iframe { width: 100%; height: 100%; border: none; }
+iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block; /* Supprime l'espace résiduel sous l'iframe */
+}
+
+/* LE FORMULAIRE : On remet des marges ici */
+.card {
+    background: white;
+    padding: 20px;
+    margin: 20px 15px; /* 20px haut/bas, 15px gauche/droite */
+    border-radius: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+h2 { margin-top: 0; font-size: 1.2rem; color: var(--primary); }
+label { display: block; margin-top: 10px; font-size: 0.9rem; color: #666; }
+
+input {
+    width: 100%;
+    padding: 12px;
+    margin: 8px 0;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    box-sizing: border-box;
+    font-size: 16px;
+}
+
+button {
+    width: 100%;
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 15px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: bold;
+    margin-top: 10px;
+}
+
+.btn-secondary { background: #95a5a6; margin-bottom: 40px; }
 
 #status { text-align: center; margin-top: 10px; font-weight: bold; }
