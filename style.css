@@ -1,276 +1,52 @@
-/* ==========================================================================
-   1. VARIABLES ET CONFIGURATION DE BASE
-   ========================================================================== */
 :root { 
-    --primary: #2c3e50;    /* Bleu nuit (Header/Texte) */
-    --accent: #27ae60;     /* Vert (Boutons/Validation) */
-    --danger: #ff7675;     /* Rouge (Suppression) */
-    --bg: #f4f7f6;         /* Gris clair (Fond) */
-    --white: #ffffff;
-    --border: #dddddd;
+    --primary: #2c3e50; --accent: #27ae60; --danger: #ff7675; --bg: #f4f7f6; --white: #ffffff; --border: #dddddd;
 }
 
 html, body { 
-    height: 100%; 
-    margin: 0; 
-    padding: 0; 
-    overflow: hidden; /* Empêche le scroll parasite sur mobile */
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg);
-    width: 100%;
-    position: fixed; /* Bloque l'écran pour une sensation d'app native */
+    height: 100%; margin: 0; padding: 0; overflow: hidden; font-family: sans-serif; background: var(--bg); width: 100%; position: fixed;
 }
 
-/* ==========================================================================
-   2. MISE EN PAGE GÉNÉRALE (LAYOUT)
-   ========================================================================== */
 .header { 
-    height: 50px; 
-    background: var(--primary); 
-    color: var(--white); 
-    display: flex; 
-    align-items: center; 
-    justify-content: space-between; 
-    padding: 0 15px; 
-    font-weight: bold;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    height: 50px; background: var(--primary); color: var(--white); display: flex; align-items: center; justify-content: space-between; padding: 0 15px; font-weight: bold;
 }
 
-.icon-refresh {
-    fill: white;
-    width: 24px;
-    height: 24px;
-    cursor: pointer;
+.container { height: calc(100% - 50px); width: 100%; display: flex; flex-direction: column; }
+#appSection { height: calc(100% - 75px); display: flex; flex-direction: column; width: 100%; }
+.calendar-container { flex: 1; width: 100%; position: relative; background: var(--white); }
+iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+.help-link { height: 25px; text-align: center; font-size: 11px; background: var(--white); line-height: 25px; }
+
+/* Formulaires */
+.card { background: var(--white); padding: 25px; border-radius: 15px; margin: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+label { display: block; font-size: 13px; font-weight: bold; color: var(--primary); margin-top: 12px; margin-bottom: 4px; }
+input, select { 
+    width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 16px; box-sizing: border-box; outline: none; background-color: white;
 }
 
-.container { 
-    height: calc(100% - 50px); 
-    width: 100%; 
-    display: flex; 
-    flex-direction: column; 
-}
+/* Style spécifique pour les menus Heure/Minutes */
+.time-select-row { display: flex; gap: 15px; margin-top: 5px; }
+.time-group { flex: 1; }
+.select-pair { display: flex; gap: 5px; }
+.select-pair select { flex: 1; padding: 10px 5px; text-align: center; }
 
-/* Zone principale de l'application */
-#appSection { 
-    height: calc(100% - 75px); /* Espace restant après la barre de navigation */
-    display: flex; 
-    flex-direction: column; 
-    width: 100%; 
-}
-
-/* ==========================================================================
-   3. CALENDRIER (IFRAME)
-   ========================================================================== */
-.calendar-container { 
-    flex: 1; 
-    width: 100%; 
-    position: relative; 
-    background: var(--white); 
-}
-
-iframe { 
-    position: absolute; 
-    top: 0; 
-    left: 0; 
-    width: 100%; 
-    height: 100%; 
-    border: none; 
-}
-
-.help-link { 
-    height: 25px; 
-    text-align: center; 
-    font-size: 11px; 
-    background: var(--white); 
-    line-height: 25px; 
-}
-
-.help-link a { 
-    color: var(--primary); 
-    text-decoration: none; 
-    opacity: 0.6; 
-}
-
-/* ==========================================================================
-   4. FORMULAIRES ET CARTES (LOGIN / RÉSERVATION)
-   ========================================================================== */
-.card { 
-    background: var(--white); 
-    padding: 25px; 
-    border-radius: 15px; 
-    margin: 20px; 
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
-}
-
-label {
-    display: block;
-    font-size: 13px;
-    font-weight: bold;
-    color: var(--primary);
-    margin-top: 10px;
-}
-
-input { 
-    width: 100%; 
-    padding: 12px; 
-    margin: 8px 0; 
-    border: 1px solid var(--border); 
-    border-radius: 10px; 
-    font-size: 16px; 
-    box-sizing: border-box; 
-    outline: none; 
-}
-
-input:focus {
-    border-color: var(--accent);
-}
-
-/* Conteneur spécial pour le mot de passe avec l'œil */
-.password-container { 
-    position: relative; 
-    width: 100%; 
-}
-
-.password-container input { 
-    padding-right: 45px; /* Laisse de la place pour l'icône */
-}
-
-.toggle-password { 
-    position: absolute; 
-    right: 12px; 
-    top: 50%; 
-    transform: translateY(-50%); 
-    cursor: pointer; 
-    width: 24px; 
-    height: 24px; 
-    display: flex; 
-    align-items: center; 
-    opacity: 0.5; 
-    z-index: 2;
-}
-
-.toggle-password svg { 
-    fill: var(--primary); 
-    width: 20px; 
-    height: 20px; 
-}
-
-.remember-box { 
-    display: flex; 
-    align-items: center; 
-    margin: 15px 0; 
-    font-size: 14px; 
-}
-
-.remember-box input { 
-    width: 20px; 
-    margin: 0 10px 0 0; 
-}
+/* Navigation Tab Bar */
+.tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 75px; background: var(--white); display: flex; justify-content: space-around; align-items: center; border-top: 1px solid var(--border); padding-bottom: env(safe-area-inset-bottom); }
+.tab-item { background: none; border: none; font-size: 11px; color: var(--primary); display: flex; flex-direction: column; align-items: center; width: 33%; }
+.tab-item svg { fill: var(--primary); width: 24px; height: 24px; margin-bottom: 4px; }
+.tab-item-add { color: var(--accent); font-weight: bold; }
+.tab-item-add svg { fill: var(--accent); width: 30px; height: 30px; }
 
 /* Boutons */
-button { 
-    width: 100%; 
-    background: var(--accent); 
-    color: var(--white); 
-    border: none; 
-    padding: 15px; 
-    border-radius: 12px; 
-    font-weight: bold; 
-    font-size: 16px; 
-    margin-top: 10px; 
-    cursor: pointer;
-    transition: opacity 0.2s;
-}
-
-button:active { opacity: 0.8; }
-button:disabled { background: #ccc; cursor: not-allowed; }
-
+button { width: 100%; background: var(--accent); color: var(--white); border: none; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 16px; margin-top: 10px; cursor: pointer; }
 .btn-secondary { background: #95a5a6; }
 
-/* ==========================================================================
-   5. NAVIGATION BASSE (TAB BAR)
-   ========================================================================== */
-.tab-bar { 
-    position: fixed; 
-    bottom: 0; 
-    left: 0; 
-    right: 0; 
-    height: 75px; 
-    background: var(--white); 
-    display: flex; 
-    justify-content: space-around; 
-    align-items: center; 
-    border-top: 1px solid var(--border); 
-    padding-bottom: env(safe-area-inset-bottom); /* Support iPhone avec encoche */
-}
+/* Modaux */
+.modal { position: fixed; bottom: 75px; left: 0; right: 0; background: var(--white); padding: 20px; border-radius: 20px 20px 0 0; display: none; z-index: 100; border-top: 3px solid var(--accent); box-shadow: 0 -5px 20px rgba(0,0,0,0.15); max-height: 80vh; overflow-y: auto; }
+.event-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; }
+.btn-del { background: var(--danger); width: auto; padding: 6px 12px; font-size: 12px; margin: 0; }
 
-.tab-item { 
-    background: none; 
-    border: none; 
-    font-size: 11px; 
-    color: var(--primary); 
-    display: flex; 
-    flex-direction: column; 
-    align-items: center; 
-    padding: 0; 
-    width: 33%;
-}
-
-.tab-item svg { 
-    fill: var(--primary); 
-    width: 24px; 
-    height: 24px; 
-    margin-bottom: 4px; 
-}
-
-.tab-item-add { 
-    color: var(--accent); 
-    font-weight: bold; 
-}
-
-.tab-item-add svg { 
-    fill: var(--accent); 
-    width: 30px; 
-    height: 30px; 
-}
-
-/* ==========================================================================
-   6. MODAUX ET LISTES
-   ========================================================================== */
-.modal { 
-    position: fixed; 
-    bottom: 75px; 
-    left: 0; 
-    right: 0; 
-    background: var(--white); 
-    padding: 20px; 
-    border-radius: 20px 20px 0 0; 
-    display: none; 
-    z-index: 100; 
-    border-top: 3px solid var(--accent);
-    box-shadow: 0 -5px 20px rgba(0,0,0,0.15);
-    max-height: 80vh;
-    overflow-y: auto;
-}
-
-.event-item { 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center;
-    padding: 12px; 
-    border-bottom: 1px solid #eee; 
-}
-
-.event-item span {
-    font-size: 14px;
-    color: var(--primary);
-}
-
-.btn-del { 
-    background: var(--danger); 
-    width: auto; 
-    padding: 6px 12px; 
-    font-size: 12px; 
-    margin: 0; 
-    border-radius: 8px;
-}
+/* Password Eye Icon */
+.password-container { position: relative; width: 100%; }
+.password-container input { padding-right: 45px; }
+.toggle-password { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; width: 24px; height: 24px; display: flex; align-items: center; opacity: 0.5; }
+.toggle-password svg { fill: var(--primary); width: 20px; height: 20px; }
