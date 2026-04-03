@@ -1,4 +1,5 @@
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwk8lxyTHBFKIsFybMLH-E861B6rRDTj5VvVTbvpq2Q3tE3FPcp8r8esyGz2nl_cZE3/exec";
+
 window.onload = () => {
     const user = localStorage.getItem('orgue_user') || sessionStorage.getItem('orgue_user');
     if(user) showApp();
@@ -7,13 +8,8 @@ window.onload = () => {
 function togglePassword() {
     const passInput = document.getElementById('userPass');
     const eyeBtn = document.querySelector('.eye-btn');
-    if (passInput.type === "password") {
-        passInput.type = "text";
-        eyeBtn.style.opacity = "1";
-    } else {
-        passInput.type = "password";
-        eyeBtn.style.opacity = "0.5";
-    }
+    passInput.type = (passInput.type === "password") ? "text" : "password";
+    eyeBtn.style.opacity = (passInput.type === "text") ? "1" : "0.5";
 }
 
 async function login() {
@@ -22,13 +18,12 @@ async function login() {
     const remember = document.getElementById('rememberMe').checked;
     const btn = document.getElementById('btnLogin');
 
-    if(!email || !pass) return alert("Veuillez remplir les champs.");
+    if(!email || !pass) return alert("Champs vides.");
     btn.disabled = true; btn.innerText = "Connexion...";
 
     try {
         const resp = await fetch(`${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`);
         const data = await resp.json();
-
         if(data.result === "success") {
             const storage = remember ? localStorage : sessionStorage;
             storage.setItem('orgue_user', email);
@@ -36,11 +31,11 @@ async function login() {
             localStorage.setItem('orgue_name', data.name);
             showApp();
         } else {
-            alert("Identifiants incorrects.");
+            alert("Erreur d'identification.");
             btn.disabled = false; btn.innerText = "Se connecter";
         }
     } catch(e) {
-        alert("Erreur de connexion au serveur.");
+        alert("Erreur serveur.");
         btn.disabled = false; btn.innerText = "Se connecter";
     }
 }
@@ -54,7 +49,6 @@ function showApp() {
 function prepareReservation() {
     document.getElementById('eventTitle').value = localStorage.getItem('orgue_name') || "";
     document.getElementById('resDay').value = new Date().toISOString().split('T')[0];
-    
     const hSels = [document.getElementById('startH'), document.getElementById('endH')];
     hSels.forEach(s => {
         s.innerHTML = "";
@@ -69,16 +63,10 @@ function prepareReservation() {
 async function sendReservation() {
     const title = document.getElementById('eventTitle').value;
     const day = document.getElementById('resDay').value;
-    const startH = document.getElementById('startH').value;
-    const startM = document.getElementById('startM').value;
-    const endH = document.getElementById('endH').value;
-    const endM = document.getElementById('endM').value;
-
-    const start = new Date(`${day}T${startH}:${startM}:00`);
-    const end = new Date(`${day}T${endH}:${endM}:00`);
+    const start = new Date(`${day}T${document.getElementById('startH').value}:${document.getElementById('startM').value}:00`);
+    const end = new Date(`${day}T${document.getElementById('endH').value}:${document.getElementById('endM').value}:00`);
 
     if(end <= start) return alert("L'heure de fin doit être après le début.");
-
     const btn = document.getElementById('btnResa');
     btn.disabled = true; btn.innerText = "Envoi...";
 
@@ -92,11 +80,8 @@ async function sendReservation() {
     try {
         const r = await fetch(`${SCRIPT_URL}?${params.toString()}`);
         const res = await r.json();
-        if(res.result === "success") { 
-            alert("Réservé !"); 
-            closeModals(); 
-            refreshCalendar(); 
-        } else alert(res.message);
+        if(res.result === "success") { alert("Réservé !"); closeModals(); refreshCalendar(); }
+        else alert(res.message);
     } catch(e) { alert("Erreur réseau"); }
     btn.disabled = false; btn.innerText = "Confirmer";
 }
@@ -108,19 +93,37 @@ function showMyEvents() {
     const email = localStorage.getItem('orgue_user') || sessionStorage.getItem('orgue_user');
     const pass = localStorage.getItem('orgue_pass') || sessionStorage.getItem('orgue_pass');
     
-    fetch(`${SCRIPT_URL}?action=list&email=${email}&password=${pass}`)
+    fetch(`${SCRIPT_URL}?action=list&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`)
     .then(r => r.json()).then(data => {
-        if(!data.events || data.events.length === 0) listDiv.innerHTML = "Aucun cours.";
-        else listDiv.innerHTML = data.events.map(ev => `<div style="display:flex; justify-content:space-between; margin-bottom:10px; padding:10px; border-bottom:1px solid #eee;"><span>${ev.start}</span> <button style="width:auto; padding:5px 10px; font-size:12px; background:#e74c3c" onclick="deleteEvent('${ev.id}')">Suppr.</button></div>`).join('');
+        if(!data.events || data.events.length === 0) {
+            listDiv.innerHTML = "<p style='text-align:center; padding:10px;'>Aucun cours.</p>";
+        } else {
+            listDiv.innerHTML = data.events.map(ev => `
+                <div class="event-item-card">
+                    <div class="event-info">
+                        <strong>${ev.title}</strong><br>
+                        <span>${ev.date} | ${ev.start} - ${ev.end}</span>
+                    </div>
+                    <button class="btn-del" onclick="deleteEvent('${ev.id}')">Suppr.</button>
+                </div>
+            `).join('');
+        }
     });
 }
 
-function deleteEvent(id) {
+async function deleteEvent(id) {
     if(!confirm("Supprimer cette réservation ?")) return;
     const email = localStorage.getItem('orgue_user') || sessionStorage.getItem('orgue_user');
     const pass = localStorage.getItem('orgue_pass') || sessionStorage.getItem('orgue_pass');
-    fetch(`${SCRIPT_URL}?action=delete&id=${id}&email=${email}&password=${pass}`)
-    .then(() => { closeModals(); refreshCalendar(); });
+    
+    try {
+        const resp = await fetch(`${SCRIPT_URL}?action=delete&id=${encodeURIComponent(id)}&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`);
+        const res = await resp.json();
+        if(res.result === "success") {
+            showMyEvents();
+            refreshCalendar();
+        } else { alert("Erreur : " + res.message); }
+    } catch(e) { alert("Erreur réseau."); }
 }
 
 function closeModals() { document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); }
