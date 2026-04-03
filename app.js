@@ -55,14 +55,13 @@ function initCalendar() {
     const name = localStorage.getItem('orgue_name');
     const calendarEl = document.getElementById('calendar');
 
-    if (!calendarEl) return;
-
     calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'timeGridWeek',
         locale: 'fr',
         slotMinTime: '08:00:00',
         slotMaxTime: '22:00:00',
-        height: 'calc(100vh - 120px)',
+        slotLabelFormat: { hour: '2-digit', minute: '2-digit', meridiem: false }, // Format HH:mm
+        height: 'calc(100vh - 100px)',
         allDaySlot: false,
         selectable: true,
         editable: true,
@@ -71,9 +70,9 @@ function initCalendar() {
         headerToolbar: {
             left: 'title',
             center: '',
-            right: 'today prev,next dayGridMonth,timeGridWeek,timeGridDay'
+            right: 'today prev,next dayGridMonth,timeGridWeek'
         },
-        buttonText: { today: "Auj.", month: "Mois", week: "Sem.", day: "Jour" },
+        buttonText: { today: "Auj.", month: "Mois", week: "Sem." },
         events: `${SCRIPT_URL}?action=getEvents&email=${email}&password=${pass}`,
 
         eventDrop: (info) => handleSync(info),
@@ -86,7 +85,6 @@ function initCalendar() {
             title.className = 'fc-event-title-custom';
             nodes.push(title);
 
-            // On vérifie si l'événement appartient à l'utilisateur
             if (arg.event.extendedProps && arg.event.extendedProps.mine) {
                 let x = document.createElement('div');
                 x.innerHTML = '✕';
@@ -103,7 +101,6 @@ function initCalendar() {
             return { domNodes: nodes };
         },
 
-        // LA CORRECTION CRUCIALE : Ajout de vérifications de sécurité
         eventDidMount: function(arg) {
             if (arg && arg.el && arg.event && arg.event.extendedProps && arg.event.extendedProps.mine) {
                 arg.el.classList.add('fc-event-mine');
