@@ -55,6 +55,8 @@ function initCalendar() {
     const name = localStorage.getItem('orgue_name');
     const calendarEl = document.getElementById('calendar');
 
+    if (!calendarEl) return;
+
     calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'timeGridWeek',
         locale: 'fr',
@@ -77,7 +79,6 @@ function initCalendar() {
         eventDrop: (info) => handleSync(info),
         eventResize: (info) => handleSync(info),
 
-        // Génère le contenu interne (Texte + Bouton X)
         eventContent: function(arg) {
             let nodes = [];
             let title = document.createElement('div');
@@ -85,7 +86,8 @@ function initCalendar() {
             title.className = 'fc-event-title-custom';
             nodes.push(title);
 
-            if (arg.event.extendedProps.mine) {
+            // On vérifie si l'événement appartient à l'utilisateur
+            if (arg.event.extendedProps && arg.event.extendedProps.mine) {
                 let x = document.createElement('div');
                 x.innerHTML = '✕';
                 x.className = 'delete-event-btn';
@@ -101,16 +103,16 @@ function initCalendar() {
             return { domNodes: nodes };
         },
 
-        // Correction de l'erreur : On attend que l'élément soit monté pour ajouter la classe
+        // LA CORRECTION CRUCIALE : Ajout de vérifications de sécurité
         eventDidMount: function(arg) {
-            if (arg.event.extendedProps.mine) {
+            if (arg && arg.el && arg.event && arg.event.extendedProps && arg.event.extendedProps.mine) {
                 arg.el.classList.add('fc-event-mine');
             }
         },
 
         eventClick: function(info) {
             currentEvent = info.event;
-            if (info.event.extendedProps.mine) {
+            if (info.event.extendedProps && info.event.extendedProps.mine) {
                 document.getElementById('editTitle').value = info.event.title;
                 document.getElementById('editStart').value = info.event.start.toTimeString().substring(0,5);
                 document.getElementById('editEnd').value = info.event.end.toTimeString().substring(0,5);
@@ -138,7 +140,7 @@ function initCalendar() {
 }
 
 async function handleSync(info) {
-    if (!info.event.extendedProps.mine) return info.revert();
+    if (!info.event.extendedProps || !info.event.extendedProps.mine) return info.revert();
     const email = localStorage.getItem('orgue_user');
     const pass = localStorage.getItem('orgue_pass');
     await fetch(`${SCRIPT_URL}?action=delete&id=${info.event.id}&email=${email}&password=${pass}`);
@@ -175,6 +177,5 @@ function logout() {
 }
 
 window.addEventListener('load', () => {
-    console.log("App chargée.");
     if(localStorage.getItem('orgue_user')) showApp();
 });
