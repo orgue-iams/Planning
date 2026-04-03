@@ -205,3 +205,10 @@ button {
 
 /* --- MOBILE OPTIMIZATION --- */
 @media (max-width: 600px) {
+    .fc-header-toolbar {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .fc-toolbar-title { font-size: 1.1rem !important; }
+}
