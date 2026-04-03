@@ -1,4 +1,4 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyfUgkPbQofGALRfUHRSU-1UPLPOevxiUyt6HH63C2EmroZO0dMRACSl1hoUZCaFoc/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyEx-IN2xJe6lZN5XFRNHzckoK_TeffDL6y8xu28Q_HrRb5-DmybIGKRKrFtU1i07QJ/exec"; 
 
 window.onload = () => {
     const user = localStorage.getItem('orgue_user') || sessionStorage.getItem('orgue_user');
@@ -17,10 +17,8 @@ async function login() {
     const pass = document.getElementById('userPass').value.trim();
     const remember = document.getElementById('rememberMe').checked;
     const btn = document.getElementById('btnLogin');
-
     if(!email || !pass) return alert("Champs vides.");
     btn.disabled = true; btn.innerText = "Connexion...";
-
     try {
         const resp = await fetch(`${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`);
         const data = await resp.json();
@@ -65,34 +63,24 @@ async function sendReservation() {
     const day = document.getElementById('resDay').value;
     const start = new Date(`${day}T${document.getElementById('startH').value}:${document.getElementById('startM').value}:00`);
     const end = new Date(`${day}T${document.getElementById('endH').value}:${document.getElementById('endM').value}:00`);
-
     if(end <= start) return alert("L'heure de fin doit être après le début.");
-    
     const btn = document.getElementById('btnResa');
     btn.disabled = true; btn.innerText = "Envoi...";
-
     const params = new URLSearchParams({
         action: "reserve",
         email: localStorage.getItem('orgue_user') || sessionStorage.getItem('orgue_user'),
         password: localStorage.getItem('orgue_pass') || sessionStorage.getItem('orgue_pass'),
         title: title, start: start.toISOString(), end: end.toISOString()
     });
-
     try {
         const r = await fetch(`${SCRIPT_URL}?${params.toString()}`);
         const res = await r.json();
-        
         if(res.result === "success") { 
-            closeModals(); // On ferme tout de suite
+            closeModals();
             refreshCalendar();
-            setTimeout(() => { alert("Réservation confirmée !"); }, 500);
-        } else { 
-            alert(res.message); 
-        }
-    } catch(e) { 
-        alert("La requête a pris trop de temps, mais vérifiez le calendrier car elle a pu passer."); 
-    }
-    
+            setTimeout(() => { refreshCalendar(); }, 1500);
+        } else { alert(res.message); }
+    } catch(e) { alert("Erreur réseau."); }
     btn.disabled = false; btn.innerText = "Confirmer";
 }
 
@@ -102,7 +90,6 @@ function showMyEvents() {
     document.getElementById('modalListe').style.display = 'block';
     const email = localStorage.getItem('orgue_user') || sessionStorage.getItem('orgue_user');
     const pass = localStorage.getItem('orgue_pass') || sessionStorage.getItem('orgue_pass');
-    
     fetch(`${SCRIPT_URL}?action=list&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`)
     .then(r => r.json()).then(data => {
         if(!data.events || data.events.length === 0) {
@@ -125,14 +112,11 @@ async function deleteEvent(id) {
     if(!confirm("Supprimer cette réservation ?")) return;
     const email = localStorage.getItem('orgue_user') || sessionStorage.getItem('orgue_user');
     const pass = localStorage.getItem('orgue_pass') || sessionStorage.getItem('orgue_pass');
-    
     try {
         const resp = await fetch(`${SCRIPT_URL}?action=delete&id=${encodeURIComponent(id)}&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`);
         const res = await resp.json();
-        if(res.result === "success") {
-            showMyEvents();
-            refreshCalendar();
-        } else { alert("Erreur : " + res.message); }
+        if(res.result === "success") { showMyEvents(); refreshCalendar(); }
+        else { alert("Erreur : " + res.message); }
     } catch(e) { alert("Erreur réseau."); }
 }
 
