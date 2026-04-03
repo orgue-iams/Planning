@@ -1,4 +1,4 @@
-const SCRIPT_URL = "TON_URL_APPS_SCRIPT";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbtervtORATCnDZ02BYj0nKg4LHGyl_HjMjKcOXBBB3VvMtQWBcZe0SI5l8DBXSpT6/exec";
 
 window.onload = () => {
     const savedUser = localStorage.getItem('orgue_user');
