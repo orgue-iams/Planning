@@ -1,4 +1,4 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw7Cy5TDwRIwtPyUvW4JTo6SzU7RaGWI9Fg0nq9vFnSAxpKoEriOTpk_pmuePC0RHtI/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbydyjV32O31ZziVt4CtewqPw6U_szswgWwt8HKbv6vsjycjO0u10I8TKbe1-t98w-wE/execI";
 let calendar;
 let currentEvent = null;
 
@@ -9,31 +9,35 @@ function togglePass() {
 
 function showMsg(text, isError = true) {
     const el = document.getElementById('loginMessage');
-    el.innerText = text; el.style.color = isError ? "#e74c3c" : "#27ae60";
+    el.innerText = text; el.style.color = isError ? "#ff3b30" : "#34c759";
 }
 
 async function login() {
     const email = document.getElementById('userEmail').value.trim().toLowerCase();
     const pass = document.getElementById('userPass').value.trim();
-    if(!email || !pass) return showMsg("Champs vides");
+    if(!email || !pass) return showMsg("Veuillez remplir les champs");
     showMsg("Connexion...");
-    const resp = await fetch(`${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`);
-    const data = await resp.json();
-    if(data.result === "success") {
-        localStorage.setItem('orgue_user', email);
-        localStorage.setItem('orgue_pass', pass);
-        localStorage.setItem('orgue_name', data.name);
-        showApp();
-    } else { showMsg(data.message); }
+    try {
+        const resp = await fetch(`${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`);
+        const data = await resp.json();
+        if(data.result === "success") {
+            localStorage.setItem('orgue_user', email);
+            localStorage.setItem('orgue_pass', pass);
+            localStorage.setItem('orgue_name', data.name);
+            showApp();
+        } else { showMsg(data.message); }
+    } catch(e) { showMsg("Erreur serveur"); }
 }
 
 async function forgotPassword() {
     const email = document.getElementById('userEmail').value.trim().toLowerCase();
     if(!email) return showMsg("Saisissez l'email d'abord");
     showMsg("Envoi...", false);
-    const resp = await fetch(`${SCRIPT_URL}?action=forgot&email=${encodeURIComponent(email)}`);
-    const data = await resp.json();
-    showMsg(data.message, data.result === "error");
+    try {
+        const resp = await fetch(`${SCRIPT_URL}?action=forgot&email=${encodeURIComponent(email)}`);
+        const data = await resp.json();
+        showMsg(data.message, data.result === "error");
+    } catch(e) { showMsg("Erreur"); }
 }
 
 function showApp() {
@@ -59,25 +63,25 @@ function initCalendar() {
         eventOverlap: false,
         nowIndicator: true,
         headerToolbar: {
-            left: 'today prev,next',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            left: 'title',
+            center: '',
+            right: 'today prev,next dayGridMonth,timeGridWeek,timeGridDay'
         },
+        buttonText: { today: "Auj.", month: "Mois", week: "Sem.", day: "Jour" },
         events: `${SCRIPT_URL}?action=getEvents&email=${email}&password=${pass}`,
 
-        // DRAG & DROP / RESIZE
-        eventDrop: (info) => handleMove(info),
-        eventResize: (info) => handleMove(info),
+        eventDrop: (info) => handleSync(info),
+        eventResize: (info) => handleSync(info),
 
-        // RENDU DU BOUTON X
         eventContent: function(arg) {
             let nodes = [];
             let title = document.createElement('div');
             title.innerHTML = arg.event.title;
-            title.style.fontWeight = '600';
+            title.className = 'fc-event-title-custom';
             nodes.push(title);
 
             if (arg.event.extendedProps.mine) {
+                arg.event.setProp('classNames', ['fc-event-mine']);
                 let x = document.createElement('div');
                 x.innerHTML = '✕';
                 x.className = 'delete-event-btn';
@@ -91,7 +95,6 @@ function initCalendar() {
             return { domNodes: nodes };
         },
 
-        // CLIC SUR UN CRÉNEAU
         eventClick: function(info) {
             currentEvent = info.event;
             if (info.event.extendedProps.mine) {
@@ -105,7 +108,6 @@ function initCalendar() {
             }
         },
 
-        // RÉSERVATION ZONE VIDE
         select: async function(info) {
             if (info.view.type === 'dayGridMonth') return calendar.changeView('timeGridDay', info.start);
             const params = new URLSearchParams({action: "reserve", email, password: pass, title: name, start: info.start.toISOString(), end: info.end.toISOString()});
@@ -117,7 +119,7 @@ function initCalendar() {
     calendar.render();
 }
 
-async function handleMove(info) {
+async function handleSync(info) {
     if (!info.event.extendedProps.mine) return info.revert();
     const email = localStorage.getItem('orgue_user');
     const pass = localStorage.getItem('orgue_pass');
@@ -132,18 +134,17 @@ async function updateEvent() {
     const pass = localStorage.getItem('orgue_pass');
     await fetch(`${SCRIPT_URL}?action=delete&id=${currentEvent.id}&email=${email}&password=${pass}`);
     const baseDate = currentEvent.start.toISOString().split('T')[0];
-    const finalStart = new Date(`${baseDate}T${document.getElementById('editStart').value}:00`);
-    const finalEnd = new Date(`${baseDate}T${document.getElementById('editEnd').value}:00`);
-    const params = new URLSearchParams({action: "reserve", email, password: pass, title: document.getElementById('editTitle').value, start: finalStart.toISOString(), end: finalEnd.toISOString()});
+    const params = new URLSearchParams({
+        action: "reserve", email, password: pass, 
+        title: document.getElementById('editTitle').value,
+        start: new Date(`${baseDate}T${document.getElementById('editStart').value}:00`).toISOString(),
+        end: new Date(`${baseDate}T${document.getElementById('editEnd').value}:00`).toISOString()
+    });
     await fetch(`${SCRIPT_URL}?${params}`);
     closeModals();
     calendar.refetchEvents();
 }
 
-function closeModals() {
-    document.getElementById('modalEdit').style.display = 'none';
-    document.getElementById('popupView').style.display = 'none';
-}
-
+function closeModals() { document.getElementById('modalEdit').style.display = 'none'; document.getElementById('popupView').style.display = 'none'; }
 function logout() { localStorage.clear(); location.reload(); }
 window.onload = () => { if(localStorage.getItem('orgue_user')) showApp(); };
