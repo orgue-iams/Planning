@@ -26,14 +26,10 @@
 
     <div id="appSection" style="display:none;">
         <div class="header-app">
-            <span>Planning Orgue</span>
-            <div class="header-right">
-                <select id="viewSelector" class="view-dropdown" onchange="changeView(this.value)">
-                    <option value="timeGridWeek">Semaine</option>
-                    <option value="dayGridMonth">Mois</option>
-                </select>
-                <button class="btn-logout" onclick="logout()">Quitter</button>
-            </div>
+            <span class="app-title">Planning Orgue</span>
+            <button class="btn-logout-icon" onclick="logout()" title="Quitter">
+                <svg viewBox="0 0 24 24" width="24" height="24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" fill="#5f6368"/></svg>
+            </button>
         </div>
         <div id="calendar"></div>
     </div>
