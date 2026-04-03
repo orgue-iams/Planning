@@ -61,6 +61,7 @@ function initCalendar() {
         slotMinTime: '08:00:00',
         slotMaxTime: '22:00:00',
         slotLabelFormat: { hour: '2-digit', minute: '2-digit', meridiem: false },
+        dayHeaderFormat: { day: 'numeric', weekday: 'short' }, // Affiche : 12 lun.
         height: 'calc(100vh - 100px)',
         allDaySlot: false,
         selectable: true,
@@ -70,9 +71,9 @@ function initCalendar() {
         headerToolbar: {
             left: 'title',
             center: '',
-            right: 'today prev,next dayGridMonth,timeGridWeek'
+            right: 'today prev,next timeGridWeek,dayGridMonth'
         },
-        buttonText: { today: "Auj.", month: "Mois", week: "Sem." },
+        buttonText: { today: "Aujourd'hui", month: "Mois", week: "Semaine" },
         events: `${SCRIPT_URL}?action=getEvents&email=${email}&password=${pass}`,
 
         eventDrop: (info) => handleSync(info),
@@ -119,13 +120,14 @@ function initCalendar() {
                 document.getElementById('editEnd').value = info.event.end.toTimeString().substring(0,5);
                 document.getElementById('modalEdit').style.display = 'flex';
             } else {
-                // POPUP POUR LES AUTRES
                 const startStr = info.event.start.toLocaleTimeString([], {hour:'2h', minute:'2m'});
                 const endStr = info.event.end.toLocaleTimeString([], {hour:'2h', minute:'2m'});
                 document.getElementById('viewContent').innerHTML = `
-                    <div style="margin-bottom:10px; color:#039be5; font-weight:bold;">Détails de la réservation</div>
-                    <div style="font-size:14px;"><strong>Occupant :</strong> ${info.event.title}</div>
-                    <div style="font-size:13px; color:#666;">${startStr} à ${endStr}</div>
+                    <div class="popup-title">Détails</div>
+                    <div class="popup-body">
+                        <strong>${info.event.title}</strong><br>
+                        <span style="color:#70757a">${startStr} – ${endStr}</span>
+                    </div>
                 `;
                 document.getElementById('popupView').style.display = 'block';
             }
@@ -133,7 +135,7 @@ function initCalendar() {
 
         select: async function(info) {
             if (info.view.type === 'dayGridMonth') {
-                calendar.changeView('timeGridDay', info.start);
+                calendar.changeView('timeGridWeek', info.start);
                 return;
             }
             const params = new URLSearchParams({action: "reserve", email, password: pass, title: name, start: info.start.toISOString(), end: info.end.toISOString()});
