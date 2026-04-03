@@ -5,12 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="https://img.icons8.com/color/512/piano.png">
-  
   <title>Planning Orgue</title>
-  
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,11 +17,10 @@
   <div class="container">
     
     <div id="loginSection" class="card">
-      <h2>Connexion Élève</h2>
-      <p>Entrez vos identifiants pour réserver.</p>
+      <h2>Connexion</h2>
       <input type="email" id="userEmail" placeholder="Email">
       <input type="password" id="userPass" placeholder="Mot de passe">
-      <button onclick="login()">Accéder au Planning</button>
+      <button onclick="login()">Se connecter</button>
     </div>
 
     <div id="appSection" style="display:none;">
@@ -32,34 +28,32 @@
       <div class="calendar-container">
         <iframe 
           id="googleCal" 
-          src="https://calendar.google.com/calendar/embed?src=orgue.iams@gmail.com&ctz=Europe%2FParis&mode=WEEK&showTabs=1&showNav=1&showTitle=0&showPrint=0&showTabs=1&showCalendars=0" 
-          style="border-width:0" 
+          src="https://calendar.google.com/calendar/embed?src=orgue.iams@gmail.com&ctz=Europe%2FParis&mode=WEEK&showTabs=1&showNav=1&showTitle=0&showPrint=0&showCalendars=0" 
+          style="border: 0" 
+          width="100%" 
+          height="100%" 
           frameborder="0" 
           scrolling="no">
         </iframe>
       </div>
 
-      <div class="card" style="margin-top: 15px;">
-        <h2>Nouvelle Réservation</h2>
-        
-        <label>Début du créneau (dès 08h00)</label>
+      <div class="card">
+        <h2>Réserver un créneau</h2>
+        <label>Début (8h - 22h)</label>
         <input type="datetime-local" id="eventStart">
-        
-        <label>Fin du créneau (max 23h00)</label>
+        <label>Fin (max 23h)</label>
         <input type="datetime-local" id="eventEnd">
-        
-        <button onclick="sendReservation()" id="btnResa">Confirmer la réservation</button>
+        <button onclick="sendReservation()" id="btnResa">Confirmer</button>
         <div id="status"></div>
       </div>
-      
-      <button onclick="logout()" class="btn-secondary">Se déconnecter</button>
-      
-      <div style="height: 50px;"></div>
+
+      <div style="padding: 0 15px;">
+        <button onclick="logout()" class="btn-secondary">Déconnexion</button>
+      </div>
     </div>
 
   </div>
 
   <script src="app.js"></script>
-
 </body>
 </html>
