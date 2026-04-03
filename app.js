@@ -1,4 +1,4 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwk8lxyTHBFKIsFybMLH-E861B6rRDTj5VvVTbvpq2Q3tE3FPcp8r8esyGz2nl_cZE3/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyG1SYO_2jbVZbEJZBm15T_ydJe3P7jnvIUGCYF_icFXpFU5YfVKQyztm1DfN6XWF5d/exec";
 
 window.onload = () => {
     const user = localStorage.getItem('orgue_user') || sessionStorage.getItem('orgue_user');
