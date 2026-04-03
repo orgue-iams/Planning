@@ -60,7 +60,7 @@ function initCalendar() {
         locale: 'fr',
         slotMinTime: '08:00:00',
         slotMaxTime: '22:00:00',
-        slotLabelFormat: { hour: '2-digit', minute: '2-digit', meridiem: false }, // Format HH:mm
+        slotLabelFormat: { hour: '2-digit', minute: '2-digit', meridiem: false },
         height: 'calc(100vh - 100px)',
         allDaySlot: false,
         selectable: true,
@@ -102,8 +102,12 @@ function initCalendar() {
         },
 
         eventDidMount: function(arg) {
-            if (arg && arg.el && arg.event && arg.event.extendedProps && arg.event.extendedProps.mine) {
-                arg.el.classList.add('fc-event-mine');
+            if (arg && arg.el && arg.event && arg.event.extendedProps) {
+                if (arg.event.extendedProps.mine) {
+                    arg.el.classList.add('fc-event-mine');
+                } else {
+                    arg.el.classList.add('fc-event-others');
+                }
             }
         },
 
@@ -115,9 +119,14 @@ function initCalendar() {
                 document.getElementById('editEnd').value = info.event.end.toTimeString().substring(0,5);
                 document.getElementById('modalEdit').style.display = 'flex';
             } else {
+                // POPUP POUR LES AUTRES
                 const startStr = info.event.start.toLocaleTimeString([], {hour:'2h', minute:'2m'});
                 const endStr = info.event.end.toLocaleTimeString([], {hour:'2h', minute:'2m'});
-                document.getElementById('viewContent').innerHTML = `<strong>${info.event.title}</strong><br>${startStr} - ${endStr}`;
+                document.getElementById('viewContent').innerHTML = `
+                    <div style="margin-bottom:10px; color:#039be5; font-weight:bold;">Détails de la réservation</div>
+                    <div style="font-size:14px;"><strong>Occupant :</strong> ${info.event.title}</div>
+                    <div style="font-size:13px; color:#666;">${startStr} à ${endStr}</div>
+                `;
                 document.getElementById('popupView').style.display = 'block';
             }
         },
