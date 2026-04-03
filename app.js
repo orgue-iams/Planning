@@ -1,8 +1,12 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbytvTaSR7HjfxB6ntzdiKEShzgxILU5HXraD2YOYVRGoamwovG0Uimt9ldtVhI53PTY/exec";
+const SCRIPT_URL = "TON_URL_EXEC_GOOGLE";
+
+window.onload = () => {
+    if(localStorage.getItem('orgue_user')) showApp();
+};
 
 function login() {
     const email = document.getElementById('userEmail').value;
-    if(!email) return;
+    if(!email) return alert("Email requis");
     localStorage.setItem('orgue_user', email.toLowerCase());
     showApp();
 }
@@ -23,33 +27,41 @@ function closeModals() {
     document.getElementById('modalListe').style.display = 'none';
 }
 
-function sendAction(action, extraData = {}) {
-    const email = localStorage.getItem('orgue_user');
-    let data = { action: action, email: email, ...extraData };
+function refreshCalendar() {
+    const cal = document.getElementById('googleCal');
+    const baseSrc = cal.src.split('&t=')[0];
+    cal.src = baseSrc + '&t=' + new Date().getTime();
+}
 
-    if(action === 'reserve') {
-        data.start = document.getElementById('eventStart').value;
-        data.end = document.getElementById('eventEnd').value;
-    }
+function sendReservation() {
+    const start = document.getElementById('eventStart').value;
+    const end = document.getElementById('eventEnd').value;
+    const btn = document.getElementById('btnResa');
+
+    if(!start || !end) return alert("Dates incomplètes");
+
+    btn.disabled = true;
+    btn.innerText = "Envoi...";
+
+    const data = {
+        action: "reserve",
+        email: localStorage.getItem('orgue_user'),
+        start: start,
+        end: end
+    };
 
     fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(data) })
     .then(() => {
-        alert("Demande enregistrée !");
+        alert("Réservation envoyée ! Attendez 2-3 sec que l'agenda se mette à jour.");
         closeModals();
-        document.getElementById('googleCal').src += ''; // Refresh iframe
-    });
+        setTimeout(refreshCalendar, 2000);
+        btn.disabled = false;
+        btn.innerText = "Confirmer";
+    })
+    .catch(() => alert("Erreur de connexion"));
 }
 
-function showMyEvents() {
-    openModal('modalListe');
-    const email = localStorage.getItem('orgue_user');
-    const listDiv = document.getElementById('mesEventsList');
-    listDiv.innerHTML = "Chargement...";
-
-    // Note: Le "no-cors" empêche de lire la réponse JSON directe. 
-    // Pour une vraie liste, il faudrait une petite astuce de fetch.
-    // Pour ce projet, on simplifie : l'élève verra ses créneaux sur l'agenda.
-    // Si tu veux la liste réelle, dis-le moi, on passera par une autre méthode.
+function logout() {
+    localStorage.clear();
+    location.reload();
 }
-
-function logout() { localStorage.clear(); location.reload(); }
