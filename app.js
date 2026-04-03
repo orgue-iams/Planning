@@ -2,8 +2,6 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwPznpQrAuJkyvr_Iqcm
 let calendar;
 let currentEvent = null;
 
-console.log("App.js chargé.");
-
 function togglePass() {
     const p = document.getElementById('userPass');
     p.type = p.type === "password" ? "text" : "password";
@@ -79,7 +77,7 @@ function initCalendar() {
         eventDrop: (info) => handleSync(info),
         eventResize: (info) => handleSync(info),
 
-        // Création du contenu de l'événement (Titre + Bouton X)
+        // Génère le contenu interne (Texte + Bouton X)
         eventContent: function(arg) {
             let nodes = [];
             let title = document.createElement('div');
@@ -103,7 +101,7 @@ function initCalendar() {
             return { domNodes: nodes };
         },
 
-        // Application du style orange APRES l'affichage (évite l'erreur classList)
+        // Correction de l'erreur : On attend que l'élément soit monté pour ajouter la classe
         eventDidMount: function(arg) {
             if (arg.event.extendedProps.mine) {
                 arg.el.classList.add('fc-event-mine');
@@ -152,6 +150,7 @@ async function handleSync(info) {
 async function updateEvent() {
     const email = localStorage.getItem('orgue_user');
     const pass = localStorage.getItem('orgue_pass');
+    if(!currentEvent) return;
     await fetch(`${SCRIPT_URL}?action=delete&id=${currentEvent.id}&email=${email}&password=${pass}`);
     const baseDate = currentEvent.start.toISOString().split('T')[0];
     const params = new URLSearchParams({
@@ -176,5 +175,6 @@ function logout() {
 }
 
 window.addEventListener('load', () => {
+    console.log("App chargée.");
     if(localStorage.getItem('orgue_user')) showApp();
 });
