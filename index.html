@@ -8,17 +8,8 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="https://img.icons8.com/color/512/piano.png">
   <title>Planning Orgue</title>
-  <style>
-    :root { --primary: #2c3e50; --accent: #27ae60; --text: #333; }
-    body { font-family: -apple-system, sans-serif; margin: 0; background: #f4f7f6; color: var(--text); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-    .header { background: var(--primary); color: white; padding: 40px 20px 20px; text-align: center; font-weight: bold; font-size: 1.2rem; }
-    .container { padding: 20px; flex: 1; overflow-y: auto; }
-    .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; }
-    input { width: 100%; padding: 15px; margin: 10px 0; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; font-size: 16px; }
-    button { width: 100%; background: var(--accent); color: white; border: none; padding: 15px; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; }
-    iframe { width: 100%; height: 450px; border: none; border-radius: 10px; }
-    #status { text-align: center; margin-top: 10px; font-weight: bold; color: var(--accent); }
-  </style>
+  
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -27,65 +18,31 @@
 <div class="container">
   <div id="loginSection" class="card">
     <h2>Connexion</h2>
-    <p>Entrez votre nom pour accéder au planning :</p>
-    <input type="text" id="userName" placeholder="Nom et Prénom">
-    <button onclick="saveUser()">Accéder au Planning</button>
+    <input type="email" id="userEmail" placeholder="Email">
+    <input type="password" id="userPass" placeholder="Mot de passe">
+    <button onclick="login()">Se connecter</button>
   </div>
 
   <div id="appSection" style="display:none;">
     <div class="card">
-      <p>Bonjour <strong id="displayName"></strong></p>
-      <iframe src="https://calendar.google.com/calendar/embed?src=orgue.iams@gmail.com&ctz=Europe%2FParis&mode=WEEK&showNav=0&showTitle=0&showPrint=0&showTabs=0&showCalendars=0"></iframe>
+      <div class="calendar-container">
+        <iframe id="googleCal" src="https://calendar.google.com/calendar/embed?src=orgue.iams@gmail.com&ctz=Europe%2FParis&mode=WEEK&showTabs=1&showNav=1&showTitle=0&showPrint=0&showCalendars=0"></iframe>
+      </div>
     </div>
-    
+
     <div class="card">
-      <h3>Réserver</h3>
-      <button onclick="sendReservation()" id="btnResa">Réserver maintenant</button>
+      <h2>Nouvelle Réservation</h2>
+      <label>Début (8h - 22h)</label>
+      <input type="datetime-local" id="eventStart">
+      <label>Fin (max 23h)</label>
+      <input type="datetime-local" id="eventEnd">
+      <button onclick="sendReservation()" id="btnResa">Réserver ce créneau</button>
       <div id="status"></div>
     </div>
+    <button onclick="logout()" class="btn-secondary">Déconnexion</button>
   </div>
 </div>
 
-<script>
-  const GOOGLE_URL = "https://script.google.com/macros/s/AKfycbwOwnGM3RYWrZ7prvNkChzSygHfMIuP5YE6bsEm7RIl9iMtc3S3SC5obOmPPFOKij1D/exec";
-
-  window.onload = function() {
-    const user = localStorage.getItem('orgue_user');
-    if(user) showApp(user);
-  };
-
-  function saveUser() {
-    const name = document.getElementById('userName').value;
-    if(name) {
-      localStorage.setItem('orgue_user', name);
-      showApp(name);
-    }
-  }
-
-  function showApp(name) {
-    document.getElementById('loginSection').style.display = 'none';
-    document.getElementById('appSection').style.display = 'block';
-    document.getElementById('displayName').innerText = name;
-  }
-
-  function sendReservation() {
-    const name = localStorage.getItem('orgue_user');
-    document.getElementById('btnResa').disabled = true;
-    document.getElementById('status').innerText = "Envoi...";
-
-    fetch(GOOGLE_URL, {
-      method: 'POST',
-      mode: 'no-cors', // Important pour Google Script
-      body: JSON.stringify({nom: name, date: new Date().toISOString()})
-    }).then(() => {
-      document.getElementById('status').innerText = "✅ Réservation enregistrée !";
-      setTimeout(() => { 
-        document.getElementById('status').innerText = "";
-        document.getElementById('btnResa').disabled = false;
-      }, 3000);
-    });
-  }
-</script>
-
+<script src="app.js"></script>
 </body>
 </html>
