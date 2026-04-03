@@ -3,73 +3,84 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="style.css">
-  <title>Planning Orgue</title>
+  <title>Planning Orgue IAMS</title>
 </head>
 <body>
   
   <div class="header">
     <span>PLANNING ORGUE</span>
-    <svg class="icon-refresh" onclick="refreshCalendar()" viewBox="0 0 24 24">
-        <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
-    </svg>
+    <svg class="icon-refresh" onclick="refreshCalendar()" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
   </div>
   
   <div class="container">
     <div id="loginSection" class="card">
-      <h2>Espace Élève</h2>
+      <h2 class="login-title">Planning orgue G.Bancells de l'IAMS</h2>
+      
       <input type="email" id="userEmail" placeholder="Email">
-      <div class="password-container">
+      
+      <div class="password-wrapper">
         <input type="password" id="userPass" placeholder="Mot de passe">
-        <div class="toggle-password" onclick="togglePassword()">
+        <div class="eye-btn" onclick="togglePassword()">
             <svg id="eyeIcon" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
         </div>
       </div>
-      <div class="remember-box">
+      
+      <div class="remember-container">
         <input type="checkbox" id="rememberMe">
         <label for="rememberMe">Se souvenir de moi</label>
       </div>
+
       <button onclick="login()" id="btnLogin">Se connecter</button>
     </div>
 
     <div id="appSection" style="display:none;">
       <div class="calendar-container">
-        <iframe id="googleCal" src="https://calendar.google.com/calendar/embed?src=orgue.iams@gmail.com&ctz=Europe%2FParis&mode=WEEK&showTabs=1&showNav=1&showTitle=0&showPrint=0" frameborder="0"></iframe>
-      </div>
-      <div class="help-link">
-        <a href="https://calendar.google.com/calendar/u/0/embed?src=orgue.iams@gmail.com&ctz=Europe/Paris" target="_blank">Ouvrir en plein écran ↗</a>
+        <iframe id="googleCal" src="https://calendar.google.com/calendar/embed?src=orgue.iams@gmail.com&ctz=Europe%2FParis&mode=WEEK&showTabs=1&showNav=1&showTitle=0" frameborder="0"></iframe>
       </div>
 
       <div id="modalResa" class="modal">
         <h3>Nouvelle Réservation</h3>
-        
         <label>Titre de la réservation</label>
         <input type="text" id="eventTitle">
         
-        <label>Date de la séance</label>
+        <label>Date</label>
         <input type="date" id="resDay">
         
-        <div class="time-select-row">
-            <div class="time-group">
+        <div class="time-row">
+            <div class="time-col">
                 <label>Début</label>
-                <div class="select-pair">
+                <div class="time-selects">
                     <select id="startH"></select>
-                    <select id="startM">
-                        <option value="00">00</option>
-                        <option value="15">15</option>
-                        <option value="30">30</option>
-                        <option value="45">45</option>
-                    </select>
+                    <select id="startM"><option>00</option><option>15</option><option>30</option><option>45</option></select>
                 </div>
             </div>
-            <div class="time-group">
+            <div class="time-col">
                 <label>Fin</label>
-                <div class="select-pair">
+                <div class="time-selects">
                     <select id="endH"></select>
-                    <select id="endM">
-                        <option value="00">00</option>
-                        <option value="15">15</option>
-                        <option value="30">30</option>
-                        <option value="45">45</option
+                    <select id="endM"><option>00</option><option>15</option><option>30</option><option>45</option></select>
+                </div>
+            </div>
+        </div>
+        <button onclick="sendReservation()" id="btnResa">Confirmer</button>
+        <button onclick="closeModals()" class="btn-secondary">Annuler</button>
+      </div>
+
+      <div id="modalListe" class="modal">
+        <h3>Mes Réservations</h3>
+        <div id="mesEventsList"></div>
+        <button onclick="closeModals()" class="btn-secondary">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <nav id="navBar" class="tab-bar" style="display:none;">
+    <button class="tab-item" onclick="logout()"><span>Quitter</span></button>
+    <button class="tab-item" onclick="showMyEvents()"><span>Mes cours</span></button>
+    <button class="tab-item tab-item-add" onclick="prepareReservation()"><span>Réserver</span></button>
+  </nav>
+
+  <script src="app.js"></script>
+</body>
+</html>
