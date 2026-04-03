@@ -24,66 +24,28 @@ function initCalendar() {
         nowIndicator: true,
         selectable: true,
         editable: true,
+        eventDurationEditable: true,
         slotLabelFormat: { hour: '2-digit', minute: '2-digit', meridiem: false },
-        titleFormat: { year: 'numeric', month: 'short' },
         headerToolbar: { left: 'prev,next today title', center: '', right: 'timeGridWeek,dayGridMonth' },
-        buttonText: { today: "Auj.", week: "Sem.", month: "Mois" },
         
-        eventDrop: async function(info) {
-            if (!info.event.extendedProps.mine) { info.revert(); return; }
-            const params = new URLSearchParams({
-                action: "update", id: info.event.id, email, password: pass,
-                start: info.event.start.toISOString(), end: info.event.end.toISOString(), title: info.event.title
-            });
-            await fetch(`${SCRIPT_URL}?${params}`);
-        },
+        eventDrop: syncEventChange,
+        eventResize: syncEventChange,
 
-        dayHeaderContent: function(arg) {
-            let dayName = arg.date.toLocaleDateString('fr-FR', { weekday: 'short' }).toUpperCase().replace('.', '');
-            let dayNum = arg.date.getDate();
-            let container = document.createElement('div');
-            container.className = 'custom-header-container';
-            container.innerHTML = `<span class="day-name">${dayName}</span><span class="day-number">${dayNum}</span>`;
-            return { domNodes: [container] };
+        eventDidMount: function(info) {
+            if (info.event.extendedProps?.mine) {
+                info.el.style.backgroundColor = '#93c54b';
+                info.el.style.borderColor = '#93c54b';
+            } else {
+                info.el.style.backgroundColor = '#3e3f3a';
+                info.el.style.borderColor = '#3e3f3a';
+            }
         },
 
         events: `${SCRIPT_URL}?action=getEvents&email=${email}&password=${pass}`,
 
-        eventContent: function(arg) {
-            let container = document.createElement('div');
-            container.className = 'fc-event-main-container';
-            let title = document.createElement('div');
-            title.innerHTML = arg.event.title;
-            title.className = 'fc-event-title-custom';
-            container.appendChild(title);
-            if (arg.event.extendedProps?.mine) {
-                let x = document.createElement('div');
-                x.innerHTML = '✕'; x.className = 'delete-event-btn';
-                x.onclick = (e) => { e.stopPropagation(); if (confirm("Supprimer ?")) { arg.event.remove(); fetch(`${SCRIPT_URL}?action=delete&id=${arg.event.id}&email=${email}&password=${pass}`); }};
-                container.appendChild(x);
-            }
-            return { domNodes: [container] };
-        },
-
-        eventDidMount: function(arg) {
-            if (arg.event.extendedProps?.mine) arg.el.classList.add('fc-event-mine');
-            else arg.el.classList.add('fc-event-others');
-        },
-
         eventClick: function(info) {
             currentEvent = info.event;
-            const startStr = info.event.start.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
-            const endStr = info.event.end.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
-            if (info.event.extendedProps?.mine) {
-                document.getElementById('editTitle').value = info.event.title;
-                document.getElementById('editDate').value = info.event.start.toISOString().split('T')[0];
-                document.getElementById('editStart').value = startStr.replace('h', ':');
-                document.getElementById('editEnd').value = endStr.replace('h', ':');
-                document.getElementById('modalEdit').style.display = 'flex';
-            } else {
-                document.getElementById('viewContent').innerHTML = `<div class="view-item"><strong>Utilisateur :</strong>${info.event.title}</div><div class="view-item"><strong>Horaire :</strong>${startStr} - ${endStr}</div>`;
-                document.getElementById('popupView').style.display = 'flex';
-            }
+            openPopup(info.event);
         },
 
         select: async function(info) {
@@ -97,20 +59,79 @@ function initCalendar() {
     calendar.render();
 }
 
-async function updateEvent() {
+function openPopup(event) {
+    const isMine = event.extendedProps.mine;
+    const startStr = event.start.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+    const endStr = event.end.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+    const dateStr = event.start.toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long'});
+
+    // Visibilité des boutons d'action
+    document.getElementById('btnEdit').style.display = isMine ? 'inline-flex' : 'none';
+    document.getElementById('btnDelete').style.display = isMine ? 'inline-flex' : 'none';
+
+    // Remplissage mode vue
+    document.getElementById('viewMode').innerHTML = `
+        <div class="mb-1 small text-muted">UTILISATEUR</div><div class="mb-3">${event.title}</div>
+        <div class="mb-1 small text-muted">DATE</div><div class="mb-3 text-capitalize">${dateStr}</div>
+        <div class="mb-1 small text-muted">HORAIRE</div><div>${startStr} - ${endStr}</div>
+    `;
+
+    // Pré-remplissage mode édition
+    document.getElementById('editTitle').value = event.title;
+    document.getElementById('editDate').value = event.start.toISOString().split('T')[0];
+    document.getElementById('editStart').value = startStr.replace('h', ':');
+    document.getElementById('editEnd').value = endStr.replace('h', ':');
+
+    // Reset affichage
+    document.getElementById('viewMode').style.display = 'block';
+    document.getElementById('editMode').style.display = 'none';
+    document.getElementById('popupDetails').style.display = 'flex';
+}
+
+function switchToEditMode() {
+    document.getElementById('viewMode').style.display = 'none';
+    document.getElementById('editMode').style.display = 'block';
+}
+
+async function saveChanges() {
     const email = localStorage.getItem('orgue_user');
     const pass = localStorage.getItem('orgue_pass');
     await fetch(`${SCRIPT_URL}?action=delete&id=${currentEvent.id}&email=${email}&password=${pass}`);
+    
     const params = new URLSearchParams({
         action: "reserve", email, password: pass, title: document.getElementById('editTitle').value,
         start: new Date(`${document.getElementById('editDate').value}T${document.getElementById('editStart').value}:00`).toISOString(),
         end: new Date(`${document.getElementById('editDate').value}T${document.getElementById('editEnd').value}:00`).toISOString()
     });
     await fetch(`${SCRIPT_URL}?${params}`);
-    closeModals(); calendar.refetchEvents();
+    closeModals();
+    calendar.refetchEvents();
 }
 
-function login() { /* ... login logic ... */ }
+async function deleteCurrentEvent() {
+    if (confirm("Supprimer cette réservation ?")) {
+        const id = currentEvent.id;
+        currentEvent.remove();
+        closeModals();
+        const email = localStorage.getItem('orgue_user');
+        const pass = localStorage.getItem('orgue_pass');
+        await fetch(`${SCRIPT_URL}?action=delete&id=${id}&email=${email}&password=${pass}`);
+    }
+}
+
+async function syncEventChange(info) {
+    if (!info.event.extendedProps.mine) { info.revert(); return; }
+    const email = localStorage.getItem('orgue_user');
+    const pass = localStorage.getItem('orgue_pass');
+    const params = new URLSearchParams({
+        action: "update", id: info.event.id, email, password: pass,
+        start: info.event.start.toISOString(), end: info.event.end.toISOString(), title: info.event.title
+    });
+    await fetch(`${SCRIPT_URL}?${params}`);
+}
+
+function closeModals() { document.getElementById('popupDetails').style.display = 'none'; }
+function login() { /* Logique identique au précédent */ }
 function logout() { localStorage.clear(); location.reload(); }
-function closeModals() { document.getElementById('modalEdit').style.display = 'none'; document.getElementById('popupView').style.display = 'none'; }
+function togglePass() { const p = document.getElementById('userPass'); p.type = p.type === "password" ? "text" : "password"; }
 window.onload = () => { if(localStorage.getItem('orgue_user')) showApp(); };
