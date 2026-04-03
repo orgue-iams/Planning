@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="style.css">
   <title>Planning Orgue</title>
 </head>
@@ -20,10 +21,14 @@
     <div id="loginSection" class="card">
       <h2>Espace Élève</h2>
       <input type="email" id="userEmail" placeholder="Email">
-      <input type="password" id="userPass" placeholder="Mot de passe">
       
-      <div style="display: flex; align-items: center; margin: 15px 0; font-size: 14px; color: #2c3e50;">
-        <input type="checkbox" id="rememberMe" style="width: 20px; margin: 0 10px 0 0;">
+      <div class="password-container">
+        <input type="password" id="userPass" placeholder="Mot de passe">
+        <span class="toggle-password" onclick="togglePassword()">👁️</span>
+      </div>
+      
+      <div class="remember-box">
+        <input type="checkbox" id="rememberMe">
         <label for="rememberMe">Se souvenir de moi</label>
       </div>
 
