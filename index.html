@@ -1,46 +1,67 @@
-<div id="modalEdit" class="modal">
-    <div class="modal-card">
-        <div class="modal-header">
-            <span class="icon-calendar"></span>
-            <h3>Modifier la réservation</h3>
-        </div>
-        <div class="modal-body">
-            <div class="input-group">
-                <label>Activité / Nom</label>
-                <input type="text" id="editTitle" placeholder="Ex: Répétition Orgue">
-            </div>
-            <div class="input-group">
-                <label>Date</label>
-                <input type="date" id="editDate">
-            </div>
-            <div class="time-row">
-                <div class="input-group">
-                    <label>Début</label>
-                    <input type="time" id="editStart" step="900">
-                </div>
-                <div class="input-group">
-                    <label>Fin</label>
-                    <input type="time" id="editEnd" step="900">
-                </div>
-            </div>
-        </div>
-        <div class="modal-footer">
-            <button onclick="updateEvent()" class="btn-save">Enregistrer</button>
-            <button onclick="closeModals()" class="btn-cancel">Annuler</button>
-        </div>
-    </div>
-</div>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Planning Orgue IAMS</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet" />
+</head>
+<body>
 
-<div id="popupView" class="modal">
-    <div class="modal-card view-card">
-        <div class="modal-header blue-header">
-            <span class="icon-info"></span>
-            <h3>Détails du créneau</h3>
-        </div>
-        <div id="viewContent" class="modal-body">
+    <div id="loginSection" class="login-container">
+        <div class="login-card">
+            <h2>Planning Orgue IAMS</h2>
+            <input type="email" id="userEmail" placeholder="Email">
+            <div class="password-group">
+                <input type="password" id="userPass" placeholder="Mot de passe">
+                <span class="toggle-password" onclick="togglePass()">
+                    <svg viewBox="0 0 24 24" width="20"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" fill="#666"/></svg>
+                </span>
             </div>
-        <div class="modal-footer">
-            <button onclick="closeModals()" class="btn-cancel">Fermer</button>
+            <button id="btnLogin" onclick="login()">Se connecter</button>
+            <div id="loginMessage" class="status-msg"></div>
         </div>
     </div>
-</div>
+
+    <div id="appSection" style="display:none;">
+        <div class="header-app">
+            <span class="app-title">Planning Orgue</span>
+            <button class="btn-logout-icon" onclick="logout()" title="Quitter">
+                <svg viewBox="0 0 24 24" width="24" height="24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" fill="#5f6368"/></svg>
+            </button>
+        </div>
+        <div id="calendar"></div>
+    </div>
+
+    <div id="modalEdit" class="modal">
+        <div class="modal-card">
+            <div class="modal-header"><h3>Modifier la réservation</h3></div>
+            <div class="modal-body">
+                <div class="input-group"><label>Nom</label><input type="text" id="editTitle"></div>
+                <div class="input-group"><label>Date</label><input type="date" id="editDate"></div>
+                <div class="time-row">
+                    <div class="input-group"><label>Début</label><input type="time" id="editStart" step="900"></div>
+                    <div class="input-group"><label>Fin</label><input type="time" id="editEnd" step="900"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="updateEvent()" class="btn-save">Enregistrer</button>
+                <button onclick="closeModals()" class="btn-cancel">Annuler</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="popupView" class="modal">
+        <div class="modal-card view-card">
+            <div class="modal-header blue-header"><h3>Détails</h3></div>
+            <div id="viewContent" class="modal-body"></div>
+            <div class="modal-footer"><button onclick="closeModals()" class="btn-cancel">Fermer</button></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales/fr.js"></script>
+    <script src="app.js" defer></script>
+</body>
+</html>
