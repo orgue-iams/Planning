@@ -2,13 +2,14 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwPznpQrAuJkyvr_Iqcm
 let calendar;
 let currentEvent = null;
 
-// Gestion de la visibilité du mot de passe
+// Vérification du chargement
+console.log("App.js chargé avec succès.");
+
 function togglePass() {
     const p = document.getElementById('userPass');
     p.type = p.type === "password" ? "text" : "password";
 }
 
-// Affichage des messages d'erreur/succès sous le bouton
 function showMsg(text, isError = true) {
     const el = document.getElementById('loginMessage');
     if (el) {
@@ -17,14 +18,13 @@ function showMsg(text, isError = true) {
     }
 }
 
-// Connexion
 async function login() {
     const email = document.getElementById('userEmail').value.trim().toLowerCase();
     const pass = document.getElementById('userPass').value.trim();
     
     if(!email || !pass) return showMsg("Veuillez remplir les champs");
     
-    showMsg("Connexion...");
+    showMsg("Connexion en cours...", false);
     
     try {
         const resp = await fetch(`${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`);
@@ -39,12 +39,11 @@ async function login() {
             showMsg(data.message); 
         }
     } catch(e) { 
-        showMsg("Erreur de connexion au script Google"); 
+        showMsg("Erreur de communication avec le serveur"); 
         console.error(e);
     }
 }
 
-// Mot de passe oublié
 async function forgotPassword() {
     const email = document.getElementById('userEmail').value.trim().toLowerCase();
     if(!email) return showMsg("Saisissez l'email d'abord");
@@ -62,7 +61,8 @@ async function forgotPassword() {
 function showApp() {
     document.getElementById('loginSection').style.display = 'none';
     document.getElementById('appSection').style.display = 'block';
-    setTimeout(initCalendar, 100); // Petit délai pour laisser le DOM s'ajuster
+    // On attend un court instant pour s'assurer que le DOM est rendu
+    setTimeout(initCalendar, 50);
 }
 
 function initCalendar() {
@@ -81,8 +81,8 @@ function initCalendar() {
         height: 'calc(100vh - 120px)',
         allDaySlot: false,
         selectable: true,
-        editable: true,       // Active le drag & drop global
-        eventOverlap: false,  // Interdit de chevaucher un autre cours
+        editable: true,
+        eventOverlap: false,
         nowIndicator: true,
         headerToolbar: {
             left: 'title',
@@ -91,14 +91,11 @@ function initCalendar() {
         },
         buttonText: { today: "Auj.", month: "Mois", week: "Sem.", day: "Jour" },
         
-        // Chargement des événements
         events: `${SCRIPT_URL}?action=getEvents&email=${email}&password=${pass}`,
 
-        // Synchronisation après Drag & Drop ou Redimensionnement
         eventDrop: (info) => handleSync(info),
         eventResize: (info) => handleSync(info),
 
-        // Personnalisation de l'affichage (Bouton X)
         eventContent: function(arg) {
             let nodes = [];
             let title = document.createElement('div');
@@ -107,14 +104,12 @@ function initCalendar() {
             nodes.push(title);
 
             if (arg.event.extendedProps.mine) {
-                // Ajoute une classe CSS pour le style orange
                 arg.el.classList.add('fc-event-mine');
-                
                 let x = document.createElement('div');
                 x.innerHTML = '✕';
                 x.className = 'delete-event-btn';
                 x.onclick = async (e) => {
-                    e.stopPropagation(); // Empêche d'ouvrir la modale
+                    e.stopPropagation();
                     if (confirm("Supprimer cette réservation ?")) {
                         arg.event.remove();
                         await fetch(`${SCRIPT_URL}?action=delete&id=${arg.event.id}&email=${email}&password=${pass}`);
@@ -125,7 +120,6 @@ function initCalendar() {
             return { domNodes: nodes };
         },
 
-        // Clic sur un créneau (Modale vs Popup)
         eventClick: function(info) {
             currentEvent = info.event;
             if (info.event.extendedProps.mine) {
@@ -141,7 +135,6 @@ function initCalendar() {
             }
         },
 
-        // Création d'une réservation (Clic glissé sur zone vide)
         select: async function(info) {
             if (info.view.type === 'dayGridMonth') {
                 calendar.changeView('timeGridDay', info.start);
@@ -163,7 +156,6 @@ function initCalendar() {
     calendar.render();
 }
 
-// Fonction de synchro pour Drag & Drop
 async function handleSync(info) {
     if (!info.event.extendedProps.mine) {
         info.revert();
@@ -172,7 +164,6 @@ async function handleSync(info) {
     const email = localStorage.getItem('orgue_user');
     const pass = localStorage.getItem('orgue_pass');
     
-    // On supprime l'ancien et on crée le nouveau à la nouvelle place
     await fetch(`${SCRIPT_URL}?action=delete&id=${info.event.id}&email=${email}&password=${pass}`);
     
     const params = new URLSearchParams({
@@ -185,7 +176,6 @@ async function handleSync(info) {
     calendar.refetchEvents();
 }
 
-// Mise à jour via la modale de modification
 async function updateEvent() {
     const email = localStorage.getItem('orgue_user');
     const pass = localStorage.getItem('orgue_pass');
@@ -217,9 +207,10 @@ function logout() {
     localStorage.clear();
     location.reload();
 }
-// Auto-login au chargement
-window.onload = () => {
+
+// Lancement automatique
+window.addEventListener('load', () => {
     if(localStorage.getItem('orgue_user')) {
         showApp();
     }
-};
+});
