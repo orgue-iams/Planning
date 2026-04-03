@@ -19,49 +19,44 @@ html, body {
 }
 
 #appSection {
-    height: calc(100% - 75px); /* On enlève la barre du bas */
-    display: flex; flex-direction: column; width: 100%;
+    height: calc(100% - 75px); display: flex; flex-direction: column; width: 100%;
 }
 
-.calendar-container { 
-    flex: 1; width: 100%; position: relative; background: white;
-}
+.calendar-container { flex: 1; width: 100%; position: relative; background: white; }
+iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
 
-iframe { 
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; 
-}
-
-.help-link { 
-    height: 25px; text-align: center; font-size: 11px; background: white; line-height: 25px;
-}
-
+.help-link { height: 25px; text-align: center; font-size: 11px; background: white; line-height: 25px; }
 .help-link a { color: var(--primary); text-decoration: none; opacity: 0.6; }
 
-/* Login Styles */
+/* Login */
 .card { background: white; padding: 25px; border-radius: 15px; margin: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; box-sizing: border-box; }
+input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; box-sizing: border-box; outline: none; }
 
-.password-container { position: relative; width: 100%; }
-.toggle-password { position: absolute; right: 12px; top: 22px; cursor: pointer; font-size: 18px; }
+/* Password Container avec Œil */
+.password-container { position: relative; width: 100%; margin: 10px 0; }
+.password-container input { margin: 0; padding-right: 45px; }
+
+.toggle-password {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    cursor: pointer; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+    opacity: 0.5; transition: 0.2s;
+}
+.toggle-password svg { fill: var(--primary); width: 20px; height: 20px; }
 
 .remember-box { display: flex; align-items: center; margin: 15px 0; font-size: 14px; }
 .remember-box input { width: 20px; margin: 0 10px 0 0; }
 
-button { width: 100%; background: var(--accent); color: white; border: none; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; }
+button { width: 100%; background: var(--accent); color: white; border: none; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 16px; margin-top: 10px; }
 .btn-secondary { background: #95a5a6; }
 
-/* Navigation */
-.tab-bar { 
-    position: fixed; bottom: 0; left: 0; right: 0; height: 75px; 
-    background: white; display: flex; justify-content: space-around; 
-    align-items: center; border-top: 1px solid #ddd; padding-bottom: env(safe-area-inset-bottom);
-}
+/* Nav */
+.tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 75px; background: white; display: flex; justify-content: space-around; align-items: center; border-top: 1px solid #ddd; padding-bottom: env(safe-area-inset-bottom); }
 .tab-item { background: none; border: none; font-size: 11px; color: var(--primary); display: flex; flex-direction: column; align-items: center; }
 .tab-item svg { fill: var(--primary); width: 24px; height: 24px; margin-bottom: 4px; }
 .tab-item-add { color: var(--accent); font-weight: bold; }
 .tab-item-add svg { fill: var(--accent); width: 30px; height: 30px; }
 
 /* Modals */
-.modal { position: fixed; bottom: 75px; left: 0; right: 0; background: white; padding: 20px; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.1); display: none; z-index: 100; }
+.modal { position: fixed; bottom: 75px; left: 0; right: 0; background: white; padding: 20px; border-radius: 20px 20px 0 0; display: none; z-index: 100; border-top: 2px solid var(--accent); }
 .event-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #eee; }
-.btn-del { background: #ff7675; width: auto; padding: 5px 10px; font-size: 12px; }
+.btn-del { background: #ff7675; width: auto; padding: 5px 10px; font-size: 12px; margin: 0; }
