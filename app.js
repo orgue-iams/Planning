@@ -2,45 +2,8 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwPznpQrAuJkyvr_Iqcm
 let calendar;
 let currentEvent = null;
 
-function togglePass() {
-    const p = document.getElementById('userPass');
-    p.type = p.type === "password" ? "text" : "password";
-}
-
-function showMsg(text, isError = true) {
-    const el = document.getElementById('loginMessage');
-    if (el) {
-        el.innerText = text; 
-        el.style.color = isError ? "#d93025" : "#1e8e3e";
-    }
-}
-
-async function login() {
-    const email = document.getElementById('userEmail').value.trim().toLowerCase();
-    const pass = document.getElementById('userPass').value.trim();
-    if(!email || !pass) return showMsg("Champs requis");
-    showMsg("Connexion...", false);
-    try {
-        const resp = await fetch(`${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`);
-        const data = await resp.json();
-        if(data.result === "success") {
-            localStorage.setItem('orgue_user', email);
-            localStorage.setItem('orgue_pass', pass);
-            localStorage.setItem('orgue_name', data.name);
-            showApp();
-        } else { showMsg(data.message); }
-    } catch(e) { showMsg("Erreur serveur"); }
-}
-
-async function forgotPassword() {
-    const email = document.getElementById('userEmail').value.trim().toLowerCase();
-    if(!email) return showMsg("Saisissez l'email d'abord");
-    showMsg("Envoi...", false);
-    try {
-        const resp = await fetch(`${SCRIPT_URL}?action=forgot&email=${encodeURIComponent(email)}`);
-        const data = await resp.json();
-        showMsg(data.message, data.result === "error");
-    } catch(e) { showMsg("Erreur envoi"); }
+function changeView(viewName) {
+    if(calendar) calendar.changeView(viewName);
 }
 
 function showApp() {
@@ -66,25 +29,23 @@ function initCalendar() {
         selectable: true,
         editable: true,
         slotLabelFormat: { hour: '2-digit', minute: '2-digit', meridiem: false },
-        
-        // Titre haut gauche : ex. Mars - Avr. 2026
         titleFormat: { year: 'numeric', month: 'short' },
-        
-        // Format Header : Nom jour (3 lettres) + Numéro
         dayHeaderFormat: { weekday: 'short', day: 'numeric' },
         
         headerToolbar: {
             left: 'title',
             center: '',
-            right: 'today prev,next timeGridWeek,dayGridMonth'
+            right: 'today prev,next' // On retire les boutons natifs semaine/mois
         },
-        buttonText: { today: "Aujourd'hui", month: "Mois", week: "Semaine" },
         events: `${SCRIPT_URL}?action=getEvents&email=${email}&password=${pass}`,
 
         eventContent: function(arg) {
+            let container = document.createElement('div');
+            container.className = 'fc-event-main-container';
             let title = document.createElement('div');
             title.innerHTML = arg.event.title;
             title.className = 'fc-event-title-custom';
+            container.appendChild(title);
             if (arg.event.extendedProps?.mine) {
                 let x = document.createElement('div');
                 x.innerHTML = '✕';
@@ -96,9 +57,9 @@ function initCalendar() {
                         await fetch(`${SCRIPT_URL}?action=delete&id=${arg.event.id}&email=${email}&password=${pass}`);
                     }
                 };
-                return { domNodes: [title, x] };
+                container.appendChild(x);
             }
-            return { domNodes: [title] };
+            return { domNodes: [container] };
         },
 
         eventDidMount: function(arg) {
@@ -122,7 +83,7 @@ function initCalendar() {
         },
 
         select: async function(info) {
-            if (info.view.type === 'dayGridMonth') return calendar.changeView('timeGridWeek', info.start);
+            if (info.view.type === 'dayGridMonth') return; 
             const params = new URLSearchParams({action: "reserve", email, password: pass, title: name, start: info.start.toISOString(), end: info.end.toISOString()});
             await fetch(`${SCRIPT_URL}?${params}`);
             calendar.refetchEvents();
@@ -132,30 +93,19 @@ function initCalendar() {
     calendar.render();
 }
 
-async function updateEvent() {
-    const email = localStorage.getItem('orgue_user');
-    const pass = localStorage.getItem('orgue_pass');
-    if(!currentEvent) return;
-    await fetch(`${SCRIPT_URL}?action=delete&id=${currentEvent.id}&email=${email}&password=${pass}`);
-    const baseDate = currentEvent.start.toISOString().split('T')[0];
-    const params = new URLSearchParams({
-        action: "reserve", email, password: pass, 
-        title: document.getElementById('editTitle').value,
-        start: new Date(`${baseDate}T${document.getElementById('editStart').value}:00`).toISOString(),
-        end: new Date(`${baseDate}T${document.getElementById('editEnd').value}:00`).toISOString()
-    });
-    await fetch(`${SCRIPT_URL}?${params}`);
-    closeModals();
-    calendar.refetchEvents();
+// Fonctions Login/Logout/Update standard...
+async function login() {
+    const email = document.getElementById('userEmail').value.trim().toLowerCase();
+    const pass = document.getElementById('userPass').value.trim();
+    const resp = await fetch(`${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`);
+    const data = await resp.json();
+    if(data.result === "success") {
+        localStorage.setItem('orgue_user', email);
+        localStorage.setItem('orgue_pass', pass);
+        localStorage.setItem('orgue_name', data.name);
+        showApp();
+    }
 }
-
-function closeModals() {
-    document.getElementById('modalEdit').style.display = 'none';
-    document.getElementById('popupView').style.display = 'none';
-}
-
 function logout() { localStorage.clear(); location.reload(); }
-
-window.addEventListener('load', () => {
-    if(localStorage.getItem('orgue_user')) showApp();
-});
+function closeModals() { document.getElementById('modalEdit').style.display = 'none'; document.getElementById('popupView').style.display = 'none'; }
+window.onload = () => { if(localStorage.getItem('orgue_user')) showApp(); };
