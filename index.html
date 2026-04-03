@@ -15,17 +15,14 @@
         <div class="login-card">
             <h2>Accès Étudiant</h2>
             <input type="email" id="userEmail" placeholder="Email">
-            
             <div class="password-group">
                 <input type="password" id="userPass" placeholder="Mot de passe">
                 <span class="toggle-password" onclick="togglePass()">
                     <svg viewBox="0 0 24 24" width="20"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" fill="#666"/></svg>
                 </span>
             </div>
-            
             <button id="btnLogin" onclick="login()">Se connecter</button>
             <div id="loginMessage" class="status-msg"></div>
-            
             <p class="forgot-link" onclick="forgotPassword()">Mot de passe oublié ?</p>
         </div>
     </div>
@@ -36,6 +33,26 @@
             <button class="btn-logout" onclick="logout()">Quitter</button>
         </div>
         <div id="calendar"></div>
+    </div>
+
+    <div id="modalEdit" class="modal">
+        <div class="modal-content">
+            <h3>Modifier ma séance</h3>
+            <input type="text" id="editTitle" placeholder="Titre">
+            <div class="time-row">
+                <input type="time" id="editStart">
+                <input type="time" id="editEnd">
+            </div>
+            <div class="modal-buttons">
+                <button onclick="updateEvent()" class="btn-save">Enregistrer</button>
+                <button onclick="closeModals()" class="btn-cancel">Annuler</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="popupView" class="popup-info">
+        <div id="viewContent"></div>
+        <button onclick="closeModals()" class="btn-close-popup">Fermer</button>
     </div>
 
     <script src="app.js"></script>
