@@ -1,4 +1,4 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwrKqsYIJoHZ5sYwl7vxD3J5O_uAvM17HP4AA3lzQcrD30YYRWTu7Iry6H9Pzk1cgUm/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxbG2yrQeZ1FI0_RMR7ILDgtkN4dyQUt49eNRA4uKNOozLIJtjCmSRf8OnZEKyTlzfA/exec";
 
 window.onload = () => {
     if(localStorage.getItem('orgue_auth') === 'true') showApp();
