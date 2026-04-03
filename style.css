@@ -1,90 +1,123 @@
+/* --- CONFIGURATION GOOGLE --- */
 :root {
-    --primary-color: #007aff;
-    --success-color: #34c759;
-    --danger-color: #ff3b30;
-    --mine-color: #ff8c00; /* Orange soutenu */
-    --others-color: #0056b3; /* Bleu franc */
-    --bg-pastel: #fdf5e6; /* Beige clair pastel (OldLace) */
+    --google-blue: #039be5;
+    --google-bg: #a8c7fa;
+    --mine-color: #f4511e; /* Orange Deep Google */
+    --others-pastel: #e1f5fe;
+    --font-google: "Google Sans", "Roboto", "Arial", sans-serif;
 }
 
 body {
-    font-family: -apple-system, sans-serif;
-    background-color: var(--bg-pastel);
+    font-family: var(--font-google);
+    background-color: var(--google-bg);
     margin: 0;
-    font-size: 13px; /* Police globale plus petite */
+    color: #3c4043;
 }
 
 /* --- CONNEXION --- */
 .login-container {
     display: flex; justify-content: center; align-items: center; height: 100vh;
-    background: #5d4037;
+    background: #1a73e8;
 }
 .login-card {
-    background: white; padding: 1.5rem; border-radius: 15px; width: 85%; max-width: 300px; text-align: center;
+    background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 360px; text-align: center;
 }
-.login-card input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; box-sizing: border-box; }
+.login-card h2 { font-size: 18px; margin-bottom: 24px; color: #202124; }
+.login-card input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #dadce0; border-radius: 4px; box-sizing: border-box; }
+#btnLogin { background: #1a73e8; color: white; border: none; border-radius: 4px; padding: 10px; cursor: pointer; font-weight: 500; width: 100%; }
 
-/* --- HEADER --- */
+/* --- HEADER APP --- */
 .header {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 10px 15px; background: white; border-bottom: 1px solid #ddd;
+    padding: 8px 16px; background: white; border-bottom: 1px solid #dadce0;
 }
-.header span { font-weight: bold; font-size: 0.9rem; }
-.btn-logout { width: auto; padding: 5px 10px; font-size: 11px; background: #eee; border-radius: 5px; }
+.header span { font-weight: 400; font-size: 20px; }
+.btn-logout { background: none; border: 1px solid #dadce0; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
 
-/* --- CALENDRIER --- */
+/* --- CALENDRIER LOOK GOOGLE 2024 --- */
 #calendar {
-    background-color: var(--bg-pastel) !important;
-    padding: 5px;
+    background-color: var(--google-bg) !important;
+    padding: 8px;
 }
 
-/* Polices du calendrier */
-.fc { font-size: 11px !important; }
-.fc-toolbar-title { font-size: 1.1rem !important; }
+/* En-tête des colonnes (Numéro en grand, pas de lignes) */
+.fc-theme-standard .fc-scrollgrid { border: none !important; }
+.fc-theme-standard th { border: none !important; }
 
-/* Heures sur le côté */
+.fc-col-header-cell-cushion {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-bottom: 10px;
+    color: #70757a;
+    text-decoration: none !important;
+}
+
+/* Numéro du jour en très grand */
+.fc-col-header-cell-cushion::before {
+    content: attr(aria-label); /* Astuce pour extraire le chiffre via JS ou via format */
+    font-size: 24px;
+    color: #1a73e8;
+    font-weight: 400;
+}
+
+/* On personnalise le rendu du texte dans le header via FullCalendar format */
+.fc-daygrid-day-number { font-size: 14px; }
+
+/* Heures à gauche */
 .fc-timegrid-slot-label-cushion {
-    font-size: 10px;
-    color: #555;
+    font-family: var(--font-google);
+    font-size: 11px;
+    color: #70757a;
     text-transform: lowercase;
 }
 
-/* Événements des autres (Bleu franc, pas transparent) */
+/* Créneaux (Coins arrondis) */
 .fc-v-event {
-    background-color: var(--others-color) !important;
-    border: none !important;
-    opacity: 1 !important;
-}
-.fc-v-event .fc-event-title {
-    color: white !important;
-    font-weight: bold;
+    border-radius: 8px !important;
+    padding: 2px 4px;
+    margin-bottom: 1px;
 }
 
-/* Mes événements (Orange soutenu) */
+/* Autres (Bleu Pastel) */
+.fc-event-others {
+    background-color: var(--others-pastel) !important;
+    border: none !important;
+    border-left: 4px solid var(--google-blue) !important;
+}
+.fc-event-others .fc-event-title-custom { color: #01579b !important; font-weight: 500; }
+
+/* Mes réservations (Orange soutenu) */
 .fc-event-mine {
     background-color: var(--mine-color) !important;
-    border: 1px solid #cc7000 !important;
-    z-index: 5 !important;
+    border: none !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
-.fc-event-mine .fc-event-title-custom {
-    color: white !important;
-    font-weight: 900;
-    padding-left: 3px;
-}
+.fc-event-mine .fc-event-title-custom { color: white !important; font-weight: bold; }
 
-/* Bouton X blanc pour trancher sur l'orange */
 .delete-event-btn {
-    position: absolute; top: 1px; right: 2px;
-    background: white; color: var(--danger-color);
-    border-radius: 50%; width: 14px; height: 14px;
+    position: absolute; top: 3px; right: 4px;
+    background: white; color: #d93025;
+    border-radius: 50%; width: 16px; height: 16px;
     font-size: 10px; display: flex; justify-content: center; align-items: center;
     cursor: pointer;
 }
 
-/* --- MODALES --- */
-.modal-content { font-size: 12px; border-radius: 10px; }
-.modal-content h3 { margin-top: 0; }
-.modal-content input { padding: 8px; font-size: 12px; }
-
-/* Grille plus fine */
-.fc-timegrid-slot { height: 35px !important; }
+/* --- MODALES & POPUPS --- */
+.modal {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(32, 33, 36, 0.6); z-index: 2000; justify-content: center; align-items: center;
+}
+.modal-content { 
+    background: white; padding: 24px; border-radius: 8px; width: 90%; max-width: 400px;
+    box-shadow: 0 12px 20px rgba(0,0,0,0.2);
+}
+.popup-info {
+    display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: white; padding: 24px; border-radius: 8px; 
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 3000;
+    width: 300px; border-left: 6px solid var(--google-blue);
+}
+.popup-title { font-size: 12px; color: #70757a; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+.popup-body { font-size: 16px; line-height: 1.5; }
+.btn-close-popup { width: 100%; margin-top: 15px; border: none; padding: 10px; border-radius: 4px; cursor: pointer; background: #f1f3f4; }
