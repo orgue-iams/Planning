@@ -8,7 +8,7 @@ function login() {
     const email = document.getElementById('userEmail').value;
     if(email) {
         localStorage.setItem('orgue_auth', 'true');
-        localStorage.setItem('orgue_user_email', email);
+        localStorage.setItem('orgue_user_email', email.toLowerCase());
         showApp();
     }
 }
@@ -24,32 +24,35 @@ function logout() {
 }
 
 function sendReservation() {
-    const startInput = document.getElementById('eventStart').value;
-    const endInput = document.getElementById('eventEnd').value;
+    const startVal = document.getElementById('eventStart').value;
+    const endVal = document.getElementById('eventEnd').value;
     const status = document.getElementById('status');
 
-    if(!startInput || !endInput) return alert("Dates manquantes");
+    if(!startVal || !endVal) return alert("Dates manquantes");
 
-    const start = new Date(startInput);
-    const end = new Date(endInput);
+    const start = new Date(startVal);
+    const end = new Date(endVal);
 
-    // Validation 8h - 23h
     if(start.getHours() < 8 || end.getHours() > 23 || (end.getHours() === 23 && end.getMinutes() > 0)) {
         return alert("Horaires autorisés : 08:00 à 23:00");
     }
 
-    status.innerText = "Envoi...";
+    status.innerText = "⏳ Vérification...";
     
     fetch(SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
         body: JSON.stringify({
             email: localStorage.getItem('orgue_user_email'),
-            start: startInput,
-            end: endInput
+            start: startVal,
+            end: endVal
         })
     }).then(() => {
         status.innerText = "✅ Réservé !";
-        document.getElementById('googleCal').src += ''; // Refresh agenda
+        // Rafraîchissement forcé de l'iframe
+        const cal = document.getElementById('googleCal');
+        cal.src = cal.src;
+        
+        setTimeout(() => { status.innerText = ""; }, 5000);
     });
 }
