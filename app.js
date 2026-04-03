@@ -2,10 +2,6 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwPznpQrAuJkyvr_Iqcm
 let calendar;
 let currentEvent = null;
 
-function changeView(viewName) {
-    if(calendar) calendar.changeView(viewName);
-}
-
 function showApp() {
     document.getElementById('loginSection').style.display = 'none';
     document.getElementById('appSection').style.display = 'block';
@@ -24,19 +20,32 @@ function initCalendar() {
         slotMinTime: '08:00:00',
         slotMaxTime: '22:00:00',
         allDaySlot: false,
-        height: 'calc(100vh - 120px)',
+        height: 'auto',
         nowIndicator: true,
         selectable: true,
         editable: true,
         slotLabelFormat: { hour: '2-digit', minute: '2-digit', meridiem: false },
         titleFormat: { year: 'numeric', month: 'short' },
-        dayHeaderFormat: { weekday: 'short', day: 'numeric' },
         
+        // Configuration de l'en-tête FullCalendar pour tout mettre sur une ligne
         headerToolbar: {
-            left: 'title',
+            left: 'title today prev,next',
             center: '',
-            right: 'today prev,next' // On retire les boutons natifs semaine/mois
+            right: 'timeGridWeek,dayGridMonth'
         },
+        buttonText: { today: "Aujourd'hui", week: "Semaine", month: "Mois" },
+        
+        // On sépare le nom du jour et le numéro pour le style
+        dayHeaderContent: function(arg) {
+            let dayName = arg.date.toLocaleDateString('fr-FR', { weekday: 'short' }).toUpperCase().replace('.', '');
+            let dayNum = arg.date.getDate();
+            
+            let container = document.createElement('div');
+            container.className = 'custom-header-container';
+            container.innerHTML = `<span class="day-name">${dayName}</span><span class="day-number">${dayNum}</span>`;
+            return { domNodes: [container] };
+        },
+
         events: `${SCRIPT_URL}?action=getEvents&email=${email}&password=${pass}`,
 
         eventContent: function(arg) {
@@ -83,7 +92,7 @@ function initCalendar() {
         },
 
         select: async function(info) {
-            if (info.view.type === 'dayGridMonth') return; 
+            if (info.view.type === 'dayGridMonth') return;
             const params = new URLSearchParams({action: "reserve", email, password: pass, title: name, start: info.start.toISOString(), end: info.end.toISOString()});
             await fetch(`${SCRIPT_URL}?${params}`);
             calendar.refetchEvents();
@@ -93,11 +102,10 @@ function initCalendar() {
     calendar.render();
 }
 
-// Fonctions Login/Logout/Update standard...
 async function login() {
     const email = document.getElementById('userEmail').value.trim().toLowerCase();
     const pass = document.getElementById('userPass').value.trim();
-    const resp = await fetch(`${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`);
+    const resp = await fetch(`${SCRIPT_URL}?action=login&email=${email}&password=${pass}`);
     const data = await resp.json();
     if(data.result === "success") {
         localStorage.setItem('orgue_user', email);
