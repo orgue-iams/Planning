@@ -11,14 +11,14 @@ function showMsg(text, isError = true) {
     const el = document.getElementById('loginMessage');
     if (el) {
         el.innerText = text; 
-        el.style.color = isError ? "#ff3b30" : "#34c759";
+        el.style.color = isError ? "#d93025" : "#1e8e3e";
     }
 }
 
 async function login() {
     const email = document.getElementById('userEmail').value.trim().toLowerCase();
     const pass = document.getElementById('userPass').value.trim();
-    if(!email || !pass) return showMsg("Veuillez remplir les champs");
+    if(!email || !pass) return showMsg("Champs requis");
     showMsg("Connexion...", false);
     try {
         const resp = await fetch(`${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`);
@@ -60,14 +60,19 @@ function initCalendar() {
         locale: 'fr',
         slotMinTime: '08:00:00',
         slotMaxTime: '22:00:00',
-        slotLabelFormat: { hour: '2-digit', minute: '2-digit', meridiem: false },
-        dayHeaderFormat: { day: 'numeric', weekday: 'short' }, // Affiche : 12 lun.
-        height: 'calc(100vh - 100px)',
         allDaySlot: false,
+        height: 'calc(100vh - 120px)',
+        nowIndicator: true,
         selectable: true,
         editable: true,
-        eventOverlap: false,
-        nowIndicator: true,
+        slotLabelFormat: { hour: '2-digit', minute: '2-digit', meridiem: false },
+        
+        // Titre haut gauche : ex. Mars - Avr. 2026
+        titleFormat: { year: 'numeric', month: 'short' },
+        
+        // Format Header : Nom jour (3 lettres) + Numéro
+        dayHeaderFormat: { weekday: 'short', day: 'numeric' },
+        
         headerToolbar: {
             left: 'title',
             center: '',
@@ -76,68 +81,48 @@ function initCalendar() {
         buttonText: { today: "Aujourd'hui", month: "Mois", week: "Semaine" },
         events: `${SCRIPT_URL}?action=getEvents&email=${email}&password=${pass}`,
 
-        eventDrop: (info) => handleSync(info),
-        eventResize: (info) => handleSync(info),
-
         eventContent: function(arg) {
-            let nodes = [];
             let title = document.createElement('div');
             title.innerHTML = arg.event.title;
             title.className = 'fc-event-title-custom';
-            nodes.push(title);
-
-            if (arg.event.extendedProps && arg.event.extendedProps.mine) {
+            if (arg.event.extendedProps?.mine) {
                 let x = document.createElement('div');
                 x.innerHTML = '✕';
                 x.className = 'delete-event-btn';
                 x.onclick = async (e) => {
                     e.stopPropagation();
-                    if (confirm("Supprimer cette réservation ?")) {
+                    if (confirm("Supprimer ?")) {
                         arg.event.remove();
                         await fetch(`${SCRIPT_URL}?action=delete&id=${arg.event.id}&email=${email}&password=${pass}`);
                     }
                 };
-                nodes.push(x);
+                return { domNodes: [title, x] };
             }
-            return { domNodes: nodes };
+            return { domNodes: [title] };
         },
 
         eventDidMount: function(arg) {
-            if (arg && arg.el && arg.event && arg.event.extendedProps) {
-                if (arg.event.extendedProps.mine) {
-                    arg.el.classList.add('fc-event-mine');
-                } else {
-                    arg.el.classList.add('fc-event-others');
-                }
-            }
+            if (arg.event.extendedProps?.mine) arg.el.classList.add('fc-event-mine');
+            else arg.el.classList.add('fc-event-others');
         },
 
         eventClick: function(info) {
             currentEvent = info.event;
-            if (info.event.extendedProps && info.event.extendedProps.mine) {
+            if (info.event.extendedProps?.mine) {
                 document.getElementById('editTitle').value = info.event.title;
                 document.getElementById('editStart').value = info.event.start.toTimeString().substring(0,5);
                 document.getElementById('editEnd').value = info.event.end.toTimeString().substring(0,5);
                 document.getElementById('modalEdit').style.display = 'flex';
             } else {
-                const startStr = info.event.start.toLocaleTimeString([], {hour:'2h', minute:'2m'});
-                const endStr = info.event.end.toLocaleTimeString([], {hour:'2h', minute:'2m'});
-                document.getElementById('viewContent').innerHTML = `
-                    <div class="popup-title">Détails</div>
-                    <div class="popup-body">
-                        <strong>${info.event.title}</strong><br>
-                        <span style="color:#70757a">${startStr} – ${endStr}</span>
-                    </div>
-                `;
+                const start = info.event.start.toLocaleTimeString([], {hour:'2h', minute:'2m'});
+                const end = info.event.end.toLocaleTimeString([], {hour:'2h', minute:'2m'});
+                document.getElementById('viewContent').innerHTML = `<strong>${info.event.title}</strong><br>${start} - ${end}`;
                 document.getElementById('popupView').style.display = 'block';
             }
         },
 
         select: async function(info) {
-            if (info.view.type === 'dayGridMonth') {
-                calendar.changeView('timeGridWeek', info.start);
-                return;
-            }
+            if (info.view.type === 'dayGridMonth') return calendar.changeView('timeGridWeek', info.start);
             const params = new URLSearchParams({action: "reserve", email, password: pass, title: name, start: info.start.toISOString(), end: info.end.toISOString()});
             await fetch(`${SCRIPT_URL}?${params}`);
             calendar.refetchEvents();
@@ -145,16 +130,6 @@ function initCalendar() {
         }
     });
     calendar.render();
-}
-
-async function handleSync(info) {
-    if (!info.event.extendedProps || !info.event.extendedProps.mine) return info.revert();
-    const email = localStorage.getItem('orgue_user');
-    const pass = localStorage.getItem('orgue_pass');
-    await fetch(`${SCRIPT_URL}?action=delete&id=${info.event.id}&email=${email}&password=${pass}`);
-    const params = new URLSearchParams({action: "reserve", email, password: pass, title: info.event.title, start: info.event.start.toISOString(), end: info.event.end.toISOString()});
-    await fetch(`${SCRIPT_URL}?${params}`);
-    calendar.refetchEvents();
 }
 
 async function updateEvent() {
@@ -179,10 +154,7 @@ function closeModals() {
     document.getElementById('popupView').style.display = 'none';
 }
 
-function logout() {
-    localStorage.clear();
-    location.reload();
-}
+function logout() { localStorage.clear(); location.reload(); }
 
 window.addEventListener('load', () => {
     if(localStorage.getItem('orgue_user')) showApp();
