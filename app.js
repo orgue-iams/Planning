@@ -1,4 +1,4 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzHNy1on-wMEspoBbYRGnlDUwLldl5Rg_Gonos_9PJJ4bzrPeGvaK9GkAUGEt-f_Hv7/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxf38i5S-9m3TOsGxAZkvx2LGb1gQS9iT8oVfvEnH2wMTcpFA7uXa3kd9_gMAsr6TGa/exec";
 let calendar;
 let currentEvent = null;
 
@@ -21,7 +21,7 @@ async function login() {
     }
     
     msg.style.color = "#5f6368";
-    msg.innerText = "Vérification...";
+    msg.innerText = "Connexion...";
     
     try {
         const url = `${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`;
@@ -40,7 +40,7 @@ async function login() {
     } catch (error) {
         console.error("Erreur login:", error);
         msg.style.color = "#d9534f";
-        msg.innerText = "Erreur de connexion au serveur.";
+        msg.innerText = "Erreur serveur (Vérifiez votre connexion).";
     }
 }
 
@@ -55,7 +55,7 @@ function logout() {
     location.reload();
 }
 
-// --- CONFIGURATION DU CALENDRIER ---
+// --- CONFIGURATION DU CALENDRIER (TURBO MODE) ---
 function initCalendar() {
     const email = localStorage.getItem('orgue_user');
     const name = localStorage.getItem('orgue_name');
@@ -71,8 +71,9 @@ function initCalendar() {
         nowIndicator: true,
         selectable: true,
         editable: true,
+        lazyFetching: true, // Optimisation : évite les appels serveurs inutiles
         
-        // --- SÉCURITÉ ANTI-CHEVAUCHEMENT CLIENT ---
+        // Sécurité visuelle immédiate
         eventOverlap: false, 
         selectOverlap: false,
 
@@ -83,31 +84,47 @@ function initCalendar() {
             right: 'timeGridWeek,dayGridMonth' 
         },
 
-        // Source des données (Planning)
-        events: `${SCRIPT_URL}?action=getEvents&email=${email}`,
-
-        // Styles des événements (Couleurs)
-        eventDidMount: (info) => {
-            if (info.event.extendedProps?.mine) {
-                info.el.style.backgroundColor = '#93c54b'; // Vert (Mien)
-                info.el.style.borderColor = '#93c54b';
-            } else {
-                info.el.style.backgroundColor = '#3e3f3a'; // Gris (Autres)
-                info.el.style.borderColor = '#3e3f3a';
-                info.event.setProp('editable', false);    // Interdit de bouger ceux des autres
-            }
+        // Chargement des données
+        events: function(fetchInfo, successCallback, failureCallback) {
+            const url = `${SCRIPT_URL}?action=getEvents&email=${email}&start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`;
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    // On formate les données pour FullCalendar
+                    const events = data.map(ev => ({
+                        id: ev.id,
+                        title: ev.title,
+                        start: ev.start,
+                        end: ev.end,
+                        backgroundColor: ev.mine ? '#93c54b' : '#3e3f3a',
+                        borderColor: ev.mine ? '#93c54b' : '#3e3f3a',
+                        editable: ev.mine // Seuls mes créneaux sont déplaçables
+                    }));
+                    successCallback(events);
+                })
+                .catch(err => failureCallback(err));
         },
 
-        // Action : Cliquer sur un créneau existant
+        // Clic sur un événement
         eventClick: (info) => {
             currentEvent = info.event;
             openPopup(info.event);
         },
 
-        // Action : Glisser pour réserver (Nouveau créneau)
+        // Réservation immédiate
         select: async (info) => {
             if (info.view.type === 'dayGridMonth') return;
             
+            // Création visuelle immédiate (UI Optimiste)
+            const tempId = 'temp-' + Date.now();
+            const newEv = calendar.addEvent({
+                id: tempId,
+                title: name,
+                start: info.start,
+                end: info.end,
+                backgroundColor: '#93c54b'
+            });
+
             const params = new URLSearchParams({
                 action: "reserve",
                 email: email,
@@ -119,51 +136,53 @@ function initCalendar() {
             try {
                 const response = await fetch(`${SCRIPT_URL}?${params}`, { method: 'GET', redirect: 'follow' });
                 const data = await response.json();
-                
                 if (data.result === "collision") {
-                    alert("Ce créneau est déjà occupé !");
+                    alert("Déjà réservé !");
+                    newEv.remove();
                 }
                 calendar.refetchEvents();
             } catch (e) {
-                console.error("Erreur réservation:", e);
+                newEv.remove();
             }
             calendar.unselect();
         },
 
-        // Action : Déplacer ou redimensionner (Update)
+        // Déplacement (Drag & Drop)
         eventDrop: (info) => syncEventChange(info),
-        eventResize: (info) => syncEventChange(info)
+        eventResize: (info) => syncEventChange(info),
+
+        // Indicateur de chargement
+        loading: (isLoading) => {
+            calendarEl.style.opacity = isLoading ? '0.6' : '1';
+        }
     });
 
     calendar.render();
 }
 
-// --- SYNCHRONISATION AVEC LE SERVEUR ---
-async function syncEventChange(info) {
+// --- SYNCHRONISATION ARRIÈRE-PLAN (SANS AWAIT) ---
+function syncEventChange(info) {
     const email = localStorage.getItem('orgue_user');
     const url = `${SCRIPT_URL}?action=update&id=${info.event.id}&email=${email}&start=${info.event.start.toISOString()}&end=${info.event.end.toISOString()}`;
     
-    try {
-        const response = await fetch(url, { method: 'GET', redirect: 'follow' });
-        const data = await response.json();
-        
+    // On lance la requête sans bloquer l'interface
+    fetch(url, { method: 'GET', redirect: 'follow' })
+    .then(res => res.json())
+    .then(data => {
         if (data.result !== "success") {
-            alert(data.result === "collision" ? "Espace déjà occupé par un autre utilisateur !" : "Erreur de mise à jour.");
-            info.revert(); // Remet le créneau à sa place initiale
+            alert(data.result === "collision" ? "Espace déjà occupé !" : "Erreur serveur.");
+            info.revert();
         }
-    } catch (e) {
-        console.error("Erreur réseau:", e);
-        info.revert();
-    }
+    })
+    .catch(() => info.revert());
 }
 
-// --- GESTION DE LA MODALE DÉTAILS / SUPPRESSION ---
+// --- MODALE ---
 function openPopup(event) {
-    const isMine = event.extendedProps.mine;
+    const isMine = event.backgroundColor === '#93c54b' || event.extendedProps.mine;
     const startStr = event.start.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
     const endStr = event.end.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
 
-    // Afficher les boutons seulement si c'est notre créneau
     document.getElementById('btnEdit').style.display = isMine ? 'inline-flex' : 'none';
     document.getElementById('btnDelete').style.display = isMine ? 'inline-flex' : 'none';
 
@@ -171,12 +190,6 @@ function openPopup(event) {
         <div class="mb-1 small text-muted">UTILISATEUR</div><div class="mb-3"><strong>${event.title}</strong></div>
         <div class="mb-1 small text-muted">HORAIRE</div><div>${startStr} - ${endStr}</div>
     `;
-
-    // Pré-remplir le mode édition
-    document.getElementById('editTitle').value = event.title;
-    document.getElementById('editDate').value = event.start.toISOString().split('T')[0];
-    document.getElementById('editStart').value = startStr.replace('h', ':');
-    document.getElementById('editEnd').value = endStr.replace('h', ':');
 
     document.getElementById('viewMode').style.display = 'block';
     document.getElementById('editMode').style.display = 'none';
@@ -189,18 +202,13 @@ async function deleteCurrentEvent() {
     const email = localStorage.getItem('orgue_user');
     const url = `${SCRIPT_URL}?action=delete&id=${currentEvent.id}&email=${email}`;
     
-    currentEvent.remove(); // Suppression visuelle immédiate
+    currentEvent.remove(); 
     closeModals();
 
-    try {
-        await fetch(url, { method: 'GET', redirect: 'follow' });
-    } catch (e) {
-        console.error("Erreur suppression:", e);
-        calendar.refetchEvents();
-    }
+    fetch(url, { method: 'GET', redirect: 'follow' })
+    .catch(() => calendar.refetchEvents());
 }
 
-// --- UTILITAIRES INTERFACE ---
 function closeModals() {
     document.getElementById('popupDetails').style.display = 'none';
 }
@@ -208,9 +216,4 @@ function closeModals() {
 function togglePass() {
     const p = document.getElementById('userPass');
     p.type = p.type === "password" ? "text" : "password";
-}
-
-function switchToEditMode() {
-    document.getElementById('viewMode').style.display = 'none';
-    document.getElementById('editMode').style.display = 'block';
 }
