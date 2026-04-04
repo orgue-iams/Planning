@@ -1,4 +1,4 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwF6WjWV5qgaeU0Lq3PPMq0bIyAW4P87ULtiz9L6cyjLSI5rQfMtKL3JTbWl8DBEeVO/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwurGGeuHUqAEE0NptLIpoQK-lafhU9njjM1wKfgRbYlk7xLBorfgsGrDe3rXIRSmsJ/exec";
 let calendar;
 let currentEvent = null;
 
@@ -49,17 +49,34 @@ function initCalendar() {
                 .then(res => res.json())
                 .then(data => {
                     if (data.result === "error") {
-                        console.error(data.details);
+                        console.error("Erreur serveur:", data.details);
                         return successCallback([]);
                     }
-                    successCallback(data.map(ev => ({
-                        id: ev.id, title: ev.title, start: ev.start, end: ev.end,
-                        backgroundColor: ev.mine ? '#93c54b' : '#3e3f3a',
-                        borderColor: ev.mine ? '#93c54b' : '#3e3f3a',
-                        editable: ev.mine,
-                        extendedProps: { mine: ev.mine }
-                    })));
-                }).catch(e => failureCallback(e));
+                    
+                    // FILTRE ET SÉCURITÉ DES DATES
+                    const validEvents = data.filter(ev => ev.start && ev.end).map(ev => {
+                        try {
+                            return {
+                                id: ev.id,
+                                title: ev.title,
+                                start: ev.start,
+                                end: ev.end,
+                                backgroundColor: ev.mine ? '#93c54b' : '#3e3f3a',
+                                borderColor: ev.mine ? '#93c54b' : '#3e3f3a',
+                                editable: ev.mine,
+                                extendedProps: { mine: ev.mine }
+                            };
+                        } catch (e) {
+                            console.warn("Événement ignoré (date invalide):", ev);
+                            return null;
+                        }
+                    }).filter(e => e !== null);
+
+                    successCallback(validEvents);
+                }).catch(e => {
+                    console.error("Erreur Fetch:", e);
+                    failureCallback(e);
+                });
         },
 
         eventClick: (info) => { currentEvent = info.event; openPopup(info.event); },
