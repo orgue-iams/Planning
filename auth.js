@@ -1,6 +1,5 @@
-// CONFIGURATION
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxcJzXEDx5f0o59jRX4U9EUhE3Bsdlw5Bl_X4SkKLqdcSHn99atQ-6qnxoK6aO7EL3X/exec";
-const REPO_PATH = "orgue-iams/orgue-iams.github.io"; // Ton dépôt GitHub
+const REPO_PATH = "orgue-iams/orgue-iams.github.io";
 
 // RÉCUPÉRATION AUTOMATIQUE DU BUILD VIA GITHUB API
 async function fetchLastBuild() {
@@ -8,28 +7,22 @@ async function fetchLastBuild() {
         const response = await fetch(`https://api.github.com/repos/${REPO_PATH}/commits/main`);
         if (!response.ok) throw new Error();
         const data = await response.json();
-        
-        // On récupère les 7 premiers caractères du commit SHA et la date
         const commitId = data.sha.substring(0, 7);
         const commitDate = new Date(data.commit.author.date).toLocaleDateString('fr-FR');
-        
-        const buildInfo = `Build: ${commitId} (${commitDate})`;
-        document.querySelectorAll('.version-display').forEach(el => el.innerText = buildInfo);
+        document.querySelectorAll('.version-display').forEach(el => el.innerText = `Build: ${commitId} (${commitDate})`);
     } catch (e) {
-        // En cas d'erreur ou de limite d'API, on affiche une version par défaut
-        document.querySelectorAll('.version-display').forEach(el => el.innerText = "v1.2.1-static");
+        document.querySelectorAll('.version-display').forEach(el => el.innerText = "v1.2.5-stable");
     }
 }
 
-// INITIALISATION AU CHARGEMENT
 document.addEventListener('DOMContentLoaded', () => {
     fetchLastBuild();
+    // Si l'utilisateur est déjà connecté
     if (localStorage.getItem('orgue_user')) {
         if (typeof showApp === "function") showApp();
     }
 });
 
-// GESTION DU MOT DE PASSE
 function togglePasswordVisibility() {
     const passInput = document.getElementById('userPass');
     const icon = document.getElementById('togglePassword');
@@ -42,13 +35,14 @@ function togglePasswordVisibility() {
     }
 }
 
-// LOGIQUE DE CONNEXION
+// CONNEXION
 async function login() {
     const msg = document.getElementById('loginMessage');
     const email = document.getElementById('userEmail').value.trim().toLowerCase();
     const pass = document.getElementById('userPass').value.trim();
     
     if(!email || !pass) {
+        msg.style.color = "#d9534f";
         msg.innerText = "Veuillez remplir tous les champs.";
         return;
     }
@@ -60,17 +54,51 @@ async function login() {
         const response = await fetch(url, { method: 'GET', redirect: 'follow' });
         const data = await response.json();
         toggleLoader(false);
-        
         if (data.result === "success") {
             localStorage.setItem('orgue_user', email);
             localStorage.setItem('orgue_name', data.name);
-            showApp(); // Cette fonction est dans app.js
+            showApp();
         } else { 
+            msg.style.color = "#d9534f";
             msg.innerText = "Identifiants incorrects."; 
         }
     } catch (e) { 
         toggleLoader(false);
         msg.innerText = "Erreur de connexion serveur."; 
+    }
+}
+
+// MOT DE PASSE OUBLIÉ (AUTOMATIQUE)
+async function handleForgotPassword(e) {
+    e.preventDefault();
+    const email = document.getElementById('userEmail').value.trim().toLowerCase();
+    const msg = document.getElementById('loginMessage');
+
+    if (!email) {
+        msg.style.color = "#d9534f";
+        msg.innerText = "Saisissez votre email ci-dessus d'abord.";
+        return;
+    }
+
+    if (!confirm(`Envoyer votre mot de passe à ${email} ?`)) return;
+
+    toggleLoader(true);
+    try {
+        const url = `${SCRIPT_URL}?action=forgotPassword&email=${encodeURIComponent(email)}`;
+        const response = await fetch(url, { method: 'GET', redirect: 'follow' });
+        const data = await response.json();
+        toggleLoader(false);
+
+        if (data.result === "success") {
+            msg.style.color = "#10b981"; // Vert pour succès
+            msg.innerText = "Email envoyé ! Vérifiez vos courriers.";
+        } else {
+            msg.style.color = "#d9534f";
+            msg.innerText = "Email inconnu dans la base.";
+        }
+    } catch (err) {
+        toggleLoader(false);
+        msg.innerText = "Erreur d'envoi.";
     }
 }
 
