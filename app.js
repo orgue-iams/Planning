@@ -1,11 +1,13 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxcJzXEDx5f0o59jRX4U9EUhE3Bsdlw5Bl_X4SkKLqdcSHn99atQ-6qnxoK6aO7EL3X/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzQ3H7ZbqOzuuKxdRaEroLBEYRgALzYExNGegJQctzTe4uyOZ7YdR2ondHoDvN2f3cq/exec";
 let calendar;
 let currentEvent = null;
 
-// Au chargement, on vérifie si l'utilisateur est déjà connecté
-window.onload = () => { 
-    if (localStorage.getItem('orgue_user')) showApp(); 
-};
+window.onload = () => { if (localStorage.getItem('orgue_user')) showApp(); };
+
+// --- UTILITAIRES ---
+function toggleLoader(show) {
+    document.getElementById('loader').style.display = show ? 'flex' : 'none';
+}
 
 // --- AUTHENTIFICATION ---
 async function login() {
@@ -14,21 +16,23 @@ async function login() {
     const msg = document.getElementById('loginMessage');
     const url = `${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`;
     
+    toggleLoader(true);
     try {
         const response = await fetch(url, { method: 'GET', redirect: 'follow' });
         const data = await response.json();
+        toggleLoader(false);
         if (data.result === "success") {
             localStorage.setItem('orgue_user', email);
             localStorage.setItem('orgue_name', data.name);
             showApp();
         } else { msg.innerText = "Identifiants incorrects."; }
-    } catch (e) { msg.innerText = "Erreur de connexion serveur."; }
+    } catch (e) { 
+        toggleLoader(false);
+        msg.innerText = "Erreur de connexion serveur."; 
+    }
 }
 
-function logout() { 
-    localStorage.clear(); 
-    location.reload(); 
-}
+function logout() { localStorage.clear(); location.reload(); }
 
 function showApp() {
     document.getElementById('loginSection').style.display = 'none';
@@ -70,18 +74,20 @@ function initCalendar() {
                 }).catch(e => failureCallback(e));
         },
 
-        eventClick: (info) => { 
-            currentEvent = info.event; 
-            openPopup(info.event); 
-        },
+        eventClick: (info) => { currentEvent = info.event; openPopup(info.event); },
 
         select: async (info) => {
             if (info.view.type === 'dayGridMonth') return;
             const params = `action=reserve&email=${email}&title=${name}&start=${info.start.toISOString()}&end=${info.end.toISOString()}`;
+            toggleLoader(true);
             try {
                 await fetch(`${SCRIPT_URL}?${params}`, { method: 'GET', redirect: 'follow' });
+                toggleLoader(false);
                 calendar.refetchEvents();
-            } catch (e) { calendar.refetchEvents(); }
+            } catch (e) { 
+                toggleLoader(false);
+                calendar.refetchEvents(); 
+            }
             calendar.unselect();
         },
 
@@ -92,28 +98,37 @@ function initCalendar() {
     calendar.render();
 }
 
-// --- ACTIONS SYNCHRONES ---
 function syncEventChange(info) {
     const email = localStorage.getItem('orgue_user');
     const url = `${SCRIPT_URL}?action=update&id=${info.event.id}&email=${email}&start=${info.event.start.toISOString()}&end=${info.event.end.toISOString()}`;
+    toggleLoader(true);
     fetch(url, { method: 'GET', redirect: 'follow' })
     .then(res => res.json())
-    .then(data => { if (data.result !== "success") info.revert(); })
-    .catch(() => info.revert());
+    .then(data => { 
+        toggleLoader(false);
+        if (data.result !== "success") info.revert(); 
+    })
+    .catch(() => {
+        toggleLoader(false);
+        info.revert();
+    });
 }
 
 function openPopup(event) {
     const isMine = event.extendedProps.mine;
-    document.getElementById('btnEdit').style.display = isMine ? 'inline-flex' : 'none';
     document.getElementById('btnDelete').style.display = isMine ? 'inline-flex' : 'none';
     document.getElementById('viewMode').innerHTML = `<strong>${event.title}</strong><br>${event.start.toLocaleTimeString()} - ${event.end.toLocaleTimeString()}`;
     document.getElementById('popupDetails').style.display = 'flex';
 }
 
 async function deleteCurrentEvent() {
-    if (!confirm("Voulez-vous vraiment supprimer cette réservation ?")) return;
+    if (!confirm("Voulez-vous supprimer cette réservation ?")) return;
     const url = `${SCRIPT_URL}?action=delete&id=${currentEvent.id}&email=${localStorage.getItem('orgue_user')}`;
+    toggleLoader(true);
     currentEvent.remove();
     document.getElementById('popupDetails').style.display = 'none';
-    fetch(url, { method: 'GET', redirect: 'follow' });
+    try {
+        await fetch(url, { method: 'GET', redirect: 'follow' });
+        toggleLoader(false);
+    } catch(e) { toggleLoader(false); }
 }
