@@ -3,70 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Planning Orgue IAMS</title>
-    
-    <link rel="icon" type="image/png" href="https://img.icons8.com/color/512/piano.png">
-    
-    <link rel="manifest" href="manifest.json">
-
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <title>Gestion Orgue - G. Bancells</title>
     <link rel="stylesheet" href="style.css">
-    
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales/fr.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
 </head>
 <body>
-    <div id="loader" class="loader-overlay" style="display: none;"><div class="spinner"></div></div>
 
-    <div id="loginSection" class="container login-card">
-        <div class="login-header">
-            <h1>Planning IAMS</h1>
-            <h3>Orgue G. Bancells</h3>
-        </div>
-        <div class="form-group">
-            <div class="input-block">
-                <label>Email</label>
-                <input type="email" id="userEmail" placeholder="votre@email.com">
+    <div id="loader" style="display:none;">
+        <div class="spinner"></div>
+    </div>
+
+    <section id="loginSection" class="auth-container">
+        <div class="auth-box">
+            <h1>Orgue G. Bancells</h1>
+            <p class="subtitle">Espace de réservation</p>
+            
+            <div class="input-group">
+                <i class="fa fa-envelope"></i>
+                <input type="email" id="userEmail" placeholder="Email" required>
             </div>
-            <div class="input-block">
-                <label>Mot de passe</label>
-                <div class="password-wrapper">
-                    <input type="password" id="userPass" placeholder="••••••••">
-                    <i class="far fa-eye" id="togglePassword" onclick="togglePasswordVisibility()"></i>
-                </div>
+            
+            <div class="input-group">
+                <i class="fa fa-lock"></i>
+                <input type="password" id="userPass" placeholder="Mot de passe" required>
+                <i class="fa fa-eye toggle-pass" id="togglePassword" onclick="togglePasswordVisibility()"></i>
             </div>
-            <button class="login-btn" onclick="login()">Se connecter</button>
-            <div class="forgot-link-container">
-                <a href="#" onclick="handleForgotPassword(event)" class="forgot-link">Mot de passe oublié ?</a>
-            </div>
+
+            <button onclick="login()" class="btn-login">Se connecter</button>
             <p id="loginMessage"></p>
+            
+            <div class="version-display">v1.5.2-stable</div>
         </div>
-        <div class="version-display version-tag">Chargement build...</div>
-    </div>
+    </section>
 
-    <div id="appSection" style="display:none;">
-        <div class="header-bar">
-            <h2>Orgue G. Bancells</h2>
+    <section id="appSection" style="display:none;">
+        <nav class="navbar">
+            <span class="logo">Planning Orgue</span>
             <div class="user-info">
-                <span id="userNameDisplay"></span>
-                <button class="logout-btn" onclick="logout()">Déconnexion</button>
+                <span id="userNameDisplay">Utilisateur</span>
+                <button onclick="logout()" class="btn-logout"><i class="fa fa-sign-out-alt"></i></button>
             </div>
-        </div>
-        <div id="calendar"></div>
-        <div class="version-display version-tag-app"></div>
-    </div>
+        </nav>
 
-    <div id="popupDetails" class="modal" style="display:none;">
-        <div class="modal-content">
-            <div id="viewMode"></div>
-            <div class="modal-buttons">
-                <button id="btnDelete" class="delete-btn" onclick="deleteCurrentEvent()">Supprimer</button>
-                <button class="close-btn" onclick="document.getElementById('popupDetails').style.display='none'">Fermer</button>
-            </div>
-        </div>
-    </div>
+        <main class="calendar-container">
+            <div id="calendar"></div>
+        </main>
+    </section>
 
     <script src="auth.js"></script>
     <script src="app.js"></script>
