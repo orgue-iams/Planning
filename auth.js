@@ -1,4 +1,4 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzzrjR3XLp3JW5L4yusJSr8bO9jSAmVoxQV2npGELygS3OHPQjenWMg2cjDhmd-Zw39/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz1cnIvKmQsWAfF7XNy456Fk2BJk049YuSErR0-3tfcD2Tv-KBnNGU2KbcWoNa8OJH7/exec";
 const REPO_PATH = "orgue-iams/orgue-iams.github.io";
 
 async function fetchLastBuild() {
