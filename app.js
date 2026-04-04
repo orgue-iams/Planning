@@ -2,6 +2,20 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwPznpQrAuJkyvr_Iqcm
 let calendar;
 let currentEvent = null;
 
+// --- FONCTION D'ENVOI SÉCURISÉE (ANTI-CORS) ---
+async function sendData(params) {
+    try {
+        await fetch(`${SCRIPT_URL}?${params}`, {
+            mode: 'no-cors',
+            method: 'GET'
+        });
+        return true;
+    } catch (e) {
+        console.error("Erreur d'envoi:", e);
+        return false;
+    }
+}
+
 // --- CONNEXION ---
 async function login() {
     const email = document.getElementById('userEmail').value.trim().toLowerCase();
@@ -14,7 +28,7 @@ async function login() {
     }
 
     msg.style.color = "#5f6368";
-    msg.innerText = "Connexion au calendrier...";
+    msg.innerText = "Vérification...";
     
     try {
         const url = `${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`;
@@ -32,7 +46,7 @@ async function login() {
         }
     } catch (error) {
         msg.style.color = "#d9534f";
-        msg.innerText = "Erreur réseau. Vérifiez votre connexion.";
+        msg.innerText = "Erreur de connexion au serveur.";
     }
 }
 
@@ -85,9 +99,12 @@ function initCalendar() {
 
         select: async (info) => {
             if (info.view.type === 'dayGridMonth') return;
-            const params = new URLSearchParams({ action: "reserve", email, password: pass, title: name, start: info.start.toISOString(), end: info.end.toISOString() });
-            await fetch(`${SCRIPT_URL}?${params}`);
-            calendar.refetchEvents();
+            const params = new URLSearchParams({ 
+                action: "reserve", email, password: pass, title: name, 
+                start: info.start.toISOString(), end: info.end.toISOString() 
+            });
+            await sendData(params);
+            setTimeout(() => calendar.refetchEvents(), 500);
             calendar.unselect();
         }
     });
@@ -126,27 +143,33 @@ function switchToEditMode() {
 async function saveChanges() {
     const email = localStorage.getItem('orgue_user');
     const pass = localStorage.getItem('orgue_pass');
-    // Supprimer l'ancien et créer le nouveau (logique Google Apps Script classique)
-    await fetch(`${SCRIPT_URL}?action=delete&id=${currentEvent.id}&email=${email}&password=${pass}`);
     
-    const params = new URLSearchParams({
+    // On supprime l'existant
+    const delParams = new URLSearchParams({ action: "delete", id: currentEvent.id, email, password: pass });
+    await sendData(delParams);
+    
+    // On crée le nouveau
+    const addParams = new URLSearchParams({
         action: "reserve", email, password: pass, title: document.getElementById('editTitle').value,
         start: new Date(`${document.getElementById('editDate').value}T${document.getElementById('editStart').value}:00`).toISOString(),
         end: new Date(`${document.getElementById('editDate').value}T${document.getElementById('editEnd').value}:00`).toISOString()
     });
-    await fetch(`${SCRIPT_URL}?${params}`);
+    await sendData(addParams);
+    
     closeModals();
-    calendar.refetchEvents();
+    setTimeout(() => calendar.refetchEvents(), 600);
 }
 
 async function deleteCurrentEvent() {
     if (confirm("Supprimer cette réservation ?")) {
         const id = currentEvent.id;
-        currentEvent.remove();
-        closeModals();
         const email = localStorage.getItem('orgue_user');
         const pass = localStorage.getItem('orgue_pass');
-        await fetch(`${SCRIPT_URL}?action=delete&id=${id}&email=${email}&password=${pass}`);
+        const params = new URLSearchParams({ action: "delete", id, email, password: pass });
+        
+        currentEvent.remove();
+        closeModals();
+        await sendData(params);
     }
 }
 
@@ -158,7 +181,7 @@ async function syncEventChange(info) {
         action: "update", id: info.event.id, email, password: pass,
         start: info.event.start.toISOString(), end: info.event.end.toISOString(), title: info.event.title
     });
-    await fetch(`${SCRIPT_URL}?${params}`);
+    await sendData(params);
 }
 
 // --- UTILITAIRES ---
