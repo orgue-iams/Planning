@@ -1,4 +1,4 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwKwv0jv-Hg8atU0PC_YqI-ih5R7hsJX94GdU-_TYZN73vjpwBYzCTsxrk-pDpY-DTi/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzFZFHU0ERp0Y6bntcl2e9wINMGucsVSdKLifnARR-UI2R9uRjzv_GsJ9dhFhQbketD/exec";
 let calendar;
 let currentEvent = null;
 
