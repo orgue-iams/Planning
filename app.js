@@ -1,5 +1,4 @@
-// ASSUREZ-VOUS QUE CETTE URL EST CELLE DU TOUT DERNIER DÉPLOIEMENT
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzIb36zndWHHaCs0M8VqfTMkyZLfv3KUiv8zbZXKM3WuoVny76DON-52C7qiKXohTbf/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwF6WjWV5qgaeU0Lq3PPMq0bIyAW4P87ULtiz9L6cyjLSI5rQfMtKL3JTbWl8DBEeVO/exec";
 let calendar;
 let currentEvent = null;
 
@@ -10,7 +9,6 @@ async function login() {
     const pass = document.getElementById('userPass').value.trim();
     const msg = document.getElementById('loginMessage');
     const url = `${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`;
-    
     try {
         const response = await fetch(url, { method: 'GET', redirect: 'follow' });
         const data = await response.json();
@@ -19,7 +17,7 @@ async function login() {
             localStorage.setItem('orgue_name', data.name);
             showApp();
         } else { msg.innerText = "Identifiants incorrects."; }
-    } catch (e) { msg.innerText = "Erreur de connexion au serveur."; }
+    } catch (e) { msg.innerText = "Erreur serveur."; }
 }
 
 function showApp() {
@@ -50,14 +48,10 @@ function initCalendar() {
             fetch(url, { method: 'GET', redirect: 'follow' })
                 .then(res => res.json())
                 .then(data => {
-                    // Si le serveur a renvoyé une erreur (result: "error")
                     if (data.result === "error") {
-                        console.error("Erreur Google Script:", data.details);
-                        alert("Erreur Calendrier : " + data.details);
+                        console.error(data.details);
                         return successCallback([]);
                     }
-                    if (!Array.isArray(data)) return successCallback([]);
-                    
                     successCallback(data.map(ev => ({
                         id: ev.id, title: ev.title, start: ev.start, end: ev.end,
                         backgroundColor: ev.mine ? '#93c54b' : '#3e3f3a',
