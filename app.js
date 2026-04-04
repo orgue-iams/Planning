@@ -2,6 +2,7 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzhOMYytzqNuJTjPyX71
 let calendar;
 let currentEvent = null;
 
+// --- ENVOI SÉCURISÉ (MODE NO-CORS POUR L'ÉCRITURE) ---
 async function sendData(params) {
     try {
         await fetch(`${SCRIPT_URL}?${params}`, { mode: 'no-cors', method: 'GET' });
@@ -12,22 +13,22 @@ async function sendData(params) {
     }
 }
 
+// --- CONNEXION (ROBUSTE) ---
 async function login() {
     const email = document.getElementById('userEmail').value.trim().toLowerCase();
     const pass = document.getElementById('userPass').value.trim();
     const msg = document.getElementById('loginMessage');
     
-    if (!email || !pass) { msg.innerText = "Veuillez saisir vos identifiants."; return; }
-    msg.style.color = "#5f6368"; msg.innerText = "Vérification...";
+    if (!email || !pass) { msg.innerText = "Veuillez remplir les champs."; return; }
+    msg.style.color = "#5f6368"; msg.innerText = "Vérification en cours...";
     
     try {
         const url = `${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`;
         
-        // Ajout du redirect: 'follow' pour gérer la redirection Google Script
+        // Utilisation de redirect: 'follow' pour gérer la redirection Google
         const response = await fetch(url, { method: 'GET', redirect: 'follow' });
-        if (!response.ok) throw new Error('Erreur réseau');
-        
         const data = await response.json();
+
         if (data.result === "success") {
             localStorage.setItem('orgue_user', email);
             localStorage.setItem('orgue_pass', pass);
@@ -37,8 +38,8 @@ async function login() {
             msg.style.color = "#d9534f"; msg.innerText = "Email ou mot de passe incorrect.";
         }
     } catch (error) {
-        console.error("Erreur Login:", error);
-        msg.style.color = "#d9534f"; msg.innerText = "Erreur de connexion au serveur.";
+        console.error("Erreur login:", error);
+        msg.style.color = "#d9534f"; msg.innerText = "Erreur de connexion serveur.";
     }
 }
 
@@ -48,6 +49,7 @@ function showApp() {
     setTimeout(initCalendar, 50);
 }
 
+// --- INITIALISATION CALENDRIER ---
 function initCalendar() {
     const email = localStorage.getItem('orgue_user');
     const pass = localStorage.getItem('orgue_pass');
@@ -97,6 +99,7 @@ function initCalendar() {
     calendar.render();
 }
 
+// --- GESTION POPUP ---
 function openPopup(event) {
     const isMine = event.extendedProps.mine;
     const startStr = event.start.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
@@ -128,6 +131,7 @@ function switchToEditMode() {
 async function saveChanges() {
     const email = localStorage.getItem('orgue_user');
     const pass = localStorage.getItem('orgue_pass');
+    
     const delParams = new URLSearchParams({ action: "delete", id: currentEvent.id, email, password: pass });
     await sendData(delParams);
     
@@ -171,4 +175,5 @@ function togglePass() {
     const p = document.getElementById('userPass'); 
     p.type = p.type === "password" ? "text" : "password"; 
 }
+
 window.onload = () => { if(localStorage.getItem('orgue_user')) showApp(); };
