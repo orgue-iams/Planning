@@ -24,17 +24,22 @@
         </div>
         <div class="form-group">
             <div class="input-block">
-                <label>Email</label>
+                <label for="userEmail">Email</label>
                 <input type="email" id="userEmail" placeholder="votre@email.com">
             </div>
             <div class="input-block">
-                <label>Mot de passe</label>
+                <label for="userPass">Mot de passe</label>
                 <div class="password-wrapper">
                     <input type="password" id="userPass" placeholder="••••••••">
                     <i class="far fa-eye" id="togglePassword" onclick="togglePasswordVisibility()"></i>
                 </div>
             </div>
             <button class="login-btn" onclick="login()">Se connecter</button>
+            
+            <div class="forgot-link-container">
+                <a href="#" onclick="handleForgotPassword(event)" class="forgot-link">Mot de passe oublié ?</a>
+            </div>
+
             <p id="loginMessage"></p>
         </div>
         <div class="version-display version-tag">Chargement version...</div>
