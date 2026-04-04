@@ -1,14 +1,19 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxNVJ7IWV8ZjfXwGHYUkKA5TFnp5vK9fHvhlF4vwdJQOZHoMZHYNo2FOiHNXQW1RKPJ/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxcJzXEDx5f0o59jRX4U9EUhE3Bsdlw5Bl_X4SkKLqdcSHn99atQ-6qnxoK6aO7EL3X/exec";
 let calendar;
 let currentEvent = null;
 
-window.onload = () => { if (localStorage.getItem('orgue_user')) showApp(); };
+// Au chargement, on vérifie si l'utilisateur est déjà connecté
+window.onload = () => { 
+    if (localStorage.getItem('orgue_user')) showApp(); 
+};
 
+// --- AUTHENTIFICATION ---
 async function login() {
     const email = document.getElementById('userEmail').value.trim().toLowerCase();
     const pass = document.getElementById('userPass').value.trim();
     const msg = document.getElementById('loginMessage');
     const url = `${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`;
+    
     try {
         const response = await fetch(url, { method: 'GET', redirect: 'follow' });
         const data = await response.json();
@@ -17,7 +22,12 @@ async function login() {
             localStorage.setItem('orgue_name', data.name);
             showApp();
         } else { msg.innerText = "Identifiants incorrects."; }
-    } catch (e) { msg.innerText = "Erreur serveur."; }
+    } catch (e) { msg.innerText = "Erreur de connexion serveur."; }
+}
+
+function logout() { 
+    localStorage.clear(); 
+    location.reload(); 
 }
 
 function showApp() {
@@ -26,6 +36,7 @@ function showApp() {
     setTimeout(initCalendar, 50);
 }
 
+// --- CALENDRIER ---
 function initCalendar() {
     const email = localStorage.getItem('orgue_user');
     const name = localStorage.getItem('orgue_name');
@@ -48,10 +59,7 @@ function initCalendar() {
             fetch(url, { method: 'GET', redirect: 'follow' })
                 .then(res => res.json())
                 .then(data => {
-                    if (data.result === "error") {
-                        console.error("Erreur Google Script:", data.details);
-                        return successCallback([]);
-                    }
+                    if (data.result === "error") return successCallback([]);
                     successCallback(data.map(ev => ({
                         id: ev.id, title: ev.title, start: ev.start, end: ev.end,
                         backgroundColor: ev.mine ? '#93c54b' : '#3e3f3a',
@@ -62,7 +70,10 @@ function initCalendar() {
                 }).catch(e => failureCallback(e));
         },
 
-        eventClick: (info) => { currentEvent = info.event; openPopup(info.event); },
+        eventClick: (info) => { 
+            currentEvent = info.event; 
+            openPopup(info.event); 
+        },
 
         select: async (info) => {
             if (info.view.type === 'dayGridMonth') return;
@@ -81,6 +92,7 @@ function initCalendar() {
     calendar.render();
 }
 
+// --- ACTIONS SYNCHRONES ---
 function syncEventChange(info) {
     const email = localStorage.getItem('orgue_user');
     const url = `${SCRIPT_URL}?action=update&id=${info.event.id}&email=${email}&start=${info.event.start.toISOString()}&end=${info.event.end.toISOString()}`;
@@ -99,11 +111,9 @@ function openPopup(event) {
 }
 
 async function deleteCurrentEvent() {
-    if (!confirm("Supprimer ?")) return;
+    if (!confirm("Voulez-vous vraiment supprimer cette réservation ?")) return;
     const url = `${SCRIPT_URL}?action=delete&id=${currentEvent.id}&email=${localStorage.getItem('orgue_user')}`;
     currentEvent.remove();
     document.getElementById('popupDetails').style.display = 'none';
     fetch(url, { method: 'GET', redirect: 'follow' });
 }
-
-function logout() { localStorage.clear(); location.reload(); }
