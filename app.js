@@ -2,11 +2,14 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxEosjgFyHohNWFKvxqW
 let calendar;
 let currentEvent = null;
 
-// --- ENVOI DE DONNÉES (MODE NO-CORS POUR L'ÉCRITURE) ---
+// --- COMMUNICATIONS AVEC LE SERVEUR ---
+
+/**
+ * Envoi de données sans attendre de réponse JSON (Actions d'écriture)
+ * Utilise 'no-cors' pour éviter les blocages de sécurité lors des redirections Google
+ */
 async function sendData(params) {
     try {
-        // Pour les actions de modification (reserve, delete, update), 
-        // Google Apps Script ne renvoie pas de CORS, on utilise 'no-cors'.
         await fetch(`${SCRIPT_URL}?${params}`, { mode: 'no-cors', method: 'GET' });
         return true;
     } catch (e) {
@@ -15,7 +18,9 @@ async function sendData(params) {
     }
 }
 
-// --- SYSTÈME DE CONNEXION ---
+/**
+ * Fonction de Connexion
+ */
 async function login() {
     const email = document.getElementById('userEmail').value.trim().toLowerCase();
     const pass = document.getElementById('userPass').value.trim();
@@ -27,7 +32,7 @@ async function login() {
     try {
         const url = `${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`;
         
-        // On suit la redirection Google pour récupérer le JSON de succès
+        // On utilise redirect: 'follow' pour que le navigateur suive la redirection de Google Script
         const response = await fetch(url, { method: 'GET', redirect: 'follow' });
         const data = await response.json();
 
@@ -43,7 +48,7 @@ async function login() {
     } catch (error) {
         console.error("Erreur login:", error);
         msg.style.color = "#d9534f";
-        msg.innerText = "Erreur de connexion au serveur (CORS ou Timeout).";
+        msg.innerText = "Le serveur ne répond pas (Vérifiez le déploiement).";
     }
 }
 
@@ -54,6 +59,7 @@ function showApp() {
 }
 
 // --- INITIALISATION DU CALENDRIER ---
+
 function initCalendar() {
     const email = localStorage.getItem('orgue_user');
     const pass = localStorage.getItem('orgue_pass');
@@ -78,32 +84,31 @@ function initCalendar() {
             right: 'timeGridWeek,dayGridMonth' 
         },
         
-        // Synchronisation automatique après glisser-déposer
+        // Drag & Drop
         eventDrop: syncEventChange,
         eventResize: syncEventChange,
 
-        // Couleurs : Vert pour "mes" créneaux, Gris pour les autres
+        // Styles des événements
         eventDidMount: (info) => {
             if (info.event.extendedProps?.mine) {
-                info.el.style.backgroundColor = '#93c54b'; 
+                info.el.style.backgroundColor = '#93c54b'; // Vert pour l'utilisateur
                 info.el.style.borderColor = '#93c54b';
             } else {
-                info.el.style.backgroundColor = '#3e3f3a'; 
+                info.el.style.backgroundColor = '#3e3f3a'; // Gris pour les autres
                 info.el.style.borderColor = '#3e3f3a';
-                info.event.setProp('editable', false); // On ne peut pas bouger le créneau des autres
+                info.event.setProp('editable', false);
             }
         },
 
-        // Source des données
+        // Chargement des données
         events: `${SCRIPT_URL}?action=getEvents&email=${email}&password=${pass}`,
 
-        // Clic sur un événement (Détails / Modif)
         eventClick: (info) => { 
             currentEvent = info.event; 
             openPopup(info.event); 
         },
 
-        // Sélection d'une plage vide (Réservation)
+        // Sélection d'un nouveau créneau
         select: async (info) => {
             if (info.view.type === 'dayGridMonth') return;
             const params = new URLSearchParams({ 
@@ -122,7 +127,8 @@ function initCalendar() {
     calendar.render();
 }
 
-// --- GESTION DE LA MODALE ---
+// --- GESTION DES ACTIONS (MODALE) ---
+
 function openPopup(event) {
     const isMine = event.extendedProps.mine;
     const startStr = event.start.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
@@ -136,7 +142,6 @@ function openPopup(event) {
         <div class="mb-1 small text-muted">HORAIRE</div><div>${startStr} - ${endStr}</div>
     `;
 
-    // Pré-remplissage du mode édition
     document.getElementById('editTitle').value = event.title;
     document.getElementById('editDate').value = event.start.toISOString().split('T')[0];
     document.getElementById('editStart').value = startStr.replace('h', ':');
@@ -156,7 +161,7 @@ async function saveChanges() {
     const email = localStorage.getItem('orgue_user');
     const pass = localStorage.getItem('orgue_pass');
     
-    // On supprime l'ancien et on recrée (plus simple que 'update' complexe)
+    // Pour la modification, on supprime l'existant et on recrée (plus fiable)
     const delParams = new URLSearchParams({ action: "delete", id: currentEvent.id, email, password: pass });
     await sendData(delParams);
     
@@ -200,5 +205,4 @@ function togglePass() {
     p.type = p.type === "password" ? "text" : "password"; 
 }
 
-// Reconnexion auto
 window.onload = () => { if(localStorage.getItem('orgue_user')) showApp(); };
