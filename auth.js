@@ -24,27 +24,37 @@ async function login() {
     const pass = document.getElementById('userPass').value.trim();
     const msg = document.getElementById('loginMessage');
     
-    if(!email || !pass) { msg.innerText = "Champs requis"; return; }
+    if(!email || !pass) { 
+        msg.innerText = "Champs requis"; 
+        return; 
+    }
     
-    toggleLoader(true);
+    toggleLoader(true); // Le cercle commence à tourner
+    msg.innerText = ""; 
+
     try {
         const url = `${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`;
         const res = await fetch(url);
-        const data = await res.json();
-        toggleLoader(false);
         
+        // Sécurité : si la réponse n'est pas du JSON
+        const data = await res.json();
+        
+        toggleLoader(false); // ON ARRÊTE LE CERCLE ICI
+
         if (data.result === "success") {
             localStorage.setItem('orgue_user', email);
             localStorage.setItem('orgue_name', data.name);
-            showApp();
+            showApp(); // Affiche le planning
         } else {
             msg.style.color = "#ef4444";
+            // Affiche l'erreur précise venant de Google (ex: getSheetByName error)
             msg.innerText = data.message || "Identifiants invalides";
         }
     } catch (e) {
-        toggleLoader(false);
-        msg.innerText = "Erreur de connexion au serveur";
-        console.error(e);
+        toggleLoader(false); // ON ARRÊTE LE CERCLE AUSSI EN CAS DE CRASH
+        msg.style.color = "#ef4444";
+        msg.innerText = "Erreur de réponse du serveur";
+        console.error("Détail erreur:", e);
     }
 }
 
