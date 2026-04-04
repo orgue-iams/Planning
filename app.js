@@ -1,4 +1,4 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwDOfP_Gab4-PQSPHY3sO-Bgm6BZgA6L2vU9cBiJx5n8CmzVMDry5xhaiPTsMK0NQP3/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxNVJ7IWV8ZjfXwGHYUkKA5TFnp5vK9fHvhlF4vwdJQOZHoMZHYNo2FOiHNXQW1RKPJ/exec";
 let calendar;
 let currentEvent = null;
 
@@ -44,13 +44,12 @@ function initCalendar() {
         headerToolbar: { left: 'prev,next today title', center: '', right: 'timeGridWeek,dayGridMonth' },
 
         events: function(fetchInfo, successCallback, failureCallback) {
-            // On utilise toISOString() pour être le plus standard possible
             const url = `${SCRIPT_URL}?action=getEvents&email=${email}&start=${fetchInfo.start.toISOString()}&end=${fetchInfo.end.toISOString()}`;
             fetch(url, { method: 'GET', redirect: 'follow' })
                 .then(res => res.json())
                 .then(data => {
                     if (data.result === "error") {
-                        console.error("Erreur serveur détectée:", data.details);
+                        console.error("Erreur Google Script:", data.details);
                         return successCallback([]);
                     }
                     successCallback(data.map(ev => ({
