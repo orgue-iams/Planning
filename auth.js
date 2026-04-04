@@ -1,4 +1,4 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxcJzXEDx5f0o59jRX4U9EUhE3Bsdlw5Bl_X4SkKLqdcSHn99atQ-6qnxoK6aO7EL3X/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyxC8Cujp4u150jtDKO-IeWWhYZZYgZTNTBdlwHXe8AAee-pWjST_rHxV_sDxrulmk/exec";
 const REPO_PATH = "orgue-iams/orgue-iams.github.io";
 
 // Récupère automatiquement le dernier commit de GitHub
