@@ -1,179 +1,98 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxH57onzjLftYtwGC_JdxVveZ-yn_qZnhWcb6yCqlmG7OFu2hz46ETMC2BB02a9uIYP/exec";
-let calendar;
-let currentEvent = null;
+// CONFIGURATION
+const CALENDAR_ID = 'orgue.iams@gmail.com';
+const SPREADSHEET_NAME = 'Planning';
+const SHEET_NAME = 'Users';
 
-// --- ENVOI SÉCURISÉ (MODE NO-CORS POUR L'ÉCRITURE) ---
-async function sendData(params) {
-    try {
-        await fetch(`${SCRIPT_URL}?${params}`, { mode: 'no-cors', method: 'GET' });
-        return true;
-    } catch (e) {
-        console.error("Erreur d'envoi:", e);
-        return false;
-    }
-}
-
-// --- CONNEXION (ROBUSTE) ---
-async function login() {
-    const email = document.getElementById('userEmail').value.trim().toLowerCase();
-    const pass = document.getElementById('userPass').value.trim();
-    const msg = document.getElementById('loginMessage');
-    
-    if (!email || !pass) { msg.innerText = "Veuillez remplir les champs."; return; }
-    msg.style.color = "#5f6368"; msg.innerText = "Vérification en cours...";
-    
-    try {
-        const url = `${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`;
-        
-        // Utilisation de redirect: 'follow' pour gérer la redirection Google
-        const response = await fetch(url, { method: 'GET', redirect: 'follow' });
-        const data = await response.json();
-
-        if (data.result === "success") {
-            localStorage.setItem('orgue_user', email);
-            localStorage.setItem('orgue_pass', pass);
-            localStorage.setItem('orgue_name', data.name);
-            showApp();
-        } else {
-            msg.style.color = "#d9534f"; msg.innerText = "Email ou mot de passe incorrect.";
+/**
+ * Fonction principale (GET)
+ */
+function doGet(e) {
+  const action = e.parameter.action;
+  
+  try {
+    // 1. CONNEXION / LOGIN
+    if (action === 'login') {
+      const email = e.parameter.email;
+      const pass = e.parameter.password;
+      
+      // Récupération du classeur par nom ou par le fichier actif
+      let ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (ss.getName() !== SPREADSHEET_NAME) {
+        // Sécurité si le script est détaché : cherche par nom
+        const files = DriveApp.getFilesByName(SPREADSHEET_NAME);
+        if (files.hasNext()) {
+          ss = SpreadsheetApp.open(files.next());
         }
-    } catch (error) {
-        console.error("Erreur login:", error);
-        msg.style.color = "#d9534f"; msg.innerText = "Erreur de connexion serveur.";
-    }
-}
-
-function showApp() {
-    document.getElementById('loginSection').style.display = 'none';
-    document.getElementById('appSection').style.display = 'block';
-    setTimeout(initCalendar, 50);
-}
-
-// --- INITIALISATION CALENDRIER ---
-function initCalendar() {
-    const email = localStorage.getItem('orgue_user');
-    const pass = localStorage.getItem('orgue_pass');
-    const name = localStorage.getItem('orgue_name');
-    const calendarEl = document.getElementById('calendar');
-
-    calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'timeGridWeek',
-        locale: 'fr',
-        slotMinTime: '08:00:00',
-        slotMaxTime: '22:00:00',
-        allDaySlot: false,
-        height: 'auto',
-        nowIndicator: true,
-        selectable: true,
-        editable: true,
-        eventDurationEditable: true,
-        slotLabelFormat: { hour: '2-digit', minute: '2-digit', meridiem: false },
-        headerToolbar: { left: 'prev,next today title', center: '', right: 'timeGridWeek,dayGridMonth' },
-        
-        eventDrop: syncEventChange,
-        eventResize: syncEventChange,
-
-        eventDidMount: (info) => {
-            if (info.event.extendedProps?.mine) {
-                info.el.style.backgroundColor = '#93c54b'; info.el.style.borderColor = '#93c54b';
-            } else {
-                info.el.style.backgroundColor = '#3e3f3a'; info.el.style.borderColor = '#3e3f3a';
-            }
-        },
-
-        events: `${SCRIPT_URL}?action=getEvents&email=${email}&password=${pass}`,
-
-        eventClick: (info) => { currentEvent = info.event; openPopup(info.event); },
-
-        select: async (info) => {
-            if (info.view.type === 'dayGridMonth') return;
-            const params = new URLSearchParams({ 
-                action: "reserve", email, password: pass, title: name, 
-                start: info.start.toISOString(), end: info.end.toISOString() 
-            });
-            await sendData(params);
-            setTimeout(() => calendar.refetchEvents(), 600);
-            calendar.unselect();
+      }
+      
+      const sheet = ss.getSheetByName(SHEET_NAME);
+      if (!sheet) return createResponse({result: "error", message: "Onglet '" + SHEET_NAME + "' introuvable"});
+      
+      const data = sheet.getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) {
+        // A: Email, B: Pass, C: Nom
+        if (data[i][0].toString().toLowerCase() === email.toLowerCase() && data[i][1].toString() === pass) {
+          return createResponse({result: "success", name: data[i][2]});
         }
-    });
-    calendar.render();
-}
+      }
+      return createResponse({result: "error", message: "Identifiants incorrects"});
+    } 
 
-// --- GESTION POPUP ---
-function openPopup(event) {
-    const isMine = event.extendedProps.mine;
-    const startStr = event.start.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
-    const endStr = event.end.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+    // 2. RECUPERATION DES EVENEMENTS
+    else if (action === 'getEvents') {
+      const optionalArgs = {
+        timeMin: e.parameter.start,
+        timeMax: e.parameter.end,
+        singleEvents: true,
+        orderBy: 'startTime'
+      };
+      
+      const response = Calendar.Events.list(CALENDAR_ID, optionalArgs);
+      const items = response.items || [];
+      
+      const events = items.map(event => ({
+        id: event.id,
+        title: event.summary || "(Sans titre)",
+        start: event.start.dateTime || event.start.date,
+        end: event.end.dateTime || event.end.date,
+        extendedProps: { 
+          mine: (event.description && event.description.includes(e.parameter.email)) 
+        }
+      }));
+      return createResponse(events);
+    } 
 
-    document.getElementById('btnEdit').style.display = isMine ? 'inline-flex' : 'none';
-    document.getElementById('btnDelete').style.display = isMine ? 'inline-flex' : 'none';
-
-    document.getElementById('viewMode').innerHTML = `
-        <div class="mb-1 small text-muted">UTILISATEUR</div><div class="mb-3">${event.title}</div>
-        <div class="mb-1 small text-muted">HORAIRE</div><div>${startStr} - ${endStr}</div>
-    `;
-
-    document.getElementById('editTitle').value = event.title;
-    document.getElementById('editDate').value = event.start.toISOString().split('T')[0];
-    document.getElementById('editStart').value = startStr.replace('h', ':');
-    document.getElementById('editEnd').value = endStr.replace('h', ':');
-
-    document.getElementById('viewMode').style.display = 'block';
-    document.getElementById('editMode').style.display = 'none';
-    document.getElementById('popupDetails').style.display = 'flex';
-}
-
-function switchToEditMode() {
-    document.getElementById('viewMode').style.display = 'none';
-    document.getElementById('editMode').style.display = 'block';
-}
-
-async function saveChanges() {
-    const email = localStorage.getItem('orgue_user');
-    const pass = localStorage.getItem('orgue_pass');
-    
-    const delParams = new URLSearchParams({ action: "delete", id: currentEvent.id, email, password: pass });
-    await sendData(delParams);
-    
-    const addParams = new URLSearchParams({
-        action: "reserve", email, password: pass, title: document.getElementById('editTitle').value,
-        start: new Date(`${document.getElementById('editDate').value}T${document.getElementById('editStart').value}:00`).toISOString(),
-        end: new Date(`${document.getElementById('editDate').value}T${document.getElementById('editEnd').value}:00`).toISOString()
-    });
-    await sendData(addParams);
-    
-    closeModals();
-    setTimeout(() => calendar.refetchEvents(), 800);
-}
-
-async function deleteCurrentEvent() {
-    if (confirm("Supprimer cette réservation ?")) {
-        const id = currentEvent.id;
-        const email = localStorage.getItem('orgue_user');
-        const pass = localStorage.getItem('orgue_pass');
-        const params = new URLSearchParams({ action: "delete", id, email, password: pass });
-        currentEvent.remove();
-        closeModals();
-        await sendData(params);
+    // 3. RESERVATION
+    else if (action === 'reserve') {
+      const cal = CalendarApp.getCalendarById(CALENDAR_ID);
+      const ev = cal.createEvent(e.parameter.title, new Date(e.parameter.start), new Date(e.parameter.end), {
+        description: "Réservé par : " + e.parameter.email
+      });
+      return createResponse({result: "success", id: ev.getId()});
     }
+
+    // 4. SUPPRESSION
+    else if (action === 'delete') {
+      const cal = CalendarApp.getCalendarById(CALENDAR_ID);
+      const ev = cal.getEventById(e.parameter.id);
+      if (ev && ev.getDescription().includes(e.parameter.email)) {
+        ev.deleteEvent();
+        return createResponse({result: "success"});
+      }
+      return createResponse({result: "error", message: "Non autorisé"});
+    }
+
+    return createResponse({result: "error", message: "Action non reconnue"});
+
+  } catch (err) {
+    return createResponse({result: "error", message: err.toString()});
+  }
 }
 
-async function syncEventChange(info) {
-    if (!info.event.extendedProps.mine) { info.revert(); return; }
-    const email = localStorage.getItem('orgue_user');
-    const pass = localStorage.getItem('orgue_pass');
-    const params = new URLSearchParams({
-        action: "update", id: info.event.id, email, password: pass,
-        start: info.event.start.toISOString(), end: info.event.end.toISOString(), title: info.event.title
-    });
-    await sendData(params);
+/**
+ * Formate la réponse en JSON
+ */
+function createResponse(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
-
-function closeModals() { document.getElementById('popupDetails').style.display = 'none'; }
-function logout() { localStorage.clear(); location.reload(); }
-function togglePass() { 
-    const p = document.getElementById('userPass'); 
-    p.type = p.type === "password" ? "text" : "password"; 
-}
-
-window.onload = () => { if(localStorage.getItem('orgue_user')) showApp(); };
