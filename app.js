@@ -1,13 +1,11 @@
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxcJzXEDx5f0o59jRX4U9EUhE3Bsdlw5Bl_X4SkKLqdcSHn99atQ-6qnxoK6aO7EL3X/exec";
-let calendar; // Unique déclaration autorisée
+let votrePlanning; // Renommé pour éviter tout conflit
 let currentEvent = null;
 
-// --- INITIALISATION ---
 window.onload = () => { 
     if (localStorage.getItem('orgue_user')) showApp(); 
 };
 
-// --- INTERFACE ---
 function toggleLoader(show) {
     const loader = document.getElementById('loader');
     if (loader) loader.style.display = show ? 'flex' : 'none';
@@ -25,14 +23,10 @@ function togglePasswordVisibility() {
     }
 }
 
-// --- AUTHENTIFICATION ---
 async function login() {
-    const emailInput = document.getElementById('userEmail');
-    const passInput = document.getElementById('userPass');
     const msg = document.getElementById('loginMessage');
-    
-    const email = emailInput.value.trim().toLowerCase();
-    const pass = passInput.value.trim();
+    const email = document.getElementById('userEmail').value.trim().toLowerCase();
+    const pass = document.getElementById('userPass').value.trim();
     const url = `${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`;
     
     toggleLoader(true);
@@ -63,14 +57,12 @@ function showApp() {
     setTimeout(initCalendar, 50);
 }
 
-// --- LOGIQUE CALENDRIER ---
 function initCalendar() {
     const email = localStorage.getItem('orgue_user');
     const name = localStorage.getItem('orgue_name');
     const calendarEl = document.getElementById('calendar');
 
-    // On utilise la variable 'calendar' déclarée en haut (sans 'let' devant ici)
-    calendar = new FullCalendar.Calendar(calendarEl, {
+    votrePlanning = new FullCalendar.Calendar(calendarEl, {
         initialView: 'timeGridWeek',
         locale: 'fr',
         slotMinTime: '08:00:00',
@@ -110,22 +102,21 @@ function initCalendar() {
             try {
                 await fetch(`${SCRIPT_URL}?${params}`, { method: 'GET', redirect: 'follow' });
                 toggleLoader(false);
-                calendar.refetchEvents();
+                votrePlanning.refetchEvents();
             } catch (e) { 
                 toggleLoader(false);
-                calendar.refetchEvents(); 
+                votrePlanning.refetchEvents(); 
             }
-            calendar.unselect();
+            votrePlanning.unselect();
         },
 
         eventDrop: (info) => syncEventChange(info),
         eventResize: (info) => syncEventChange(info),
         loading: (isLoading) => { if(calendarEl) calendarEl.style.opacity = isLoading ? '0.6' : '1'; }
     });
-    calendar.render();
+    votrePlanning.render();
 }
 
-// --- ACTIONS RÉSEAU ---
 function syncEventChange(info) {
     const email = localStorage.getItem('orgue_user');
     const url = `${SCRIPT_URL}?action=update&id=${info.event.id}&email=${email}&start=${info.event.start.toISOString()}&end=${info.event.end.toISOString()}`;
