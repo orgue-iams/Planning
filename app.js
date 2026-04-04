@@ -2,7 +2,6 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzCQsg4C7y4jgCj5n9qC
 let calendar;
 let currentEvent = null;
 
-// --- ENVOI SÉCURISÉ (MODE NO-CORS POUR L'ÉCRITURE) ---
 async function sendData(params) {
     try {
         await fetch(`${SCRIPT_URL}?${params}`, { mode: 'no-cors', method: 'GET' });
@@ -13,7 +12,6 @@ async function sendData(params) {
     }
 }
 
-// --- CONNEXION ---
 async function login() {
     const email = document.getElementById('userEmail').value.trim().toLowerCase();
     const pass = document.getElementById('userPass').value.trim();
@@ -24,7 +22,11 @@ async function login() {
     
     try {
         const url = `${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`;
-        const response = await fetch(url);
+        
+        // Ajout du redirect: 'follow' pour gérer la redirection Google Script
+        const response = await fetch(url, { method: 'GET', redirect: 'follow' });
+        if (!response.ok) throw new Error('Erreur réseau');
+        
         const data = await response.json();
         if (data.result === "success") {
             localStorage.setItem('orgue_user', email);
@@ -32,10 +34,11 @@ async function login() {
             localStorage.setItem('orgue_name', data.name);
             showApp();
         } else {
-            msg.style.color = "#d9534f"; msg.innerText = "Identifiants incorrects.";
+            msg.style.color = "#d9534f"; msg.innerText = "Email ou mot de passe incorrect.";
         }
     } catch (error) {
-        msg.style.color = "#d9534f"; msg.innerText = "Erreur de connexion serveur.";
+        console.error("Erreur Login:", error);
+        msg.style.color = "#d9534f"; msg.innerText = "Erreur de connexion au serveur.";
     }
 }
 
@@ -45,7 +48,6 @@ function showApp() {
     setTimeout(initCalendar, 50);
 }
 
-// --- CALENDRIER ---
 function initCalendar() {
     const email = localStorage.getItem('orgue_user');
     const pass = localStorage.getItem('orgue_pass');
@@ -95,7 +97,6 @@ function initCalendar() {
     calendar.render();
 }
 
-// --- POPUP ---
 function openPopup(event) {
     const isMine = event.extendedProps.mine;
     const startStr = event.start.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
@@ -127,12 +128,9 @@ function switchToEditMode() {
 async function saveChanges() {
     const email = localStorage.getItem('orgue_user');
     const pass = localStorage.getItem('orgue_pass');
-    
-    // Suppression
     const delParams = new URLSearchParams({ action: "delete", id: currentEvent.id, email, password: pass });
     await sendData(delParams);
     
-    // Création
     const addParams = new URLSearchParams({
         action: "reserve", email, password: pass, title: document.getElementById('editTitle').value,
         start: new Date(`${document.getElementById('editDate').value}T${document.getElementById('editStart').value}:00`).toISOString(),
