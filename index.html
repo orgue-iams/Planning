@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales/fr.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -17,14 +18,19 @@
     </div>
 
     <div id="loginSection" class="container login-card">
-        <h1>Planning IAMS</h1>
-        <h3>Orgue G. Bancells</h3>
+        <div class="login-header">
+            <h1>Planning IAMS</h1>
+            <h3>Orgue G. Bancells</h3>
+        </div>
         <div class="form-group">
             <input type="email" id="userEmail" placeholder="Email">
-            <input type="password" id="userPass" placeholder="Mot de passe">
+            <div class="password-wrapper">
+                <input type="password" id="userPass" placeholder="Mot de passe">
+                <i class="far fa-eye" id="togglePassword" onclick="togglePasswordVisibility()"></i>
+            </div>
             <button class="login-btn" onclick="login()">Se connecter</button>
         </div>
-        <p id="loginMessage" style="color:#d9534f; font-size: 14px; margin-top: 10px;"></p>
+        <p id="loginMessage" style="color:#d9534f; font-size: 14px; margin-top: 15px;"></p>
     </div>
 
     <div id="appSection" style="display:none;">
