@@ -2,20 +2,21 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz1cnIvKmQsWAfF7XNy4
 const REPO_PATH = "orgue-iams/orgue-iams.github.io";
 
 async function fetchLastBuild() {
+    // On met une version par défaut immédiatement
+    document.querySelectorAll('.version-display').forEach(el => el.innerText = "v1.4.6-stable");
+    
     try {
-        // Tente main d'abord
-        let res = await fetch(`https://api.github.com/repos/${REPO_PATH}/commits/main`);
-        if (!res.ok) {
-            // Si 404, on tente master
-            res = await fetch(`https://api.github.com/repos/${REPO_PATH}/commits/master`);
-            if (!res.ok) throw new Error("API introuvable");
+        // On tente de récupérer le build, mais sans bloquer si ça échoue
+        const res = await fetch(`https://api.github.com/repos/${REPO_PATH}/commits`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data && data[0]) {
+                const buildInfo = `Build: ${data[0].sha.substring(0, 7)} (${new Date(data[0].commit.author.date).toLocaleDateString('fr-FR')})`;
+                document.querySelectorAll('.version-display').forEach(el => el.innerText = buildInfo);
+            }
         }
-        const data = await res.json();
-        const buildInfo = `Build: ${data.sha.substring(0, 7)} (${new Date(data.commit.author.date).toLocaleDateString('fr-FR')})`;
-        document.querySelectorAll('.version-display').forEach(el => el.innerText = buildInfo);
     } catch (e) {
-        // Si ça échoue, on affiche une version manuelle sans bloquer le script
-        document.querySelectorAll('.version-display').forEach(el => el.innerText = "v1.4.5-stable");
+        console.log("Info: Impossible de récupérer le numéro de build GitHub.");
     }
 }
 
