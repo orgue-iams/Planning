@@ -1,8 +1,6 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzQ3H7ZbqOzuuKxdRaEroLBEYRgALzYExNGegJQctzTe4uyOZ7YdR2ondHoDvN2f3cq/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwDOfP_Gab4-PQSPHY3sO-Bgm6BZgA6L2vU9cBiJx5n8CmzVMDry5xhaiPTsMK0NQP3/exec";
 let calendar;
 let currentEvent = null;
-
-const isValidDate = (d) => d instanceof Date && !isNaN(d);
 
 window.onload = () => { if (localStorage.getItem('orgue_user')) showApp(); };
 
@@ -46,11 +44,15 @@ function initCalendar() {
         headerToolbar: { left: 'prev,next today title', center: '', right: 'timeGridWeek,dayGridMonth' },
 
         events: function(fetchInfo, successCallback, failureCallback) {
-            const url = `${SCRIPT_URL}?action=getEvents&email=${email}&start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`;
+            // On utilise toISOString() pour être le plus standard possible
+            const url = `${SCRIPT_URL}?action=getEvents&email=${email}&start=${fetchInfo.start.toISOString()}&end=${fetchInfo.end.toISOString()}`;
             fetch(url, { method: 'GET', redirect: 'follow' })
                 .then(res => res.json())
                 .then(data => {
-                    if (data.result === "error" || !Array.isArray(data)) return successCallback([]);
+                    if (data.result === "error") {
+                        console.error("Erreur serveur détectée:", data.details);
+                        return successCallback([]);
+                    }
                     successCallback(data.map(ev => ({
                         id: ev.id, title: ev.title, start: ev.start, end: ev.end,
                         backgroundColor: ev.mine ? '#93c54b' : '#3e3f3a',
@@ -64,12 +66,8 @@ function initCalendar() {
         eventClick: (info) => { currentEvent = info.event; openPopup(info.event); },
 
         select: async (info) => {
-            if (info.view.type === 'dayGridMonth' || !isValidDate(info.start) || !isValidDate(info.end)) return;
-            
-            const startISO = info.start.toISOString();
-            const endISO = info.end.toISOString();
-            const params = `action=reserve&email=${email}&title=${name}&start=${startISO}&end=${endISO}`;
-            
+            if (info.view.type === 'dayGridMonth') return;
+            const params = `action=reserve&email=${email}&title=${name}&start=${info.start.toISOString()}&end=${info.end.toISOString()}`;
             try {
                 await fetch(`${SCRIPT_URL}?${params}`, { method: 'GET', redirect: 'follow' });
                 calendar.refetchEvents();
@@ -86,8 +84,6 @@ function initCalendar() {
 
 function syncEventChange(info) {
     const email = localStorage.getItem('orgue_user');
-    if (!isValidDate(info.event.start) || !isValidDate(info.event.end)) return info.revert();
-    
     const url = `${SCRIPT_URL}?action=update&id=${info.event.id}&email=${email}&start=${info.event.start.toISOString()}&end=${info.event.end.toISOString()}`;
     fetch(url, { method: 'GET', redirect: 'follow' })
     .then(res => res.json())
@@ -99,8 +95,7 @@ function openPopup(event) {
     const isMine = event.extendedProps.mine;
     document.getElementById('btnEdit').style.display = isMine ? 'inline-flex' : 'none';
     document.getElementById('btnDelete').style.display = isMine ? 'inline-flex' : 'none';
-    const timeStr = isValidDate(event.start) ? `${event.start.toLocaleTimeString()} - ${event.end.toLocaleTimeString()}` : "Horaire inconnu";
-    document.getElementById('viewMode').innerHTML = `<strong>${event.title}</strong><br>${timeStr}`;
+    document.getElementById('viewMode').innerHTML = `<strong>${event.title}</strong><br>${event.start.toLocaleTimeString()} - ${event.end.toLocaleTimeString()}`;
     document.getElementById('popupDetails').style.display = 'flex';
 }
 
