@@ -1,7 +1,7 @@
 let votrePlanning; 
 let currentEvent = null;
 
-// AFFICHAGE DE L'INTERFACE APPRÈS LOGIN
+// Passage de l'écran login à l'écran calendrier
 function showApp() {
     document.getElementById('loginSection').style.display = 'none';
     document.getElementById('appSection').style.display = 'block';
@@ -9,7 +9,6 @@ function showApp() {
     setTimeout(initCalendar, 50);
 }
 
-// INITIALISATION DU CALENDRIER
 function initCalendar() {
     const email = localStorage.getItem('orgue_user');
     const name = localStorage.getItem('orgue_name');
@@ -23,31 +22,21 @@ function initCalendar() {
         allDaySlot: false,
         editable: true,
         selectable: true,
-        headerToolbar: { 
-            left: 'prev,next today title', 
-            center: '', 
-            right: 'timeGridWeek,dayGridMonth' 
-        },
+        headerToolbar: { left: 'prev,next today title', center: '', right: 'timeGridWeek,dayGridMonth' },
         events: function(fetchInfo, successCallback, failureCallback) {
             const url = `${SCRIPT_URL}?action=getEvents&email=${email}&start=${fetchInfo.start.toISOString()}&end=${fetchInfo.end.toISOString()}`;
             fetch(url, { method: 'GET', redirect: 'follow' })
                 .then(res => res.json())
                 .then(data => {
                     successCallback(data.map(ev => ({
-                        id: ev.id, 
-                        title: ev.title, 
-                        start: ev.start, 
-                        end: ev.end,
+                        id: ev.id, title: ev.title, start: ev.start, end: ev.end,
                         backgroundColor: ev.mine ? '#10b981' : '#1e3a8a',
                         borderColor: ev.mine ? '#10b981' : '#1e3a8a',
                         extendedProps: { mine: ev.mine }
                     })));
                 });
         },
-        eventClick: (info) => { 
-            currentEvent = info.event; 
-            openPopup(info.event); 
-        },
+        eventClick: (info) => { currentEvent = info.event; openPopup(info.event); },
         select: async (info) => {
             if (info.view.type === 'dayGridMonth') return;
             const params = `action=reserve&email=${email}&title=${name}&start=${info.start.toISOString()}&end=${info.end.toISOString()}`;
@@ -61,7 +50,6 @@ function initCalendar() {
     votrePlanning.render();
 }
 
-// POPUP DE DÉTAILS
 function openPopup(event) {
     const isMine = event.extendedProps.mine;
     document.getElementById('btnDelete').style.display = isMine ? 'inline-flex' : 'none';
@@ -72,9 +60,8 @@ function openPopup(event) {
     document.getElementById('popupDetails').style.display = 'flex';
 }
 
-// SUPPRESSION
 async function deleteCurrentEvent() {
-    if (!confirm("Voulez-vous vraiment supprimer cette réservation ?")) return;
+    if (!confirm("Supprimer cette réservation ?")) return;
     const url = `${SCRIPT_URL}?action=delete&id=${currentEvent.id}&email=${localStorage.getItem('orgue_user')}`;
     toggleLoader(true);
     currentEvent.remove();
