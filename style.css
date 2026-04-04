@@ -1,30 +1,90 @@
-body { font-family: 'Inter', sans-serif; background: #f4f7f6; margin: 0; }
-.container { max-width: 400px; margin: 100px auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; }
-input { width: 90%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; }
-button { padding: 10px 20px; background: #3e3f3a; color: white; border: none; border-radius: 4px; cursor: pointer; }
-button:hover { background: #2a2b27; }
+body { 
+    font-family: 'Inter', sans-serif; 
+    background: #f0f2f5; 
+    margin: 0; 
+    display: flex; 
+    flex-direction: column; 
+    min-height: 100vh;
+}
 
-.header-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: white; border-bottom: 1px solid #ddd; }
-#calendar { margin: 20px; background: white; padding: 15px; border-radius: 8px; }
+/* CARTE DE LOGIN */
+.login-card { 
+    max-width: 350px; 
+    margin: 80px auto; 
+    padding: 40px 30px; 
+    background: white; 
+    border-radius: 12px; 
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1); 
+    text-align: center; 
+}
+.login-card h1 { margin-bottom: 5px; color: #3e3f3a; font-size: 24px; }
+.login-card h3 { margin-top: 0; color: #888; font-weight: 400; font-size: 16px; margin-bottom: 30px; }
 
-/* STYLE DU CHARGEMENT (SPINNER CIRCULAIRE SOBRE) */
+.form-group { display: flex; flex-direction: column; gap: 15px; }
+
+input { 
+    padding: 12px; 
+    border: 1px solid #ddd; 
+    border-radius: 6px; 
+    font-size: 16px; 
+    outline: none;
+}
+input:focus { border-color: #3e3f3a; box-shadow: 0 0 0 2px rgba(62,63,58,0.1); }
+
+.login-btn { 
+    padding: 12px; 
+    background: #3e3f3a; 
+    color: white; 
+    border: none; 
+    border-radius: 6px; 
+    cursor: pointer; 
+    font-weight: 600;
+    font-size: 16px;
+    transition: background 0.3s;
+}
+.login-btn:hover { background: #2a2b27; }
+
+/* HEADER & CALENDRIER */
+.header-bar { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    padding: 15px 30px; 
+    background: white; 
+    border-bottom: 1px solid #ddd; 
+}
+.header-bar h2 { margin: 0; font-size: 20px; color: #3e3f3a; }
+
+#calendar { 
+    margin: 20px; 
+    background: white; 
+    padding: 20px; 
+    border-radius: 12px; 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+/* SPINNER SOBRE */
 .loader-overlay {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(255, 255, 255, 0.7); /* Fond blanc très transparent */
+    background: rgba(255, 255, 255, 0.7);
     display: flex; justify-content: center; align-items: center;
     z-index: 9999;
 }
 .spinner {
-    width: 40px; height: 40px;
-    border: 4px solid rgba(0, 0, 0, 0.1); /* Anneau de base très clair */
-    border-top: 4px solid #3e3f3a; /* Partie qui tourne (gris anthracite) */
+    width: 45px; height: 45px;
+    border: 5px solid rgba(0, 0, 0, 0.05);
+    border-top: 5px solid #3e3f3a;
     border-radius: 50%;
-    animation: spin 0.8s linear infinite; /* Rotation fluide */
+    animation: spin 0.8s linear infinite;
 }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-/* MODAL / POPUP */
+/* POPUP MODALE */
 .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-.modal-content { background: white; padding: 20px; border-radius: 8px; min-width: 300px; text-align: center; }
-.delete-btn { background: #d9534f; margin-right: 10px; }
-.logout-btn { background: #888; font-size: 12px; }
+.modal-content { background: white; padding: 30px; border-radius: 12px; min-width: 320px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+.modal-buttons { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+
+.delete-btn { background: #d9534f; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+.close-btn { background: #eee; color: #333; border: none; padding: 10px; border-radius: 6px; cursor: pointer; }
+.logout-btn { background: transparent; color: #d9534f; border: 1px solid #d9534f; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+.logout-btn:hover { background: #d9534f; color: white; }
