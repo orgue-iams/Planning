@@ -1,4 +1,5 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxZy6kDLqjxEIKODLMtP6T4xx1RN9mg7hfg54SKyypbuvJseFXvylkVqO7M-2Drog/exec";
+// ASSUREZ-VOUS QUE CETTE URL EST CELLE DU TOUT DERNIER DÉPLOIEMENT
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzIb36zndWHHaCs0M8VqfTMkyZLfv3KUiv8zbZXKM3WuoVny76DON-52C7qiKXohTbf/exec";
 let calendar;
 let currentEvent = null;
 
@@ -11,23 +12,14 @@ async function login() {
     const url = `${SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`;
     
     try {
-        // Mode 'cors' avec redirection forcée
-        const response = await fetch(url, { 
-            method: 'GET', 
-            mode: 'cors', 
-            redirect: 'follow' 
-        });
+        const response = await fetch(url, { method: 'GET', redirect: 'follow' });
         const data = await response.json();
-        
         if (data.result === "success") {
             localStorage.setItem('orgue_user', email);
             localStorage.setItem('orgue_name', data.name);
             showApp();
         } else { msg.innerText = "Identifiants incorrects."; }
-    } catch (e) { 
-        console.error("Détails erreur CORS/Fetch:", e);
-        msg.innerText = "Erreur de connexion. Vérifiez le déploiement du script."; 
-    }
+    } catch (e) { msg.innerText = "Erreur de connexion au serveur."; }
 }
 
 function showApp() {
@@ -55,10 +47,17 @@ function initCalendar() {
 
         events: function(fetchInfo, successCallback, failureCallback) {
             const url = `${SCRIPT_URL}?action=getEvents&email=${email}&start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`;
-            fetch(url, { method: 'GET', mode: 'cors', redirect: 'follow' })
+            fetch(url, { method: 'GET', redirect: 'follow' })
                 .then(res => res.json())
                 .then(data => {
+                    // Si le serveur a renvoyé une erreur (result: "error")
+                    if (data.result === "error") {
+                        console.error("Erreur Google Script:", data.details);
+                        alert("Erreur Calendrier : " + data.details);
+                        return successCallback([]);
+                    }
                     if (!Array.isArray(data)) return successCallback([]);
+                    
                     successCallback(data.map(ev => ({
                         id: ev.id, title: ev.title, start: ev.start, end: ev.end,
                         backgroundColor: ev.mine ? '#93c54b' : '#3e3f3a',
@@ -75,7 +74,7 @@ function initCalendar() {
             if (info.view.type === 'dayGridMonth') return;
             const params = `action=reserve&email=${email}&title=${name}&start=${info.start.toISOString()}&end=${info.end.toISOString()}`;
             try {
-                await fetch(`${SCRIPT_URL}?${params}`, { method: 'GET', mode: 'cors', redirect: 'follow' });
+                await fetch(`${SCRIPT_URL}?${params}`, { method: 'GET', redirect: 'follow' });
                 calendar.refetchEvents();
             } catch (e) { calendar.refetchEvents(); }
             calendar.unselect();
@@ -83,7 +82,7 @@ function initCalendar() {
 
         eventDrop: (info) => syncEventChange(info),
         eventResize: (info) => syncEventChange(info),
-        loading: (isLoading) => { calendarEl.style.opacity = isLoading ? '0.6' : '1'; }
+        loading: (isLoading) => { if(calendarEl) calendarEl.style.opacity = isLoading ? '0.6' : '1'; }
     });
     calendar.render();
 }
@@ -91,7 +90,7 @@ function initCalendar() {
 function syncEventChange(info) {
     const email = localStorage.getItem('orgue_user');
     const url = `${SCRIPT_URL}?action=update&id=${info.event.id}&email=${email}&start=${info.event.start.toISOString()}&end=${info.event.end.toISOString()}`;
-    fetch(url, { method: 'GET', mode: 'cors', redirect: 'follow' })
+    fetch(url, { method: 'GET', redirect: 'follow' })
     .then(res => res.json())
     .then(data => { if (data.result !== "success") info.revert(); })
     .catch(() => info.revert());
@@ -110,7 +109,7 @@ async function deleteCurrentEvent() {
     const url = `${SCRIPT_URL}?action=delete&id=${currentEvent.id}&email=${localStorage.getItem('orgue_user')}`;
     currentEvent.remove();
     document.getElementById('popupDetails').style.display = 'none';
-    fetch(url, { method: 'GET', mode: 'cors', redirect: 'follow' });
+    fetch(url, { method: 'GET', redirect: 'follow' });
 }
 
 function logout() { localStorage.clear(); location.reload(); }
