@@ -11,6 +11,47 @@ export const PASSWORD_MIN_LENGTH = 6;
 
 const MIN_PASS_LEN = PASSWORD_MIN_LENGTH;
 
+/** Fenêtre pour finaliser le nouveau mot de passe après ouverture du lien (session côté client, pas le jeton e-mail). */
+const RECOVERY_PENDING_TTL_MS = 30 * 60 * 1000;
+
+const RECOVERY_PENDING_KEY = 'planning_supabase_recovery_until_ms';
+
+function recoveryDeadlineFromNow() {
+    return String(Date.now() + RECOVERY_PENDING_TTL_MS);
+}
+
+export function markSupabasePasswordRecoveryPending() {
+    try {
+        sessionStorage.setItem(RECOVERY_PENDING_KEY, recoveryDeadlineFromNow());
+    } catch {
+        /* quota / navigation privée */
+    }
+}
+
+export function clearSupabasePasswordRecoveryPending() {
+    try {
+        sessionStorage.removeItem(RECOVERY_PENDING_KEY);
+    } catch {
+        /* ignore */
+    }
+}
+
+/** Réinitialisation en cours : lien déjà consommé, mot de passe pas encore enregistré (fenêtre 30 min). */
+export function isSupabasePasswordRecoveryPending() {
+    try {
+        const raw = sessionStorage.getItem(RECOVERY_PENDING_KEY);
+        if (!raw) return false;
+        const until = Number.parseInt(raw, 10);
+        if (!Number.isFinite(until) || Date.now() > until) {
+            sessionStorage.removeItem(RECOVERY_PENDING_KEY);
+            return false;
+        }
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 /** Lignes affichées dans la modale « changement de mot de passe ». */
 export const PASSWORD_POLICY_LINES = [
     `Longueur minimale : ${MIN_PASS_LEN} caractères.`,
@@ -43,6 +84,10 @@ export function setPasswordModalMode(isTokenReset) {
     const group = document.getElementById('group-old-pass');
     if (group) {
         group.classList.toggle('hidden', !!isTokenReset);
+    }
+    const hint = document.getElementById('recovery-hint');
+    if (hint) {
+        hint.classList.toggle('hidden', !isTokenReset);
     }
 }
 
@@ -148,6 +193,9 @@ export async function updatePassword() {
             alert(error.message || 'Impossible de mettre à jour le mot de passe.');
             return false;
         }
+        if (isTokenReset) {
+            clearSupabasePasswordRecoveryPending();
+        }
         alert('Mot de passe modifié avec succès !');
         document.getElementById('modal_password').close();
         return true;
@@ -205,6 +253,20 @@ export function subscribeSupabasePasswordRecovery(onRecovery) {
     return () => subscription.unsubscribe();
 }
 
+/** Session encore valide après un lien « oublié » consommé : on peut rouvrir la modale (jeton e-mail, lui, reste à usage unique). */
+export async function shouldResumeSupabasePasswordRecovery() {
+    if (!isBackendAuthConfigured()) return false;
+    if (!isSupabasePasswordRecoveryPending()) return false;
+    const supabase = getSupabaseClient();
+    if (!supabase) return false;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+        clearSupabasePasswordRecoveryPending();
+        return false;
+    }
+    return true;
+}
+
 export async function sendResetLink(email) {
     const addr = String(email).trim();
     if (!addr.includes('@')) {
@@ -260,6 +322,7 @@ export function setLogoutHandler(fn) {
 }
 
 export async function logout() {
+    clearSupabasePasswordRecoveryPending();
     if (isBackendAuthConfigured()) {
         await getSupabaseClient()?.auth.signOut();
     }

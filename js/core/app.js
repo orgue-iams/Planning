@@ -28,7 +28,10 @@ import {
     hasSupabaseRecoveryInUrl,
     subscribeSupabasePasswordRecovery,
     stripSupabaseAuthFromUrl,
-    isBackendAuthConfigured
+    isBackendAuthConfigured,
+    markSupabasePasswordRecoveryPending,
+    isSupabasePasswordRecoveryPending,
+    shouldResumeSupabasePasswordRecovery
 } from './auth-logic.js';
 import { initMessagesUi, tryShowBroadcastPopup } from './messages-ui.js';
 import { initProfileLabelsUi } from './profile-labels-ui.js';
@@ -167,6 +170,13 @@ function initCalendarAndRevealUi() {
 function wireDialogBackdropClose() {
     document.addEventListener('click', (e) => {
         if (e.target instanceof HTMLDialogElement && e.target.open) {
+            if (
+                e.target.id === 'modal_password' &&
+                isBackendAuthConfigured() &&
+                isSupabasePasswordRecoveryPending()
+            ) {
+                return;
+            }
             e.target.close();
         }
     });
@@ -209,6 +219,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     unsubscribeRecovery = subscribeSupabasePasswordRecovery(() => {
         unsubscribeRecovery();
         unsubscribeRecovery = () => {};
+        markSupabasePasswordRecoveryPending();
         setPasswordModalMode(true);
         document.getElementById('modal_login')?.close();
         document.getElementById('modal_forgot')?.close();
@@ -229,6 +240,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         initCalendarAndRevealUi();
         document.getElementById('modal_login')?.close();
     }
+
+    if (await shouldResumeSupabasePasswordRecovery()) {
+        setPasswordModalMode(true);
+        document.getElementById('modal_login')?.close();
+        document.getElementById('modal_forgot')?.close();
+        document.getElementById('modal_password')?.showModal();
+        requestAnimationFrame(() => document.getElementById('new-pass')?.focus());
+    }
+
+    document.getElementById('btn-password-cancel')?.addEventListener('click', async () => {
+        if (isBackendAuthConfigured() && isSupabasePasswordRecoveryPending()) {
+            if (
+                !confirm(
+                    'Annuler la réinitialisation ? Vous devrez demander un nouveau lien par e-mail. Le lien déjà reçu ne fonctionnera plus.'
+                )
+            ) {
+                return;
+            }
+            await logout();
+            return;
+        }
+        document.getElementById('modal_password')?.close();
+    });
 
     document.getElementById('btn-do-login').onclick = async () => {
         const result = await login(
@@ -352,7 +386,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const hasResetToken = new URLSearchParams(window.location.search).has('token');
     const supabaseRecoveryUrl = hasSupabaseRecoveryInUrl();
-    if (!hasResetToken && !supabaseRecoveryUrl && !currentUser?.email) {
+    const passModalOpen = document.getElementById('modal_password')?.open;
+    if (!hasResetToken && !supabaseRecoveryUrl && !currentUser?.email && !passModalOpen) {
         const dlg = document.getElementById('modal_login');
         await applyLoginBanner();
         dlg?.showModal();
