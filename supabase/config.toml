@@ -1,4 +1,5 @@
 # Généré / complété pour supabase CLI (optionnel). Commandes : supabase init (si besoin), puis déploiement des fonctions.
+# CI: push sur ce fichier déclenche migrations + functions deploy.
 
 [functions.calendar-bridge]
 verify_jwt = true
