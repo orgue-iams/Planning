@@ -3,6 +3,7 @@
  */
 
 import { getSupabaseClient, isBackendAuthConfigured } from '../core/supabase-client.js';
+import { RESERVATION_MOTIFS, normalizeMotif } from '../core/reservation-motifs.js';
 
 function storageKey(email) {
     return `orgue_iams_profile_${String(email).trim().toLowerCase()}`;
@@ -35,14 +36,11 @@ function normalizeReservationPayload(raw) {
     return { labels, favoriteLabel };
 }
 
-function writeProfileLocal(email, labels, favoriteLabel) {
-    const cleaned = [...new Set(labels.map((s) => String(s).trim()).filter(Boolean))];
-    let fav = String(favoriteLabel || '').trim();
-    if (fav && !cleaned.includes(fav)) fav = cleaned[0] || '';
-    if (!fav && cleaned.length) fav = cleaned[0];
+function writeProfileLocal(email, favoriteLabel) {
+    const fav = normalizeMotif(favoriteLabel);
     localStorage.setItem(
         storageKey(email),
-        JSON.stringify({ labels: cleaned, favoriteLabel: fav })
+        JSON.stringify({ labels: [...RESERVATION_MOTIFS], favoriteLabel: fav })
     );
 }
 
@@ -54,24 +52,26 @@ function writeProfileLocal(email, labels, favoriteLabel) {
 export function hydrateReservationTypesFromServer(email, reservationTypes) {
     if (!email) return;
     const { labels, favoriteLabel } = normalizeReservationPayload(reservationTypes);
-    if (!labels.length) return;
-    writeProfileLocal(email, labels, favoriteLabel);
+    const fav = normalizeMotif(favoriteLabel || labels[0] || 'Travail');
+    writeProfileLocal(email, fav);
 }
 
 /** @returns {{ labels: string[], favoriteLabel: string }} */
 export function getProfile(email) {
-    if (!email) return { labels: [], favoriteLabel: '' };
+    if (!email) return { labels: [...RESERVATION_MOTIFS], favoriteLabel: 'Travail' };
     try {
         const raw = localStorage.getItem(storageKey(email));
-        if (!raw) return { labels: [], favoriteLabel: '' };
-        return normalizeReservationPayload(raw);
+        if (!raw) return { labels: [...RESERVATION_MOTIFS], favoriteLabel: 'Travail' };
+        const { labels, favoriteLabel } = normalizeReservationPayload(raw);
+        const fav = normalizeMotif(favoriteLabel || labels[0] || 'Travail');
+        return { labels: [...RESERVATION_MOTIFS], favoriteLabel: fav };
     } catch {
-        return { labels: [], favoriteLabel: '' };
+        return { labels: [...RESERVATION_MOTIFS], favoriteLabel: 'Travail' };
     }
 }
 
-export async function saveProfile(email, labels, favoriteLabel) {
-    writeProfileLocal(email, labels, favoriteLabel);
+export async function saveProfile(email, _labelsIgnored, favoriteLabel) {
+    writeProfileLocal(email, favoriteLabel);
     const { labels: cleaned, favoriteLabel: fav } = getProfile(email);
 
     if (isBackendAuthConfigured()) {
@@ -93,7 +93,5 @@ export async function saveProfile(email, labels, favoriteLabel) {
 }
 
 export function getFavoriteLabel(email) {
-    const { favoriteLabel, labels } = getProfile(email);
-    if (favoriteLabel && labels.includes(favoriteLabel)) return favoriteLabel;
-    return labels[0] || '';
+    return getProfile(email).favoriteLabel;
 }

@@ -3,7 +3,6 @@ import { getCalendarConfig, bindResponsiveCalendarToolbar } from '../config/fc-s
 import { initCalendarToolbar } from './calendar-toolbar.js';
 import { populateTimeSelects } from '../utils/time-helpers.js';
 import { initSwipe } from '../utils/touch-handler.js';
-import { demoEvents } from '../data/mock-events.js';
 import {
     getEventContent,
     openModal,
@@ -159,7 +158,6 @@ function initCalendarAndRevealUi() {
     const mount = () => {
         calendar = new FullCalendar.Calendar(calendarEl, getCalendarConfig(handlers, currentUser));
         calendar.render();
-        calendar.addEventSource(demoEvents);
         const toolbarCtl = initCalendarToolbar(calendar);
         handlers.onDatesSet = () => {
             toolbarCtl?.refreshTitle();
@@ -433,10 +431,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (t?.name === 'recur-mode') {
             const custom = document.getElementById('recur-mode-days')?.checked;
             document.getElementById('recur-dow-grid')?.classList.toggle('hidden', !custom);
-        }
-        if (t?.id === 'event-title-select') {
-            const isCustom = t.value === '__custom__';
-            document.getElementById('event-title-custom')?.classList.toggle('hidden', !isCustom);
         }
     });
 

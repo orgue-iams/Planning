@@ -4,6 +4,7 @@
  */
 
 import { showToast } from '../utils/toast.js';
+import { demoEvents } from '../data/mock-events.js';
 
 /** @deprecated Conservé pour d’éventuels appels ; la barre FC native est désactivée. */
 export function isCompactCalendarToolbar() {
@@ -55,6 +56,13 @@ export const getCalendarConfig = (handlers, currentUser) => {
             listWeek: {
                 listDayFormat: { weekday: 'long' },
                 listDaySideFormat: { month: 'long', day: 'numeric', year: 'numeric' }
+            },
+            /** Fenêtre glissante de 30 jours ; filtre « mes créneaux » appliqué dans `events`. */
+            listMyPlanning: {
+                type: 'list',
+                duration: { days: 30 },
+                listDayFormat: { weekday: 'long' },
+                listDaySideFormat: { month: 'long', day: 'numeric', year: 'numeric' }
             }
         },
         slotMinTime: '08:00:00',
@@ -98,6 +106,31 @@ export const getCalendarConfig = (handlers, currentUser) => {
                 handlers.onDatesSet?.();
             } catch {
                 /* */
+            }
+        },
+
+        events: (fetchInfo, successCallback, failureCallback) => {
+            try {
+                let rows = demoEvents.map((e) => ({ ...e }));
+                const start = fetchInfo.start;
+                const end = fetchInfo.end;
+                rows = rows.filter((ev) => {
+                    const d = new Date(ev.start);
+                    return d >= start && d < end;
+                });
+                /* Vue « Mon planning » = liste sur 30 jours : seule fenêtre ~29–31 jours ici. */
+                const spanDays = Math.round((end.getTime() - start.getTime()) / 86400000);
+                if (spanDays >= 29 && spanDays <= 31 && currentUser?.email) {
+                    const me = String(currentUser.email).trim().toLowerCase();
+                    rows = rows.filter(
+                        (ev) => String(ev.extendedProps?.owner || '').trim().toLowerCase() === me
+                    );
+                } else if (spanDays >= 29 && spanDays <= 31 && !currentUser?.email) {
+                    rows = [];
+                }
+                successCallback(rows);
+            } catch (e) {
+                failureCallback(e);
             }
         },
 

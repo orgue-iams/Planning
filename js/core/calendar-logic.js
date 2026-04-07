@@ -8,6 +8,7 @@ import { getAccessToken, isBackendAuthConfigured, isPrivilegedUser } from './aut
 import { invokeCalendarBridge } from './calendar-bridge.js';
 import { getProfile, getFavoriteLabel } from '../utils/user-profile.js';
 import { isPlanningRole } from './planning-roles.js';
+import { RESERVATION_MOTIFS, normalizeMotif, motifToSlotType } from './reservation-motifs.js';
 
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -405,46 +406,22 @@ function addOneEventPerDay(calendar, days, title, tStart, tEnd, type, ownerEmail
 
 export function getReservationTitleFromForm() {
     const sel = document.getElementById('event-title-select');
-    const inp = document.getElementById('event-title-custom');
-    if (sel?.value === '__custom__') {
-        return (inp?.value || '').trim() || 'Sans titre';
-    }
-    return (sel?.value || '').trim() || 'Sans titre';
+    return normalizeMotif(sel?.value || '');
 }
 
-/** Remplit la liste déroulante des motifs + saisie libre ; préremplit le favori ou un titre existant. */
+/** Remplit la liste déroulante des motifs (Travail / Cours / Fermeture / Autre). */
 export function buildReservationTitleSelect(currentUser, existingTitle) {
-    const { labels, favoriteLabel } = getProfile(currentUser?.email);
+    const { favoriteLabel } = getProfile(currentUser?.email);
     const sel = document.getElementById('event-title-select');
-    const inp = document.getElementById('event-title-custom');
-    if (!sel || !inp) return;
+    if (!sel) return;
 
     sel.innerHTML = '';
-    for (const lab of labels) {
+    for (const lab of RESERVATION_MOTIFS) {
         sel.add(new Option(lab, lab));
     }
-    sel.add(new Option('— Saisie libre —', '__custom__'));
 
-    const str = String(existingTitle ?? '').trim();
-    if (str && labels.includes(str)) {
-        sel.value = str;
-        inp.value = '';
-        inp.classList.add('hidden');
-    } else if (str) {
-        sel.value = '__custom__';
-        inp.value = str;
-        inp.classList.remove('hidden');
-    } else if (labels.length === 0) {
-        sel.value = '__custom__';
-        inp.value = '';
-        inp.classList.remove('hidden');
-    } else {
-        const fav =
-            favoriteLabel && labels.includes(favoriteLabel) ? favoriteLabel : labels[0];
-        sel.value = fav;
-        inp.value = '';
-        inp.classList.add('hidden');
-    }
+    const str = normalizeMotif(existingTitle || favoriteLabel);
+    sel.value = str;
 }
 
 /** Fin de plage pour un clic simple (aligné sur snapDuration, pas sur la hauteur visuelle du slot). */
@@ -484,8 +461,7 @@ export function quickCreateFromSelection(calendar, selectInfo, currentUser) {
         return;
     }
 
-    let title = getFavoriteLabel(currentUser.email).trim();
-    if (!title) title = 'Réservation';
+    let title = normalizeMotif(getFavoriteLabel(currentUser.email).trim() || 'Travail');
 
     const conflict = findOverlappingCalendarEvent(
         calendar,
@@ -509,7 +485,7 @@ export function quickCreateFromSelection(calendar, selectInfo, currentUser) {
                 owner: currentUser.email,
                 ownerDisplayName: currentUser.name || currentUser.email.split('@')[0],
                 ownerRole: normalizeRole(currentUser.role) || 'eleve',
-                type: 'reservation'
+                type: motifToSlotType(title)
             }
         });
     };
@@ -617,19 +593,6 @@ export function openModal(start, end, event, currentUser) {
         setSelectTime(reEl, endInstant);
     }
 
-    document.getElementById('wrap-event-type')?.classList.toggle('hidden', !isPrivilegedUser(currentUser));
-
-    // Type de créneau (si existant) — `maintenance` retiré au profit de `cours`
-    const typeEl = document.getElementById('event-type');
-    if (event && event.extendedProps.type && typeEl) {
-        let t = event.extendedProps.type;
-        if (t === 'maintenance') t = 'cours';
-        if (![...typeEl.options].some((o) => o.value === t)) t = 'reservation';
-        typeEl.value = t;
-    } else if (typeEl) {
-        typeEl.value = 'reservation';
-    }
-
     const recurWrap = document.getElementById('event-recurring-wrap');
     const recurCb = document.getElementById('event-recurring');
     /** Réservation sur plusieurs jours : création, admin / prof uniquement. */
@@ -658,11 +621,9 @@ export function openModal(start, end, event, currentUser) {
     // Sécurité : Verrouillage si le créneau appartient à quelqu'un d'autre
     const fields = [
         'event-title-select',
-        'event-title-custom',
         'event-date-start',
         'event-start',
         'event-end',
-        'event-type',
         'event-recurring',
         'event-recur-period-start',
         'event-recur-period-end',
@@ -685,10 +646,7 @@ export function openModal(start, end, event, currentUser) {
 
     modal.showModal();
     requestAnimationFrame(() => {
-        const custom = document.getElementById('event-title-select')?.value === '__custom__';
-        const titleEl = custom
-            ? document.getElementById('event-title-custom')
-            : document.getElementById('event-title-select');
+        const titleEl = document.getElementById('event-title-select');
         if (titleEl && !titleEl.disabled) titleEl.focus();
     });
 }
@@ -711,6 +669,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     }
 
     const title = getReservationTitleFromForm();
+    const slotType = motifToSlotType(title);
     const recurOn =
         isPrivilegedUser(currentUser) &&
         document.getElementById('event-recurring')?.checked &&
@@ -764,14 +723,13 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
                 return;
             }
         }
-        const type = document.getElementById('event-type').value;
         addOneEventPerDay(
             calendar,
             days,
             title,
             tRecStart,
             tRecEnd,
-            type,
+            slotType,
             currentUser.email,
             currentUser.name || currentUser.email.split('@')[0],
             currentUser.role
@@ -785,7 +743,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
             title,
             start: `${d}T${tRecStart}:00`,
             end: `${d}T${tRecEnd}:00`,
-            type,
+            type: slotType,
             owner: currentUser.email
         }));
         await trySyncGoogleCalendar(bridgeEvents);
@@ -822,8 +780,6 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         return;
     }
 
-    const type = document.getElementById('event-type').value;
-
     const eventData = {
         title: title,
         start: startStr,
@@ -832,7 +788,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
             owner: currentUser.email,
             ownerDisplayName: currentUser.name || currentUser.email.split('@')[0],
             ownerRole: normalizeRole(currentUser.role) || 'eleve',
-            type: type
+            type: slotType
         }
     };
 
@@ -840,7 +796,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         // Mise à jour
         currentEventRef.setProp('title', title);
         currentEventRef.setDates(startStr, endStr);
-        currentEventRef.setExtendedProp('type', type);
+        currentEventRef.setExtendedProp('type', slotType);
     } else {
         // Création
         calendar.addEvent(eventData);
@@ -853,7 +809,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
             title,
             start: startStr,
             end: endStr,
-            type,
+            type: slotType,
             owner: currentUser.email
         }
     ]);

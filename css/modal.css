@@ -102,13 +102,25 @@
     color: #1d4ed8;
 }
 
-/* Quill (règles + annonces) — barre type « traitement de texte » */
+/* Quill (règles + annonces) — barre au-dessus du texte, sticky pour rester sous l’en-tête de la modale */
+.planning-quill-mount {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
 .planning-quill-mount .ql-toolbar.ql-snow {
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
     border: 1px solid #e2e8f0;
     border-radius: 0.75rem 0.75rem 0 0;
-    background: rgb(248 250 252 / 0.95);
+    background: rgb(248 250 252 / 0.98);
+    backdrop-filter: blur(6px);
     padding: 6px 8px;
 }
+
 .planning-quill-mount .ql-container.ql-snow {
     border: 1px solid #e2e8f0;
     border-top: 0;
@@ -117,196 +129,77 @@
     min-height: 12rem;
     background: white;
 }
+
 .planning-quill-mount.planning-quill-mount--compact .ql-container.ql-snow {
     min-height: 7.5rem;
 }
+
 .planning-quill-mount .ql-editor {
     min-height: 11rem;
     line-height: 1.5;
+    /* un peu d’air en bas : moins de chevauchement avec barres système / poignées de sélection */
+    padding-bottom: 1.25rem;
 }
+
 .planning-quill-mount.planning-quill-mount--compact .ql-editor {
     min-height: 6.5rem;
 }
+
 .planning-quill-mount .ql-snow .ql-picker {
     font-size: 13px;
     font-weight: 700;
     color: #0f172a;
 }
+
 .planning-quill-mount .ql-snow .ql-stroke {
     stroke: #334155;
 }
+
 .planning-quill-mount .ql-snow .ql-fill {
     fill: #334155;
 }
+
+/* Listes déroulantes au-dessus du contenu / des menus tactiles quand c’est possible */
 .planning-quill-mount .ql-snow .ql-picker-options {
+    z-index: 150;
     border-radius: 0.5rem;
-}
-
-/* Polices Quill (whitelist planning-quill.js) — sans ça la liste « Normal » / noms incorrects dans le sélecteur. */
-.planning-quill-mount .ql-font-system-ui {
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-}
-.planning-quill-mount .ql-font-arial {
-    font-family: Arial, Helvetica, sans-serif;
-}
-.planning-quill-mount .ql-font-helvetica {
-    font-family: Helvetica, Arial, sans-serif;
-}
-.planning-quill-mount .ql-font-verdana {
-    font-family: Verdana, Geneva, sans-serif;
-}
-.planning-quill-mount .ql-font-tahoma {
-    font-family: Tahoma, Geneva, sans-serif;
-}
-.planning-quill-mount .ql-font-trebuchet-ms {
-    font-family: 'Trebuchet MS', 'Lucida Grande', sans-serif;
-}
-.planning-quill-mount .ql-font-georgia {
-    font-family: Georgia, serif;
-}
-.planning-quill-mount .ql-font-times-new-roman {
-    font-family: 'Times New Roman', Times, serif;
-}
-.planning-quill-mount .ql-font-palatino {
-    font-family: Palatino, 'Palatino Linotype', serif;
-}
-.planning-quill-mount .ql-font-garamond {
-    font-family: Garamond, Palatino, serif;
-}
-.planning-quill-mount .ql-font-courier-new {
-    font-family: 'Courier New', Courier, monospace;
-}
-.planning-quill-mount .ql-font-consolas {
-    font-family: Consolas, Monaco, monospace;
-}
-.planning-quill-mount .ql-font-comic-sans-ms {
-    font-family: 'Comic Sans MS', cursive;
-}
-.planning-quill-mount .ql-font-impact {
-    font-family: Impact, Haettenschweiler, sans-serif;
-}
-
-/* Libellés du menu déroulant « Police » (sinon tout apparaît comme « Normal »). */
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-item[data-value='system-ui']::before {
-    content: 'Système';
-    font-family: system-ui, sans-serif;
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-item[data-value='arial']::before {
-    content: 'Arial';
-    font-family: Arial, sans-serif;
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-item[data-value='helvetica']::before {
-    content: 'Helvetica';
-    font-family: Helvetica, Arial, sans-serif;
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-item[data-value='verdana']::before {
-    content: 'Verdana';
-    font-family: Verdana, sans-serif;
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-item[data-value='tahoma']::before {
-    content: 'Tahoma';
-    font-family: Tahoma, sans-serif;
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-item[data-value='trebuchet-ms']::before {
-    content: 'Trebuchet';
-    font-family: 'Trebuchet MS', sans-serif;
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-item[data-value='georgia']::before {
-    content: 'Georgia';
-    font-family: Georgia, serif;
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-item[data-value='times-new-roman']::before {
-    content: 'Times New Roman';
-    font-family: 'Times New Roman', Times, serif;
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-item[data-value='palatino']::before {
-    content: 'Palatino';
-    font-family: Palatino, serif;
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-item[data-value='garamond']::before {
-    content: 'Garamond';
-    font-family: Garamond, serif;
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-item[data-value='courier-new']::before {
-    content: 'Courier New';
-    font-family: 'Courier New', monospace;
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-item[data-value='consolas']::before {
-    content: 'Consolas';
-    font-family: Consolas, monospace;
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-item[data-value='comic-sans-ms']::before {
-    content: 'Comic Sans MS';
-    font-family: 'Comic Sans MS', cursive;
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-item[data-value='impact']::before {
-    content: 'Impact';
-    font-family: Impact, sans-serif;
-}
-
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-label[data-value='system-ui']::before {
-    content: 'Système';
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-label[data-value='arial']::before {
-    content: 'Arial';
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-label[data-value='helvetica']::before {
-    content: 'Helvetica';
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-label[data-value='verdana']::before {
-    content: 'Verdana';
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-label[data-value='tahoma']::before {
-    content: 'Tahoma';
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-label[data-value='trebuchet-ms']::before {
-    content: 'Trebuchet';
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-label[data-value='georgia']::before {
-    content: 'Georgia';
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-label[data-value='times-new-roman']::before {
-    content: 'Times New Roman';
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-label[data-value='palatino']::before {
-    content: 'Palatino';
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-label[data-value='garamond']::before {
-    content: 'Garamond';
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-label[data-value='courier-new']::before {
-    content: 'Courier New';
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-label[data-value='consolas']::before {
-    content: 'Consolas';
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-label[data-value='comic-sans-ms']::before {
-    content: 'Comic Sans MS';
-}
-.planning-quill-mount .ql-snow .ql-picker.ql-font .ql-picker-label[data-value='impact']::before {
-    content: 'Impact';
+    box-shadow: 0 10px 30px rgb(15 23 42 / 0.18);
+    max-height: 14rem;
+    overflow-y: auto;
 }
 
 /*
- * Tactile (Android, iPhone) : le menu système « Traduire, Couper, Copier… » apparaît
- * au-dessus de la sélection et recouvre la barre Quill quand elle est au-dessus du texte.
- * Inverser l’ordre : éditeur en haut, mise en forme en bas — la barre reste utilisable.
+ * Tailles personnalisées (px) : sans règles explicites, Quill n’affiche que « Normal » partout.
+ * Ici on affiche la valeur réelle (10px, 12px, …). Libellé quand aucune taille forcée sur la sélection :
  */
-@media (pointer: coarse) {
-    .planning-quill-mount {
-        display: flex;
-        flex-direction: column-reverse;
-    }
+.planning-quill-mount .ql-snow .ql-picker.ql-size .ql-picker-item::before {
+    content: attr(data-value) !important;
+}
 
-    .planning-quill-mount .ql-container.ql-snow {
-        border-radius: 0.75rem 0.75rem 0 0;
-        border: 1px solid #e2e8f0;
-        border-bottom: 0;
-    }
+.planning-quill-mount .ql-snow .ql-picker.ql-size .ql-picker-label[data-value]::before {
+    content: attr(data-value) !important;
+}
 
-    .planning-quill-mount .ql-toolbar.ql-snow {
-        border-radius: 0 0 0.75rem 0.75rem;
-        border: 1px solid #e2e8f0;
-        border-top: 0;
-    }
+.planning-quill-mount .ql-snow .ql-picker.ql-size .ql-picker-label:not([data-value])::before {
+    content: 'Défaut';
+}
+
+/* Rendu des tailles dans le texte (classes internes Quill) */
+.planning-quill-mount .ql-editor .ql-size-10px {
+    font-size: 10px;
+}
+.planning-quill-mount .ql-editor .ql-size-12px {
+    font-size: 12px;
+}
+.planning-quill-mount .ql-editor .ql-size-14px {
+    font-size: 14px;
+}
+.planning-quill-mount .ql-editor .ql-size-16px {
+    font-size: 16px;
+}
+.planning-quill-mount .ql-editor .ql-size-18px {
+    font-size: 18px;
+}
+.planning-quill-mount .ql-editor .ql-size-20px {
+    font-size: 20px;
 }

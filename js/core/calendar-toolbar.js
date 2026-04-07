@@ -81,6 +81,10 @@ export function formatCalendarToolbarTitle(calendar) {
         return `${ucFirst(MONTH_SHORT[start.getMonth()])} ${start.getFullYear()} – ${ucFirst(MONTH_SHORT[end.getMonth()])} ${end.getFullYear()}`;
     }
 
+    if (type === 'listMyPlanning') {
+        return `Mon planning · 30 jours`;
+    }
+
     if (type.startsWith('list')) {
         if (start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth()) {
             return `${start.getDate()} – ${end.getDate()} ${MONTH_LONG[start.getMonth()]} ${start.getFullYear()}`;
@@ -99,7 +103,8 @@ const VIEW_ITEMS = [
     { id: 'dayGridMonth', label: 'Mois' },
     { id: 'timeGridDay', label: 'Jour' },
     { id: 'multiMonthYear', label: 'Année' },
-    { id: 'listWeek', label: 'Planning' }
+    { id: 'listWeek', label: 'Planning' },
+    { id: 'listMyPlanning', label: 'Mon planning' }
 ];
 
 /** @param {import('@fullcalendar/core').CalendarApi} calendar */
@@ -175,6 +180,9 @@ export function initCalendarToolbar(calendar) {
         b.setAttribute('data-view', id);
         b.addEventListener('click', (ev) => {
             ev.stopPropagation();
+            if (id === 'listMyPlanning') {
+                calendar.today();
+            }
             calendar.changeView(id);
             closeMenu();
             refreshTitle();

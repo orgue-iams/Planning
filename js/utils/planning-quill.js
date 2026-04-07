@@ -1,39 +1,23 @@
 /**
  * Éditeur WYSIWYG partagé (modales Règles + Annonces).
  * Requiert `window.Quill` chargé via CDN (voir index.html).
+ *
+ * Pas de sélecteur de police : affichage homogène et lisibilité du menu « taille »
+ * (sans quoi Quill n’affiche que « Normal » pour les tailles personnalisées).
+ * La barre d’outils est rendue sticky en CSS pour limiter le recouvrement par le menu Copier/Coller (mobile).
  */
 
 export function isQuillAvailable() {
     return typeof window !== 'undefined' && typeof window.Quill === 'function';
 }
 
-function registerPlanningFormats() {
-    if (window.__planningQuillFormatsRegistered) return;
+function registerPlanningSizeFormat() {
+    if (window.__planningQuillSizeRegistered) return;
     const Quill = window.Quill;
-    const Font = Quill.import('formats/font');
-    Font.whitelist = [
-        'system-ui',
-        'arial',
-        'helvetica',
-        'verdana',
-        'tahoma',
-        'trebuchet-ms',
-        'georgia',
-        'times-new-roman',
-        'palatino',
-        'garamond',
-        'courier-new',
-        'consolas',
-        'comic-sans-ms',
-        'impact'
-    ];
-    Quill.register(Font, true);
-
     const Size = Quill.import('formats/size');
     Size.whitelist = ['10px', '12px', '14px', '16px', '18px', '20px'];
     Quill.register(Size, true);
-
-    window.__planningQuillFormatsRegistered = true;
+    window.__planningQuillSizeRegistered = true;
 }
 
 /**
@@ -46,8 +30,8 @@ export function createPlanningQuill(mountEl, opts = {}) {
         console.warn('[planning-quill] Quill indisponible');
         return null;
     }
-    mountEl.innerHTML = '';
-    registerPlanningFormats();
+    mountEl.replaceChildren();
+    registerPlanningSizeFormat();
     const Quill = window.Quill;
     return new Quill(mountEl, {
         theme: 'snow',
@@ -56,7 +40,6 @@ export function createPlanningQuill(mountEl, opts = {}) {
             toolbar: [
                 ['bold', 'italic', 'underline'],
                 [{ list: 'bullet' }],
-                [{ font: [] }],
                 [{ size: ['10px', '12px', '14px', '16px', '18px', '20px'] }],
                 [{ color: [] }]
             ]

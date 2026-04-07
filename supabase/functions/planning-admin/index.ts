@@ -43,6 +43,31 @@ type ListedUser = {
     created_at?: string | null;
 };
 
+/** Appel direct GoTrue (même endpoint que auth-js) : évite les écarts de forme de `data` avec certains bundles Deno/esm. */
+async function fetchAuthUsersPage(
+    projectUrl: string,
+    serviceKey: string,
+    page: number,
+    perPage: number
+): Promise<ListedUser[]> {
+    const base = projectUrl.replace(/\/$/, '');
+    const qs = new URLSearchParams({ page: String(page), per_page: String(perPage) });
+    const res = await fetch(`${base}/auth/v1/admin/users?${qs}`, {
+        headers: {
+            Authorization: `Bearer ${serviceKey}`,
+            apikey: serviceKey,
+            'Content-Type': 'application/json',
+            'X-Supabase-Api-Version': '2024-01-01'
+        }
+    });
+    if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t.trim() || `Liste utilisateurs Auth : HTTP ${res.status}`);
+    }
+    const body = (await res.json()) as { users?: unknown };
+    return Array.isArray(body.users) ? (body.users as ListedUser[]) : [];
+}
+
 const cors: Record<string, string> = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers':
@@ -128,10 +153,7 @@ Deno.serve(async (req) => {
             }> = [];
 
             while (true) {
-                const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
-                if (error) throw error;
-                const payload = data as { users?: ListedUser[] } | null | undefined;
-                const users: ListedUser[] = Array.isArray(payload?.users) ? payload.users : [];
+                const users = await fetchAuthUsersPage(url, serviceKey, page, perPage);
                 if (users.length === 0) break;
 
                 const ids = users.map((u) => u.id).filter(Boolean);
