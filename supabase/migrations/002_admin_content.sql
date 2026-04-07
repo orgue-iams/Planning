@@ -10,7 +10,11 @@ create table if not exists public.organ_rules (
 );
 
 insert into public.organ_rules (id, content)
-values (1, '')
+values (1, $$<h3>Règles d’utilisation de l’orgue — Orgue Gérard Bancells (IAMS)</h3>
+<p><strong>Respect</strong> des créneaux réservés et de la signalétique sur place.</p>
+<p>Ne pas toucher aux jeux, à l’électronique ou à la mécanique sans accord du professeur.</p>
+<p>Arriver à l’heure ; en cas d’empêchement, libérer ou modifier votre réservation.</p>
+<p>Signaler tout incident ou anomalie au responsable.</p>$$)
 on conflict (id) do nothing;
 
 alter table public.organ_rules enable row level security;

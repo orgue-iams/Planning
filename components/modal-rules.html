@@ -10,10 +10,6 @@
                     <button type="button" class="rules-tool" data-cmd="underline" title="Souligné"><span style="text-decoration:underline">S</span></button>
                 </div>
                 <div class="rules-toolbar__group">
-                    <button type="button" class="rules-tool" data-cmd="insertUnorderedList" title="Liste à puces">• Liste</button>
-                    <button type="button" class="rules-tool" data-cmd="insertOrderedList" title="Liste numérotée">1. Liste</button>
-                </div>
-                <div class="rules-toolbar__group">
                     <select id="rules-block" class="rules-select" title="Style">
                         <option value="p" selected>Paragraphe</option>
                         <option value="h3">Titre</option>
@@ -34,10 +30,15 @@
                         <option value="18">18</option>
                         <option value="20">20</option>
                     </select>
-                    <label class="rules-color" title="Couleur du texte">
-                        <span class="rules-color__label">Couleur</span>
-                        <input type="color" id="rules-color" value="#0f172a" />
-                    </label>
+                    <select id="rules-color" class="rules-select" title="Couleur">
+                        <option value="#0f172a" selected>Noir</option>
+                        <option value="#475569">Gris</option>
+                        <option value="#b91c1c">Rouge</option>
+                        <option value="#047857">Vert</option>
+                        <option value="#1d4ed8">Bleu</option>
+                        <option value="__custom__">Autre…</option>
+                    </select>
+                    <input type="color" id="rules-color-custom" value="#0f172a" class="hidden" title="Couleur personnalisée" />
                     <button type="button" class="rules-tool" data-cmd="createLink" title="Lien">Lien</button>
                     <button type="button" class="rules-tool" data-cmd="removeFormat" title="Effacer la mise en forme">Nettoyer</button>
                 </div>

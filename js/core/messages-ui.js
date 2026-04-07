@@ -42,6 +42,7 @@ export function initMessagesUi(currentUser) {
     const fontSelect = document.getElementById('rules-font');
     const sizeSelect = document.getElementById('rules-size');
     const colorInput = document.getElementById('rules-color');
+    const colorCustom = document.getElementById('rules-color-custom');
     const btnEdit = document.getElementById('rules-btn-edit');
     const btnSave = document.getElementById('rules-btn-save');
     const btnCancel = document.getElementById('rules-btn-cancel');
@@ -54,6 +55,39 @@ export function initMessagesUi(currentUser) {
 
     const priv = isPrivilegedUser(currentUser);
     const backend = isBackendAuthConfigured();
+
+    /** @type {Range|null} */
+    let lastRange = null;
+
+    const saveSelection = () => {
+        const root = editor;
+        if (!(root instanceof HTMLElement)) return;
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0) return;
+        const r = sel.getRangeAt(0);
+        if (root.contains(r.startContainer) && root.contains(r.endContainer)) {
+            lastRange = r.cloneRange();
+        }
+    };
+
+    const restoreSelection = () => {
+        const root = editor;
+        if (!(root instanceof HTMLElement)) return;
+        root.focus();
+        const sel = window.getSelection();
+        if (!sel) return;
+        if (lastRange) {
+            sel.removeAllRanges();
+            sel.addRange(lastRange);
+            return;
+        }
+        // fallback: curseur à la fin
+        const r = document.createRange();
+        r.selectNodeContents(root);
+        r.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(r);
+    };
 
     if (priv) {
         btnEdit?.classList.remove('hidden');
@@ -78,6 +112,10 @@ export function initMessagesUi(currentUser) {
             const remote = await fetchOrganRulesRemote();
             if (remote !== null && remote !== '') text = remote;
         }
+        // Si la table Supabase est initialisée vide, on affiche un texte par défaut (local).
+        if (backend && (!text || String(text).trim() === '')) {
+            text = getRulesText();
+        }
         renderRulesView(text);
         if (editor) {
             const raw = String(text ?? '');
@@ -99,6 +137,9 @@ export function initMessagesUi(currentUser) {
             const r = await fetchOrganRulesRemote();
             if (r !== null) text = r;
         }
+        if (backend && (!text || String(text).trim() === '')) {
+            text = getRulesText();
+        }
         if (editor) {
             const raw = String(text ?? '');
             editor.innerHTML = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
@@ -109,6 +150,7 @@ export function initMessagesUi(currentUser) {
         btnSave?.classList.remove('hidden');
         btnCancel?.classList.remove('hidden');
         editor?.focus();
+        saveSelection();
     });
 
     btnCancel?.addEventListener('click', () => {
@@ -122,12 +164,29 @@ export function initMessagesUi(currentUser) {
     });
 
     function exec(cmd, value) {
-        editor?.focus();
+        restoreSelection();
         try {
             document.execCommand(cmd, false, value);
         } catch {
             /* ignore */
         }
+        saveSelection();
+    }
+
+    // Éviter que la toolbar vole le focus/selection (sinon bold/underline ne s’appliquent pas).
+    toolbar?.addEventListener('mousedown', (e) => {
+        if (e.target?.closest?.('button,select,input')) e.preventDefault();
+    });
+
+    editor?.addEventListener?.('keyup', saveSelection);
+    editor?.addEventListener?.('mouseup', saveSelection);
+    document.addEventListener('selectionchange', saveSelection);
+
+    // Meilleure compat CSS pour couleur / tailles dans certains navigateurs.
+    try {
+        document.execCommand('styleWithCSS', false, true);
+    } catch {
+        /* ignore */
     }
 
     toolbar?.addEventListener('click', (e) => {
@@ -175,11 +234,23 @@ export function initMessagesUi(currentUser) {
         }
     });
 
-    colorInput?.addEventListener('input', () => {
+    const applyColor = (v) => {
+        const c = String(v || '').trim();
+        if (!c) return;
+        exec('foreColor', c);
+    };
+
+    colorInput?.addEventListener('change', () => {
         const v = String(colorInput.value || '').trim();
-        if (!v) return;
-        exec('foreColor', v);
+        if (v === '__custom__') {
+            colorCustom?.classList.remove('hidden');
+            colorCustom?.focus();
+            return;
+        }
+        colorCustom?.classList.add('hidden');
+        applyColor(v);
     });
+    colorCustom?.addEventListener('input', () => applyColor(colorCustom.value));
 
     btnSave?.addEventListener('click', async () => {
         const html = editor?.innerHTML ?? '';
