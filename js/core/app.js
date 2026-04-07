@@ -24,7 +24,11 @@ import {
     tryRestoreSession,
     isPrivilegedUser,
     roleLabelFr,
-    PASSWORD_POLICY_LINES
+    PASSWORD_POLICY_LINES,
+    hasSupabaseRecoveryInUrl,
+    subscribeSupabasePasswordRecovery,
+    stripSupabaseAuthFromUrl,
+    isBackendAuthConfigured
 } from './auth-logic.js';
 import { initMessagesUi, tryShowBroadcastPopup } from './messages-ui.js';
 import { initProfileLabelsUi } from './profile-labels-ui.js';
@@ -201,6 +205,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     populateTimeSelects('event-recur-start', 'event-recur-end');
     checkUrlToken();
 
+    let unsubscribeRecovery = () => {};
+    unsubscribeRecovery = subscribeSupabasePasswordRecovery(() => {
+        unsubscribeRecovery();
+        unsubscribeRecovery = () => {};
+        setPasswordModalMode(true);
+        document.getElementById('modal_login')?.close();
+        document.getElementById('modal_forgot')?.close();
+        document.getElementById('modal_password')?.showModal();
+        stripSupabaseAuthFromUrl();
+        requestAnimationFrame(() => document.getElementById('new-pass')?.focus());
+    });
+
+    // Laisser le client traiter #access_token / ?code= avant getSession() (évite la course avec la modale login).
+    if (isBackendAuthConfigured()) {
+        await new Promise((r) => setTimeout(r, 200));
+    }
+
     const restored = await tryRestoreSession();
     if (restored) {
         currentUser = restored;
@@ -330,7 +351,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     const hasResetToken = new URLSearchParams(window.location.search).has('token');
-    if (!hasResetToken && !currentUser?.email) {
+    const supabaseRecoveryUrl = hasSupabaseRecoveryInUrl();
+    if (!hasResetToken && !supabaseRecoveryUrl && !currentUser?.email) {
         const dlg = document.getElementById('modal_login');
         await applyLoginBanner();
         dlg?.showModal();

@@ -159,6 +159,52 @@ export async function updatePassword() {
     return true;
 }
 
+/**
+ * Indique si l’URL actuelle ressemble au retour d’un e-mail de réinitialisation Supabase
+ * (fragment #… ou redirection PKCE avec ?code=).
+ */
+export function hasSupabaseRecoveryInUrl() {
+    if (!isBackendAuthConfigured()) return false;
+    const h = window.location.hash.replace(/^#/, '');
+    if (h) {
+        const hp = new URLSearchParams(h);
+        if (hp.get('type') === 'recovery') return true;
+    }
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get('type') === 'recovery') return true;
+    // Flux PKCE : échange du code au chargement ; on retarde l’ouverture de la modale login le temps que ça parte.
+    if (sp.get('code')) return true;
+    return false;
+}
+
+/** Retire hash et paramètres d’auth de l’URL après consommation par le client Supabase. */
+export function stripSupabaseAuthFromUrl() {
+    const u = new URL(window.location.href);
+    u.hash = '';
+    for (const k of ['code', 'error', 'error_description', 'type']) {
+        u.searchParams.delete(k);
+    }
+    const qs = u.searchParams.toString();
+    window.history.replaceState({}, document.title, u.pathname + (qs ? `?${qs}` : ''));
+}
+
+/**
+ * À appeler tôt au boot : ouvre le flux « nouveau mot de passe » sans ancien mot de passe quand Supabase émet PASSWORD_RECOVERY.
+ * @param {(session: import('https://esm.sh/@supabase/supabase-js@2.49.8').Session) => void} onRecovery
+ * @returns {() => void} désinscription
+ */
+export function subscribeSupabasePasswordRecovery(onRecovery) {
+    if (!isBackendAuthConfigured()) return () => {};
+    const supabase = getSupabaseClient();
+    if (!supabase) return () => {};
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'PASSWORD_RECOVERY' && session) {
+            onRecovery(session);
+        }
+    });
+    return () => subscription.unsubscribe();
+}
+
 export async function sendResetLink(email) {
     const addr = String(email).trim();
     if (!addr.includes('@')) {
