@@ -29,6 +29,29 @@ function renderRulesView(text) {
     el.innerHTML = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
 }
 
+function ensureFallbackRulesModal() {
+    let dlg = document.getElementById('modal_rules_fallback');
+    if (!(dlg instanceof HTMLDialogElement)) {
+        const host = document.getElementById('app-modals') || document.body;
+        if (!host) return null;
+        dlg = document.createElement('dialog');
+        dlg.id = 'modal_rules_fallback';
+        dlg.className = 'modal';
+        dlg.innerHTML = `
+            <div class="modal-box max-w-2xl w-[94%] max-h-[90dvh] flex flex-col border border-slate-200 rounded-2xl">
+                <h3 class="font-black text-sm uppercase tracking-wide text-slate-600 border-b pb-2 shrink-0">Règles d'utilisation de l'orgue</h3>
+                <div id="rules-fallback-view" class="text-sm text-slate-700 leading-relaxed py-4 overflow-y-auto flex-1 min-h-0"></div>
+                <div class="modal-action shrink-0 border-t border-slate-100 mt-2 pt-3">
+                    <button type="button" id="rules-fallback-close" class="btn btn-ghost btn-sm font-black text-[11px] ml-auto">Fermer</button>
+                </div>
+            </div>
+        `;
+        host.appendChild(dlg);
+        dlg.querySelector('#rules-fallback-close')?.addEventListener('click', () => dlg?.close());
+    }
+    return dlg;
+}
+
 export function initMessagesUi(currentUser) {
     const btnRules = document.getElementById('btn-rules');
     const modalRules = document.getElementById('modal_rules');
@@ -116,6 +139,16 @@ export function initMessagesUi(currentUser) {
         // Si la table Supabase est initialisée vide, on affiche un texte par défaut (local).
         if (backend && (!text || String(text).trim() === '')) {
             text = getRulesText();
+        }
+        if (!modalRules || !view) {
+            const fallback = ensureFallbackRulesModal();
+            const fallbackView = fallback?.querySelector?.('#rules-fallback-view');
+            if (fallbackView) {
+                const raw = String(text ?? '');
+                fallbackView.innerHTML = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
+            }
+            fallback?.showModal?.();
+            return;
         }
         renderRulesView(text);
         if (editor) {
