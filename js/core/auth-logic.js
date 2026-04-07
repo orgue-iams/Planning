@@ -63,8 +63,9 @@ export const PASSWORD_POLICY_LINES = [
 const USERS = {
     'admin@iams.fr': { pass: '1234', name: 'Nicolas M.', email: 'admin@iams.fr', role: 'admin' },
     'prof@iams.fr': { pass: '1234', name: 'Prof. Durif', email: 'prof@iams.fr', role: 'prof' },
-    'eleve1@test.com': { pass: '1234', name: 'Jean (Élève 1)', email: 'eleve1@test.com', role: 'eleve' },
-    'eleve2@test.com': { pass: '1234', name: 'Marie (Élève 2)', email: 'eleve2@test.com', role: 'eleve' }
+    'eleve1@iams.fr': { pass: '1234', name: 'Jean (Élève 1)', email: 'eleve1@iams.fr', role: 'eleve' },
+    'eleve2@iams.fr': { pass: '1234', name: 'Marie (Élève 2)', email: 'eleve2@iams.fr', role: 'eleve' },
+    'consultation@iams.fr': { pass: '1234', name: 'Compte consultation', email: 'consultation@iams.fr', role: 'consultation' }
 };
 
 export function isPrivilegedUser(user) {
@@ -76,7 +77,7 @@ export function isAdmin(user) {
 }
 
 export function roleLabelFr(role) {
-    const m = { admin: 'Gestion (secrétariat)', prof: 'Enseignant·e', eleve: 'Élève' };
+    const m = { admin: 'Gestion (secrétariat)', prof: 'Enseignant·e', eleve: 'Élève', consultation: 'Consultation' };
     return m[role] || role || '';
 }
 

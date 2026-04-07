@@ -25,6 +25,7 @@ function renderUsersTable(users) {
             <td class="text-[10px] font-bold break-all">${escapeTd(u.email)}</td>
             <td>
                 <select class="select select-xs select-bordered admin-role-sel max-w-[6.5rem]" data-user-id="${u.id}">
+                    <option value="consultation" ${u.role === 'consultation' ? 'selected' : ''}>consultation</option>
                     <option value="eleve" ${u.role === 'eleve' ? 'selected' : ''}>élève</option>
                     <option value="prof" ${u.role === 'prof' ? 'selected' : ''}>prof</option>
                     <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>

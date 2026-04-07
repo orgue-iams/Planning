@@ -1,5 +1,5 @@
 -- Contenu éditorial + messages planifiés (à exécuter après schema.sql initial)
--- + sécurisation du rôle à la création de compte (invite : metadata role eleve|prof uniquement)
+-- + sécurisation du rôle à la création de compte
 
 -- --- Règles orgue (une ligne) -------------------------------------------------
 create table if not exists public.organ_rules (
@@ -115,7 +115,7 @@ declare
     v_role text;
 begin
     v_role := lower(trim(coalesce(new.raw_user_meta_data ->> 'role', 'eleve')));
-    if v_role not in ('eleve', 'prof') then
+    if v_role not in ('eleve', 'prof', 'consultation') then
         v_role := 'eleve';
     end if;
 

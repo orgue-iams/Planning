@@ -319,7 +319,7 @@ export async function tryShowBroadcastPopup(currentUser) {
 
     if (isBackendAuthConfigured()) {
         if (!currentUser || currentUser.role === 'admin') return;
-        if (currentUser.role !== 'eleve' && currentUser.role !== 'prof') return;
+        if (!['eleve', 'prof', 'consultation'].includes(currentUser.role)) return;
         const m = await fetchActiveAfterLoginMessage();
         if (!m?.body) return;
         if (localStorage.getItem(`orgue_sm_seen_${m.id}`) === '1') return;

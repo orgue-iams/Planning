@@ -24,7 +24,8 @@ export async function fetchAppUserFromSession(session) {
         (data?.display_name && String(data.display_name).trim()) ||
         email.split('@')[0] ||
         'Utilisateur';
-    const role = data?.role && ['admin', 'prof', 'eleve'].includes(data.role) ? data.role : 'eleve';
+    const allowedRoles = ['admin', 'prof', 'eleve', 'consultation'];
+    const role = data?.role && allowedRoles.includes(data.role) ? data.role : 'eleve';
 
     return { name, email, role, id: session.user.id };
 }

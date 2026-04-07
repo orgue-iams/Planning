@@ -130,8 +130,8 @@ Deno.serve(async (req) => {
                     headers: { ...cors, 'Content-Type': 'application/json' }
                 });
             }
-            if (role !== 'eleve' && role !== 'prof') {
-                return new Response(JSON.stringify({ error: 'Rôle invite : eleve ou prof uniquement' }), {
+            if (!['eleve', 'prof', 'consultation'].includes(role)) {
+                return new Response(JSON.stringify({ error: 'Rôle invite : eleve, prof ou consultation uniquement' }), {
                     status: 400,
                     headers: { ...cors, 'Content-Type': 'application/json' }
                 });
@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
                     headers: { ...cors, 'Content-Type': 'application/json' }
                 });
             }
-            if (!['eleve', 'prof', 'admin'].includes(role)) {
+            if (!['eleve', 'prof', 'consultation', 'admin'].includes(role)) {
                 return new Response(JSON.stringify({ error: 'Rôle invalide' }), {
                     status: 400,
                     headers: { ...cors, 'Content-Type': 'application/json' }
