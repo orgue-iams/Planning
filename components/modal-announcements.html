@@ -1,7 +1,7 @@
 <dialog id="modal_announcements" class="modal">
     <div class="modal-box p-5 w-[96%] max-w-md max-h-[90dvh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col">
         <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest shrink-0">Annonces planifiées</h3>
-        <p class="text-[10px] text-slate-500 mb-3 leading-snug">Mise en forme simple : retours à la ligne, et <span class="font-mono">**mot**</span> pour le gras. Définissez la période d’affichage.</p>
+        <p class="text-[10px] text-slate-500 mb-3 leading-snug">Mise en forme simple via les boutons (gras, italique, souligné). Définissez la période d’affichage.</p>
 
         <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-3 space-y-2 mb-3 shrink-0">
             <label class="text-[10px] font-bold text-slate-600">Où afficher</label>
@@ -18,6 +18,11 @@
                     <label class="text-[9px] font-bold text-slate-500">Fin</label>
                     <input type="datetime-local" id="ann-end" class="input input-sm input-bordered w-full text-xs" />
                 </div>
+            </div>
+            <div id="ann-toolbar" class="flex items-center gap-2">
+                <button type="button" id="ann-btn-bold" class="btn btn-xs btn-outline font-black" title="Gras">G</button>
+                <button type="button" id="ann-btn-italic" class="btn btn-xs btn-outline italic font-black" title="Italique">I</button>
+                <button type="button" id="ann-btn-underline" class="btn btn-xs btn-outline underline font-black" title="Souligné">S</button>
             </div>
             <textarea id="ann-body" class="textarea textarea-bordered w-full text-sm min-h-[100px]" placeholder="Votre message…"></textarea>
             <button type="button" id="ann-publish-btn" class="btn btn-primary btn-sm w-full font-black text-[11px]">Publier</button>

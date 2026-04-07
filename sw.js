@@ -1,4 +1,4 @@
-const CACHE_NAME = 'orgue-v25';
+const CACHE_NAME = 'orgue-v26';
 
 /** Ressources locales (hors CDN) pour démarrage rapide / coquille hors-ligne */
 const ASSETS = [

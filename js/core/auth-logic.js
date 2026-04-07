@@ -3,6 +3,7 @@
  */
 
 import { getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
+import { showToast } from '../utils/toast.js';
 
 export { isBackendAuthConfigured } from './supabase-client.js';
 import { fetchAppUserFromSession } from './supabase-auth.js';
@@ -77,7 +78,7 @@ export function isAdmin(user) {
 }
 
 export function roleLabelFr(role) {
-    const m = { admin: 'Gestion (secrétariat)', prof: 'Enseignant·e', eleve: 'Élève', consultation: 'Consultation' };
+    const m = { admin: 'Admin', prof: 'Prof', eleve: 'Élève', consultation: 'Consultation' };
     return m[role] || role || '';
 }
 
@@ -101,7 +102,7 @@ export async function login(email, pass) {
     if (isBackendAuthConfigured()) {
         const supabase = getSupabaseClient();
         if (!supabase) {
-            alert('Configuration Supabase invalide.');
+            showToast('Configuration Supabase invalide.', 'error');
             return { success: false };
         }
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -109,12 +110,12 @@ export async function login(email, pass) {
             password: pass
         });
         if (error) {
-            alert(error.message || 'Identifiants invalides');
+            showToast(error.message || 'Identifiants invalides', 'error');
             return { success: false };
         }
         const user = await fetchAppUserFromSession(data.session);
         if (!user) {
-            alert('Session invalide.');
+            showToast('Session invalide.', 'error');
             return { success: false };
         }
         document.getElementById('modal_login')?.close();
@@ -129,7 +130,7 @@ export async function login(email, pass) {
             user: { name: row.name, email: row.email, role: row.role }
         };
     }
-    alert('Identifiants invalides');
+    showToast('Identifiants invalides', 'error');
     return { success: false };
 }
 
@@ -159,12 +160,12 @@ export async function updatePassword() {
     const isTokenReset = !!document.getElementById('group-old-pass')?.classList.contains('hidden');
 
     if (newPass.length < MIN_PASS_LEN) {
-        alert(`Le mot de passe doit contenir au moins ${MIN_PASS_LEN} caractères.`);
+        showToast(`Le mot de passe doit contenir au moins ${MIN_PASS_LEN} caractères.`, 'error');
         return false;
     }
 
     if (newPass !== confirmPass) {
-        alert("Les nouveaux mots de passe ne correspondent pas.");
+        showToast('Les nouveaux mots de passe ne correspondent pas.', 'error');
         return false;
     }
 
@@ -176,7 +177,7 @@ export async function updatePassword() {
             const oldPass = oldPassEl?.value || '';
             const { data: { user } } = await supabase.auth.getUser();
             if (!user?.email) {
-                alert('Session expirée. Reconnectez-vous.');
+                showToast('Session expirée. Reconnectez-vous.', 'error');
                 return false;
             }
             const check = await supabase.auth.signInWithPassword({
@@ -184,26 +185,25 @@ export async function updatePassword() {
                 password: oldPass
             });
             if (check.error) {
-                alert('Ancien mot de passe incorrect.');
+                showToast('Ancien mot de passe incorrect.', 'error');
                 return false;
             }
         }
 
         const { error } = await supabase.auth.updateUser({ password: newPass });
         if (error) {
-            alert(error.message || 'Impossible de mettre à jour le mot de passe.');
+            showToast(error.message || 'Impossible de mettre à jour le mot de passe.', 'error');
             return false;
         }
         if (isTokenReset) {
             clearSupabasePasswordRecoveryPending();
         }
-        alert('Mot de passe modifié avec succès !');
+        showToast('Mot de passe modifié avec succès !');
         document.getElementById('modal_password').close();
         return true;
     }
 
-    console.log('Succès : Mot de passe mis à jour (démo).');
-    alert('Mot de passe modifié avec succès !');
+    showToast('Mot de passe modifié avec succès !');
     document.getElementById('modal_password').close();
     return true;
 }
@@ -271,7 +271,7 @@ export async function shouldResumeSupabasePasswordRecovery() {
 export async function sendResetLink(email) {
     const addr = String(email).trim();
     if (!addr.includes('@')) {
-        alert('Email invalide');
+        showToast('Email invalide', 'error');
         return;
     }
 
@@ -281,10 +281,10 @@ export async function sendResetLink(email) {
         const redirectTo = `${window.location.origin}${window.location.pathname}`;
         const { error } = await supabase.auth.resetPasswordForEmail(addr, { redirectTo });
         if (error) {
-            alert(error.message || 'Impossible d’envoyer le lien.');
+            showToast(error.message || 'Impossible d’envoyer le lien.', 'error');
             return;
         }
-        alert(`Si cette adresse est enregistrée, un e-mail de réinitialisation a été envoyé.`);
+        showToast('Si cette adresse est enregistrée, un e-mail de réinitialisation a été envoyé.', 'info');
         document.getElementById('modal_forgot').close();
         document.getElementById('modal_login')?.showModal();
         return;
@@ -293,7 +293,7 @@ export async function sendResetLink(email) {
     const token = Math.random().toString(36).substring(2, 15);
     const resetURL = `${window.location.origin}${window.location.pathname}?token=${token}`;
     console.log('Lien démo :', resetURL);
-    alert(`Un mail a été envoyé à ${addr}.`);
+    showToast(`Un mail a été envoyé à ${addr}.`, 'info');
     document.getElementById('modal_forgot').close();
     document.getElementById('modal_login')?.showModal();
 }

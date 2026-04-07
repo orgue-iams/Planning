@@ -25,6 +25,29 @@ function fromLocalInputValue(s) {
     return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+function wrapSelectionWith(before, after = before) {
+    const body = document.getElementById('ann-body');
+    if (!(body instanceof HTMLTextAreaElement)) return;
+    const start = body.selectionStart ?? 0;
+    const end = body.selectionEnd ?? 0;
+    const selected = body.value.slice(start, end);
+    const payload = `${before}${selected}${after}`;
+    body.setRangeText(payload, start, end, 'end');
+    body.focus();
+}
+
+function getAnnBodyHtml() {
+    const body = document.getElementById('ann-body');
+    if (!(body instanceof HTMLTextAreaElement)) return '';
+    return body.value || '';
+}
+
+function clearAnnBody() {
+    const body = document.getElementById('ann-body');
+    if (!(body instanceof HTMLTextAreaElement)) return;
+    body.value = '';
+}
+
 async function renderList() {
     const wrap = document.getElementById('ann-list');
     if (!wrap) return;
@@ -69,8 +92,12 @@ export function initAnnouncementsUi(currentUser) {
         void renderList();
     });
 
+    document.getElementById('ann-btn-bold')?.addEventListener('click', () => wrapSelectionWith('<strong>', '</strong>'));
+    document.getElementById('ann-btn-italic')?.addEventListener('click', () => wrapSelectionWith('<em>', '</em>'));
+    document.getElementById('ann-btn-underline')?.addEventListener('click', () => wrapSelectionWith('<u>', '</u>'));
+
     document.getElementById('ann-publish-btn')?.addEventListener('click', async () => {
-        const body = document.getElementById('ann-body')?.value || '';
+        const body = getAnnBodyHtml();
         const channel = document.getElementById('ann-channel')?.value || 'login';
         const starts = fromLocalInputValue(document.getElementById('ann-start')?.value || '');
         const ends = fromLocalInputValue(document.getElementById('ann-end')?.value || '');
@@ -92,7 +119,7 @@ export function initAnnouncementsUi(currentUser) {
             return;
         }
         showToast('Annonce enregistrée.');
-        document.getElementById('ann-body').value = '';
+        clearAnnBody();
         await renderList();
     });
 

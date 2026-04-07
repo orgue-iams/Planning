@@ -157,6 +157,63 @@ Deno.serve(async (req) => {
             });
         }
 
+        if (action === 'create_user') {
+            const email = String(body.email ?? '').trim().toLowerCase();
+            const displayName = String(body.display_name ?? '').trim();
+            const role = String(body.role ?? 'eleve').toLowerCase();
+            const password = String(body.password ?? '');
+
+            if (!email.includes('@')) {
+                return new Response(JSON.stringify({ error: 'Email invalide' }), {
+                    status: 400,
+                    headers: { ...cors, 'Content-Type': 'application/json' }
+                });
+            }
+            if (!['eleve', 'prof', 'consultation', 'admin'].includes(role)) {
+                return new Response(JSON.stringify({ error: 'Rôle invalide' }), {
+                    status: 400,
+                    headers: { ...cors, 'Content-Type': 'application/json' }
+                });
+            }
+            if (password.length < MIN_PASSWORD_LEN) {
+                return new Response(
+                    JSON.stringify({ error: `Mot de passe : au moins ${MIN_PASSWORD_LEN} caractères` }),
+                    { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } }
+                );
+            }
+
+            const { data, error } = await admin.auth.admin.createUser({
+                email,
+                password,
+                email_confirm: true,
+                user_metadata: {
+                    display_name: displayName || email.split('@')[0],
+                    role
+                }
+            });
+            if (error) throw error;
+
+            const createdId = data.user?.id;
+            if (createdId) {
+                const { error: pErr } = await admin
+                    .from('profiles')
+                    .upsert(
+                        {
+                            id: createdId,
+                            display_name: displayName || email.split('@')[0],
+                            role,
+                            updated_at: new Date().toISOString()
+                        },
+                        { onConflict: 'id' }
+                    );
+                if (pErr) throw pErr;
+            }
+
+            return new Response(JSON.stringify({ ok: true, user: data.user }), {
+                headers: { ...cors, 'Content-Type': 'application/json' }
+            });
+        }
+
         if (action === 'update_role') {
             const userId = String(body.user_id ?? '');
             const role = String(body.role ?? '').toLowerCase();

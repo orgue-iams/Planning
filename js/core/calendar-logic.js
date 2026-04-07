@@ -14,6 +14,72 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+function normalizeRole(role) {
+    const r = String(role || '').toLowerCase();
+    return r === 'admin' || r === 'prof' || r === 'eleve' || r === 'consultation' ? r : '';
+}
+
+function ownerInfoFromEvent(event, currentUser) {
+    const ownerEmail = String(
+        event?.extendedProps?.owner || currentUser?.email || ''
+    ).trim().toLowerCase();
+    const ownerName =
+        String(
+            event?.extendedProps?.ownerDisplayName ||
+            event?.extendedProps?.ownerName ||
+            ''
+        ).trim() ||
+        (ownerEmail ? ownerEmail.split('@')[0] : 'Inconnu');
+    const ownerRoleRaw = normalizeRole(
+        event?.extendedProps?.ownerRole || event?.extendedProps?.owner_role || ''
+    );
+    const ownerRole = ownerRoleRaw || roleFromOwnerEmail(ownerEmail);
+    return { ownerEmail, ownerName, ownerRole };
+}
+
+function ownerIdentityLabel(owner) {
+    const roleLabel =
+        owner.ownerRole === 'admin'
+            ? 'admin'
+            : owner.ownerRole === 'prof'
+                ? 'prof'
+                : owner.ownerRole === 'eleve'
+                    ? 'élève'
+                    : owner.ownerRole === 'consultation'
+                        ? 'consultation'
+                        : 'profil inconnu';
+    const name = owner.ownerName || 'Inconnu';
+    const email = owner.ownerEmail || 'email inconnu';
+    return `Réservé par : ${name} (${email}) — ${roleLabel}`;
+}
+
+export function canCurrentUserEditEvent(currentUser, event) {
+    if (!currentUser?.email) return false;
+    const meRole = normalizeRole(currentUser.role);
+    if (meRole === 'consultation') return false;
+    if (meRole === 'admin') return true;
+
+    const owner = ownerInfoFromEvent(event, currentUser);
+    const ownerRole = owner.ownerRole || roleFromOwnerEmail(owner.ownerEmail);
+    if (owner.ownerEmail && owner.ownerEmail === String(currentUser.email).trim().toLowerCase()) {
+        return true;
+    }
+    if (meRole === 'prof') {
+        return ownerRole === 'eleve' || ownerRole === 'consultation';
+    }
+    return false;
+}
+
+function roleFromOwnerEmail(email) {
+    const e = String(email || '').toLowerCase();
+    if (!e) return '';
+    if (e === 'admin@iams.fr' || e === 'nicolas.marestin@gmail.com') return 'admin';
+    if (e.startsWith('prof')) return 'prof';
+    if (e.startsWith('eleve') || e.startsWith('élève')) return 'eleve';
+    if (e.startsWith('consultation')) return 'consultation';
+    return '';
+}
+
 // --- 1. RENDU VISUEL DES CRÉNEAUX ---
 export function getEventContent(arg, currentUser) {
     const title = arg.event.title || "Occupation";
@@ -220,7 +286,7 @@ function selectedDowSet() {
 }
 
 /** Un événement par jour (même horaire), rendu batch pour FullCalendar. */
-function addOneEventPerDay(calendar, days, title, tStart, tEnd, type, ownerEmail) {
+function addOneEventPerDay(calendar, days, title, tStart, tEnd, type, ownerEmail, ownerDisplayName, ownerRole) {
     const run = () => {
         for (const d of days) {
             const s = `${d}T${tStart}:00`;
@@ -231,7 +297,12 @@ function addOneEventPerDay(calendar, days, title, tStart, tEnd, type, ownerEmail
                 start: s,
                 end: e,
                 allDay: false,
-                extendedProps: { owner: ownerEmail, type }
+                extendedProps: {
+                    owner: ownerEmail,
+                    ownerDisplayName: ownerDisplayName || ownerEmail.split('@')[0],
+                    ownerRole: normalizeRole(ownerRole) || 'eleve',
+                    type
+                }
             });
         }
     };
@@ -306,6 +377,10 @@ export function quickCreateFromSelection(calendar, selectInfo, currentUser) {
         showToast('Connectez-vous pour réserver.', 'error');
         return;
     }
+    if (normalizeRole(currentUser.role) === 'consultation') {
+        showToast('Le profil consultation est en lecture seule.', 'error');
+        return;
+    }
 
     if (
         selectInfo.view.type === 'dayGridMonth' ||
@@ -325,7 +400,12 @@ export function quickCreateFromSelection(calendar, selectInfo, currentUser) {
             start: selectInfo.start,
             end: selectInfo.end,
             allDay: false,
-            extendedProps: { owner: currentUser.email, type: 'reservation' }
+            extendedProps: {
+                owner: currentUser.email,
+                ownerDisplayName: currentUser.name || currentUser.email.split('@')[0],
+                ownerRole: normalizeRole(currentUser.role) || 'eleve',
+                type: 'reservation'
+            }
         });
     };
 
@@ -340,20 +420,29 @@ export function quickCreateFromSelection(calendar, selectInfo, currentUser) {
 // --- 2. GESTION DE LA MODALE RÉSERVATION ---
 export function openModal(start, end, event, currentUser) {
     const modal = document.getElementById('modal_reservation');
-    const isOther = event && currentUser && event.extendedProps.owner !== currentUser.email;
+    if (!modal) return;
+    if (!event && normalizeRole(currentUser?.role) === 'consultation') {
+        showToast('Le profil consultation est en lecture seule.', 'error');
+        return;
+    }
+    const canEditEvent = !event || canCurrentUserEditEvent(currentUser, event);
+    const owner = ownerInfoFromEvent(event, currentUser);
+    const ownerText = ownerIdentityLabel(owner);
 
     const wrapRead = document.getElementById('wrap-reservation-readonly');
     const wrapEdit = document.getElementById('wrap-reservation-editor');
     const modalActions = document.querySelector('#modal_reservation .modal-action');
 
-    if (isOther) {
+    if (event && !canEditEvent) {
         if (wrapRead && wrapEdit) {
             wrapRead.classList.remove('hidden');
             wrapEdit.classList.add('hidden');
         }
         const desc = document.getElementById('event-readonly-description');
+        const ownerEl = document.getElementById('event-readonly-owner');
         const whenEl = document.getElementById('event-readonly-when');
         if (desc) desc.textContent = (event.title || 'Occupation').trim() || 'Occupation';
+        if (ownerEl) ownerEl.textContent = ownerText;
         if (whenEl) whenEl.textContent = formatOccupationWhenSentence(start, end);
         modalActions?.classList.add('justify-end');
         modalActions?.classList.remove('justify-between');
@@ -367,6 +456,8 @@ export function openModal(start, end, event, currentUser) {
         wrapRead.classList.add('hidden');
         wrapEdit.classList.remove('hidden');
     }
+    const editorOwnerEl = document.getElementById('event-editor-owner');
+    if (editorOwnerEl) editorOwnerEl.textContent = ownerText;
     modalActions?.classList.remove('justify-end');
     modalActions?.classList.add('justify-between');
 
@@ -477,15 +568,15 @@ export function openModal(start, end, event, currentUser) {
     ];
     fields.forEach((id) => {
         const el = document.getElementById(id);
-        if (el) el.disabled = isOther;
+        if (el) el.disabled = !canEditEvent;
     });
     for (let i = 0; i <= 6; i++) {
         const cb = document.getElementById(`recur-dow-${i}`);
-        if (cb) cb.disabled = isOther;
+        if (cb) cb.disabled = !canEditEvent;
     }
 
-    document.getElementById('btn-save').classList.toggle('hidden', isOther);
-    document.getElementById('btn-delete').classList.toggle('hidden', isOther || !event);
+    document.getElementById('btn-save').classList.toggle('hidden', !canEditEvent);
+    document.getElementById('btn-delete').classList.toggle('hidden', !canEditEvent || !event);
 
     modal.showModal();
     requestAnimationFrame(() => {
@@ -510,7 +601,7 @@ async function trySyncGoogleCalendar(eventsPayload) {
 // --- 3. ACTIONS (SAUVEGARDE / SUPPRESSION) ---
 export async function saveReservation(calendar, currentUser, currentEventRef) {
     if (!currentUser || !currentUser.email) {
-        alert('Veuillez vous connecter pour enregistrer une réservation.');
+        showToast('Veuillez vous connecter pour enregistrer une réservation.', 'error');
         return;
     }
 
@@ -526,20 +617,21 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         const tRecStart = document.getElementById('event-recur-start')?.value;
         const tRecEnd = document.getElementById('event-recur-end')?.value;
         if (!periodStart || !periodEnd) {
-            alert('Indiquez le jour de début et le jour de fin de la période.');
+            showToast('Indiquez le jour de début et le jour de fin de la période.', 'error');
             return;
         }
         if (periodStart > periodEnd) {
-            alert('Le jour de fin de période doit être le même jour ou après le jour de début.');
+            showToast('Le jour de fin de période doit être le même jour ou après le jour de début.', 'error');
             return;
         }
         if (!tRecStart || !tRecEnd) {
-            alert('Indiquez la plage horaire (de … à …).');
+            showToast('Indiquez la plage horaire (de … à …).', 'error');
             return;
         }
         if (clockMinutes(tRecEnd) <= clockMinutes(tRecStart)) {
-            alert(
-                'Pour une récurrence, l’heure de fin doit être le même jour après l’heure de début (pas de passage après minuit).'
+            showToast(
+                'Pour une récurrence, l’heure de fin doit être le même jour après l’heure de début (pas de passage après minuit).',
+                'error'
             );
             return;
         }
@@ -549,17 +641,27 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         if (!allPeriod) {
             dowSet = selectedDowSet();
             if (dowSet.size === 0) {
-                alert('Cochez au moins un jour de la semaine.');
+                showToast('Cochez au moins un jour de la semaine.', 'error');
                 return;
             }
         }
         const days = enumerateRecurringDays(periodStart, periodEnd, pattern, dowSet);
         if (days.length === 0) {
-            alert('Aucun jour ne correspond aux choix sur cette période.');
+            showToast('Aucun jour ne correspond aux choix sur cette période.', 'error');
             return;
         }
         const type = document.getElementById('event-type').value;
-        addOneEventPerDay(calendar, days, title, tRecStart, tRecEnd, type, currentUser.email);
+        addOneEventPerDay(
+            calendar,
+            days,
+            title,
+            tRecStart,
+            tRecEnd,
+            type,
+            currentUser.email,
+            currentUser.name || currentUser.email.split('@')[0],
+            currentUser.role
+        );
         document.getElementById('modal_reservation').close();
         showToast(`${days.length} créneau${days.length > 1 ? 'x' : ''} enregistré${days.length > 1 ? 's' : ''}.`);
         document.getElementById('event-recurring').checked = false;
@@ -581,7 +683,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     const tEnd = document.getElementById('event-end').value;
 
     if (!dateStart || !tStart || !tEnd) {
-        alert('Veuillez renseigner le jour et les heures de début et de fin.');
+        showToast('Veuillez renseigner le jour et les heures de début et de fin.', 'error');
         return;
     }
 
@@ -591,7 +693,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     const startMs = new Date(startStr).getTime();
     const endMs = new Date(endStr).getTime();
     if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) {
-        alert('La date et heure de fin doivent être après le début.');
+        showToast('La date et heure de fin doivent être après le début.', 'error');
         return;
     }
 
@@ -603,6 +705,8 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         end: endStr,
         extendedProps: {
             owner: currentUser.email,
+            ownerDisplayName: currentUser.name || currentUser.email.split('@')[0],
+            ownerRole: normalizeRole(currentUser.role) || 'eleve',
             type: type
         }
     };
@@ -636,4 +740,9 @@ export function deleteReservation(calendar, currentEventRef) {
         document.getElementById('modal_reservation').close();
         showToast('Créneau supprimé.');
     }
+}
+
+export function canEditEvent(currentUser, event) {
+    if (!currentUser?.email || !event) return false;
+    return canCurrentUserEditEvent(currentUser, event);
 }

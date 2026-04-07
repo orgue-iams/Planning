@@ -11,7 +11,8 @@ import {
     quickCreateFromSelection,
     addSlotEndFromStart,
     setRecurringOptionsVisible,
-    handleEventResize
+    handleEventResize,
+    canCurrentUserEditEvent
 } from './calendar-logic.js';
 import {
     login,
@@ -38,6 +39,7 @@ import { initProfileLabelsUi } from './profile-labels-ui.js';
 import { applyLoginBanner } from './login-banner.js';
 import { initAdminUsersUi } from './admin-users-ui.js';
 import { initAnnouncementsUi } from './announcements-ui.js';
+import { showToast } from '../utils/toast.js';
 
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register(new URL('../../sw.js', import.meta.url)).catch(() => {});
@@ -121,10 +123,22 @@ function initCalendarAndRevealUi() {
             currentEvent = info.event;
             openModal(info.event.start, info.event.end, info.event, currentUser);
         },
-        onEventDrop: () => {
+        onEventDrop: (info) => {
+            if (!canCurrentUserEditEvent(currentUser, info.event)) {
+                info.revert();
+                showToast('Vous ne pouvez pas déplacer ce créneau.', 'error');
+                return;
+            }
             /* synchro API à brancher */
         },
-        onEventResize: (info) => handleEventResize(info),
+        onEventResize: (info) => {
+            if (!canCurrentUserEditEvent(currentUser, info.event)) {
+                info.revert();
+                showToast('Vous ne pouvez pas redimensionner ce créneau.', 'error');
+                return;
+            }
+            handleEventResize(info);
+        },
         renderEventContent: (arg) => getEventContent(arg, currentUser)
     };
 
@@ -275,6 +289,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             initCalendarAndRevealUi();
         }
     };
+    document.getElementById('modal_login')?.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        const target = e.target;
+        if (!(target instanceof HTMLElement)) return;
+        if (!target.closest('#login-email, #login-pass')) return;
+        e.preventDefault();
+        document.getElementById('btn-do-login')?.click();
+    });
 
     document.getElementById('btn-save-pass').onclick = async () => {
         if ((await updatePassword()) && !currentUser) {

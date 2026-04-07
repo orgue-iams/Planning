@@ -65,6 +65,17 @@ async function refreshUserList() {
     }
 }
 
+function resetCreateInviteForm() {
+    const emailEl = document.getElementById('admin-invite-email');
+    const nameEl = document.getElementById('admin-invite-name');
+    const pwEl = document.getElementById('admin-create-password');
+    const roleSel = document.getElementById('admin-invite-role');
+    if (emailEl) emailEl.value = '';
+    if (nameEl) nameEl.value = '';
+    if (pwEl) pwEl.value = '';
+    if (roleSel) roleSel.value = 'eleve';
+}
+
 let adminUsersHandlersBound = false;
 
 export function initAdminUsersUi(currentUser) {
@@ -82,6 +93,34 @@ export function initAdminUsersUi(currentUser) {
 
     document.getElementById('admin-users-refresh')?.addEventListener('click', () => void refreshUserList());
 
+    document.getElementById('admin-create-btn')?.addEventListener('click', async () => {
+        const email = document.getElementById('admin-invite-email')?.value?.trim();
+        const display_name = document.getElementById('admin-invite-name')?.value?.trim() || '';
+        const password = document.getElementById('admin-create-password')?.value || '';
+        const role = document.getElementById('admin-invite-role')?.value || 'eleve';
+        if (!email) {
+            showToast('Indiquez un e-mail.', 'error');
+            return;
+        }
+        if (password.length < 6) {
+            showToast('Mot de passe : au moins 6 caractères.', 'error');
+            return;
+        }
+        try {
+            await planningAdminInvoke('create_user', {
+                email,
+                display_name,
+                role,
+                password
+            });
+            showToast('Compte créé.');
+            resetCreateInviteForm();
+            await refreshUserList();
+        } catch (err) {
+            showToast(err instanceof Error ? err.message : String(err), 'error');
+        }
+    });
+
     document.getElementById('admin-invite-btn')?.addEventListener('click', async () => {
         const email = document.getElementById('admin-invite-email')?.value?.trim();
         const display_name = document.getElementById('admin-invite-name')?.value?.trim() || '';
@@ -98,8 +137,7 @@ export function initAdminUsersUi(currentUser) {
                 redirect_to: redirectBaseUrl()
             });
             showToast('Invitation envoyée.');
-            document.getElementById('admin-invite-email').value = '';
-            document.getElementById('admin-invite-name').value = '';
+            resetCreateInviteForm();
             await refreshUserList();
         } catch (err) {
             showToast(err instanceof Error ? err.message : String(err), 'error');

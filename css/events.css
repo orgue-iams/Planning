@@ -22,11 +22,18 @@
     color: #991b1b !important;
 }
 
-/* Supprime la bordure FullCalendar par défaut (bleue) autour des événements. */
-.fc .fc-timegrid-event {
+/* Supprime les bordures/fonds FullCalendar par défaut autour des événements. */
+.fc .fc-timegrid-event,
+.fc .fc-v-event,
+.fc .fc-timegrid-event-harness > .fc-timegrid-event {
     border: 0 !important;
     background: transparent !important;
     box-shadow: none !important;
+}
+
+.fc .fc-timegrid-event .fc-event-main,
+.fc .fc-timegrid-event .fc-event-main-frame {
+    background: transparent !important;
 }
 
 /* Texte dans les cases (FullCalendar injecte du HTML : classes dédiées, pas Tailwind JIT) */

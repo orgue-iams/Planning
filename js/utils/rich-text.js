@@ -315,14 +315,12 @@ export function formatRichContentHtml(source) {
 
 /** Mise en forme minimale : **gras** + retours à la ligne (annonces, bandeau). */
 export function formatSimpleRichHtml(text) {
-    const parts = String(text ?? '').split(/\*\*/);
-    const inner = parts
-        .map((p, i) => {
-            const d = document.createElement('div');
-            d.textContent = p;
-            const esc = d.innerHTML;
-            return i % 2 === 1 ? `<strong>${esc}</strong>` : esc;
-        })
-        .join('');
-    return inner.replace(/\n/g, '<br>');
+    const raw = String(text ?? '');
+    if (!raw) return '';
+    if (/<\/?[a-z][\s\S]*>/i.test(raw)) {
+        return sanitizeRulesHtml(raw);
+    }
+    const d = document.createElement('div');
+    d.textContent = raw;
+    return d.innerHTML.replace(/\n/g, '<br>');
 }

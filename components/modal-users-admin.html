@@ -1,18 +1,22 @@
 <dialog id="modal_users_admin" class="modal">
     <div class="modal-box p-5 w-[96%] max-w-lg max-h-[90dvh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col">
         <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest shrink-0">Gestion des comptes</h3>
-        <p class="text-[10px] text-slate-500 mb-3 leading-snug">Invitation par e-mail, rôles, suspension ou suppression. Les mots de passe ne sont pas visibles ; vous pouvez en définir un nouveau pour un utilisateur (à lui transmettre par un canal sûr).</p>
+        <p class="text-[10px] text-slate-500 mb-3 leading-snug">Création directe de compte (avec mot de passe) ou invitation par e-mail, puis gestion des rôles, suspension, suppression et réinitialisation du mot de passe.</p>
 
         <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-3 mb-3 space-y-2 shrink-0">
-            <p class="text-[10px] font-black uppercase text-slate-500">Inviter</p>
+            <p class="text-[10px] font-black uppercase text-slate-500">Créer / inviter</p>
             <input type="email" id="admin-invite-email" placeholder="email@eleve.fr" class="input input-sm input-bordered w-full text-sm" />
             <input type="text" id="admin-invite-name" placeholder="Nom affiché (optionnel)" class="input input-sm input-bordered w-full text-sm" />
+            <input type="password" id="admin-create-password" autocomplete="new-password" placeholder="Mot de passe (si vide = invitation e-mail)" class="input input-sm input-bordered w-full text-sm" />
             <select id="admin-invite-role" class="select select-sm select-bordered w-full text-sm">
                 <option value="eleve">Élève</option>
                 <option value="prof">Enseignant·e</option>
                 <option value="consultation">Consultation</option>
             </select>
-            <button type="button" id="admin-invite-btn" class="btn btn-primary btn-sm w-full font-black text-[11px]">Envoyer l’invitation</button>
+            <div class="grid grid-cols-2 gap-2">
+                <button type="button" id="admin-create-btn" class="btn btn-primary btn-sm w-full font-black text-[11px]">Créer le compte</button>
+                <button type="button" id="admin-invite-btn" class="btn btn-outline btn-sm w-full font-black text-[11px]">Inviter</button>
+            </div>
         </div>
 
         <div class="flex-1 min-h-0 overflow-y-auto border border-slate-200 rounded-xl">

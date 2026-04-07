@@ -53,7 +53,7 @@ function ensureFallbackRulesModal() {
 }
 
 export function initMessagesUi(currentUser) {
-    const btnRules = document.getElementById('btn-rules');
+    const btnRules = document.getElementById('btn-rules') || document.querySelector('#app-header #btn-rules');
     const modalRules = document.getElementById('modal_rules');
     const modalBroadcast = document.getElementById('modal_broadcast');
 
@@ -133,8 +133,12 @@ export function initMessagesUi(currentUser) {
     btnRules?.addEventListener('click', async () => {
         let text = getRulesText();
         if (backend) {
-            const remote = await fetchOrganRulesRemote();
-            if (remote !== null && remote !== '') text = remote;
+            try {
+                const remote = await fetchOrganRulesRemote();
+                if (remote !== null && remote !== '') text = remote;
+            } catch {
+                showToast("Impossible de charger les règles distantes. Affichage de la version locale.", 'info');
+            }
         }
         // Si la table Supabase est initialisée vide, on affiche un texte par défaut (local).
         if (backend && (!text || String(text).trim() === '')) {
