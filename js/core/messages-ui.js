@@ -45,7 +45,6 @@ export function initMessagesUi(currentUser) {
     const colorCustom = document.getElementById('rules-color-custom');
     const btnEdit = document.getElementById('rules-btn-edit');
     const btnSave = document.getElementById('rules-btn-save');
-    const btnCancel = document.getElementById('rules-btn-cancel');
     const btnClose = document.getElementById('rules-btn-close');
 
     const adminBlock = document.getElementById('rules-admin-broadcast');
@@ -58,6 +57,8 @@ export function initMessagesUi(currentUser) {
 
     /** @type {Range|null} */
     let lastRange = null;
+    /** @type {string} */
+    let editInitialHtml = '';
 
     const saveSelection = () => {
         const root = editor;
@@ -129,7 +130,18 @@ export function initMessagesUi(currentUser) {
         modalRules?.showModal();
     });
 
-    btnClose?.addEventListener('click', () => modalRules?.close());
+    btnClose?.addEventListener('click', async () => {
+        const isEditing = !!editWrap && !editWrap.classList.contains('hidden');
+        if (isEditing) {
+            const current = editor?.innerHTML ?? '';
+            const dirty = String(current) !== String(editInitialHtml);
+            if (dirty) {
+                const ok = confirm('Fermer sans enregistrer les modifications ?');
+                if (!ok) return;
+            }
+        }
+        modalRules?.close();
+    });
 
     btnEdit?.addEventListener('click', async () => {
         let text = getRulesText();
@@ -148,19 +160,9 @@ export function initMessagesUi(currentUser) {
         editWrap?.classList.remove('hidden');
         btnEdit?.classList.add('hidden');
         btnSave?.classList.remove('hidden');
-        btnCancel?.classList.remove('hidden');
+        editInitialHtml = editor?.innerHTML ?? '';
         editor?.focus();
         saveSelection();
-    });
-
-    btnCancel?.addEventListener('click', () => {
-        editWrap?.classList.add('hidden');
-        view?.classList.remove('hidden');
-        btnEdit?.classList.remove('hidden');
-        btnSave?.classList.add('hidden');
-        btnCancel?.classList.add('hidden');
-        const t = editor?.innerHTML ?? getRulesText();
-        renderRulesView(t);
     });
 
     function exec(cmd, value) {
@@ -175,7 +177,7 @@ export function initMessagesUi(currentUser) {
 
     // Éviter que la toolbar vole le focus/selection (sinon bold/underline ne s’appliquent pas).
     toolbar?.addEventListener('mousedown', (e) => {
-        if (e.target?.closest?.('button,select,input')) e.preventDefault();
+        if (e.target?.closest?.('button[data-cmd]')) e.preventDefault();
     });
 
     editor?.addEventListener?.('keyup', saveSelection);
@@ -205,8 +207,8 @@ export function initMessagesUi(currentUser) {
 
     blockSelect?.addEventListener('change', () => {
         const v = String(blockSelect.value || 'p');
-        const tag = v === 'blockquote' ? 'BLOCKQUOTE' : v.toUpperCase();
-        exec('formatBlock', tag);
+        const tag = v === 'blockquote' ? 'blockquote' : v;
+        exec('formatBlock', `<${tag}>`);
     });
 
     fontSelect?.addEventListener('change', () => {
@@ -253,6 +255,22 @@ export function initMessagesUi(currentUser) {
     colorCustom?.addEventListener('input', () => applyColor(colorCustom.value));
 
     btnSave?.addEventListener('click', async () => {
+        const root = editor;
+        if (root instanceof HTMLElement) {
+            // Normalise les <font face|color|size> générés par execCommand vers des styles (sinon on perd à la sauvegarde).
+            const sizeMap = { '1': '10px', '2': '12px', '3': '14px', '4': '16px', '5': '18px', '6': '24px', '7': '32px' };
+            for (const f of Array.from(root.querySelectorAll('font'))) {
+                const span = document.createElement('span');
+                const face = f.getAttribute('face');
+                const color = f.getAttribute('color');
+                const size = f.getAttribute('size');
+                if (face) span.style.fontFamily = face;
+                if (color) span.style.color = color;
+                if (size && sizeMap[size]) span.style.fontSize = sizeMap[size];
+                span.innerHTML = f.innerHTML;
+                f.replaceWith(span);
+            }
+        }
         const html = editor?.innerHTML ?? '';
         const t = sanitizeRulesHtml(html);
         if (backend) {
@@ -268,8 +286,8 @@ export function initMessagesUi(currentUser) {
         view?.classList.remove('hidden');
         btnEdit?.classList.remove('hidden');
         btnSave?.classList.add('hidden');
-        btnCancel?.classList.add('hidden');
         renderRulesView(t);
+        editInitialHtml = editor?.innerHTML ?? '';
         showToast('Règles enregistrées.');
     });
 
