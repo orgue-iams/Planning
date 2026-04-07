@@ -44,11 +44,10 @@ async function renderList() {
     for (const r of rows) {
         const div = document.createElement('div');
         div.className = 'rounded-lg border border-slate-200 bg-white p-2';
-        const ch = r.channel === 'login' ? 'Connexion' : 'Après login';
         div.innerHTML = `
             <div class="flex justify-between items-start gap-2">
                 <div>
-                    <p class="font-black text-[10px] text-slate-600">${ch}</p>
+                    <p class="font-black text-[10px] text-slate-600">Écran de connexion</p>
                     <p class="text-[9px] text-slate-400">${r.starts_at?.slice(0, 16)} → ${r.ends_at?.slice(0, 16)}</p>
                 </div>
                 <button type="button" class="btn btn-ghost btn-xs text-error font-black text-[9px] ann-del" data-id="${r.id}">Suppr.</button>
@@ -110,7 +109,6 @@ export function initAnnouncementsUi(currentUser) {
             showToast('Saisissez un message.', 'error');
             return;
         }
-        const channel = document.getElementById('ann-channel')?.value || 'login';
         const starts = fromLocalInputValue(document.getElementById('ann-start')?.value || '');
         const ends = fromLocalInputValue(document.getElementById('ann-end')?.value || '');
         if (!starts || !ends) {
@@ -121,7 +119,7 @@ export function initAnnouncementsUi(currentUser) {
             showToast('La fin doit être après le début.', 'error');
             return;
         }
-        const res = await insertScheduledMessageRemote({ body, startsAt: starts, endsAt: ends, channel });
+        const res = await insertScheduledMessageRemote({ body, startsAt: starts, endsAt: ends });
         if (!res.ok) {
             showToast(res.error || 'Erreur', 'error');
             return;

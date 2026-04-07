@@ -1,4 +1,4 @@
-const CACHE_NAME = 'orgue-v29';
+const CACHE_NAME = 'orgue-v32';
 
 /** Ressources locales (hors CDN) pour démarrage rapide / coquille hors-ligne */
 const ASSETS = [
@@ -14,6 +14,7 @@ const ASSETS = [
   './js/core/app.js',
   './js/core/calendar-logic.js',
   './js/core/auth-logic.js',
+  './js/core/planning-roles.js',
   './js/core/supabase-client.js',
   './js/core/supabase-auth.js',
   './js/core/calendar-bridge.js',

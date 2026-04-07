@@ -206,9 +206,18 @@ export function normalizeQuillMarkup(html) {
     const fontMap = {
         'ql-font-system-ui': 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
         'ql-font-arial': 'Arial, Helvetica, sans-serif',
+        'ql-font-helvetica': 'Helvetica, Arial, sans-serif',
+        'ql-font-verdana': 'Verdana, Geneva, sans-serif',
+        'ql-font-tahoma': 'Tahoma, Geneva, sans-serif',
+        'ql-font-trebuchet-ms': '"Trebuchet MS", Lucida Grande, sans-serif',
         'ql-font-georgia': 'Georgia, serif',
         'ql-font-times-new-roman': '"Times New Roman", Times, serif',
-        'ql-font-verdana': 'Verdana, Geneva, sans-serif'
+        'ql-font-palatino': 'Palatino, "Palatino Linotype", serif',
+        'ql-font-garamond': 'Garamond, Palatino, serif',
+        'ql-font-courier-new': '"Courier New", Courier, monospace',
+        'ql-font-consolas': 'Consolas, Monaco, monospace',
+        'ql-font-comic-sans-ms': '"Comic Sans MS", cursive',
+        'ql-font-impact': 'Impact, Haettenschweiler, sans-serif'
     };
     for (const el of doc.body.querySelectorAll('[class]')) {
         if (!(el instanceof HTMLElement)) continue;

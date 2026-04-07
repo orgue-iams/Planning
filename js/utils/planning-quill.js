@@ -11,7 +11,22 @@ function registerPlanningFormats() {
     if (window.__planningQuillFormatsRegistered) return;
     const Quill = window.Quill;
     const Font = Quill.import('formats/font');
-    Font.whitelist = ['system-ui', 'arial', 'georgia', 'times-new-roman', 'verdana'];
+    Font.whitelist = [
+        'system-ui',
+        'arial',
+        'helvetica',
+        'verdana',
+        'tahoma',
+        'trebuchet-ms',
+        'georgia',
+        'times-new-roman',
+        'palatino',
+        'garamond',
+        'courier-new',
+        'consolas',
+        'comic-sans-ms',
+        'impact'
+    ];
     Quill.register(Font, true);
 
     const Size = Quill.import('formats/size');
@@ -39,8 +54,6 @@ export function createPlanningQuill(mountEl, opts = {}) {
         placeholder: opts.placeholder ?? '',
         modules: {
             toolbar: [
-                [{ header: [false, 3, 4] }],
-                ['blockquote'],
                 ['bold', 'italic', 'underline'],
                 [{ list: 'bullet' }],
                 [{ font: [] }],

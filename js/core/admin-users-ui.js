@@ -5,6 +5,7 @@ import { isAdmin } from './auth-logic.js';
 import { isBackendAuthConfigured } from './supabase-client.js';
 import { planningAdminInvoke } from './admin-api.js';
 import { showToast } from '../utils/toast.js';
+import { PLANNING_ROLE_OPTIONS, normalizePlanningRole, isPlanningRole } from './planning-roles.js';
 
 function redirectBaseUrl() {
     try {
@@ -14,32 +15,44 @@ function redirectBaseUrl() {
     }
 }
 
+function roleSelectOptionsHtml(selectedRole) {
+    const sel = normalizePlanningRole(selectedRole);
+    return PLANNING_ROLE_OPTIONS.map(
+        ({ value, label }) =>
+            `<option value="${value}" ${sel === value ? 'selected' : ''}>${escapeTd(label)}</option>`
+    ).join('');
+}
+
 function renderUsersTable(users) {
     const tb = document.getElementById('admin-users-tbody');
     if (!tb) return;
     tb.replaceChildren();
-    for (const u of users) {
+    const list = Array.isArray(users) ? users : [];
+    if (list.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="4" class="text-[10px] text-slate-500 text-center py-4">Aucun compte renvoyé par le serveur. Actualisez ou vérifiez le déploiement de la fonction « planning-admin ».</td>`;
+        tb.appendChild(tr);
+        return;
+    }
+    for (const u of list) {
         const tr = document.createElement('tr');
         const suspended = u.banned_until && new Date(u.banned_until) > new Date();
         tr.innerHTML = `
             <td class="text-[10px] font-bold break-all">${escapeTd(u.email)}</td>
             <td>
-                <select class="select select-xs select-bordered admin-role-sel max-w-[6.5rem]" data-user-id="${u.id}">
-                    <option value="consultation" ${u.role === 'consultation' ? 'selected' : ''}>consultation</option>
-                    <option value="eleve" ${u.role === 'eleve' ? 'selected' : ''}>élève</option>
-                    <option value="prof" ${u.role === 'prof' ? 'selected' : ''}>prof</option>
-                    <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
+                <select class="select select-xs select-bordered admin-role-sel max-w-[7.5rem]" data-user-id="${escapeAttr(u.id)}">
+                    ${roleSelectOptionsHtml(u.role)}
                 </select>
             </td>
             <td class="text-[10px]">${suspended ? '<span class="text-error font-bold">Suspendu</span>' : '<span class="text-success">Actif</span>'}</td>
             <td>
                 <div class="flex flex-col gap-1">
-                    <button type="button" class="btn btn-xs btn-outline font-black text-[9px] admin-btn-apply" data-user-id="${u.id}">Appliquer rôle</button>
-                    <button type="button" class="btn btn-xs btn-ghost font-black text-[9px] admin-btn-pw" data-email="${escapeAttr(u.email)}" data-user-id="${u.id}">Mot de passe</button>
+                    <button type="button" class="btn btn-xs btn-outline font-black text-[9px] admin-btn-apply" data-user-id="${escapeAttr(u.id)}">Appliquer rôle</button>
+                    <button type="button" class="btn btn-xs btn-ghost font-black text-[9px] admin-btn-pw" data-email="${escapeAttr(u.email)}" data-user-id="${escapeAttr(u.id)}">Mot de passe</button>
                     ${suspended
-                        ? `<button type="button" class="btn btn-xs btn-success btn-outline font-black text-[9px] admin-btn-unsuspend" data-user-id="${u.id}">Réactiver</button>`
-                        : `<button type="button" class="btn btn-xs btn-warning btn-outline font-black text-[9px] admin-btn-suspend" data-user-id="${u.id}">Suspendre</button>`}
-                    <button type="button" class="btn btn-xs btn-error btn-outline font-black text-[9px] admin-btn-delete" data-user-id="${u.id}">Supprimer</button>
+                        ? `<button type="button" class="btn btn-xs btn-success btn-outline font-black text-[9px] admin-btn-unsuspend" data-user-id="${escapeAttr(u.id)}">Réactiver</button>`
+                        : `<button type="button" class="btn btn-xs btn-warning btn-outline font-black text-[9px] admin-btn-suspend" data-user-id="${escapeAttr(u.id)}">Suspendre</button>`}
+                    <button type="button" class="btn btn-xs btn-error btn-outline font-black text-[9px] admin-btn-delete" data-user-id="${escapeAttr(u.id)}">Supprimer</button>
                 </div>
             </td>`;
         tb.appendChild(tr);
@@ -110,6 +123,14 @@ export function initAdminUsersUi(currentUser) {
             showToast('Indiquez un e-mail.', 'error');
             return;
         }
+        if (!display_name) {
+            showToast('Le nom affiché est obligatoire.', 'error');
+            return;
+        }
+        if (!isPlanningRole(role)) {
+            showToast('Rôle invalide.', 'error');
+            return;
+        }
         if (password.length < 6) {
             showToast('Mot de passe : au moins 6 caractères.', 'error');
             return;
@@ -137,6 +158,14 @@ export function initAdminUsersUi(currentUser) {
             showToast('Indiquez un e-mail.', 'error');
             return;
         }
+        if (!display_name) {
+            showToast('Le nom affiché est obligatoire.', 'error');
+            return;
+        }
+        if (!isPlanningRole(role)) {
+            showToast('Rôle invalide.', 'error');
+            return;
+        }
         try {
             await planningAdminInvoke('invite', {
                 email,
@@ -162,9 +191,9 @@ export function initAdminUsersUi(currentUser) {
             const row = t.closest('tr');
             const sel = row?.querySelector('.admin-role-sel');
             const role = sel?.value;
-            if (!role) return;
+            if (!role || !isPlanningRole(role)) return;
             try {
-                await planningAdminInvoke('update_role', { user_id: uid, role });
+                await planningAdminInvoke('update_role', { user_id: uid, role: normalizePlanningRole(role) });
                 showToast('Rôle mis à jour.');
                 await refreshUserList();
             } catch (err) {

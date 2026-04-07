@@ -13,7 +13,7 @@ import {
 } from '../utils/messaging.js';
 import { isPrivilegedUser } from './auth-logic.js';
 import { isBackendAuthConfigured } from './supabase-client.js';
-import { fetchOrganRulesRemote, saveOrganRulesRemote, fetchActiveAfterLoginMessage } from '../utils/org-content.js';
+import { fetchOrganRulesRemote, saveOrganRulesRemote } from '../utils/org-content.js';
 import {
     formatSimpleRichHtml,
     looksLikeHtml,
@@ -241,15 +241,8 @@ export async function tryShowBroadcastPopup(currentUser) {
     const body = document.getElementById('broadcast-body');
     if (!modal || !body) return;
 
+    /* Avec Supabase : les annonces planifiées ne s’affichent que sur l’écran de connexion (bandeau). */
     if (isBackendAuthConfigured()) {
-        if (!currentUser || currentUser.role === 'admin') return;
-        if (!['eleve', 'prof', 'consultation'].includes(currentUser.role)) return;
-        const m = await fetchActiveAfterLoginMessage();
-        if (!m?.body) return;
-        if (localStorage.getItem(`orgue_sm_seen_${m.id}`) === '1') return;
-        modal.dataset.broadcastId = `sm_${m.id}`;
-        body.innerHTML = `<div class="organ-rich">${formatSimpleRichHtml(m.body)}</div>`;
-        modal.showModal();
         return;
     }
 

@@ -42,10 +42,10 @@ export function initProfileLabelsUi(currentUser) {
 
     document.getElementById('profile-labels-btn-close')?.addEventListener('click', () => dlg?.close());
 
-    document.getElementById('profile-labels-btn-save')?.addEventListener('click', () => {
+    document.getElementById('profile-labels-btn-save')?.addEventListener('click', async () => {
         if (!currentUser?.email) return;
         const lines = ta.value.split('\n').map((s) => s.trim()).filter(Boolean);
-        saveProfile(currentUser.email, lines, fav?.value || '');
+        await saveProfile(currentUser.email, lines, fav?.value || '');
         dlg?.close();
         showToast('Réservations type enregistrées.');
     });

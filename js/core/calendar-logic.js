@@ -7,6 +7,7 @@ import { showToast } from '../utils/toast.js';
 import { getAccessToken, isBackendAuthConfigured, isPrivilegedUser } from './auth-logic.js';
 import { invokeCalendarBridge } from './calendar-bridge.js';
 import { getProfile, getFavoriteLabel } from '../utils/user-profile.js';
+import { isPlanningRole } from './planning-roles.js';
 
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -16,7 +17,7 @@ function escapeHtml(text) {
 
 function normalizeRole(role) {
     const r = String(role || '').toLowerCase();
-    return r === 'admin' || r === 'prof' || r === 'eleve' || r === 'consultation' ? r : '';
+    return isPlanningRole(r) ? r : '';
 }
 
 function ownerInfoFromEvent(event, currentUser) {

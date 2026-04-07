@@ -50,35 +50,13 @@ export async function fetchActiveLoginMessage() {
     return { id: data.id, body: data.body };
 }
 
-/** Popup après connexion (élèves / profs). */
-export async function fetchActiveAfterLoginMessage() {
-    if (!isBackendAuthConfigured()) return null;
-    const sb = getSupabaseClient();
-    if (!sb) return null;
-    const now = new Date().toISOString();
-    const { data, error } = await sb
-        .from('scheduled_messages')
-        .select('id,body')
-        .eq('channel', 'after_login')
-        .lte('starts_at', now)
-        .gte('ends_at', now)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-    if (error) {
-        console.warn('[after_login message]', error.message);
-        return null;
-    }
-    if (!data?.body) return null;
-    return { id: String(data.id), body: data.body };
-}
-
 export async function listScheduledMessagesRemote() {
     const sb = getSupabaseClient();
     if (!sb) return [];
     const { data, error } = await sb
         .from('scheduled_messages')
         .select('id,body,starts_at,ends_at,channel,created_at')
+        .eq('channel', 'login')
         .order('starts_at', { ascending: false })
         .limit(50);
     if (error) {
@@ -88,7 +66,7 @@ export async function listScheduledMessagesRemote() {
     return data ?? [];
 }
 
-export async function insertScheduledMessageRemote({ body, startsAt, endsAt, channel }) {
+export async function insertScheduledMessageRemote({ body, startsAt, endsAt }) {
     const sb = getSupabaseClient();
     if (!sb) return { ok: false, error: 'Non connecté' };
     const { data: u } = await sb.auth.getUser();
@@ -96,7 +74,7 @@ export async function insertScheduledMessageRemote({ body, startsAt, endsAt, cha
         body: String(body || '').trim(),
         starts_at: startsAt,
         ends_at: endsAt,
-        channel,
+        channel: 'login',
         created_by: u.user?.id ?? null
     });
     if (error) return { ok: false, error: error.message };

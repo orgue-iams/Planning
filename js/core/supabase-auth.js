@@ -1,4 +1,6 @@
 import { getSupabaseClient } from './supabase-client.js';
+import { normalizePlanningRole } from './planning-roles.js';
+import { hydrateReservationTypesFromServer } from '../utils/user-profile.js';
 
 /**
  * Construit l’objet utilisateur applicatif à partir d’une session Supabase + ligne `profiles`.
@@ -11,7 +13,7 @@ export async function fetchAppUserFromSession(session) {
 
     const { data, error } = await supabase
         .from('profiles')
-        .select('display_name, role')
+        .select('display_name, role, reservation_types')
         .eq('id', session.user.id)
         .maybeSingle();
 
@@ -27,8 +29,9 @@ export async function fetchAppUserFromSession(session) {
         metaName ||
         email.split('@')[0] ||
         'Utilisateur';
-    const allowedRoles = ['admin', 'prof', 'eleve', 'consultation'];
-    const role = data?.role && allowedRoles.includes(data.role) ? data.role : 'eleve';
+    const role = normalizePlanningRole(data?.role);
+
+    hydrateReservationTypesFromServer(email, data?.reservation_types);
 
     return { name, email, role, id: session.user.id };
 }

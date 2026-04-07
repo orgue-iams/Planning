@@ -39,7 +39,7 @@
 /* Texte dans les cases (FullCalendar injecte du HTML : classes dédiées, pas Tailwind JIT) */
 .event-title-fc {
     text-align: center;
-    font-weight: 500;
+    font-weight: 700;
     font-size: 0.625rem;
     line-height: 1.25;
     text-transform: none;
@@ -58,7 +58,7 @@
 .event-time-fc {
     text-align: center;
     font-size: 0.5625rem;
-    font-weight: 700;
+    font-weight: 400;
     opacity: 0.88;
     padding-bottom: 0.2rem;
     font-variant-numeric: tabular-nums;

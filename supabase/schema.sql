@@ -5,6 +5,7 @@ create table if not exists public.profiles (
     id uuid primary key references auth.users (id) on delete cascade,
     display_name text,
     role text not null default 'eleve' check (role in ('admin', 'prof', 'eleve', 'consultation')),
+    reservation_types jsonb not null default '{"labels":[],"favoriteLabel":""}'::jsonb,
     updated_at timestamptz default now()
 );
 
@@ -27,13 +28,33 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+    v_role text;
+    v_display text;
+    v_reservation jsonb;
 begin
-    insert into public.profiles (id, display_name, role)
-    values (
-        new.id,
-        coalesce(new.raw_user_meta_data ->> 'display_name', split_part(new.email, '@', 1), ''),
-        'eleve'
-    )
+    v_role := lower(trim(coalesce(new.raw_user_meta_data ->> 'role', 'eleve')));
+    if v_role not in ('eleve', 'prof', 'consultation') then
+        v_role := 'eleve';
+    end if;
+
+    v_display := coalesce(
+        nullif(trim(new.raw_user_meta_data ->> 'display_name'), ''),
+        split_part(new.email, '@', 1),
+        ''
+    );
+
+    if trim(v_display) <> '' then
+        v_reservation := jsonb_build_object(
+            'labels', jsonb_build_array(trim(v_display)),
+            'favoriteLabel', trim(v_display)
+        );
+    else
+        v_reservation := '{"labels":[],"favoriteLabel":""}'::jsonb;
+    end if;
+
+    insert into public.profiles (id, display_name, role, reservation_types)
+    values (new.id, v_display, v_role, v_reservation)
     on conflict (id) do nothing;
     return new;
 end;

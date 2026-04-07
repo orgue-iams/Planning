@@ -6,11 +6,12 @@
         <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-3 mb-3 space-y-2 shrink-0">
             <p class="text-[10px] font-black uppercase text-slate-500">Créer / inviter</p>
             <input type="email" id="admin-invite-email" placeholder="email@eleve.fr" class="input input-sm input-bordered w-full text-sm" />
-            <input type="text" id="admin-invite-name" placeholder="Nom affiché (optionnel)" class="input input-sm input-bordered w-full text-sm" />
-            <input type="password" id="admin-create-password" autocomplete="new-password" placeholder="Mot de passe (si vide = invitation e-mail)" class="input input-sm input-bordered w-full text-sm" />
-            <select id="admin-invite-role" class="select select-sm select-bordered w-full text-sm">
-                <option value="eleve">Élève</option>
-                <option value="prof">Enseignant·e</option>
+            <input type="text" id="admin-invite-name" placeholder="Nom affiché (obligatoire)" class="input input-sm input-bordered w-full text-sm" required autocomplete="name" />
+            <input type="password" id="admin-create-password" autocomplete="new-password" placeholder="Mot de passe (création) ou laisser vide pour inviter par e-mail" class="input input-sm input-bordered w-full text-sm" />
+            <select id="admin-invite-role" class="select select-sm select-bordered w-full text-sm" aria-label="Rôle du compte">
+                <option value="admin">Admin</option>
+                <option value="prof">Prof</option>
+                <option value="eleve" selected>Élève</option>
                 <option value="consultation">Consultation</option>
             </select>
             <div class="grid grid-cols-2 gap-2">

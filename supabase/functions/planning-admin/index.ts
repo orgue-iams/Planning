@@ -6,6 +6,43 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
 
 const MIN_PASSWORD_LEN = 6;
 
+/** Aligné sur public.profiles.role (check SQL). */
+const PLANNING_ROLES = ['admin', 'prof', 'eleve', 'consultation'] as const;
+
+function isPlanningRole(r: string): boolean {
+    return (PLANNING_ROLES as readonly string[]).includes(r.toLowerCase());
+}
+
+function normalizePlanningRole(r: string): (typeof PLANNING_ROLES)[number] {
+    const x = r.toLowerCase();
+    return isPlanningRole(x) ? (x as (typeof PLANNING_ROLES)[number]) : 'eleve';
+}
+
+/** Évite les URLs `in.(id)` trop longues (liste vide / erreur silencieuse côté client). */
+async function profileRowsForUserIds(
+    admin: ReturnType<typeof createClient>,
+    ids: string[]
+): Promise<Map<string, { id: string; display_name: string | null; role: string }>> {
+    const map = new Map<string, { id: string; display_name: string | null; role: string }>();
+    const chunk = 40;
+    for (let i = 0; i < ids.length; i += chunk) {
+        const slice = ids.slice(i, i + chunk);
+        const { data, error } = await admin.from('profiles').select('id,display_name,role').in('id', slice);
+        if (error) throw error;
+        for (const p of data ?? []) {
+            map.set(p.id, p);
+        }
+    }
+    return map;
+}
+
+type ListedUser = {
+    id: string;
+    email?: string | null;
+    banned_until?: string | null;
+    created_at?: string | null;
+};
+
 const cors: Record<string, string> = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers':
@@ -93,21 +130,23 @@ Deno.serve(async (req) => {
             while (true) {
                 const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
                 if (error) throw error;
-                const users = data?.users ?? [];
+                const payload = data as { users?: ListedUser[] } | null | undefined;
+                const users: ListedUser[] = Array.isArray(payload?.users) ? payload.users : [];
                 if (users.length === 0) break;
 
-                const ids = users.map((u) => u.id);
-                const { data: profs } = await admin.from('profiles').select('id,display_name,role').in('id', ids);
-                const pmap = new Map((profs ?? []).map((p) => [p.id, p]));
+                const ids = users.map((u) => u.id).filter(Boolean);
+                const pmap = await profileRowsForUserIds(admin, ids);
 
                 for (const u of users) {
+                    if (!u?.id) continue;
                     const p = pmap.get(u.id);
-                    const ban = (u as { banned_until?: string | null }).banned_until ?? null;
+                    const ban = u.banned_until ?? null;
+                    const dbRole = p?.role != null ? String(p.role) : '';
                     all.push({
                         id: u.id,
                         email: u.email ?? '',
                         display_name: p?.display_name ?? null,
-                        role: p?.role ?? 'eleve',
+                        role: normalizePlanningRole(dbRole),
                         banned_until: ban ?? null,
                         created_at: u.created_at ?? null
                     });
@@ -135,11 +174,20 @@ Deno.serve(async (req) => {
                     headers: { ...cors, 'Content-Type': 'application/json' }
                 });
             }
-            if (!['eleve', 'prof', 'consultation'].includes(role)) {
-                return new Response(JSON.stringify({ error: 'Rôle invite : eleve, prof ou consultation uniquement' }), {
+            if (!displayName) {
+                return new Response(JSON.stringify({ error: 'Le nom affiché est obligatoire.' }), {
                     status: 400,
                     headers: { ...cors, 'Content-Type': 'application/json' }
                 });
+            }
+            if (!isPlanningRole(role)) {
+                return new Response(
+                    JSON.stringify({ error: 'Rôle invalide : admin, prof, eleve ou consultation uniquement.' }),
+                    {
+                        status: 400,
+                        headers: { ...cors, 'Content-Type': 'application/json' }
+                    }
+                );
             }
             if (!redirectTo.startsWith('http')) {
                 return new Response(JSON.stringify({ error: 'redirect_to requis (URL du site)' }), {
@@ -151,8 +199,8 @@ Deno.serve(async (req) => {
             const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
                 redirectTo,
                 data: {
-                    display_name: displayName || email.split('@')[0],
-                    role
+                    display_name: displayName,
+                    role: normalizePlanningRole(role)
                 }
             });
             if (error) throw error;
@@ -174,11 +222,20 @@ Deno.serve(async (req) => {
                     headers: { ...cors, 'Content-Type': 'application/json' }
                 });
             }
-            if (!['eleve', 'prof', 'consultation', 'admin'].includes(role)) {
-                return new Response(JSON.stringify({ error: 'Rôle invalide' }), {
+            if (!displayName) {
+                return new Response(JSON.stringify({ error: 'Le nom affiché est obligatoire.' }), {
                     status: 400,
                     headers: { ...cors, 'Content-Type': 'application/json' }
                 });
+            }
+            if (!isPlanningRole(role)) {
+                return new Response(
+                    JSON.stringify({ error: 'Rôle invalide : admin, prof, eleve ou consultation uniquement.' }),
+                    {
+                        status: 400,
+                        headers: { ...cors, 'Content-Type': 'application/json' }
+                    }
+                );
             }
             if (password.length < MIN_PASSWORD_LEN) {
                 return new Response(
@@ -187,26 +244,29 @@ Deno.serve(async (req) => {
                 );
             }
 
+            const nr = normalizePlanningRole(role);
             const { data, error } = await admin.auth.admin.createUser({
                 email,
                 password,
                 email_confirm: true,
                 user_metadata: {
-                    display_name: displayName || email.split('@')[0],
-                    role
+                    display_name: displayName,
+                    role: nr
                 }
             });
             if (error) throw error;
 
             const createdId = data.user?.id;
             if (createdId) {
+                const dn = displayName.trim();
                 const { error: pErr } = await admin
                     .from('profiles')
                     .upsert(
                         {
                             id: createdId,
-                            display_name: displayName || email.split('@')[0],
-                            role,
+                            display_name: dn,
+                            role: nr,
+                            reservation_types: { labels: [dn], favoriteLabel: dn },
                             updated_at: new Date().toISOString()
                         },
                         { onConflict: 'id' }
@@ -228,17 +288,21 @@ Deno.serve(async (req) => {
                     headers: { ...cors, 'Content-Type': 'application/json' }
                 });
             }
-            if (!['eleve', 'prof', 'consultation', 'admin'].includes(role)) {
-                return new Response(JSON.stringify({ error: 'Rôle invalide' }), {
-                    status: 400,
-                    headers: { ...cors, 'Content-Type': 'application/json' }
-                });
+            if (!isPlanningRole(role)) {
+                return new Response(
+                    JSON.stringify({ error: 'Rôle invalide : admin, prof, eleve ou consultation uniquement.' }),
+                    {
+                        status: 400,
+                        headers: { ...cors, 'Content-Type': 'application/json' }
+                    }
+                );
             }
 
-            const { error } = await admin.from('profiles').update({ role }).eq('id', userId);
+            const nr = normalizePlanningRole(role);
+            const { error } = await admin.from('profiles').update({ role: nr }).eq('id', userId);
             if (error) throw error;
             await admin.auth.admin.updateUserById(userId, {
-                user_metadata: { role }
+                user_metadata: { role: nr }
             });
 
             return new Response(JSON.stringify({ ok: true }), {
