@@ -3,21 +3,56 @@
         <h3 class="font-black text-sm uppercase tracking-wide text-slate-600 border-b pb-2 shrink-0">Règles d'utilisation de l'orgue</h3>
         <div id="rules-view" class="text-sm text-slate-700 leading-relaxed py-4 overflow-y-auto flex-1 min-h-0"></div>
         <div id="rules-edit-wrap" class="hidden flex-1 min-h-0 py-2 flex flex-col min-h-0 gap-2">
-            <textarea id="rules-editor" class="textarea textarea-bordered w-full min-h-[12rem] flex-1 text-sm font-mono leading-snug" rows="12"></textarea>
-            <details class="text-[10px] text-slate-500 leading-snug border border-slate-100 rounded-lg px-2 py-1.5 bg-slate-50/80 shrink-0">
-                <summary class="cursor-pointer font-bold text-slate-600 select-none">Aide mise en forme</summary>
-                <ul class="mt-2 space-y-1 list-disc list-inside marker:text-slate-400">
-                    <li><strong>Paragraphe</strong> : lignes suivies d’une ligne vide.</li>
-                    <li><strong>Titres</strong> : <code class="text-[9px] bg-slate-200/80 px-1 rounded">#</code> grand, <code class="text-[9px] bg-slate-200/80 px-1 rounded">##</code> moyen, <code class="text-[9px] bg-slate-200/80 px-1 rounded">###</code> petit (espace après le #).</li>
-                    <li><strong>Gras / italique</strong> : <code class="text-[9px] bg-slate-200/80 px-1 rounded">**texte**</code> , <code class="text-[9px] bg-slate-200/80 px-1 rounded">*texte*</code></li>
-                    <li><strong>Liens</strong> : <code class="text-[9px] bg-slate-200/80 px-1 rounded">[libellé](https://…)</code> ou <code class="text-[9px] bg-slate-200/80 px-1 rounded">mailto:…</code></li>
-                    <li><strong>Liste à puces</strong> : ligne commençant par <code class="text-[9px] bg-slate-200/80 px-1 rounded">-</code> ou <code class="text-[9px] bg-slate-200/80 px-1 rounded">*</code> + espace.</li>
-                    <li><strong>Liste numérotée</strong> : <code class="text-[9px] bg-slate-200/80 px-1 rounded">1.</code> <code class="text-[9px] bg-slate-200/80 px-1 rounded">2.</code> …</li>
-                    <li><strong>Citation</strong> : lignes commençant par <code class="text-[9px] bg-slate-200/80 px-1 rounded">&gt;</code> .</li>
-                    <li><strong>Séparateur</strong> : une ligne avec seulement <code class="text-[9px] bg-slate-200/80 px-1 rounded">---</code></li>
-                </ul>
-                <p class="mt-2 text-slate-400">Pas de HTML brut (sécurité). Réservé aux enseignant·e·s et à la gestion.</p>
-            </details>
+            <div id="rules-toolbar" class="rules-toolbar shrink-0">
+                <div class="rules-toolbar__group">
+                    <button type="button" class="rules-tool" data-cmd="bold" title="Gras"><strong>G</strong></button>
+                    <button type="button" class="rules-tool" data-cmd="italic" title="Italique"><em>I</em></button>
+                    <button type="button" class="rules-tool" data-cmd="underline" title="Souligné"><span style="text-decoration:underline">S</span></button>
+                </div>
+                <div class="rules-toolbar__group">
+                    <button type="button" class="rules-tool" data-cmd="insertUnorderedList" title="Liste à puces">• Liste</button>
+                    <button type="button" class="rules-tool" data-cmd="insertOrderedList" title="Liste numérotée">1. Liste</button>
+                </div>
+                <div class="rules-toolbar__group">
+                    <select id="rules-block" class="rules-select" title="Style">
+                        <option value="p" selected>Paragraphe</option>
+                        <option value="h3">Titre</option>
+                        <option value="h4">Sous-titre</option>
+                        <option value="blockquote">Citation</option>
+                    </select>
+                    <select id="rules-font" class="rules-select" title="Police">
+                        <option value="inherit" selected>Police (auto)</option>
+                        <option value="Arial">Arial</option>
+                        <option value="Georgia">Georgia</option>
+                        <option value="Times New Roman">Times</option>
+                        <option value="Verdana">Verdana</option>
+                    </select>
+                    <select id="rules-size" class="rules-select" title="Taille">
+                        <option value="14" selected>14</option>
+                        <option value="12">12</option>
+                        <option value="16">16</option>
+                        <option value="18">18</option>
+                        <option value="20">20</option>
+                    </select>
+                    <label class="rules-color" title="Couleur du texte">
+                        <span class="rules-color__label">Couleur</span>
+                        <input type="color" id="rules-color" value="#0f172a" />
+                    </label>
+                    <button type="button" class="rules-tool" data-cmd="createLink" title="Lien">Lien</button>
+                    <button type="button" class="rules-tool" data-cmd="removeFormat" title="Effacer la mise en forme">Nettoyer</button>
+                </div>
+            </div>
+
+            <div
+                id="rules-editor"
+                class="rules-editor textarea textarea-bordered w-full flex-1 text-sm leading-relaxed"
+                contenteditable="true"
+                spellcheck="true"
+            ></div>
+
+            <p class="text-[10px] text-slate-400 leading-snug shrink-0">
+                La mise en forme est enregistrée. Pour la sécurité, seules quelques balises et styles (gras/italique/souligné, listes, titres, liens, couleurs, taille, police) sont conservés.
+            </p>
         </div>
 
         <p id="rules-backend-hint" class="hidden border-t border-slate-100 pt-3 mt-2 shrink-0 text-[10px] text-slate-500 leading-snug">

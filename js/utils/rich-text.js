@@ -5,6 +5,47 @@ function escapeHtml(text) {
     return d.innerHTML;
 }
 
+function sanitizeCssValue(raw) {
+    const v = String(raw ?? '').trim();
+    if (!v) return '';
+    // Très strict : on refuse tout ce qui ressemble à une fonction ou à une URL.
+    if (/[()]/.test(v)) return '';
+    if (/url\s*=/i.test(v)) return '';
+    return v;
+}
+
+function sanitizeStyleAttr(styleText) {
+    const style = String(styleText ?? '');
+    if (!style) return '';
+    const keep = [];
+    for (const decl of style.split(';')) {
+        const [kRaw, vRaw] = decl.split(':');
+        if (!kRaw || !vRaw) continue;
+        const k = kRaw.trim().toLowerCase();
+        const v = sanitizeCssValue(vRaw);
+        if (!v) continue;
+        if (k === 'color') {
+            if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(v)) keep.push(`color:${v}`);
+        }
+        if (k === 'font-size') {
+            if (/^\d{1,2}px$/.test(v) || /^\d{1,2}(\.\d)?rem$/.test(v)) keep.push(`font-size:${v}`);
+        }
+        if (k === 'font-family') {
+            if (/^[a-z0-9 ,\-]+$/i.test(v)) keep.push(`font-family:${v}`);
+        }
+        if (k === 'text-decoration') {
+            if (/^(underline|none)$/i.test(v)) keep.push(`text-decoration:${v}`);
+        }
+        if (k === 'font-weight') {
+            if (/^(bold|normal|[1-9]00)$/i.test(v)) keep.push(`font-weight:${v}`);
+        }
+        if (k === 'font-style') {
+            if (/^(italic|normal)$/i.test(v)) keep.push(`font-style:${v}`);
+        }
+    }
+    return keep.join(';');
+}
+
 /**
  * Gras + italique + retours ligne (contenu déjà traité pour les liens).
  * **gras** , *italique* (italique : une seule paire d’astérisques, pas de doubles).
@@ -30,6 +71,112 @@ function sanitizeHref(raw) {
         return null;
     }
     return null;
+}
+
+/**
+ * Nettoie un HTML riche (WYSIWYG) en ne gardant qu’un sous-ensemble sûr de balises/attributs.
+ * Objectif : permettre taille/police/couleur sans autoriser scripts/handlers/styles dangereux.
+ */
+export function sanitizeRulesHtml(html) {
+    const input = String(html ?? '');
+    if (!input) return '';
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(input, 'text/html');
+
+    const allowedTags = new Set([
+        'DIV',
+        'P',
+        'BR',
+        'STRONG',
+        'B',
+        'EM',
+        'I',
+        'U',
+        'UL',
+        'OL',
+        'LI',
+        'H3',
+        'H4',
+        'H5',
+        'BLOCKQUOTE',
+        'HR',
+        'A',
+        'SPAN'
+    ]);
+
+    const walk = (node) => {
+        if (node.nodeType === Node.TEXT_NODE) return;
+        if (node.nodeType === Node.COMMENT_NODE) {
+            node.remove();
+            return;
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) {
+            node.remove();
+            return;
+        }
+
+        const el = /** @type {HTMLElement} */ (node);
+        const tag = el.tagName.toUpperCase();
+
+        if (!allowedTags.has(tag)) {
+            const parent = el.parentNode;
+            if (!parent) {
+                el.remove();
+                return;
+            }
+            while (el.firstChild) parent.insertBefore(el.firstChild, el);
+            el.remove();
+            return;
+        }
+
+        for (const attr of Array.from(el.attributes)) {
+            const name = attr.name.toLowerCase();
+            if (name.startsWith('on')) {
+                el.removeAttribute(attr.name);
+                continue;
+            }
+            if (name === 'style') {
+                const clean = sanitizeStyleAttr(attr.value);
+                if (clean) el.setAttribute('style', clean);
+                else el.removeAttribute('style');
+                continue;
+            }
+            if (tag === 'A' && name === 'href') {
+                const safe = sanitizeHref(attr.value);
+                if (safe) el.setAttribute('href', safe);
+                else el.removeAttribute('href');
+                continue;
+            }
+            // Autoriser target/rel, on forcera des valeurs sûres.
+            if (tag === 'A' && (name === 'target' || name === 'rel')) continue;
+
+            el.removeAttribute(attr.name);
+        }
+
+        if (tag === 'A') {
+            el.setAttribute('target', '_blank');
+            el.setAttribute('rel', 'noopener noreferrer');
+        }
+
+        for (const child of Array.from(el.childNodes)) walk(child);
+    };
+
+    for (const child of Array.from(doc.body.childNodes)) walk(child);
+    return doc.body.innerHTML;
+}
+
+/** Convertit un texte simple en HTML sûr (paragraphes + <br>). */
+export function plainTextToSafeHtml(text) {
+    const t = String(text ?? '');
+    if (!t) return '';
+    const lines = t.split(/\n/).map((l) => escapeHtml(l));
+    return `<p>${lines.join('<br>')}</p>`;
+}
+
+export function looksLikeHtml(text) {
+    const t = String(text ?? '').trim();
+    if (!t) return false;
+    return /<\/?[a-z][\s\S]*>/i.test(t);
 }
 
 /**

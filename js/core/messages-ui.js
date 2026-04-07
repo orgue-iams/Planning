@@ -14,7 +14,7 @@ import {
 import { isPrivilegedUser } from './auth-logic.js';
 import { isBackendAuthConfigured } from './supabase-client.js';
 import { fetchOrganRulesRemote, saveOrganRulesRemote, fetchActiveAfterLoginMessage } from '../utils/org-content.js';
-import { formatSimpleRichHtml, formatRichContentHtml } from '../utils/rich-text.js';
+import { formatSimpleRichHtml, looksLikeHtml, plainTextToSafeHtml, sanitizeRulesHtml } from '../utils/rich-text.js';
 
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -25,7 +25,8 @@ function escapeHtml(text) {
 function renderRulesView(text) {
     const el = document.getElementById('rules-view');
     if (!el) return;
-    el.innerHTML = formatRichContentHtml(text);
+    const raw = String(text ?? '');
+    el.innerHTML = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
 }
 
 export function initMessagesUi(currentUser) {
@@ -36,6 +37,11 @@ export function initMessagesUi(currentUser) {
     const view = document.getElementById('rules-view');
     const editWrap = document.getElementById('rules-edit-wrap');
     const editor = document.getElementById('rules-editor');
+    const toolbar = document.getElementById('rules-toolbar');
+    const blockSelect = document.getElementById('rules-block');
+    const fontSelect = document.getElementById('rules-font');
+    const sizeSelect = document.getElementById('rules-size');
+    const colorInput = document.getElementById('rules-color');
     const btnEdit = document.getElementById('rules-btn-edit');
     const btnSave = document.getElementById('rules-btn-save');
     const btnCancel = document.getElementById('rules-btn-cancel');
@@ -73,7 +79,10 @@ export function initMessagesUi(currentUser) {
             if (remote !== null && remote !== '') text = remote;
         }
         renderRulesView(text);
-        if (editor) editor.value = text;
+        if (editor) {
+            const raw = String(text ?? '');
+            editor.innerHTML = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
+        }
         editWrap?.classList.add('hidden');
         view?.classList.remove('hidden');
         btnSave?.classList.add('hidden');
@@ -90,7 +99,10 @@ export function initMessagesUi(currentUser) {
             const r = await fetchOrganRulesRemote();
             if (r !== null) text = r;
         }
-        if (editor) editor.value = text;
+        if (editor) {
+            const raw = String(text ?? '');
+            editor.innerHTML = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
+        }
         view?.classList.add('hidden');
         editWrap?.classList.remove('hidden');
         btnEdit?.classList.add('hidden');
@@ -105,12 +117,73 @@ export function initMessagesUi(currentUser) {
         btnEdit?.classList.remove('hidden');
         btnSave?.classList.add('hidden');
         btnCancel?.classList.add('hidden');
-        const t = editor?.value ?? getRulesText();
+        const t = editor?.innerHTML ?? getRulesText();
         renderRulesView(t);
     });
 
+    function exec(cmd, value) {
+        editor?.focus();
+        try {
+            document.execCommand(cmd, false, value);
+        } catch {
+            /* ignore */
+        }
+    }
+
+    toolbar?.addEventListener('click', (e) => {
+        const btn = e.target?.closest?.('button[data-cmd]');
+        if (!btn) return;
+        const cmd = btn.getAttribute('data-cmd');
+        if (!cmd) return;
+        if (cmd === 'createLink') {
+            const href = prompt('Adresse du lien (https://… ou mailto:…):');
+            if (!href) return;
+            exec('createLink', href);
+            return;
+        }
+        exec(cmd);
+    });
+
+    blockSelect?.addEventListener('change', () => {
+        const v = String(blockSelect.value || 'p');
+        const tag = v === 'blockquote' ? 'BLOCKQUOTE' : v.toUpperCase();
+        exec('formatBlock', tag);
+    });
+
+    fontSelect?.addEventListener('change', () => {
+        const v = String(fontSelect.value || 'inherit');
+        if (v === 'inherit') {
+            // fallback : pas de « reset » fiable via execCommand, on nettoie le formatage.
+            exec('removeFormat');
+            return;
+        }
+        exec('fontName', v);
+    });
+
+    sizeSelect?.addEventListener('change', () => {
+        const px = Number.parseInt(String(sizeSelect.value || '14'), 10);
+        if (!Number.isFinite(px)) return;
+        // execCommand fontSize ne gère que 1..7. On l’utilise puis on remplace par px.
+        exec('fontSize', '3');
+        // Remapper <font size="3"> vers style font-size:px
+        const root = editor;
+        if (!root) return;
+        const fonts = root.querySelectorAll('font[size="3"]');
+        for (const f of fonts) {
+            f.removeAttribute('size');
+            f.style.fontSize = `${px}px`;
+        }
+    });
+
+    colorInput?.addEventListener('input', () => {
+        const v = String(colorInput.value || '').trim();
+        if (!v) return;
+        exec('foreColor', v);
+    });
+
     btnSave?.addEventListener('click', async () => {
-        const t = editor?.value ?? '';
+        const html = editor?.innerHTML ?? '';
+        const t = sanitizeRulesHtml(html);
         if (backend) {
             const res = await saveOrganRulesRemote(t);
             if (!res.ok) {
