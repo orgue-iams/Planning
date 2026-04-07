@@ -125,7 +125,6 @@ export function initMessagesUi(currentUser) {
         editWrap?.classList.add('hidden');
         view?.classList.remove('hidden');
         btnSave?.classList.add('hidden');
-        btnCancel?.classList.add('hidden');
         btnEdit?.classList.toggle('hidden', !priv);
         modalRules?.showModal();
     });
