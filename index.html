@@ -22,6 +22,7 @@
     <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
 
     <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/calendar-toolbar.css">
     <link rel="stylesheet" href="css/calendar-theme.css">
     <link rel="stylesheet" href="css/events.css">
     <link rel="stylesheet" href="css/modal.css">
@@ -32,12 +33,36 @@
     <div id="app-header"></div>
     
     <main id="app-shell" class="pt-14 px-1 max-w-5xl mx-auto flex flex-col gap-1 min-h-0">
+        <div id="calendar-toolbar" class="calendar-toolbar hidden shrink-0 w-full max-w-full" aria-label="Navigation du calendrier">
+            <div class="calendar-toolbar__left">
+                <button type="button" id="cal-btn-today" class="cal-tb-pill">Auj.</button>
+                <button type="button" id="cal-btn-prev" class="cal-tb-nav" aria-label="Période précédente">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <button type="button" id="cal-btn-next" class="cal-tb-nav" aria-label="Période suivante">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                </button>
+            </div>
+            <div class="calendar-toolbar__title" id="cal-toolbar-title"></div>
+            <div class="calendar-toolbar__right">
+                <div class="cal-view-dd">
+                    <button type="button" id="cal-view-trigger" class="cal-tb-pill cal-tb-pill--view" aria-expanded="false" aria-haspopup="listbox">
+                        <span id="cal-view-trigger-label">Semaine</span>
+                        <span class="cal-tb-pill__chev" aria-hidden="true">▾</span>
+                    </button>
+                    <ul id="cal-view-menu" class="cal-view-dd__menu" role="listbox" hidden></ul>
+                </div>
+            </div>
+        </div>
         <div id="calendar" class="bg-white rounded-xl shadow-sm border flex-1 min-h-0 w-full"></div>
-        <div id="planning-legend" class="planning-legend flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2 bg-white rounded-xl border border-slate-200 text-slate-600 shrink-0" aria-label="Légende des créneaux">
-            <span class="text-xs font-bold uppercase tracking-wide text-slate-500 w-full sm:w-auto">Légende</span>
-            <span class="legend-item"><span class="legend-swatch legend-swatch--mine" aria-hidden="true"></span>Moi</span>
-            <span class="legend-item"><span class="legend-swatch legend-swatch--others" aria-hidden="true"></span>Autres</span>
-            <span class="legend-item"><span class="legend-swatch legend-swatch--cours" aria-hidden="true"></span>Cours</span>
+        <div id="planning-legend" class="planning-legend flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 bg-white rounded-xl border border-slate-200 text-slate-600 shrink-0" aria-label="Légende des créneaux">
+            <span class="text-[10px] font-bold uppercase tracking-wide text-slate-500 w-full sm:w-auto">Légende</span>
+            <span class="legend-item"><span class="legend-swatch legend-swatch--mine-eleve" aria-hidden="true"></span>Mes créneaux</span>
+            <span class="legend-item"><span class="legend-swatch legend-swatch--other-eleve" aria-hidden="true"></span>Autres élèves</span>
+            <span class="legend-item"><span class="legend-swatch legend-swatch--prof" aria-hidden="true"></span>Prof / cours</span>
+            <span class="legend-item"><span class="legend-swatch legend-swatch--student-block" aria-hidden="true"></span>Élève (vue prof)</span>
+            <span class="legend-item"><span class="legend-swatch legend-swatch--staff" aria-hidden="true"></span>Mon créneau (prof.)</span>
+            <span class="legend-item"><span class="legend-swatch legend-swatch--cours" aria-hidden="true"></span>Type cours</span>
             <span class="legend-item"><span class="legend-swatch legend-swatch--fermeture" aria-hidden="true"></span>Fermeture</span>
         </div>
     </main>

@@ -80,14 +80,52 @@ export function getEventContent(arg, currentUser) {
     const durationMs = end - start;
     const durationMin = Math.round(durationMs / (1000 * 60));
 
-    // Détermination de la couleur (Moi vs Autres vs Maintenance)
     const isMine = currentUser && arg.event.extendedProps.owner === currentUser.email;
     const type = arg.event.extendedProps.type || 'reservation';
-    
-    let colorClass = 'event-others';
-    if (isMine) colorClass = 'event-mine';
-    if (type === 'cours' || type === 'maintenance') colorClass = 'event-cours';
-    if (type === 'fermeture') colorClass = 'event-fermeture';
+    let ownerRole = normalizeRole(arg.event.extendedProps.ownerRole);
+    if (!ownerRole && arg.event.extendedProps.owner) {
+        ownerRole = roleFromOwnerEmail(String(arg.event.extendedProps.owner));
+    }
+    const viewerRole = normalizeRole(currentUser?.role);
+
+    let colorClass = 'event-slot-default';
+
+    if (type === 'fermeture') {
+        colorClass = 'event-fermeture';
+    } else if (type === 'cours' || type === 'maintenance') {
+        colorClass = 'event-cours';
+    } else if (viewerRole === 'eleve') {
+        if (isMine) {
+            colorClass = 'event-mine-eleve';
+        } else if (ownerRole === 'prof') {
+            colorClass = 'event-by-prof';
+        } else if (ownerRole === 'admin') {
+            colorClass = 'event-by-admin';
+        } else if (ownerRole === 'consultation') {
+            colorClass = 'event-by-consultation';
+        } else {
+            colorClass = 'event-other-eleve';
+        }
+    } else if (viewerRole === 'prof' || viewerRole === 'admin') {
+        if (isMine) {
+            colorClass = 'event-mine-staff';
+        } else if (ownerRole === 'eleve') {
+            colorClass = 'event-student-block';
+        } else if (ownerRole === 'prof') {
+            colorClass = 'event-peer-prof';
+        } else if (ownerRole === 'admin') {
+            colorClass = 'event-admin-block';
+        } else if (ownerRole === 'consultation') {
+            colorClass = 'event-by-consultation';
+        } else {
+            colorClass = 'event-slot-default';
+        }
+    } else if (viewerRole === 'consultation') {
+        colorClass = isMine ? 'event-mine-consult' : 'event-readonly-consult';
+    } else {
+        if (isMine) colorClass = 'event-mine-staff';
+        else colorClass = 'event-slot-default';
+    }
 
     // Formatage de l'heure (HH:mm)
     const formatTime = (date) => date.toLocaleTimeString('fr-FR', {
@@ -438,6 +476,7 @@ export function quickCreateFromSelection(calendar, selectInfo, currentUser) {
 
     if (
         selectInfo.view.type === 'dayGridMonth' ||
+        selectInfo.view.type.startsWith('list') ||
         selectInfo.allDay
     ) {
         openModal(selectInfo.start, selectInfo.end, null, currentUser);

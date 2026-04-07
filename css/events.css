@@ -1,28 +1,78 @@
-/* MOI (vert — bien distinct du fond blanc et des autres créneaux) */
-.event-mine {
-    background-color: #ecfdf3 !important;
-    color: #047857 !important;
-}
-
-/* AUTRES (bleu soutenu mais pas agressif) */
-.event-others {
-    background-color: #e8f1fe !important;
-    color: #1e3a5f !important;
-}
-
-/* COURS (Violet) */
+/* Types « métier » */
 .event-cours {
-    background-color: #f5f3ff !important;
-    color: #5b21b6 !important;
+    background-color: #eef2ff !important;
+    color: #3730a3 !important;
 }
 
-/* FERMETURE (Rouge) */
 .event-fermeture {
     background-color: #fef2f2 !important;
     color: #991b1b !important;
 }
 
-/* Supprime les bordures/fonds FullCalendar par défaut autour des événements. */
+/* Vue élève */
+.event-mine-eleve {
+    background-color: #d1fae5 !important;
+    color: #065f46 !important;
+}
+
+.event-other-eleve {
+    background-color: #ffedd5 !important;
+    color: #9a3412 !important;
+}
+
+.event-by-prof {
+    background-color: #e0e7ff !important;
+    color: #312e81 !important;
+}
+
+.event-by-admin {
+    background-color: #fce7f3 !important;
+    color: #9d174d !important;
+}
+
+.event-by-consultation {
+    background-color: #cffafe !important;
+    color: #155e75 !important;
+}
+
+/* Vue prof / admin */
+.event-mine-staff {
+    background-color: #dbeafe !important;
+    color: #1e40af !important;
+}
+
+.event-student-block {
+    background-color: #ecfccb !important;
+    color: #3f6212 !important;
+}
+
+.event-peer-prof {
+    background-color: #ede9fe !important;
+    color: #5b21b6 !important;
+}
+
+.event-admin-block {
+    background-color: #f3f4f6 !important;
+    color: #374151 !important;
+}
+
+.event-slot-default {
+    background-color: #e2e8f0 !important;
+    color: #1e293b !important;
+}
+
+/* Consultation */
+.event-mine-consult {
+    background-color: #ccfbf1 !important;
+    color: #0f766e !important;
+}
+
+.event-readonly-consult {
+    background-color: #f1f5f9 !important;
+    color: #475569 !important;
+}
+
+/* Supprime les bordures/fonds FullCalendar par défaut autour des événements (grille). */
 .fc .fc-timegrid-event,
 .fc .fc-v-event,
 .fc .fc-timegrid-event-harness > .fc-timegrid-event {
@@ -36,7 +86,21 @@
     background: transparent !important;
 }
 
-/* Texte dans les cases (FullCalendar injecte du HTML : classes dédiées, pas Tailwind JIT) */
+/* Vue liste (Planning) : aérer le bloc coloré */
+.fc .fc-list-event-graphic {
+    padding-top: 0.2rem;
+}
+
+.fc .fc-list-event {
+    align-items: flex-start;
+}
+
+.fc .fc-list-event-dot {
+    border-color: transparent !important;
+    background: transparent !important;
+}
+
+/* Texte dans les cases (FullCalendar injecte du HTML) */
 .event-title-fc {
     text-align: center;
     font-weight: 700;
@@ -70,9 +134,9 @@
     }
 }
 
-/* Légende en bas du calendrier */
+/* Légende */
 .planning-legend {
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
 }
 
 .planning-legend .legend-item {
@@ -90,18 +154,31 @@
     flex-shrink: 0;
 }
 
-.legend-swatch--mine {
+.legend-swatch--mine-eleve {
     background: #10b981;
 }
 
-.legend-swatch--others {
-    background: #2563eb;
+.legend-swatch--other-eleve {
+    background: #ea580c;
+}
+
+.legend-swatch--prof {
+    background: #4f46e5;
 }
 
 .legend-swatch--cours {
-    background: #7c3aed;
+    background: #4f46e5;
+    opacity: 0.7;
 }
 
 .legend-swatch--fermeture {
     background: #ef4444;
+}
+
+.legend-swatch--student-block {
+    background: #65a30d;
+}
+
+.legend-swatch--staff {
+    background: #2563eb;
 }

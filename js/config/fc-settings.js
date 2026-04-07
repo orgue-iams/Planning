@@ -5,41 +5,9 @@
 
 import { showToast } from '../utils/toast.js';
 
-const TOOLBAR_FULL = {
-    left: 'prev,next today',
-    center: 'title',
-    right: 'dayGridMonth,timeGridWeek'
-};
-
-/** Même ensemble, « Aujourd’hui » regroupé à droite pour gagner de la largeur */
-const TOOLBAR_COMPACT = {
-    left: 'prev,next',
-    center: 'title',
-    right: 'today dayGridMonth,timeGridWeek'
-};
-
-const BUTTON_TEXT_FULL = {
-    today: "Aujourd'hui",
-    month: 'Mois',
-    week: 'Semaine'
-};
-
-const BUTTON_TEXT_COMPACT = {
-    today: 'Auj.',
-    month: 'Mois',
-    week: 'Sem.'
-};
-
+/** @deprecated Conservé pour d’éventuels appels ; la barre FC native est désactivée. */
 export function isCompactCalendarToolbar() {
     return typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches;
-}
-
-export function getHeaderToolbarOptions(compact) {
-    return compact ? TOOLBAR_COMPACT : TOOLBAR_FULL;
-}
-
-export function getButtonTextOptions(compact) {
-    return compact ? BUTTON_TEXT_COMPACT : BUTTON_TEXT_FULL;
 }
 
 /** Dernière « vraie » fin de sélection (FullCalendar utilise une fin exclusive). */
@@ -58,15 +26,10 @@ function selectAllowSingleCalendarDay(selectInfo) {
     );
 }
 
-/** Recalcule la barre d’outils (rotation mobile, redimensionnement). */
+/** Recalcul du calendrier au redimensionnement (barre d’outils = HTML custom). */
 export function bindResponsiveCalendarToolbar(calendar) {
     const mql = window.matchMedia('(max-width: 640px)');
-    const apply = () => {
-        const compact = mql.matches;
-        calendar.setOption('headerToolbar', getHeaderToolbarOptions(compact));
-        calendar.setOption('buttonText', getButtonTextOptions(compact));
-        calendar.updateSize();
-    };
+    const apply = () => calendar.updateSize();
     mql.addEventListener('change', apply);
 }
 
@@ -78,10 +41,22 @@ export const getCalendarConfig = (handlers, currentUser) => {
 
     return {
         initialView: 'timeGridWeek',
-        headerToolbar: getHeaderToolbarOptions(compact),
-        buttonText: getButtonTextOptions(compact),
+        headerToolbar: false,
         locale: 'fr',
         firstDay: 1,
+
+        views: {
+            multiMonthYear: {
+                type: 'multiMonth',
+                duration: { years: 1 },
+                multiMonthMaxColumns: 3,
+                multiMonthMinWidth: 260
+            },
+            listWeek: {
+                listDayFormat: { weekday: 'long' },
+                listDaySideFormat: { month: 'long', day: 'numeric', year: 'numeric' }
+            }
+        },
         slotMinTime: '08:00:00',
         slotMaxTime: '22:00:00',
         /* Grille visuelle : une ligne par heure. Interaction (sélection, glisser) : pas 30 min. */
@@ -99,6 +74,10 @@ export const getCalendarConfig = (handlers, currentUser) => {
         selectLongPressDelay: 250,
 
         selectAllow: (selectInfo) => {
+            if (selectInfo.view.type.startsWith('list')) {
+                showToast('Utilisez la vue Semaine ou Jour pour sélectionner une plage sur la grille.', 'info');
+                return false;
+            }
             if (selectAllowSingleCalendarDay(selectInfo)) return true;
             const msg = privileged
                 ? 'Une seule journée à la fois sur le calendrier : pour plusieurs jours, cochez « Réservation sur plusieurs jours » dans la fenêtre.'
@@ -113,6 +92,14 @@ export const getCalendarConfig = (handlers, currentUser) => {
         editable: !!privileged,
         eventStartEditable: !!privileged,
         eventDurationEditable: !!privileged && !isTouchDevice,
+
+        datesSet: () => {
+            try {
+                handlers.onDatesSet?.();
+            } catch {
+                /* */
+            }
+        },
 
         select: (info) => handlers.onSelect(info),
         dateClick: (info) => handlers.onDateClick(info),

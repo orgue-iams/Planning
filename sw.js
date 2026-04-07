@@ -1,4 +1,4 @@
-const CACHE_NAME = 'orgue-v32';
+const CACHE_NAME = 'orgue-v33';
 
 /** Ressources locales (hors CDN) pour démarrage rapide / coquille hors-ligne */
 const ASSETS = [
@@ -7,11 +7,13 @@ const ASSETS = [
   './favicon.svg',
   './manifest.json',
   './css/main.css',
+  './css/calendar-toolbar.css',
   './css/calendar-theme.css',
   './css/events.css',
   './css/modal.css',
   './css/auth.css',
   './js/core/app.js',
+  './js/core/calendar-toolbar.js',
   './js/core/calendar-logic.js',
   './js/core/auth-logic.js',
   './js/core/planning-roles.js',

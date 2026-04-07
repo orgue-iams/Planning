@@ -1,0 +1,164 @@
+/* Barre d’outils calendrier type Google Agenda (plats, chevrons, titre centré). */
+
+.calendar-toolbar {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.25rem 0.5rem;
+    background: #fff;
+    border-radius: 0.75rem;
+    border: 1px solid rgb(226 232 240);
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+    min-height: 2.75rem;
+}
+
+.calendar-toolbar__left {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.15rem;
+    flex-shrink: 0;
+}
+
+.calendar-toolbar__title {
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #1e293b;
+    line-height: 1.25;
+    padding: 0 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (min-width: 640px) {
+    .calendar-toolbar__title {
+        font-size: 1.05rem;
+    }
+}
+
+.calendar-toolbar__right {
+    flex-shrink: 0;
+}
+
+/* Bouton « Auj. » et déclencheur de vue — plat, arrondi */
+.cal-tb-pill {
+    appearance: none;
+    border: 0;
+    margin: 0;
+    background: #f1f5f9;
+    color: #334155;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    padding: 0.4rem 0.65rem;
+    border-radius: 9999px;
+    cursor: pointer;
+    line-height: 1.2;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.cal-tb-pill:hover {
+    background: #e2e8f0;
+}
+
+.cal-tb-pill:active {
+    background: #cbd5e1;
+}
+
+.cal-tb-pill--view {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding-right: 0.45rem;
+}
+
+.cal-tb-pill__chev {
+    opacity: 0.6;
+    font-size: 0.65rem;
+}
+
+/* Chevrons : pas de cadre, fond rond au survol */
+.cal-tb-nav {
+    appearance: none;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 9999px;
+    background: transparent;
+    color: #475569;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.cal-tb-nav:hover {
+    background: rgb(15 23 42 / 0.08);
+}
+
+.cal-tb-nav:active {
+    background: rgb(15 23 42 / 0.12);
+}
+
+.cal-tb-nav svg {
+    display: block;
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.cal-view-dd {
+    position: relative;
+}
+
+.cal-view-dd__menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    min-width: 11rem;
+    padding: 0.35rem 0;
+    margin: 0;
+    list-style: none;
+    background: #fff;
+    border-radius: 0.5rem;
+    border: 1px solid rgb(226 232 240);
+    box-shadow:
+        0 4px 12px rgb(15 23 42 / 0.08),
+        0 0 0 1px rgb(15 23 42 / 0.04);
+    z-index: 60;
+}
+
+.cal-view-dd__menu[hidden] {
+    display: none !important;
+}
+
+.cal-view-dd__menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.45rem 0.85rem;
+    border: 0;
+    background: transparent;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #334155;
+    cursor: pointer;
+}
+
+.cal-view-dd__menu button:hover {
+    background: #f1f5f9;
+}
+
+.cal-view-dd__menu button.is-active {
+    background: #e0f2fe;
+    color: #0369a1;
+}

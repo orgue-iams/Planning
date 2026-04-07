@@ -1,5 +1,6 @@
 import { loadUIComponents } from '../utils/loader.js';
 import { getCalendarConfig, bindResponsiveCalendarToolbar } from '../config/fc-settings.js';
+import { initCalendarToolbar } from './calendar-toolbar.js';
 import { populateTimeSelects } from '../utils/time-helpers.js';
 import { initSwipe } from '../utils/touch-handler.js';
 import { demoEvents } from '../data/mock-events.js';
@@ -104,6 +105,8 @@ function initCalendarAndRevealUi() {
     if (calendar) return;
 
     const handlers = {
+        onDatesSet: null,
+
         /** Glisser / appui long puis plage : création rapide (motif favori, type réservation). */
         onSelect: (info) => {
             currentEvent = null;
@@ -114,7 +117,9 @@ function initCalendarAndRevealUi() {
         onDateClick: (info) => {
             currentEvent = null;
             let start = info.date;
-            if (info.view.type === 'dayGridMonth') {
+            const isMonthLike =
+                info.view.type === 'dayGridMonth' || info.view.type.startsWith('multiMonth');
+            if (isMonthLike) {
                 start = new Date(info.date);
                 if (info.allDay !== false) {
                     start.setHours(8, 0, 0, 0);
@@ -155,6 +160,12 @@ function initCalendarAndRevealUi() {
         calendar = new FullCalendar.Calendar(calendarEl, getCalendarConfig(handlers, currentUser));
         calendar.render();
         calendar.addEventSource(demoEvents);
+        const toolbarCtl = initCalendarToolbar(calendar);
+        handlers.onDatesSet = () => {
+            toolbarCtl?.refreshTitle();
+            toolbarCtl?.syncViewTriggerLabel();
+        };
+        handlers.onDatesSet();
         bindResponsiveCalendarToolbar(calendar);
 
         initSwipe(calendarEl, calendar);
