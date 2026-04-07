@@ -1,18 +1,27 @@
 #modal_login .modal-box {
     background: linear-gradient(to bottom, #ffffff, #f8fafc);
+    /* Ancre la graisse du bloc : évite qu’un style focus/autofill ne fasse « gonfler » tout le texte voisin (effet visuel / héritage). */
+    font-weight: 400;
+    font-synthesis: none;
 }
 
-/* Même police et même graisse : placeholder, saisie, focus et autofill (évite le « passage en gras »). */
+/*
+ * Préremplissage e-mail / mot de passe : le navigateur ou le gestionnaire de mots de passe (attributs autocomplete).
+ * Graisse fixée au « normal » sur tous les états (focus, autofill) pour éviter le passage en gras au clic.
+ */
 #modal_login #login-email,
-#modal_login #login-pass {
+#modal_login #login-pass,
+#modal_login #login-email:focus,
+#modal_login #login-pass:focus {
     font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    font-weight: 600;
+    font-weight: 400;
+    font-synthesis: none;
     letter-spacing: normal;
 }
 
 #modal_login #login-email::placeholder,
 #modal_login #login-pass::placeholder {
-    font-weight: 600;
+    font-weight: 400;
     opacity: 0.55;
 }
 
@@ -24,10 +33,25 @@
 #modal_login #login-email:-webkit-autofill,
 #modal_login #login-pass:-webkit-autofill {
     -webkit-text-fill-color: #0f172a;
-    font-weight: 600;
+    font-weight: 400;
     font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     box-shadow: 0 0 0 1000px #f8fafc inset;
     transition: background-color 99999s ease-out 0s;
+}
+
+/* Bandeau d’annonce sous le titre : graisse stable (indépendante du focus dans les champs). */
+#modal_login #login-banner-box {
+    font-weight: 400;
+    font-synthesis: none;
+}
+
+#modal_login #login-banner-box .organ-rich {
+    font-weight: 400;
+}
+
+#modal_login #login-banner-box .organ-rich strong,
+#modal_login #login-banner-box .organ-rich b {
+    font-weight: 600;
 }
 
 /* Bouton œil : styles dédiés (les classes .btn DaisyUI masquaient souvent l’icône ou la coupaient). */
