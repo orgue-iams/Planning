@@ -1,0 +1,51 @@
+# S’exécute quand un déploiement se termine en échec → ouvre une issue (lien vers les logs).
+# GitHub peut vous envoyer un e-mail selon vos préférences de notification sur le dépôt.
+#
+# Noms des workflows : doivent correspondre EXACTEMENT à la colonne de gauche dans l’onglet Actions.
+# Si une alerte ne part pas pour Pages : Actions → ouvrir le workflow Pages → reprendre le `name:` du YAML GitHub.
+#
+# Ajuster la liste ci-dessous si besoin :
+on:
+  workflow_run:
+    workflows:
+      - Deploy Supabase
+      - pages build and deployment
+    types: [completed]
+    branches: [main, master]
+
+jobs:
+  open-issue:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const title = `[CI] Échec déploiement · ${run.name} (#${run.id})`;
+            const body = `## Déploiement en échec
+
+            | | |
+            |:--|:--|
+            | **Workflow** | \`${run.name}\` |
+            | **Branche** | \`${run.head_branch}\` |
+            | **Commit** | \`${run.head_sha}\` |
+            | **Logs** | ${run.html_url} |
+
+            ### Suite recommandée
+            1. Ouvrir le lien **Logs** ci-dessus et noter l’étape en rouge + le message d’erreur.
+            2. Corriger le dépôt ou coller ce log dans Cursor (l’assistant ne surveille pas les runs tout seul en tâche de fond).
+            3. Relancer le workflow manuellement depuis l’onglet Actions si besoin — **pas de relances automatiques en boucle** depuis ce dépôt.
+
+            ---
+            *Issue créée par \`notify-deploy-failure.yml\` — fermez-la après traitement.*`;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+            });

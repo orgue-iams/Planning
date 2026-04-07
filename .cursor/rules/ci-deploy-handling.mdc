@@ -1,0 +1,10 @@
+---
+description: Échecs CI / déploiement — pas de surveillance continue, relances prudentes
+alwaysApply: true
+---
+
+# Déploiements (GitHub Actions / Supabase)
+
+- L’assistant ne surveille pas les workflows en arrière-plan ; il agit quand vous revenez dans le chat (ou en lisant une issue créée par `notify-deploy-failure.yml`).
+- Après un échec : s’appuyer sur le **log de l’étape en rouge** ; proposer **une** correction ciblée plutôt que plusieurs essais aveugles.
+- Avant de proposer de relancer un workflow, rappeler ce qui a été modifié et les risques résiduels ; éviter les boucles « relancer sans changement ».
