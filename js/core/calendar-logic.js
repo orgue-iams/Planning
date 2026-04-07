@@ -39,19 +39,8 @@ function ownerInfoFromEvent(event, currentUser) {
 }
 
 function ownerIdentityLabel(owner) {
-    const roleLabel =
-        owner.ownerRole === 'admin'
-            ? 'admin'
-            : owner.ownerRole === 'prof'
-                ? 'prof'
-                : owner.ownerRole === 'eleve'
-                    ? 'élève'
-                    : owner.ownerRole === 'consultation'
-                        ? 'consultation'
-                        : 'profil inconnu';
     const name = owner.ownerName || 'Inconnu';
-    const email = owner.ownerEmail || 'email inconnu';
-    return `Réservé par : ${name} (${email}) — ${roleLabel}`;
+    return `Réservé par ${name}`;
 }
 
 export function canCurrentUserEditEvent(currentUser, event) {
