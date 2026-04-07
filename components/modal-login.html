@@ -13,10 +13,10 @@
                 <label class="sr-only" for="login-email">Adresse e-mail</label>
                 <input type="email" id="login-email" name="email" autocomplete="username" placeholder="votre@email.com" class="input input-bordered w-full h-12 bg-slate-50 text-sm" required />
             </div>
-            <div class="form-control">
+            <div class="form-control login-pass-form-control overflow-visible">
                 <label class="sr-only" for="login-pass">Mot de passe</label>
-                <div class="login-pass-field relative w-full">
-                    <input type="password" id="login-pass" name="password" autocomplete="current-password" placeholder="Mot de passe" class="input input-bordered w-full h-12 bg-slate-50 text-sm pr-14" required />
+                <div class="login-pass-field relative z-[1] w-full">
+                    <input type="password" id="login-pass" name="password" autocomplete="current-password" placeholder="Mot de passe" class="input input-bordered w-full h-12 bg-slate-50 text-sm pr-[3.25rem]" required />
                     <button type="button" id="login-pass-toggle" class="login-pass-toggle" aria-label="Afficher le mot de passe" aria-pressed="false">
                         <span id="login-pass-icon-show" class="login-pass-toggle__icon" aria-hidden="true">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="22" height="22">
@@ -35,6 +35,10 @@
                     <button type="button" onclick="window.openForgotPassword()" class="label-text-alt link link-primary font-bold text-xs uppercase">Mot de passe oublié ?</button>
                 </label>
             </div>
+            <label class="login-remember flex cursor-pointer items-center gap-2.5 px-0.5 py-1 text-left">
+                <input type="checkbox" id="login-remember-me" name="remember" class="checkbox checkbox-primary checkbox-sm border-slate-300" checked />
+                <span class="text-xs text-slate-600 leading-snug">Se souvenir de moi sur cet appareil</span>
+            </label>
             <button type="button" id="btn-do-login" class="btn btn-primary w-full text-white font-black h-12 shadow-xl shadow-primary/30">SE CONNECTER</button>
         </div>
     </div>

@@ -23,6 +23,8 @@ import {
     setPasswordModalMode,
     setLogoutHandler,
     tryRestoreSession,
+    tryRestoreDemoSession,
+    getRememberMePreference,
     isPrivilegedUser,
     roleLabelFr,
     PASSWORD_POLICY_LINES,
@@ -71,6 +73,8 @@ function performLogout() {
     ].forEach((id) => document.getElementById(id)?.close());
     const loginDlg = document.getElementById('modal_login');
     void applyLoginBanner();
+    const rememberCb = document.getElementById('login-remember-me');
+    if (rememberCb) rememberCb.checked = getRememberMePreference();
     loginDlg?.showModal();
     requestAnimationFrame(() => document.getElementById('login-email')?.focus());
 }
@@ -266,7 +270,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         await new Promise((r) => setTimeout(r, 200));
     }
 
-    const restored = await tryRestoreSession();
+    const restored = isBackendAuthConfigured()
+        ? await tryRestoreSession()
+        : tryRestoreDemoSession();
     if (restored) {
         currentUser = restored;
         refreshHeaderUser(currentUser);
@@ -298,9 +304,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     document.getElementById('btn-do-login').onclick = async () => {
+        const rememberMe = document.getElementById('login-remember-me')?.checked !== false;
         const result = await login(
             document.getElementById('login-email').value,
-            document.getElementById('login-pass').value
+            document.getElementById('login-pass').value,
+            rememberMe
         );
         if (result.success) {
             currentUser = result.user;
@@ -312,7 +320,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (e.key !== 'Enter') return;
         const target = e.target;
         if (!(target instanceof HTMLElement)) return;
-        if (!target.closest('#login-email, #login-pass')) return;
+        if (!target.closest('#login-email, #login-pass, #login-remember-me')) return;
         e.preventDefault();
         document.getElementById('btn-do-login')?.click();
     });
@@ -423,7 +431,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('modal_login')?.addEventListener('toggle', (ev) => {
         const el = ev.target;
-        if (el instanceof HTMLDialogElement && el.open) void applyLoginBanner();
+        if (el instanceof HTMLDialogElement && el.open) {
+            const cb = document.getElementById('login-remember-me');
+            if (cb) cb.checked = getRememberMePreference();
+            void applyLoginBanner();
+        }
     });
 
     const hasResetToken = new URLSearchParams(window.location.search).has('token');
@@ -431,6 +443,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const passModalOpen = document.getElementById('modal_password')?.open;
     if (!hasResetToken && !supabaseRecoveryUrl && !currentUser?.email && !passModalOpen) {
         const dlg = document.getElementById('modal_login');
+        const rememberCb = document.getElementById('login-remember-me');
+        if (rememberCb) rememberCb.checked = getRememberMePreference();
         await applyLoginBanner();
         dlg?.showModal();
         requestAnimationFrame(() => document.getElementById('login-email')?.focus());

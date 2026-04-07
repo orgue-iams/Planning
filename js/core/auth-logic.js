@@ -2,10 +2,17 @@
  * Authentification : mode démo (USERS locaux) ou Supabase (option 2 : prod).
  */
 
-import { getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
+import {
+    getSupabaseClient,
+    isBackendAuthConfigured,
+    getRememberMePreference,
+    setRememberMePreference,
+    resetSupabaseClient,
+    purgeSupabaseKeysFromStorage
+} from './supabase-client.js';
 import { showToast } from '../utils/toast.js';
 
-export { isBackendAuthConfigured } from './supabase-client.js';
+export { isBackendAuthConfigured, getRememberMePreference } from './supabase-client.js';
 import { fetchAppUserFromSession } from './supabase-auth.js';
 
 export const PASSWORD_MIN_LENGTH = 6;
@@ -69,6 +76,50 @@ const USERS = {
     'consultation@iams.fr': { pass: '1234', name: 'Compte consultation', email: 'consultation@iams.fr', role: 'consultation' }
 };
 
+const DEMO_SESSION_KEY = 'planning_demo_user_v1';
+
+export function clearDemoSession() {
+    try {
+        localStorage.removeItem(DEMO_SESSION_KEY);
+        sessionStorage.removeItem(DEMO_SESSION_KEY);
+    } catch {
+        /* */
+    }
+}
+
+function persistDemoSessionAfterLogin(emailKey, rememberMe) {
+    try {
+        const primary = rememberMe ? localStorage : sessionStorage;
+        const secondary = rememberMe ? sessionStorage : localStorage;
+        secondary.removeItem(DEMO_SESSION_KEY);
+        primary.setItem(DEMO_SESSION_KEY, JSON.stringify({ email: emailKey }));
+    } catch {
+        /* */
+    }
+}
+
+/** Session démo persistée (localStorage si « se souvenir », sinon sessionStorage). */
+export function tryRestoreDemoSession() {
+    if (isBackendAuthConfigured()) return null;
+    try {
+        const remember = getRememberMePreference();
+        const st = remember ? localStorage : sessionStorage;
+        const raw = st.getItem(DEMO_SESSION_KEY);
+        if (!raw) return null;
+        const o = JSON.parse(raw);
+        const id = String(o?.email ?? '').trim().toLowerCase();
+        if (!id) return null;
+        const row = USERS[id];
+        if (!row) {
+            clearDemoSession();
+            return null;
+        }
+        return { name: row.name, email: row.email, role: row.role };
+    } catch {
+        return null;
+    }
+}
+
 export function isPrivilegedUser(user) {
     return !!(user && (user.role === 'admin' || user.role === 'prof'));
 }
@@ -94,12 +145,17 @@ export function setPasswordModalMode(isTokenReset) {
 }
 
 /**
+ * @param {boolean} [rememberMe] défaut true : session conservée après fermeture du navigateur / PWA (localStorage).
  * @returns {Promise<{ success: boolean, user?: { name: string, email: string, role: string, id?: string } }>}
  */
-export async function login(email, pass) {
+export async function login(email, pass, rememberMe = true) {
     const id = String(email).trim().toLowerCase();
+    const remember = rememberMe !== false;
 
     if (isBackendAuthConfigured()) {
+        setRememberMePreference(remember);
+        resetSupabaseClient();
+        purgeSupabaseKeysFromStorage(remember ? sessionStorage : localStorage);
         const supabase = getSupabaseClient();
         if (!supabase) {
             showToast('Configuration Supabase invalide.', 'error');
@@ -122,8 +178,10 @@ export async function login(email, pass) {
         return { success: true, user };
     }
 
+    setRememberMePreference(remember);
     const row = USERS[id];
     if (row && row.pass === pass) {
+        persistDemoSessionAfterLogin(id, remember);
         document.getElementById('modal_login')?.close();
         return {
             success: true,
@@ -324,8 +382,10 @@ export function setLogoutHandler(fn) {
 
 export async function logout() {
     clearSupabasePasswordRecoveryPending();
+    clearDemoSession();
     if (isBackendAuthConfigured()) {
         await getSupabaseClient()?.auth.signOut();
+        resetSupabaseClient();
     }
     logoutImpl();
 }

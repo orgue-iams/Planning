@@ -17,6 +17,8 @@
     font-weight: 400;
     font-synthesis: none;
     letter-spacing: normal;
+    position: relative;
+    z-index: 0;
 }
 
 #modal_login #login-email::placeholder,
@@ -39,6 +41,18 @@
     transition: background-color 99999s ease-out 0s;
 }
 
+/* Chrome / Safari : boutons mots de passe intégrés au champ — ils recouvrent souvent notre œil. */
+#modal_login #login-pass::-webkit-credentials-auto-fill-button,
+#modal_login #login-pass::-webkit-contacts-auto-fill-button,
+#modal_login #login-pass::-webkit-strong-password-auto-fill-button {
+    display: none !important;
+    visibility: hidden;
+    pointer-events: none;
+    width: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+}
+
 /* Bandeau d’annonce sous le titre : graisse stable (indépendante du focus dans les champs). */
 #modal_login #login-banner-box {
     font-weight: 400;
@@ -55,16 +69,29 @@
 }
 
 /* Bouton œil : styles dédiés (les classes .btn DaisyUI masquaient souvent l’icône ou la coupaient). */
+#modal_login .login-remember {
+    margin-top: 0.15rem;
+    margin-bottom: 0.15rem;
+}
+
+#modal_login .login-remember span {
+    font-weight: 400;
+}
+
+#modal_login .login-pass-form-control {
+    overflow: visible !important;
+}
+
 #modal_login .login-pass-field {
     overflow: visible;
 }
 
 #modal_login .login-pass-toggle {
     position: absolute;
-    right: 2px;
+    right: 4px;
     top: 50%;
     transform: translateY(-50%);
-    z-index: 50;
+    z-index: 20;
     box-sizing: border-box;
     width: 2.75rem;
     height: 2.75rem;
@@ -109,6 +136,8 @@
 #modal_login .login-pass-toggle svg {
     display: block;
     flex-shrink: 0;
+    stroke: currentColor;
+    fill: none;
 }
 
 .link-primary {
