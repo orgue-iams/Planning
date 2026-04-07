@@ -6,10 +6,12 @@ Démarrage option 2 — Supabase + Google Agenda
    - Authentication → activer Email (mot de passe)
    - SQL Editor → coller et exécuter le fichier schema.sql
    - Créer 1 compte test via Authentication → Users → Add user
-   - Table Editor → profiles : ajuster display_name et role (admin / prof / eleve) pour ce compte
+   - Table Editor → profiles : ajuster display_name et role (admin / prof / eleve / consultation) pour ce compte
 
 2) SQL complémentaire (règles + annonces + trigger invite)
    - SQL Editor → exécuter supabase/migrations/002_admin_content.sql
+   - Si la base existe déjà, exécuter aussi supabase/migrations/003_consultation_role.sql
+   - Pour créer les comptes de base demandés (admin/élèves/prof), exécuter supabase/seed-users.sql
 
 3) Edge Functions
    - Installer la CLI : https://supabase.com/docs/guides/cli
