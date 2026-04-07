@@ -3,55 +3,9 @@
         <h3 class="font-black text-sm uppercase tracking-wide text-slate-600 border-b pb-2 shrink-0">Règles d'utilisation de l'orgue</h3>
         <div id="rules-view" class="text-sm text-slate-700 leading-relaxed py-4 overflow-y-auto flex-1 min-h-0"></div>
         <div id="rules-edit-wrap" class="hidden flex-1 min-h-0 py-2 flex flex-col min-h-0 gap-2">
-            <div id="rules-toolbar" class="rules-toolbar shrink-0">
-                <div class="rules-toolbar__group">
-                    <button type="button" class="rules-tool" data-cmd="bold" title="Gras"><strong>G</strong></button>
-                    <button type="button" class="rules-tool" data-cmd="italic" title="Italique"><em>I</em></button>
-                    <button type="button" class="rules-tool" data-cmd="underline" title="Souligné"><span style="text-decoration:underline">S</span></button>
-                </div>
-                <div class="rules-toolbar__group">
-                    <select id="rules-block" class="rules-select" title="Style">
-                        <option value="p" selected>Paragraphe</option>
-                        <option value="h3">Titre</option>
-                        <option value="h4">Sous-titre</option>
-                        <option value="blockquote">Citation</option>
-                    </select>
-                    <select id="rules-font" class="rules-select" title="Police">
-                        <option value="inherit" selected>Police (auto)</option>
-                        <option value="Arial">Arial</option>
-                        <option value="Georgia">Georgia</option>
-                        <option value="Times New Roman">Times</option>
-                        <option value="Verdana">Verdana</option>
-                    </select>
-                    <select id="rules-size" class="rules-select" title="Taille">
-                        <option value="14" selected>14</option>
-                        <option value="12">12</option>
-                        <option value="16">16</option>
-                        <option value="18">18</option>
-                        <option value="20">20</option>
-                    </select>
-                    <select id="rules-color" class="rules-select" title="Couleur">
-                        <option value="#0f172a" selected>Noir</option>
-                        <option value="#475569">Gris</option>
-                        <option value="#b91c1c">Rouge</option>
-                        <option value="#047857">Vert</option>
-                        <option value="#1d4ed8">Bleu</option>
-                        <option value="__custom__">Autre…</option>
-                    </select>
-                    <input type="color" id="rules-color-custom" value="#0f172a" class="hidden" title="Couleur personnalisée" />
-                    <button type="button" class="rules-tool" data-cmd="createLink" title="Lien">Lien</button>
-                </div>
-            </div>
-
-            <div
-                id="rules-editor"
-                class="rules-editor textarea textarea-bordered w-full flex-1 text-sm leading-relaxed"
-                contenteditable="true"
-                spellcheck="true"
-            ></div>
-
+            <div id="rules-quill-mount" class="planning-quill-mount"></div>
             <p class="text-[10px] text-slate-400 leading-snug shrink-0">
-                La mise en forme est enregistrée. Pour la sécurité, seules quelques balises et styles (gras/italique/souligné, listes, titres, liens, couleurs, taille, police) sont conservés.
+                Édition comme un traitement de texte. Le contenu est enregistré au format HTML sécurisé (liens et scripts non autorisés).
             </p>
         </div>
 

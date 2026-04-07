@@ -9,7 +9,14 @@ import {
     deleteScheduledMessageRemote
 } from '../utils/org-content.js';
 import { showToast } from '../utils/toast.js';
-import { formatSimpleRichHtml } from '../utils/rich-text.js';
+import { formatSimpleRichHtml, normalizeQuillMarkup, sanitizeRulesHtml } from '../utils/rich-text.js';
+import {
+    createPlanningQuill,
+    destroyPlanningQuillMount,
+    isQuillAvailable,
+    quillGetPlainText,
+    quillSetHtml
+} from '../utils/planning-quill.js';
 
 function toLocalInputValue(iso) {
     if (!iso) return '';
@@ -23,29 +30,6 @@ function fromLocalInputValue(s) {
     if (!s) return null;
     const d = new Date(s);
     return Number.isNaN(d.getTime()) ? null : d.toISOString();
-}
-
-function wrapSelectionWith(before, after = before) {
-    const body = document.getElementById('ann-body');
-    if (!(body instanceof HTMLTextAreaElement)) return;
-    const start = body.selectionStart ?? 0;
-    const end = body.selectionEnd ?? 0;
-    const selected = body.value.slice(start, end);
-    const payload = `${before}${selected}${after}`;
-    body.setRangeText(payload, start, end, 'end');
-    body.focus();
-}
-
-function getAnnBodyHtml() {
-    const body = document.getElementById('ann-body');
-    if (!(body instanceof HTMLTextAreaElement)) return '';
-    return body.value || '';
-}
-
-function clearAnnBody() {
-    const body = document.getElementById('ann-body');
-    if (!(body instanceof HTMLTextAreaElement)) return;
-    body.value = '';
 }
 
 async function renderList() {
@@ -71,12 +55,14 @@ async function renderList() {
             </div>
             <div class="text-slate-700 mt-1 text-[11px] leading-snug ann-preview"></div>`;
         const prev = div.querySelector('.ann-preview');
-        if (prev) prev.innerHTML = formatSimpleRichHtml(r.body || '');
+        if (prev) prev.innerHTML = `<div class="organ-rich">${formatSimpleRichHtml(r.body || '')}</div>`;
         wrap.appendChild(div);
     }
 }
 
 let announcementsHandlersBound = false;
+/** @type {any} */
+let annQuill = null;
 
 export function initAnnouncementsUi(currentUser) {
     const show = isBackendAuthConfigured() && isPrivilegedUser(currentUser);
@@ -84,27 +70,49 @@ export function initAnnouncementsUi(currentUser) {
     if (!show || announcementsHandlersBound) return;
     announcementsHandlersBound = true;
 
+    const modal = document.getElementById('modal_announcements');
+    const mount = document.getElementById('ann-quill-mount');
+
+    const ensureAnnQuill = () => {
+        if (!(mount instanceof HTMLElement)) return null;
+        if (!isQuillAvailable()) {
+            showToast("Éditeur indisponible. Rechargez la page.", 'error');
+            return null;
+        }
+        destroyPlanningQuillMount(mount);
+        annQuill = createPlanningQuill(mount, {
+            placeholder: 'Votre message…'
+        });
+        return annQuill;
+    };
+
+    modal?.addEventListener('close', () => {
+        if (mount instanceof HTMLElement) destroyPlanningQuillMount(mount);
+        annQuill = null;
+    });
+
     document.getElementById('menu-item-announcements')?.addEventListener('click', (e) => {
         e.preventDefault();
         document.getElementById('btn-user-menu')?.blur();
         presetAnnouncementDateInputs();
-        document.getElementById('modal_announcements')?.showModal();
+        void ensureAnnQuill();
+        modal?.showModal();
         void renderList();
     });
 
-    document.getElementById('ann-btn-bold')?.addEventListener('click', () => wrapSelectionWith('<strong>', '</strong>'));
-    document.getElementById('ann-btn-italic')?.addEventListener('click', () => wrapSelectionWith('<em>', '</em>'));
-    document.getElementById('ann-btn-underline')?.addEventListener('click', () => wrapSelectionWith('<u>', '</u>'));
-
     document.getElementById('ann-publish-btn')?.addEventListener('click', async () => {
-        const body = getAnnBodyHtml();
-        const channel = document.getElementById('ann-channel')?.value || 'login';
-        const starts = fromLocalInputValue(document.getElementById('ann-start')?.value || '');
-        const ends = fromLocalInputValue(document.getElementById('ann-end')?.value || '');
-        if (!body.trim()) {
+        if (!annQuill) {
+            void ensureAnnQuill();
+        }
+        if (!annQuill) return;
+        const body = sanitizeRulesHtml(normalizeQuillMarkup(annQuill.root.innerHTML));
+        if (!quillGetPlainText(annQuill)) {
             showToast('Saisissez un message.', 'error');
             return;
         }
+        const channel = document.getElementById('ann-channel')?.value || 'login';
+        const starts = fromLocalInputValue(document.getElementById('ann-start')?.value || '');
+        const ends = fromLocalInputValue(document.getElementById('ann-end')?.value || '');
         if (!starts || !ends) {
             showToast('Indiquez début et fin.', 'error');
             return;
@@ -119,7 +127,7 @@ export function initAnnouncementsUi(currentUser) {
             return;
         }
         showToast('Annonce enregistrée.');
-        clearAnnBody();
+        quillSetHtml(annQuill, '');
         await renderList();
     });
 

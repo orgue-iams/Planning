@@ -20,8 +20,11 @@ export async function fetchAppUserFromSession(session) {
     }
 
     const email = session.user.email || '';
+    const meta = session.user.user_metadata || {};
+    const metaName = String(meta.full_name || meta.name || meta.display_name || '').trim();
     const name =
         (data?.display_name && String(data.display_name).trim()) ||
+        metaName ||
         email.split('@')[0] ||
         'Utilisateur';
     const allowedRoles = ['admin', 'prof', 'eleve', 'consultation'];

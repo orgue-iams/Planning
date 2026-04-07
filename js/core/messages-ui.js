@@ -14,7 +14,19 @@ import {
 import { isPrivilegedUser } from './auth-logic.js';
 import { isBackendAuthConfigured } from './supabase-client.js';
 import { fetchOrganRulesRemote, saveOrganRulesRemote, fetchActiveAfterLoginMessage } from '../utils/org-content.js';
-import { formatSimpleRichHtml, looksLikeHtml, plainTextToSafeHtml, sanitizeRulesHtml } from '../utils/rich-text.js';
+import {
+    formatSimpleRichHtml,
+    looksLikeHtml,
+    normalizeQuillMarkup,
+    plainTextToSafeHtml,
+    sanitizeRulesHtml
+} from '../utils/rich-text.js';
+import {
+    createPlanningQuill,
+    destroyPlanningQuillMount,
+    isQuillAvailable,
+    quillSetHtml
+} from '../utils/planning-quill.js';
 
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -26,7 +38,8 @@ function renderRulesView(text) {
     const el = document.getElementById('rules-view');
     if (!el) return;
     const raw = String(text ?? '');
-    el.innerHTML = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
+    const inner = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
+    el.innerHTML = `<div class="organ-rich">${inner}</div>`;
 }
 
 function ensureFallbackRulesModal() {
@@ -59,13 +72,7 @@ export function initMessagesUi(currentUser) {
 
     const view = document.getElementById('rules-view');
     const editWrap = document.getElementById('rules-edit-wrap');
-    const editor = document.getElementById('rules-editor');
-    const toolbar = document.getElementById('rules-toolbar');
-    const blockSelect = document.getElementById('rules-block');
-    const fontSelect = document.getElementById('rules-font');
-    const sizeSelect = document.getElementById('rules-size');
-    const colorInput = document.getElementById('rules-color');
-    const colorCustom = document.getElementById('rules-color-custom');
+    const rulesMount = document.getElementById('rules-quill-mount');
     const btnEdit = document.getElementById('rules-btn-edit');
     const btnSave = document.getElementById('rules-btn-save');
     const btnClose = document.getElementById('rules-btn-close');
@@ -78,40 +85,16 @@ export function initMessagesUi(currentUser) {
     const priv = isPrivilegedUser(currentUser);
     const backend = isBackendAuthConfigured();
 
-    /** @type {Range|null} */
-    let lastRange = null;
-    /** @type {string} */
+    /** @type {any} */
+    let rulesQuill = null;
     let editInitialHtml = '';
 
-    const saveSelection = () => {
-        const root = editor;
-        if (!(root instanceof HTMLElement)) return;
-        const sel = window.getSelection();
-        if (!sel || sel.rangeCount === 0) return;
-        const r = sel.getRangeAt(0);
-        if (root.contains(r.startContainer) && root.contains(r.endContainer)) {
-            lastRange = r.cloneRange();
-        }
+    const resetRulesQuill = () => {
+        if (rulesMount instanceof HTMLElement) destroyPlanningQuillMount(rulesMount);
+        rulesQuill = null;
     };
 
-    const restoreSelection = () => {
-        const root = editor;
-        if (!(root instanceof HTMLElement)) return;
-        root.focus();
-        const sel = window.getSelection();
-        if (!sel) return;
-        if (lastRange) {
-            sel.removeAllRanges();
-            sel.addRange(lastRange);
-            return;
-        }
-        // fallback: curseur à la fin
-        const r = document.createRange();
-        r.selectNodeContents(root);
-        r.collapse(false);
-        sel.removeAllRanges();
-        sel.addRange(r);
-    };
+    const rulesEditorHtml = () => (rulesQuill ? String(rulesQuill.root.innerHTML) : '');
 
     if (priv) {
         btnEdit?.classList.remove('hidden');
@@ -130,7 +113,12 @@ export function initMessagesUi(currentUser) {
         backendHint?.classList.add('hidden');
     }
 
+    modalRules?.addEventListener('close', () => {
+        resetRulesQuill();
+    });
+
     btnRules?.addEventListener('click', async () => {
+        resetRulesQuill();
         let text = getRulesText();
         if (backend) {
             try {
@@ -140,7 +128,6 @@ export function initMessagesUi(currentUser) {
                 showToast("Impossible de charger les règles distantes. Affichage de la version locale.", 'info');
             }
         }
-        // Si la table Supabase est initialisée vide, on affiche un texte par défaut (local).
         if (backend && (!text || String(text).trim() === '')) {
             text = getRulesText();
         }
@@ -149,16 +136,13 @@ export function initMessagesUi(currentUser) {
             const fallbackView = fallback?.querySelector?.('#rules-fallback-view');
             if (fallbackView) {
                 const raw = String(text ?? '');
-                fallbackView.innerHTML = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
+                const inner = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
+                fallbackView.innerHTML = `<div class="organ-rich">${inner}</div>`;
             }
             fallback?.showModal?.();
             return;
         }
         renderRulesView(text);
-        if (editor) {
-            const raw = String(text ?? '');
-            editor.innerHTML = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
-        }
         editWrap?.classList.add('hidden');
         view?.classList.remove('hidden');
         btnSave?.classList.add('hidden');
@@ -168,9 +152,8 @@ export function initMessagesUi(currentUser) {
 
     btnClose?.addEventListener('click', async () => {
         const isEditing = !!editWrap && !editWrap.classList.contains('hidden');
-        if (isEditing) {
-            const current = editor?.innerHTML ?? '';
-            const dirty = String(current) !== String(editInitialHtml);
+        if (isEditing && rulesQuill) {
+            const dirty = String(rulesEditorHtml()) !== String(editInitialHtml);
             if (dirty) {
                 const ok = confirm('Fermer sans enregistrer les modifications ?');
                 if (!ok) return;
@@ -180,6 +163,11 @@ export function initMessagesUi(currentUser) {
     });
 
     btnEdit?.addEventListener('click', async () => {
+        if (!(rulesMount instanceof HTMLElement)) return;
+        if (!isQuillAvailable()) {
+            showToast("Éditeur indisponible. Rechargez la page.", 'error');
+            return;
+        }
         let text = getRulesText();
         if (backend) {
             const r = await fetchOrganRulesRemote();
@@ -188,127 +176,25 @@ export function initMessagesUi(currentUser) {
         if (backend && (!text || String(text).trim() === '')) {
             text = getRulesText();
         }
-        if (editor) {
-            const raw = String(text ?? '');
-            editor.innerHTML = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
-        }
+        resetRulesQuill();
+        rulesQuill = createPlanningQuill(rulesMount, {
+            placeholder: 'Saisissez les règles…'
+        });
+        const raw = String(text ?? '');
+        const initial = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
+        quillSetHtml(rulesQuill, initial);
+        editInitialHtml = rulesEditorHtml();
+
         view?.classList.add('hidden');
         editWrap?.classList.remove('hidden');
         btnEdit?.classList.add('hidden');
         btnSave?.classList.remove('hidden');
-        editInitialHtml = editor?.innerHTML ?? '';
-        editor?.focus();
-        saveSelection();
     });
-
-    function exec(cmd, value) {
-        restoreSelection();
-        try {
-            document.execCommand(cmd, false, value);
-        } catch {
-            /* ignore */
-        }
-        saveSelection();
-    }
-
-    // Éviter que la toolbar vole le focus/selection (sinon bold/underline ne s’appliquent pas).
-    toolbar?.addEventListener('mousedown', (e) => {
-        if (e.target?.closest?.('button[data-cmd]')) e.preventDefault();
-    });
-
-    editor?.addEventListener?.('keyup', saveSelection);
-    editor?.addEventListener?.('mouseup', saveSelection);
-    document.addEventListener('selectionchange', saveSelection);
-
-    // Meilleure compat CSS pour couleur / tailles dans certains navigateurs.
-    try {
-        document.execCommand('styleWithCSS', false, true);
-    } catch {
-        /* ignore */
-    }
-
-    toolbar?.addEventListener('click', (e) => {
-        const btn = e.target?.closest?.('button[data-cmd]');
-        if (!btn) return;
-        const cmd = btn.getAttribute('data-cmd');
-        if (!cmd) return;
-        if (cmd === 'createLink') {
-            const href = prompt('Adresse du lien (https://… ou mailto:…):');
-            if (!href) return;
-            exec('createLink', href);
-            return;
-        }
-        exec(cmd);
-    });
-
-    blockSelect?.addEventListener('change', () => {
-        const v = String(blockSelect.value || 'p');
-        const tag = v === 'blockquote' ? 'blockquote' : v;
-        exec('formatBlock', `<${tag}>`);
-    });
-
-    fontSelect?.addEventListener('change', () => {
-        const v = String(fontSelect.value || 'inherit');
-        if (v === 'inherit') {
-            // fallback : pas de « reset » fiable via execCommand, on nettoie le formatage.
-            exec('removeFormat');
-            return;
-        }
-        exec('fontName', v);
-    });
-
-    sizeSelect?.addEventListener('change', () => {
-        const px = Number.parseInt(String(sizeSelect.value || '14'), 10);
-        if (!Number.isFinite(px)) return;
-        // execCommand fontSize ne gère que 1..7. On l’utilise puis on remplace par px.
-        exec('fontSize', '3');
-        // Remapper <font size="3"> vers style font-size:px
-        const root = editor;
-        if (!root) return;
-        const fonts = root.querySelectorAll('font[size="3"]');
-        for (const f of fonts) {
-            f.removeAttribute('size');
-            f.style.fontSize = `${px}px`;
-        }
-    });
-
-    const applyColor = (v) => {
-        const c = String(v || '').trim();
-        if (!c) return;
-        exec('foreColor', c);
-    };
-
-    colorInput?.addEventListener('change', () => {
-        const v = String(colorInput.value || '').trim();
-        if (v === '__custom__') {
-            colorCustom?.classList.remove('hidden');
-            colorCustom?.focus();
-            return;
-        }
-        colorCustom?.classList.add('hidden');
-        applyColor(v);
-    });
-    colorCustom?.addEventListener('input', () => applyColor(colorCustom.value));
 
     btnSave?.addEventListener('click', async () => {
-        const root = editor;
-        if (root instanceof HTMLElement) {
-            // Normalise les <font face|color|size> générés par execCommand vers des styles (sinon on perd à la sauvegarde).
-            const sizeMap = { '1': '10px', '2': '12px', '3': '14px', '4': '16px', '5': '18px', '6': '24px', '7': '32px' };
-            for (const f of Array.from(root.querySelectorAll('font'))) {
-                const span = document.createElement('span');
-                const face = f.getAttribute('face');
-                const color = f.getAttribute('color');
-                const size = f.getAttribute('size');
-                if (face) span.style.fontFamily = face;
-                if (color) span.style.color = color;
-                if (size && sizeMap[size]) span.style.fontSize = sizeMap[size];
-                span.innerHTML = f.innerHTML;
-                f.replaceWith(span);
-            }
-        }
-        const html = editor?.innerHTML ?? '';
-        const t = sanitizeRulesHtml(html);
+        if (!rulesQuill) return;
+        const html = rulesQuill.root.innerHTML;
+        const t = sanitizeRulesHtml(normalizeQuillMarkup(html));
         if (backend) {
             const res = await saveOrganRulesRemote(t);
             if (!res.ok) {
@@ -318,12 +204,13 @@ export function initMessagesUi(currentUser) {
         } else {
             setRulesText(t);
         }
+        resetRulesQuill();
         editWrap?.classList.add('hidden');
         view?.classList.remove('hidden');
         btnEdit?.classList.remove('hidden');
         btnSave?.classList.add('hidden');
         renderRulesView(t);
-        editInitialHtml = editor?.innerHTML ?? '';
+        editInitialHtml = '';
         showToast('Règles enregistrées.');
     });
 
@@ -361,7 +248,7 @@ export async function tryShowBroadcastPopup(currentUser) {
         if (!m?.body) return;
         if (localStorage.getItem(`orgue_sm_seen_${m.id}`) === '1') return;
         modal.dataset.broadcastId = `sm_${m.id}`;
-        body.innerHTML = formatSimpleRichHtml(m.body);
+        body.innerHTML = `<div class="organ-rich">${formatSimpleRichHtml(m.body)}</div>`;
         modal.showModal();
         return;
     }
@@ -370,6 +257,6 @@ export async function tryShowBroadcastPopup(currentUser) {
     const b = getBroadcast();
     if (!b) return;
     modal.dataset.broadcastId = b.id;
-    body.innerHTML = escapeHtml(b.text).replace(/\n/g, '<br>');
+    body.innerHTML = `<div class="organ-rich">${formatSimpleRichHtml(b.text)}</div>`;
     modal.showModal();
 }

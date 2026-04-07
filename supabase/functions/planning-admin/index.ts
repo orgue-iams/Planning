@@ -39,11 +39,16 @@ Deno.serve(async (req) => {
     const url = Deno.env.get('SUPABASE_URL') ?? '';
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    if (!url || !serviceKey) {
-        return new Response(JSON.stringify({ error: 'Server misconfigured' }), {
-            status: 500,
-            headers: { ...cors, 'Content-Type': 'application/json' }
-        });
+    if (!url || !anonKey || !serviceKey) {
+        return new Response(
+            JSON.stringify({
+                error: 'Configuration serveur incomplète (SUPABASE_URL, SUPABASE_ANON_KEY ou SERVICE_ROLE manquant).'
+            }),
+            {
+                status: 500,
+                headers: { ...cors, 'Content-Type': 'application/json' }
+            }
+        );
     }
 
     const authHeader = req.headers.get('Authorization');

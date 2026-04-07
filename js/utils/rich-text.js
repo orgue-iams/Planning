@@ -14,6 +14,13 @@ function sanitizeCssValue(raw) {
     return v;
 }
 
+function isSafeColorCssValue(vRaw) {
+    const v = String(vRaw ?? '').trim();
+    if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(v)) return v;
+    if (/^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/i.test(v)) return v;
+    return '';
+}
+
 function sanitizeStyleAttr(styleText) {
     const style = String(styleText ?? '');
     if (!style) return '';
@@ -22,16 +29,20 @@ function sanitizeStyleAttr(styleText) {
         const [kRaw, vRaw] = decl.split(':');
         if (!kRaw || !vRaw) continue;
         const k = kRaw.trim().toLowerCase();
-        const v = sanitizeCssValue(vRaw);
-        if (!v) continue;
         if (k === 'color') {
-            if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(v)) keep.push(`color:${v}`);
-        }
-        if (k === 'font-size') {
-            if (/^\d{1,2}px$/.test(v) || /^\d{1,2}(\.\d)?rem$/.test(v)) keep.push(`font-size:${v}`);
+            const c = isSafeColorCssValue(vRaw);
+            if (c) keep.push(`color:${c}`);
+            continue;
         }
         if (k === 'font-family') {
-            if (/^[a-z0-9 ,\-]+$/i.test(v)) keep.push(`font-family:${v}`);
+            const ff = String(vRaw ?? '').trim();
+            if (/^[\w\s,.\-'"%&()]+$/i.test(ff) && ff.length < 220) keep.push(`font-family:${ff}`);
+            continue;
+        }
+        const v = sanitizeCssValue(vRaw);
+        if (!v) continue;
+        if (k === 'font-size') {
+            if (/^\d{1,2}px$/.test(v) || /^\d{1,2}(\.\d)?rem$/.test(v)) keep.push(`font-size:${v}`);
         }
         if (k === 'text-decoration') {
             if (/^(underline|none)$/i.test(v)) keep.push(`text-decoration:${v}`);
@@ -179,6 +190,43 @@ export function looksLikeHtml(text) {
     return /<\/?[a-z][\s\S]*>/i.test(t);
 }
 
+/** Convertit les classes Quill (taille / police) en styles inline avant sanitization. */
+export function normalizeQuillMarkup(html) {
+    const raw = String(html ?? '');
+    if (!raw.includes('ql-')) return raw;
+    const doc = new DOMParser().parseFromString(raw, 'text/html');
+    const sizeMap = {
+        'ql-size-10px': '10px',
+        'ql-size-12px': '12px',
+        'ql-size-14px': '14px',
+        'ql-size-16px': '16px',
+        'ql-size-18px': '18px',
+        'ql-size-20px': '20px'
+    };
+    const fontMap = {
+        'ql-font-system-ui': 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+        'ql-font-arial': 'Arial, Helvetica, sans-serif',
+        'ql-font-georgia': 'Georgia, serif',
+        'ql-font-times-new-roman': '"Times New Roman", Times, serif',
+        'ql-font-verdana': 'Verdana, Geneva, sans-serif'
+    };
+    for (const el of doc.body.querySelectorAll('[class]')) {
+        if (!(el instanceof HTMLElement)) continue;
+        for (const c of [...el.classList]) {
+            if (sizeMap[c]) {
+                el.style.fontSize = sizeMap[c];
+                el.classList.remove(c);
+            }
+            if (fontMap[c]) {
+                el.style.fontFamily = fontMap[c];
+                el.classList.remove(c);
+            }
+        }
+        if (el instanceof HTMLElement && el.classList.length === 0) el.removeAttribute('class');
+    }
+    return doc.body.innerHTML;
+}
+
 /**
  * Inline : liens [libellé](url), **gras**, *italique*.
  * @param {string} plain texte brut (non échappé)
@@ -313,14 +361,21 @@ export function formatRichContentHtml(source) {
     return `<div class="organ-rich">${chunks.join('')}</div>`;
 }
 
-/** Mise en forme minimale : **gras** + retours à la ligne (annonces, bandeau). */
+/** Mise en forme minimale : **gras** + retours à la ligne ; si HTML détecté → sanitization. */
 export function formatSimpleRichHtml(text) {
     const raw = String(text ?? '');
     if (!raw) return '';
     if (/<\/?[a-z][\s\S]*>/i.test(raw)) {
         return sanitizeRulesHtml(raw);
     }
-    const d = document.createElement('div');
-    d.textContent = raw;
-    return d.innerHTML.replace(/\n/g, '<br>');
+    const parts = raw.split(/\*\*/);
+    const inner = parts
+        .map((p, i) => {
+            const d = document.createElement('div');
+            d.textContent = p;
+            const esc = d.innerHTML;
+            return i % 2 === 1 ? `<strong>${esc}</strong>` : esc;
+        })
+        .join('');
+    return inner.replace(/\n/g, '<br>');
 }

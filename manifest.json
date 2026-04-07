@@ -3,9 +3,10 @@
   "name": "Planning Orgue",
   "icons": [
     {
-      "src": "https://img.icons8.com/color/512/piano.png",
-      "type": "image/png",
-      "sizes": "512x512"
+      "src": "favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
     }
   ],
   "start_url": "./index.html",

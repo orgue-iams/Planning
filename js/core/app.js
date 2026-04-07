@@ -225,6 +225,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         applyPwVisibility(false);
     });
 
+    const loginPass = document.getElementById('login-pass');
+    const loginPassToggle = document.getElementById('login-pass-toggle');
+    const loginPassIconShow = document.getElementById('login-pass-icon-show');
+    const loginPassIconHide = document.getElementById('login-pass-icon-hide');
+    const setLoginPassVisible = (visible) => {
+        loginPass?.setAttribute('type', visible ? 'text' : 'password');
+        loginPassToggle?.setAttribute('aria-pressed', String(visible));
+        loginPassToggle?.setAttribute(
+            'aria-label',
+            visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'
+        );
+        loginPassIconShow?.classList.toggle('hidden', visible);
+        loginPassIconHide?.classList.toggle('hidden', !visible);
+    };
+    loginPassToggle?.addEventListener('click', () => {
+        const vis = loginPass?.getAttribute('type') === 'text';
+        setLoginPassVisible(!vis);
+    });
+
     populateTimeSelects('event-start', 'event-end');
     populateTimeSelects('event-recur-start', 'event-recur-end');
     checkUrlToken();
@@ -345,6 +364,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     document.getElementById('modal_login')?.addEventListener('close', () => {
+        setLoginPassVisible(false);
         if (currentUser?.email) return;
         setTimeout(() => {
             if (currentUser?.email) return;

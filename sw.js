@@ -1,9 +1,10 @@
-const CACHE_NAME = 'orgue-v26';
+const CACHE_NAME = 'orgue-v29';
 
 /** Ressources locales (hors CDN) pour démarrage rapide / coquille hors-ligne */
 const ASSETS = [
   './',
   './index.html',
+  './favicon.svg',
   './manifest.json',
   './css/main.css',
   './css/calendar-theme.css',
@@ -40,6 +41,7 @@ const ASSETS = [
   './js/core/announcements-ui.js',
   './js/utils/org-content.js',
   './js/utils/rich-text.js',
+  './js/utils/planning-quill.js',
   './components/modal-profile-labels.html',
   './components/modal-users-admin.html',
   './components/modal-announcements.html'

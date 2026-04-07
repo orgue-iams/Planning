@@ -241,6 +241,68 @@ function sameCalendarDay(a, b) {
     );
 }
 
+/** Plages [aStart, aEnd) et [bStart, bEnd) (fin exclusive, comme FullCalendar). */
+function calendarRangesOverlap(aStart, aEnd, bStart, bEnd) {
+    if (!aStart || !aEnd || !bStart || !bEnd) return false;
+    return aStart.getTime() < bEnd.getTime() && bStart.getTime() < aEnd.getTime();
+}
+
+function eventRangeForOverlap(ev) {
+    const s = ev?.start ? new Date(ev.start) : null;
+    if (!s || Number.isNaN(s.getTime())) return null;
+    let e = ev.end ? new Date(ev.end) : null;
+    if (ev.allDay) {
+        if (!e || Number.isNaN(e.getTime())) {
+            e = new Date(s);
+            e.setDate(e.getDate() + 1);
+        }
+        return { start: s, end: e };
+    }
+    if (!e || Number.isNaN(e.getTime())) {
+        e = new Date(s.getTime() + 60 * 1000);
+    }
+    return { start: s, end: e };
+}
+
+function isSameFcEvent(a, b) {
+    if (!a || !b) return false;
+    if (a === b) return true;
+    const ida = a.id != null ? String(a.id) : '';
+    const idb = b.id != null ? String(b.id) : '';
+    return Boolean(ida && idb && ida === idb);
+}
+
+/**
+ * Premier événement qui chevauche [rangeStart, rangeEnd), hors `excludeEvent` (édition).
+ * @returns {import('@fullcalendar/core').EventApi | null}
+ */
+function findOverlappingCalendarEvent(calendar, rangeStart, rangeEnd, excludeEvent) {
+    if (!calendar?.getEvents) return null;
+    const rs = rangeStart instanceof Date ? rangeStart : new Date(rangeStart);
+    const re = rangeEnd instanceof Date ? rangeEnd : new Date(rangeEnd);
+    if (Number.isNaN(rs.getTime()) || Number.isNaN(re.getTime()) || re.getTime() <= rs.getTime()) {
+        return null;
+    }
+    for (const ev of calendar.getEvents()) {
+        if (isSameFcEvent(ev, excludeEvent)) continue;
+        const r = eventRangeForOverlap(ev);
+        if (!r) continue;
+        if (calendarRangesOverlap(rs, re, r.start, r.end)) {
+            return ev;
+        }
+    }
+    return null;
+}
+
+function overlapToastMessage(conflict) {
+    const t = String(conflict?.title || 'Occupation').trim() || 'Occupation';
+    const r = eventRangeForOverlap(conflict);
+    if (!r) return `Ce créneau chevauche une autre réservation : « ${t} ».`;
+    const tf = (d) =>
+        d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', weekday: 'short', day: 'numeric' });
+    return `Chevauchement avec « ${t} » (${tf(r.start)} – ${tf(r.end)}). Choisissez un autre horaire.`;
+}
+
 /** Annule le redimensionnement si la fin dépasse sur un autre jour (fin FC = exclusive). */
 export function handleEventResize(info) {
     const start = info.event.start;
@@ -393,6 +455,18 @@ export function quickCreateFromSelection(calendar, selectInfo, currentUser) {
 
     let title = getFavoriteLabel(currentUser.email).trim();
     if (!title) title = 'Réservation';
+
+    const conflict = findOverlappingCalendarEvent(
+        calendar,
+        selectInfo.start,
+        selectInfo.end,
+        null
+    );
+    if (conflict) {
+        showToast(overlapToastMessage(conflict), 'error');
+        calendar.unselect();
+        return;
+    }
 
     const add = () => {
         calendar.addEvent({
@@ -650,6 +724,15 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
             showToast('Aucun jour ne correspond aux choix sur cette période.', 'error');
             return;
         }
+        for (const d of days) {
+            const sStr = `${d}T${tRecStart}:00`;
+            const eStr = `${d}T${tRecEnd}:00`;
+            const c = findOverlappingCalendarEvent(calendar, new Date(sStr), new Date(eStr), null);
+            if (c) {
+                showToast(overlapToastMessage(c), 'error');
+                return;
+            }
+        }
         const type = document.getElementById('event-type').value;
         addOneEventPerDay(
             calendar,
@@ -694,6 +777,17 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     const endMs = new Date(endStr).getTime();
     if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) {
         showToast('La date et heure de fin doivent être après le début.', 'error');
+        return;
+    }
+
+    const conflictSingle = findOverlappingCalendarEvent(
+        calendar,
+        new Date(startStr),
+        new Date(endStr),
+        currentEventRef
+    );
+    if (conflictSingle) {
+        showToast(overlapToastMessage(conflictSingle), 'error');
         return;
     }
 

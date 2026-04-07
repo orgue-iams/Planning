@@ -87,8 +87,16 @@ export function initAdminUsersUi(currentUser) {
     document.getElementById('menu-item-users-admin')?.addEventListener('click', (e) => {
         e.preventDefault();
         document.getElementById('btn-user-menu')?.blur();
-        document.getElementById('modal_users_admin')?.showModal();
-        void refreshUserList();
+        const dlg = document.getElementById('modal_users_admin');
+        if (!dlg) {
+            showToast('Fenêtre de gestion indisponible. Rechargez la page.', 'error');
+            return;
+        }
+        /* Après fermeture du menu DaisyUI, ouvrir au frame suivant évite un conflit tactiles / focus. */
+        requestAnimationFrame(() => {
+            dlg.showModal();
+            void refreshUserList();
+        });
     });
 
     document.getElementById('admin-users-refresh')?.addEventListener('click', () => void refreshUserList());

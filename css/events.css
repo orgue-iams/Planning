@@ -1,13 +1,13 @@
-/* MOI (Bleu dominant) */
+/* MOI (vert — bien distinct du fond blanc et des autres créneaux) */
 .event-mine {
-    background-color: #eff6ff !important;
-    color: #1e40af !important;
+    background-color: #ecfdf3 !important;
+    color: #047857 !important;
 }
 
-/* AUTRES ÉLÈVES (Gris discret) */
+/* AUTRES (bleu soutenu mais pas agressif) */
 .event-others {
-    background-color: #f8fafc !important;
-    color: #475569 !important;
+    background-color: #e8f1fe !important;
+    color: #1e3a5f !important;
 }
 
 /* COURS (Violet) */
@@ -39,10 +39,10 @@
 /* Texte dans les cases (FullCalendar injecte du HTML : classes dédiées, pas Tailwind JIT) */
 .event-title-fc {
     text-align: center;
-    font-weight: 900;
+    font-weight: 500;
     font-size: 0.625rem;
     line-height: 1.25;
-    text-transform: uppercase;
+    text-transform: none;
     padding: 0.2rem 0.25rem 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -91,11 +91,11 @@
 }
 
 .legend-swatch--mine {
-    background: #3b82f6;
+    background: #10b981;
 }
 
 .legend-swatch--others {
-    background: #94a3b8;
+    background: #2563eb;
 }
 
 .legend-swatch--cours {

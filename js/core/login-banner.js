@@ -22,5 +22,5 @@ export async function applyLoginBanner() {
         return;
     }
     box.classList.remove('hidden');
-    box.innerHTML = formatSimpleRichHtml(m.body);
+    box.innerHTML = `<div class="organ-rich">${formatSimpleRichHtml(m.body)}</div>`;
 }
