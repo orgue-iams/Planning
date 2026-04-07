@@ -1,0 +1,97 @@
+/* MOI (Bleu dominant) */
+.event-mine {
+    background-color: #eff6ff !important;
+    border-left: 3px solid #3b82f6 !important;
+    color: #1e40af !important;
+}
+
+/* AUTRES ÉLÈVES (Gris discret) */
+.event-others {
+    background-color: #f8fafc !important;
+    border-left: 3px solid #cbd5e1 !important;
+    color: #475569 !important;
+}
+
+/* COURS (Violet) */
+.event-cours {
+    background-color: #f5f3ff !important;
+    border-left: 3px solid #7c3aed !important;
+    color: #5b21b6 !important;
+}
+
+/* FERMETURE (Rouge) */
+.event-fermeture {
+    background-color: #fef2f2 !important;
+    border-left: 3px solid #ef4444 !important;
+    color: #991b1b !important;
+}
+
+/* Texte dans les cases (FullCalendar injecte du HTML : classes dédiées, pas Tailwind JIT) */
+.event-title-fc {
+    text-align: center;
+    font-weight: 900;
+    font-size: 0.6875rem;
+    line-height: 1.25;
+    text-transform: uppercase;
+    padding: 0.2rem 0.25rem 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+    .event-title-fc {
+        font-size: 0.75rem;
+    }
+}
+
+.event-time-fc {
+    text-align: center;
+    font-size: 0.625rem;
+    font-weight: 700;
+    opacity: 0.88;
+    padding-bottom: 0.2rem;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 640px) {
+    .event-time-fc {
+        font-size: 0.6875rem;
+    }
+}
+
+/* Légende au-dessus du calendrier */
+.planning-legend {
+    font-size: 0.8125rem;
+}
+
+.planning-legend .legend-item {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.planning-legend .legend-swatch {
+    display: inline-block;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 2px;
+    margin-right: 0.35rem;
+    flex-shrink: 0;
+}
+
+.legend-swatch--mine {
+    background: #3b82f6;
+}
+
+.legend-swatch--others {
+    background: #94a3b8;
+}
+
+.legend-swatch--cours {
+    background: #7c3aed;
+}
+
+.legend-swatch--fermeture {
+    background: #ef4444;
+}

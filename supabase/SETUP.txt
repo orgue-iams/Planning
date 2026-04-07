@@ -1,0 +1,65 @@
+Démarrage option 2 — Supabase + Google Agenda
+=============================================
+
+1) Projet Supabase
+   - Créer un projet sur https://supabase.com
+   - Authentication → activer Email (mot de passe)
+   - SQL Editor → coller et exécuter le fichier schema.sql
+   - Créer 1 compte test via Authentication → Users → Add user
+   - Table Editor → profiles : ajuster display_name et role (admin / prof / eleve) pour ce compte
+
+2) SQL complémentaire (règles + annonces + trigger invite)
+   - SQL Editor → exécuter supabase/migrations/002_admin_content.sql
+
+3) Edge Functions
+   - Installer la CLI : https://supabase.com/docs/guides/cli
+   - supabase login && supabase link --project-ref <VOTRE_REF>
+   - Secrets du projet (Dashboard → Edge Functions → Secrets, ou CLI) pour le pont Google :
+       GOOGLE_BRIDGE_URL = URL Web App Apps Script (…/exec)
+       GOOGLE_BRIDGE_SECRET = chaîne longue aléatoire (la même dans Propriétés Apps Script → BRIDGE_SECRET)
+   - supabase functions deploy calendar-bridge
+   - supabase functions deploy planning-admin
+   (La secrétaire a le rôle profiles.role = admin ; les fonctions « gestion comptes » passent par planning-admin.)
+
+4) Google Apps Script
+   - Créer un projet, coller backend/google-apps-script/Code.gs
+   - Paramètres du projet → Script properties → BRIDGE_SECRET = même valeur que GOOGLE_BRIDGE_SECRET
+   - Déployer → Application Web : exécuter en tant que vous, accès « Moi » (ou restreint)
+   - Copier l’URL …/exec vers le secret Supabase GOOGLE_BRIDGE_URL (voir étape 3)
+
+5) Front (Planning)
+   - js/config/planning.config.js :
+       supabaseUrl = https://<ref>.supabase.co
+       supabaseAnonKey = clé anon (Settings → API)
+       calendarBridgeUrl = https://<ref>.supabase.co/functions/v1/calendar-bridge
+
+6) Auth : URLs de redirection
+   - Supabase → Authentication → URL Configuration
+   - Site URL = origine exacte du front (sans chemin en trop si ton app est à la racine du déploiement)
+   - Redirect URLs : idem + variantes (localhost pour le dev, prod pour la prod)
+   - Exemple GitHub Pages (site statique, sans hébergeur « classique ») :
+       https://<user>.github.io/<repo>/
+     ou, si tu ajoutes un nom de domaine perso sur Pages : https://planning.iams.fr/
+   - Chaque origine utilisée (connexion, lien dans un e-mail) doit être listée dans Redirect URLs.
+
+6bis) Pas d’hébergeur web : normal
+   - GitHub Pages sert uniquement les fichiers HTML/JS/CSS ; ce n’est pas là que tu configures le SMTP.
+   - Brevo n’a pas besoin de ton « hébergeur » : il a besoin d’un expéditeur autorisé (voir §7).
+   - Pour un e-mail pro (no-reply@…) sans serveur web : un nom de domaine chez un **registrar** (Gandi, OVH, Cloudflare, etc.) suffit pour poser les enregistrements DNS (SPF/DKIM) vers Brevo — pas d’offre d’hébergement obligatoire.
+   - Sans domaine du tout : tu peux souvent utiliser une adresse d’expéditeur **vérifiée** chez Brevo (ex. ton Gmail perso en expéditeur de test) ; moins idéal pour l’image IAMS mais fonctionnel pour les tests.
+
+Note : si execute function dans schema.sql échoue, remplacer par :
+   for each row execute procedure public.handle_new_user();
+
+7) E-mails (Brevo → Supabase SMTP)
+   - Compte sur https://www.brevo.com — vérifier un domaine d’envoi (ex. iams.fr) : Brevo donne les enregistrements DNS (SPF, DKIM) à ajouter chez ton hébergeur DNS.
+   - Brevo → SMTP & API : créer une clé SMTP (identifiant + mot de passe dédiés au relais).
+   - Supabase Dashboard → Project Settings → Authentication (ou Emails) → SMTP Settings :
+       Host = smtp-relay.brevo.com
+       Port = 587 (TLS)
+       User = identifiant SMTP Brevo (souvent ton email de compte ou une clé dédiée, selon l’écran)
+       Password = clé SMTP
+       Sender email = adresse autorisée sur le domaine vérifié (ex. no-reply@tondomaine.fr)
+       Sender name = Orgue IAMS (ou autre)
+   - Authentication → Email Templates : vérifier les liens (redirigent vers Site URL / Redirect URLs).
+   - Plan gratuit Brevo : une mention / logo « Brevo » peut apparaître en bas des e-mails ; disparaît sur les offres payantes.

@@ -1,0 +1,32 @@
+# Déploie les Edge Functions sur Supabase sans Node.js sur votre PC.
+# Prérequis (une fois) : secrets GitHub du dépôt :
+#   SUPABASE_ACCESS_TOKEN — https://supabase.com/dashboard/account/tokens
+#   SUPABASE_PROJECT_REF   — Project Settings → General (ref dans l’URL du projet)
+#
+# Les migrations SQL restent à exécuter dans le SQL Editor Supabase (pas ce workflow).
+
+name: Deploy Supabase functions
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - 'supabase/functions/**'
+      - 'supabase/config.toml'
+      - '.github/workflows/deploy-supabase-functions.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy all functions
+        run: supabase functions deploy --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"

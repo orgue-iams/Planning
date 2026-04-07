@@ -1,0 +1,28 @@
+<dialog id="modal_rules" class="modal">
+    <div class="modal-box max-w-lg w-[94%] max-h-[90dvh] flex flex-col border border-slate-200 rounded-2xl">
+        <h3 class="font-black text-sm uppercase tracking-wide text-slate-600 border-b pb-2 shrink-0">Règles d'utilisation de l'orgue</h3>
+        <div id="rules-view" class="text-sm text-slate-700 leading-relaxed py-4 overflow-y-auto flex-1 min-h-0"></div>
+        <div id="rules-edit-wrap" class="hidden flex-1 min-h-0 py-2">
+            <textarea id="rules-editor" class="textarea textarea-bordered w-full h-48 text-sm font-sans" rows="10"></textarea>
+            <p class="text-[10px] text-slate-400 mt-1">Texte simple : retours à la ligne conservés. Réservé aux enseignant·e·s et à la gestion.</p>
+        </div>
+
+        <p id="rules-backend-hint" class="hidden border-t border-slate-100 pt-3 mt-2 shrink-0 text-[10px] text-slate-500 leading-snug">
+            Annonces à dates (écran de connexion ou après connexion) : menu utilisateur → <strong>Annonces</strong>.
+        </p>
+
+        <div id="rules-admin-broadcast" class="hidden border-t border-slate-100 pt-3 mt-2 shrink-0">
+            <h4 class="font-bold text-[11px] uppercase text-slate-500 mb-2">Annonce (popup — élèves et profs) — mode démo</h4>
+            <textarea id="broadcast-editor" class="textarea textarea-bordered w-full text-sm h-24" placeholder="Ex. : Fermeture exceptionnelle le… Rappel : concert le…" rows="4"></textarea>
+            <button type="button" id="broadcast-publish" class="btn btn-primary btn-sm w-full mt-2 font-black text-[11px]">Publier l'annonce</button>
+            <p class="text-[10px] text-slate-400 mt-1">Publier remplace l'annonce précédente. Laisser vide et publier pour effacer.</p>
+        </div>
+
+        <div class="modal-action flex-wrap gap-2 shrink-0 border-t border-slate-100 mt-2 pt-3">
+            <button type="button" id="rules-btn-edit" class="btn btn-outline btn-sm font-black text-[11px] hidden">Modifier les règles</button>
+            <button type="button" id="rules-btn-save" class="btn btn-primary btn-sm font-black text-[11px] hidden">Enregistrer les règles</button>
+            <button type="button" id="rules-btn-cancel" class="btn btn-ghost btn-sm font-black text-[11px] hidden">Annuler</button>
+            <button type="button" id="rules-btn-close" class="btn btn-ghost btn-sm font-black text-[11px] ml-auto">Fermer</button>
+        </div>
+    </div>
+</dialog>

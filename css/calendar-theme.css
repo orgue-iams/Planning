@@ -1,0 +1,66 @@
+/* --- STRUCTURE DE LA GRILLE --- */
+.fc-timegrid-axis { 
+    width: 50px !important; 
+}
+
+.fc-timegrid-slot { 
+    height: 1.8rem !important; /* Hauteur confortable pour cliquer/toucher */
+    border-bottom: 1px solid #f1f5f9 !important;
+}
+
+/* Force le texte à prendre toute la largeur sans marges inutiles */
+.fc-timegrid-event-harness {
+    margin: 0 !important;
+    padding: 0.5px !important;
+}
+
+/* --- AFFICHAGE DU TEXTE DANS LES CASES --- */
+.event-box {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start; /* Titre en haut */
+    align-items: center;      /* Centré horizontalement */
+    height: 100%;
+    width: 100%;
+    border-radius: 4px;
+    overflow: hidden;
+    padding: 2px;
+}
+
+.event-title {
+    width: 100%;
+    line-height: 1.1;
+    word-break: break-word;
+}
+
+/* Barre FullCalendar plus lisible sur petit écran */
+@media (max-width: 640px) {
+    .fc .fc-toolbar.fc-header-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.35rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .fc .fc-toolbar-chunk {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+    }
+
+    .fc .fc-button {
+        font-size: 0.75rem;
+        line-height: 1.2;
+        padding: 0.2rem 0.45rem;
+        min-height: 2rem;
+    }
+
+    .fc-timegrid-axis {
+        width: 44px !important;
+    }
+
+    .fc .fc-timegrid-slot-label {
+        font-size: 0.7rem;
+    }
+}

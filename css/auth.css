@@ -1,0 +1,18 @@
+#modal_login .modal-box {
+    background: linear-gradient(to bottom, #ffffff, #f8fafc);
+}
+
+#modal_login input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.link-primary {
+    transition: all 0.2s;
+    text-decoration: none;
+}
+
+.link-primary:hover {
+    letter-spacing: 0.5px;
+    color: #2563eb;
+}

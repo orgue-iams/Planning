@@ -1,0 +1,37 @@
+<header class="navbar bg-white border-b px-2 sm:px-3 min-h-12 h-12 fixed top-0 z-50 w-full grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-center shadow-sm gap-1">
+    <div class="flex items-center gap-2 min-w-0">
+        <span class="text-lg shrink-0">🎹</span>
+        <div class="flex flex-col min-w-0">
+            <span class="font-black text-[11px] uppercase leading-none text-slate-800 truncate">Orgue</span>
+            <span class="text-[10px] uppercase text-slate-500 font-bold tracking-wider truncate">Gérard Bancells</span>
+        </div>
+    </div>
+
+    <div class="flex justify-center min-w-0 px-0.5">
+        <button type="button" id="btn-rules" class="btn btn-ghost btn-xs font-black text-[8px] sm:text-[9px] uppercase px-1.5 sm:px-2 h-8 sm:h-9 max-w-[min(52vw,11rem)] sm:max-w-[min(72vw,18rem)] truncate" title="Règles d'utilisation de l'orgue">
+            <span class="hidden sm:inline">Règles d'utilisation de l'orgue</span>
+            <span class="sm:hidden">Règles orgue</span>
+        </button>
+    </div>
+
+    <div class="flex items-center justify-end gap-1 sm:gap-2 min-w-0">
+        <div id="user-identity" class="flex flex-col items-end min-w-0 mr-0.5 sm:mr-1 leading-tight">
+            <span id="user-display-name" class="text-[10px] sm:text-[11px] font-black text-slate-800 truncate max-w-[6.5rem] sm:max-w-[12rem]">Invité</span>
+            <span id="user-display-role" class="text-[9px] font-bold text-slate-500 uppercase tracking-wide truncate max-w-[6.5rem] sm:max-w-[12rem] hidden"></span>
+        </div>
+        <div id="user-menu-wrap" class="dropdown dropdown-end hidden shrink-0">
+            <div tabindex="0" role="button" id="btn-user-menu" class="btn btn-ghost btn-square btn-xs sm:btn-sm border border-transparent hover:border-slate-200" aria-label="Menu utilisateur" aria-haspopup="menu">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+            </div>
+            <ul tabindex="0" class="dropdown-content menu z-[100] mt-1 w-56 rounded-box border border-slate-200 bg-base-100 p-2 shadow-lg">
+                <li class="hidden" id="menu-item-users-admin-wrap"><a href="#" id="menu-item-users-admin" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Gestion des comptes</a></li>
+                <li class="hidden" id="menu-item-announcements-wrap"><a href="#" id="menu-item-announcements" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Annonces</a></li>
+                <li><a href="#" id="menu-item-reservation-types" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Mes réservations type</a></li>
+                <li><a href="#" id="menu-item-change-password" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Changer mon mot de passe</a></li>
+                <li><a href="#" id="menu-item-logout" class="font-bold text-[11px] text-error leading-snug normal-case" role="menuitem">Déconnexion</a></li>
+            </ul>
+        </div>
+    </div>
+</header>

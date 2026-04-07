@@ -1,0 +1,339 @@
+import { loadUIComponents } from '../utils/loader.js';
+import { getCalendarConfig, bindResponsiveCalendarToolbar } from '../config/fc-settings.js';
+import { populateTimeSelects } from '../utils/time-helpers.js';
+import { initSwipe } from '../utils/touch-handler.js';
+import { demoEvents } from '../data/mock-events.js';
+import {
+    getEventContent,
+    openModal,
+    saveReservation,
+    deleteReservation,
+    quickCreateFromSelection,
+    addSlotEndFromStart,
+    setRecurringOptionsVisible,
+    handleEventResize
+} from './calendar-logic.js';
+import {
+    login,
+    logout,
+    sendResetLink,
+    checkUrlToken,
+    updatePassword,
+    setPasswordModalMode,
+    setLogoutHandler,
+    tryRestoreSession,
+    isPrivilegedUser,
+    roleLabelFr,
+    PASSWORD_POLICY_LINES
+} from './auth-logic.js';
+import { initMessagesUi, tryShowBroadcastPopup } from './messages-ui.js';
+import { initProfileLabelsUi } from './profile-labels-ui.js';
+import { applyLoginBanner } from './login-banner.js';
+import { initAdminUsersUi } from './admin-users-ui.js';
+import { initAnnouncementsUi } from './announcements-ui.js';
+
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register(new URL('../../sw.js', import.meta.url)).catch(() => {});
+}
+
+let calendar;
+let currentEvent = null;
+let currentUser = null;
+
+function performLogout() {
+    currentUser = null;
+    currentEvent = null;
+    if (calendar) {
+        calendar.destroy();
+        calendar = null;
+    }
+    document.body.classList.add('auth-pending');
+    refreshHeaderUser(null);
+    [
+        'modal_forgot',
+        'modal_password',
+        'modal_reservation',
+        'modal_profile_labels',
+        'modal_rules',
+        'modal_broadcast',
+        'modal_users_admin',
+        'modal_admin_password',
+        'modal_announcements'
+    ].forEach((id) => document.getElementById(id)?.close());
+    const loginDlg = document.getElementById('modal_login');
+    void applyLoginBanner();
+    loginDlg?.showModal();
+    requestAnimationFrame(() => document.getElementById('login-email')?.focus());
+}
+
+function refreshHeaderUser(user) {
+    const nameEl = document.getElementById('user-display-name');
+    const roleEl = document.getElementById('user-display-role');
+    const menuWrap = document.getElementById('user-menu-wrap');
+    if (!user?.email) {
+        if (nameEl) nameEl.textContent = 'Invité';
+        if (roleEl) {
+            roleEl.textContent = '';
+            roleEl.classList.add('hidden');
+        }
+        menuWrap?.classList.add('hidden');
+        return;
+    }
+    if (nameEl) nameEl.textContent = user.name;
+    if (roleEl) {
+        roleEl.textContent = roleLabelFr(user.role);
+        roleEl.classList.remove('hidden');
+    }
+    menuWrap?.classList.remove('hidden');
+}
+
+function initCalendarAndRevealUi() {
+    if (calendar) return;
+
+    const handlers = {
+        /** Glisser / appui long puis plage : création rapide (motif favori, type réservation). */
+        onSelect: (info) => {
+            currentEvent = null;
+            quickCreateFromSelection(calendar, info, currentUser);
+            calendar.unselect();
+        },
+        /** Clic simple : modale avec préremplissage (un créneau grille de durée). */
+        onDateClick: (info) => {
+            currentEvent = null;
+            let start = info.date;
+            if (info.view.type === 'dayGridMonth') {
+                start = new Date(info.date);
+                if (info.allDay !== false) {
+                    start.setHours(8, 0, 0, 0);
+                }
+            }
+            const end = addSlotEndFromStart(start, calendar);
+            openModal(start, end, null, currentUser);
+        },
+        onEventClick: (info) => {
+            currentEvent = info.event;
+            openModal(info.event.start, info.event.end, info.event, currentUser);
+        },
+        onEventDrop: () => {
+            /* synchro API à brancher */
+        },
+        onEventResize: (info) => handleEventResize(info),
+        renderEventContent: (arg) => getEventContent(arg, currentUser)
+    };
+
+    const calendarEl = document.getElementById('calendar');
+
+    // FullCalendar mesure le conteneur au render : il doit être visible (plus auth-pending).
+    document.body.classList.remove('auth-pending');
+
+    const mount = () => {
+        calendar = new FullCalendar.Calendar(calendarEl, getCalendarConfig(handlers, currentUser));
+        calendar.render();
+        calendar.addEventSource(demoEvents);
+        bindResponsiveCalendarToolbar(calendar);
+
+        initSwipe(calendarEl, calendar);
+
+        document.getElementById('btn-save').onclick = () =>
+            void saveReservation(calendar, currentUser, currentEvent).catch((err) =>
+                console.error(err)
+            );
+        document.getElementById('btn-delete').onclick = () => deleteReservation(calendar, currentEvent);
+
+        // Recalcul grille + événements après que height:100% / flex soit appliqué (Chrome, Safari, etc.)
+        calendar.updateSize();
+        requestAnimationFrame(() => {
+            calendar.updateSize();
+        });
+
+        initMessagesUi(currentUser);
+        initProfileLabelsUi(currentUser);
+        initAdminUsersUi(currentUser);
+        initAnnouncementsUi(currentUser);
+        window.setTimeout(
+            () => void tryShowBroadcastPopup(currentUser).catch((e) => console.warn(e)),
+            500
+        );
+    };
+
+    requestAnimationFrame(mount);
+}
+
+/** Fermer une modale en cliquant sur le fond (hors .modal-box). L’événement a pour cible l’élément <dialog>. */
+function wireDialogBackdropClose() {
+    document.addEventListener('click', (e) => {
+        if (e.target instanceof HTMLDialogElement && e.target.open) {
+            e.target.close();
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadUIComponents();
+    setLogoutHandler(performLogout);
+    wireDialogBackdropClose();
+
+    const policyUl = document.getElementById('password-policy-lines');
+    if (policyUl) {
+        policyUl.replaceChildren();
+        for (const line of PASSWORD_POLICY_LINES) {
+            const li = document.createElement('li');
+            li.textContent = line;
+            policyUl.appendChild(li);
+        }
+    }
+
+    const pwToggle = document.getElementById('pw-toggle-visible');
+    const pwFieldIds = ['old-pass', 'new-pass', 'confirm-pass'];
+    const applyPwVisibility = (visible) => {
+        const type = visible ? 'text' : 'password';
+        for (const id of pwFieldIds) {
+            document.getElementById(id)?.setAttribute('type', type);
+        }
+    };
+    pwToggle?.addEventListener('change', () => applyPwVisibility(pwToggle.checked));
+    document.getElementById('modal_password')?.addEventListener('close', () => {
+        if (pwToggle) pwToggle.checked = false;
+        applyPwVisibility(false);
+    });
+
+    populateTimeSelects('event-start', 'event-end');
+    populateTimeSelects('event-recur-start', 'event-recur-end');
+    checkUrlToken();
+
+    const restored = await tryRestoreSession();
+    if (restored) {
+        currentUser = restored;
+        refreshHeaderUser(currentUser);
+        initCalendarAndRevealUi();
+        document.getElementById('modal_login')?.close();
+    }
+
+    document.getElementById('btn-do-login').onclick = async () => {
+        const result = await login(
+            document.getElementById('login-email').value,
+            document.getElementById('login-pass').value
+        );
+        if (result.success) {
+            currentUser = result.user;
+            refreshHeaderUser(currentUser);
+            initCalendarAndRevealUi();
+        }
+    };
+
+    document.getElementById('btn-save-pass').onclick = async () => {
+        if ((await updatePassword()) && !currentUser) {
+            document.getElementById('modal_login')?.showModal();
+            requestAnimationFrame(() => document.getElementById('login-email')?.focus());
+        }
+    };
+
+    document.getElementById('menu-item-change-password')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('btn-user-menu')?.blur();
+        if (!currentUser) return;
+        setPasswordModalMode(false);
+        document.getElementById('modal_password')?.showModal();
+        requestAnimationFrame(() => document.getElementById('old-pass')?.focus());
+    });
+    document.getElementById('menu-item-logout')?.addEventListener('click', async (e) => {
+        e.preventDefault();
+        document.getElementById('btn-user-menu')?.blur();
+        await logout();
+    });
+
+    window.openForgotPassword = () => {
+        document.getElementById('modal_login').close();
+        document.getElementById('modal_forgot').showModal();
+    };
+
+    document.getElementById('btn-send-token').onclick = () => {
+        sendResetLink(document.getElementById('forgot-email').value);
+    };
+
+    document.getElementById('btn-forgot-cancel')?.addEventListener('click', () => {
+        document.getElementById('modal_forgot')?.close();
+        document.getElementById('modal_login')?.showModal();
+        requestAnimationFrame(() => document.getElementById('login-email')?.focus());
+    });
+
+    document.getElementById('modal_forgot')?.addEventListener('close', async () => {
+        if (currentUser?.email) return;
+        const loginDlg = document.getElementById('modal_login');
+        if (loginDlg && !loginDlg.open) {
+            await applyLoginBanner();
+            loginDlg.showModal();
+            requestAnimationFrame(() => document.getElementById('login-email')?.focus());
+        }
+    });
+
+    document.getElementById('modal_login')?.addEventListener('close', () => {
+        if (currentUser?.email) return;
+        setTimeout(() => {
+            if (currentUser?.email) return;
+            if (document.getElementById('modal_password')?.open) return;
+            if (document.getElementById('modal_forgot')?.open) return;
+            const loginDlg = document.getElementById('modal_login');
+            if (loginDlg && !loginDlg.open) {
+                loginDlg.showModal();
+                document.getElementById('login-email')?.focus();
+            }
+        }, 0);
+    });
+
+    document.getElementById('app-modals')?.addEventListener('change', (e) => {
+        const t = e.target;
+        if (t?.id === 'event-recurring') {
+            const on = t.checked;
+            if (on) {
+                const ds = document.getElementById('event-date-start')?.value;
+                if (ds) {
+                    const rps = document.getElementById('event-recur-period-start');
+                    const rpe = document.getElementById('event-recur-period-end');
+                    if (rps) rps.value = ds;
+                    if (rpe) rpe.value = ds;
+                }
+                const es = document.getElementById('event-start')?.value;
+                const ee = document.getElementById('event-end')?.value;
+                const rs = document.getElementById('event-recur-start');
+                const re = document.getElementById('event-recur-end');
+                if (es && rs) rs.value = es;
+                if (ee && re) re.value = ee;
+            } else {
+                const p0 = document.getElementById('event-recur-period-start')?.value;
+                if (p0) {
+                    const d0 = document.getElementById('event-date-start');
+                    if (d0) d0.value = p0;
+                }
+                const rs = document.getElementById('event-recur-start')?.value;
+                const re = document.getElementById('event-recur-end')?.value;
+                const es = document.getElementById('event-start');
+                const ee = document.getElementById('event-end');
+                if (rs && es) es.value = rs;
+                if (re && ee) ee.value = re;
+            }
+            setRecurringOptionsVisible(on);
+        }
+        if (t?.name === 'recur-mode') {
+            const custom = document.getElementById('recur-mode-days')?.checked;
+            document.getElementById('recur-dow-grid')?.classList.toggle('hidden', !custom);
+        }
+        if (t?.id === 'event-title-select') {
+            const isCustom = t.value === '__custom__';
+            document.getElementById('event-title-custom')?.classList.toggle('hidden', !isCustom);
+        }
+    });
+
+    document.getElementById('modal_login')?.addEventListener('toggle', (ev) => {
+        const el = ev.target;
+        if (el instanceof HTMLDialogElement && el.open) void applyLoginBanner();
+    });
+
+    const hasResetToken = new URLSearchParams(window.location.search).has('token');
+    if (!hasResetToken && !currentUser?.email) {
+        const dlg = document.getElementById('modal_login');
+        await applyLoginBanner();
+        dlg?.showModal();
+        requestAnimationFrame(() => document.getElementById('login-email')?.focus());
+    }
+});

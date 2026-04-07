@@ -1,0 +1,26 @@
+<dialog id="modal_login" class="modal">
+    <div class="modal-box max-w-sm border border-slate-200 shadow-2xl p-8">
+        <div class="text-center mb-8">
+            <div class="text-5xl mb-2">🎹</div>
+            <h2 class="font-black text-2xl uppercase tracking-tighter text-slate-800">Orgue Gérard Bancells</h2>
+            <p class="text-xs text-slate-500 font-bold uppercase tracking-[0.15em] mt-1">Espace de réservation</p>
+            <div id="login-banner-box" class="hidden mt-3 rounded-xl border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-left text-xs text-slate-800 leading-snug"></div>
+            <p id="login-demo-hint" class="text-[10px] text-slate-400 mt-3 leading-relaxed text-left px-1">Démo : <span class="font-mono">admin@iams.fr</span> ou <span class="font-mono">prof@iams.fr</span> / <span class="font-mono">eleve1@test.com</span> — mot de passe <span class="font-mono">1234</span></p>
+        </div>
+        
+        <div class="space-y-4">
+            <div class="form-control">
+                <label class="sr-only" for="login-email">Adresse e-mail</label>
+                <input type="email" id="login-email" name="email" autocomplete="username" placeholder="votre@email.com" class="input input-bordered w-full font-bold h-12 bg-slate-50 text-sm" required />
+            </div>
+            <div class="form-control">
+                <label class="sr-only" for="login-pass">Mot de passe</label>
+                <input type="password" id="login-pass" name="password" autocomplete="current-password" placeholder="Mot de passe" class="input input-bordered w-full font-bold h-12 bg-slate-50 text-sm" required />
+                <label class="label justify-end">
+                    <button type="button" onclick="window.openForgotPassword()" class="label-text-alt link link-primary font-bold text-xs uppercase">Mot de passe oublié ?</button>
+                </label>
+            </div>
+            <button type="button" id="btn-do-login" class="btn btn-primary w-full text-white font-black h-12 shadow-xl shadow-primary/30">SE CONNECTER</button>
+        </div>
+    </div>
+</dialog>

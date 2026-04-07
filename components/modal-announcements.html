@@ -1,0 +1,33 @@
+<dialog id="modal_announcements" class="modal">
+    <div class="modal-box p-5 w-[96%] max-w-md max-h-[90dvh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col">
+        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest shrink-0">Annonces planifiées</h3>
+        <p class="text-[10px] text-slate-500 mb-3 leading-snug">Mise en forme simple : retours à la ligne, et <span class="font-mono">**mot**</span> pour le gras. Définissez la période d’affichage.</p>
+
+        <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-3 space-y-2 mb-3 shrink-0">
+            <label class="text-[10px] font-bold text-slate-600">Où afficher</label>
+            <select id="ann-channel" class="select select-sm select-bordered w-full text-sm">
+                <option value="login">Écran de connexion (avant login)</option>
+                <option value="after_login">Après connexion (popup élèves &amp; profs)</option>
+            </select>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="text-[9px] font-bold text-slate-500">Début</label>
+                    <input type="datetime-local" id="ann-start" class="input input-sm input-bordered w-full text-xs" />
+                </div>
+                <div>
+                    <label class="text-[9px] font-bold text-slate-500">Fin</label>
+                    <input type="datetime-local" id="ann-end" class="input input-sm input-bordered w-full text-xs" />
+                </div>
+            </div>
+            <textarea id="ann-body" class="textarea textarea-bordered w-full text-sm min-h-[100px]" placeholder="Votre message…"></textarea>
+            <button type="button" id="ann-publish-btn" class="btn btn-primary btn-sm w-full font-black text-[11px]">Publier</button>
+        </div>
+
+        <p class="text-[10px] font-bold text-slate-500 mb-1">Messages récents</p>
+        <div id="ann-list" class="flex-1 min-h-0 overflow-y-auto space-y-2 text-xs border border-slate-100 rounded-lg p-2 max-h-[40vh]"></div>
+
+        <div class="modal-action shrink-0 mt-2">
+            <button type="button" class="btn btn-ghost btn-sm font-black text-[11px]" onclick="document.getElementById('modal_announcements').close()">Fermer</button>
+        </div>
+    </div>
+</dialog>

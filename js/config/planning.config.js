@@ -1,0 +1,19 @@
+/**
+ * Copier ce fichier et renseigner les valeurs (projet Supabase + URL Web App Apps Script).
+ * Ne commitez pas de vraies clés dans un dépôt public : utilisez des secrets côté hébergeur
+ * ou remplissez ce fichier uniquement sur le serveur de prod.
+ *
+ * Option 2 (recommandée) : Supabase = auth + table profiles ; Google Agenda = source des créneaux ;
+ * Apps Script (ou Edge Function) = pont sécurisé entre les deux.
+ */
+window.__PLANNING_CONFIG__ = window.__PLANNING_CONFIG__ || {
+    supabaseUrl: 'https://dqgzvddphbjibkszcdun.supabase.co',
+    supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRxZ3p2ZGRwaGJqaWJrc3pjZHVuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0ODk4OTYsImV4cCI6MjA5MTA2NTg5Nn0.72X8hzNx0IWPuvmw-jCJvNtQWCclyW-xf3SEsffH3qM',
+    /**
+     * En production : URL de l’Edge Function (recommandé).
+     * Ex. https://<project-ref>.supabase.co/functions/v1/calendar-bridge
+     * Elle vérifie le JWT puis relaye vers Google Apps Script.
+     * Laisser vide + pas de clé Supabase = mode démo local inchangé.
+     */
+    calendarBridgeUrl: ''
+};

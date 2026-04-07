@@ -1,0 +1,35 @@
+/* Libellés accessibles uniquement aux lecteurs d’écran (si classe Tailwind absente) */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+body {
+    -webkit-tap-highlight-color: transparent; /* Supprime le flash bleu au clic sur mobile */
+}
+
+/* Avant connexion : pas d’en-tête ni de calendrier (évite le rendu « en dessous » de la modale) */
+body.auth-pending #app-header,
+body.auth-pending #app-shell {
+    display: none !important;
+}
+
+/* Scroll fluide mais désactivé sur le body pour privilégier le calendrier */
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+/* Hauteur : le conteneur parent (#app-shell) est en flex ; le calendrier prend l’espace restant */
+#app-shell #calendar {
+    min-height: 0;
+}

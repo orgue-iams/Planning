@@ -1,0 +1,30 @@
+/* Empêcher le zoom auto sur iPhone/Android lors du focus sur un input */
+.modal input, 
+.modal select {
+    font-size: 16px !important; /* Taille magique pour bloquer le zoom */
+}
+
+/*
+ * Mise en forme du bloc date/heure « un seul jour ».
+ * Ne pas cibler l’élément quand il a .hidden : sinon display:flex l’emporte sur .hidden (spécificité) et le bloc reste visible en mode « plusieurs jours ».
+ */
+#modal_reservation .bg-slate-100\/80:not(.hidden) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* Ajustement des select pour qu'ils ne débordent pas */
+.modal select {
+    appearance: none;
+    padding-left: 0.5rem;
+    cursor: pointer;
+}
+
+/* Contours neutres (pas de surlignage thème / bleu primaire au focus) */
+#modal_reservation .input:focus,
+#modal_reservation .select:focus {
+    outline: none;
+    border-color: #cbd5e1;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.06);
+}

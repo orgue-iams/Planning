@@ -1,0 +1,7 @@
+# Généré / complété pour supabase CLI (optionnel). Commandes : supabase init (si besoin), puis déploiement des fonctions.
+
+[functions.calendar-bridge]
+verify_jwt = true
+
+[functions.planning-admin]
+verify_jwt = true
