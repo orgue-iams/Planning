@@ -4,7 +4,9 @@
 #   SUPABASE_ACCESS_TOKEN — https://supabase.com/dashboard/account/tokens
 #   SUPABASE_PROJECT_REF  — Project Settings → General (Reference ID)
 #   SUPABASE_DB_PASSWORD  — Project Settings → Database → mot de passe Postgres
-#     (requis pour `supabase db push` ; sans ce secret, l’étape Link échoue)
+#
+# En cas d’échec : ouvrir le run → chaque étape affiche les logs ; déplier celle en rouge
+# (Install / Check secrets / Link / db push / functions deploy).
 
 name: Deploy Supabase
 
@@ -23,22 +25,48 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v6
 
-      # Binaire officiel (évite supabase/setup-cli@v1 qui cible Node 20 et casse avec FORCE_JAVASCRIPT_ACTIONS_TO_NODE24).
-      - name: Install Supabase CLI
+      - name: Check required secrets
         run: |
           set -euo pipefail
+          missing=
+          [ -z "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ] && missing="$missing SUPABASE_ACCESS_TOKEN"
+          [ -z "${{ secrets.SUPABASE_PROJECT_REF }}" ] && missing="$missing SUPABASE_PROJECT_REF"
+          [ -z "${{ secrets.SUPABASE_DB_PASSWORD }}" ] && missing="$missing SUPABASE_DB_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::Secrets GitHub manquants ou vides :$missing"
+            exit 1
+          fi
+          echo "Secrets requis : OK (valeurs masquées)"
+
+      - name: Install Supabase CLI
+        run: |
+          set -euxo pipefail
           curl -fsSL "https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz" -o /tmp/supabase.tgz
-          sudo tar -xzf /tmp/supabase.tgz -C /usr/local/bin supabase
+          tar -tzf /tmp/supabase.tgz | head -20
+          sudo tar -xzf /tmp/supabase.tgz -C /usr/local/bin
+          chmod +x /usr/local/bin/supabase
           supabase --version
 
       - name: Link project
-        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
+        run: |
+          set -euxo pipefail
+          supabase link \
+            --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" \
+            --password "${{ secrets.SUPABASE_DB_PASSWORD }}" \
+            --yes
 
       - name: Push database migrations
-        run: supabase db push
+        run: |
+          set -euxo pipefail
+          supabase db push --yes
 
       - name: Deploy all functions
-        run: supabase functions deploy --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+        run: |
+          set -euxo pipefail
+          supabase functions deploy --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" --yes
