@@ -3,8 +3,9 @@
     width: 50px !important; 
 }
 
-.fc-timegrid-slot { 
-    height: 1.8rem !important; /* Hauteur confortable pour cliquer/toucher */
+.fc-timegrid-slot {
+    /* Une ligne d’axe = 1 h (slotDuration 1 h) : hauteur ≈ 2 × l’ancien demi-créneau pour garder une densité lisible */
+    height: 3.6rem !important;
     border-bottom: 1px solid #f1f5f9 !important;
 }
 

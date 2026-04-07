@@ -84,7 +84,8 @@ export const getCalendarConfig = (handlers, currentUser) => {
         firstDay: 1,
         slotMinTime: '08:00:00',
         slotMaxTime: '22:00:00',
-        slotDuration: '00:30:00',
+        /* Grille visuelle : une ligne par heure. Interaction (sélection, glisser) : pas 30 min. */
+        slotDuration: '01:00:00',
         snapDuration: '00:30:00',
         allDaySlot: false,
         height: '100%',

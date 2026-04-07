@@ -420,12 +420,14 @@ export function buildReservationTitleSelect(currentUser, existingTitle) {
     }
 }
 
-/** Fin de plage pour un clic simple (durée d’un créneau grille). */
+/** Fin de plage pour un clic simple (aligné sur snapDuration, pas sur la hauteur visuelle du slot). */
 export function addSlotEndFromStart(start, calendar) {
-    const sd = calendar.getOption('slotDuration');
+    const snap = calendar.getOption('snapDuration');
+    const fallback = calendar.getOption('slotDuration');
+    const raw = typeof snap === 'string' && snap !== '' ? snap : fallback;
     let ms = 30 * 60 * 1000;
-    if (typeof sd === 'string') {
-        const m = sd.match(/^(\d{1,2}):(\d{2}):(\d{2})/);
+    if (typeof raw === 'string') {
+        const m = raw.match(/^(\d{1,2}):(\d{2}):(\d{2})/);
         if (m) ms = (+m[1]) * 3600000 + (+m[2]) * 60000 + (+m[3]) * 1000;
     }
     return new Date(start.getTime() + ms);
