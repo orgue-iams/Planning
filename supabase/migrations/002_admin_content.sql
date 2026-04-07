@@ -19,6 +19,9 @@ on conflict (id) do nothing;
 
 alter table public.organ_rules enable row level security;
 
+drop policy if exists "organ_rules_select_all" on public.organ_rules;
+drop policy if exists "organ_rules_update_privileged" on public.organ_rules;
+
 create policy "organ_rules_select_all" on public.organ_rules
     for select using (true);
 
@@ -44,6 +47,13 @@ create table if not exists public.scheduled_messages (
 );
 
 alter table public.scheduled_messages enable row level security;
+
+drop policy if exists "scheduled_select_login_active" on public.scheduled_messages;
+drop policy if exists "scheduled_select_after_login_active" on public.scheduled_messages;
+drop policy if exists "scheduled_insert_privileged" on public.scheduled_messages;
+drop policy if exists "scheduled_update_privileged" on public.scheduled_messages;
+drop policy if exists "scheduled_delete_privileged" on public.scheduled_messages;
+drop policy if exists "scheduled_select_all_privileged" on public.scheduled_messages;
 
 create policy "scheduled_select_login_active" on public.scheduled_messages
     for select to anon, authenticated
