@@ -1,10 +1,23 @@
 <dialog id="modal_rules" class="modal">
-    <div class="modal-box max-w-lg w-[94%] max-h-[90dvh] flex flex-col border border-slate-200 rounded-2xl">
+    <div class="modal-box max-w-2xl w-[94%] max-h-[90dvh] flex flex-col border border-slate-200 rounded-2xl">
         <h3 class="font-black text-sm uppercase tracking-wide text-slate-600 border-b pb-2 shrink-0">Règles d'utilisation de l'orgue</h3>
         <div id="rules-view" class="text-sm text-slate-700 leading-relaxed py-4 overflow-y-auto flex-1 min-h-0"></div>
-        <div id="rules-edit-wrap" class="hidden flex-1 min-h-0 py-2">
-            <textarea id="rules-editor" class="textarea textarea-bordered w-full h-48 text-sm font-sans" rows="10"></textarea>
-            <p class="text-[10px] text-slate-400 mt-1">Texte simple : retours à la ligne conservés. Réservé aux enseignant·e·s et à la gestion.</p>
+        <div id="rules-edit-wrap" class="hidden flex-1 min-h-0 py-2 flex flex-col min-h-0 gap-2">
+            <textarea id="rules-editor" class="textarea textarea-bordered w-full min-h-[12rem] flex-1 text-sm font-mono leading-snug" rows="12"></textarea>
+            <details class="text-[10px] text-slate-500 leading-snug border border-slate-100 rounded-lg px-2 py-1.5 bg-slate-50/80 shrink-0">
+                <summary class="cursor-pointer font-bold text-slate-600 select-none">Aide mise en forme</summary>
+                <ul class="mt-2 space-y-1 list-disc list-inside marker:text-slate-400">
+                    <li><strong>Paragraphe</strong> : lignes suivies d’une ligne vide.</li>
+                    <li><strong>Titres</strong> : <code class="text-[9px] bg-slate-200/80 px-1 rounded">#</code> grand, <code class="text-[9px] bg-slate-200/80 px-1 rounded">##</code> moyen, <code class="text-[9px] bg-slate-200/80 px-1 rounded">###</code> petit (espace après le #).</li>
+                    <li><strong>Gras / italique</strong> : <code class="text-[9px] bg-slate-200/80 px-1 rounded">**texte**</code> , <code class="text-[9px] bg-slate-200/80 px-1 rounded">*texte*</code></li>
+                    <li><strong>Liens</strong> : <code class="text-[9px] bg-slate-200/80 px-1 rounded">[libellé](https://…)</code> ou <code class="text-[9px] bg-slate-200/80 px-1 rounded">mailto:…</code></li>
+                    <li><strong>Liste à puces</strong> : ligne commençant par <code class="text-[9px] bg-slate-200/80 px-1 rounded">-</code> ou <code class="text-[9px] bg-slate-200/80 px-1 rounded">*</code> + espace.</li>
+                    <li><strong>Liste numérotée</strong> : <code class="text-[9px] bg-slate-200/80 px-1 rounded">1.</code> <code class="text-[9px] bg-slate-200/80 px-1 rounded">2.</code> …</li>
+                    <li><strong>Citation</strong> : lignes commençant par <code class="text-[9px] bg-slate-200/80 px-1 rounded">&gt;</code> .</li>
+                    <li><strong>Séparateur</strong> : une ligne avec seulement <code class="text-[9px] bg-slate-200/80 px-1 rounded">---</code></li>
+                </ul>
+                <p class="mt-2 text-slate-400">Pas de HTML brut (sécurité). Réservé aux enseignant·e·s et à la gestion.</p>
+            </details>
         </div>
 
         <p id="rules-backend-hint" class="hidden border-t border-slate-100 pt-3 mt-2 shrink-0 text-[10px] text-slate-500 leading-snug">

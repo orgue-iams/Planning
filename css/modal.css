@@ -28,3 +28,76 @@
     border-color: #cbd5e1;
     box-shadow: 0 1px 2px rgb(15 23 42 / 0.06);
 }
+
+/* Contenu riche (règles d’utilisation) — syntaxe type Markdown sans HTML */
+#modal_rules .organ-rich {
+    --organ-prose: #334155;
+    color: var(--organ-prose);
+}
+#modal_rules .organ-rich-h {
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    color: #0f172a;
+    margin: 0.75rem 0 0.4rem;
+    line-height: 1.25;
+}
+#modal_rules .organ-rich-h:first-child {
+    margin-top: 0;
+}
+#modal_rules .organ-rich-h-level1 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+}
+#modal_rules .organ-rich-h-level2 {
+    font-size: 0.95rem;
+}
+#modal_rules .organ-rich-h-level3 {
+    font-size: 0.88rem;
+    color: #475569;
+}
+#modal_rules .organ-rich-p {
+    margin: 0 0 0.65rem;
+    line-height: 1.55;
+}
+#modal_rules .organ-rich-p:last-child {
+    margin-bottom: 0;
+}
+#modal_rules .organ-rich-ul,
+#modal_rules .organ-rich-ol {
+    margin: 0.35rem 0 0.75rem;
+    padding-left: 1.35rem;
+    line-height: 1.5;
+}
+#modal_rules .organ-rich-ul {
+    list-style: disc;
+}
+#modal_rules .organ-rich-ol {
+    list-style: decimal;
+}
+#modal_rules .organ-rich-ul li,
+#modal_rules .organ-rich-ol li {
+    margin-bottom: 0.2rem;
+}
+#modal_rules .organ-rich-bq {
+    margin: 0.5rem 0 0.75rem;
+    padding: 0.5rem 0.65rem;
+    border-left: 3px solid #94a3b8;
+    background: rgb(248 250 252 / 0.9);
+    border-radius: 0 0.5rem 0.5rem 0;
+    font-size: 0.92em;
+    color: #475569;
+}
+#modal_rules .organ-rich-hr {
+    border: none;
+    border-top: 1px solid #e2e8f0;
+    margin: 0.85rem 0;
+}
+#modal_rules .organ-rich-a {
+    color: #2563eb;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    font-weight: 600;
+}
+#modal_rules .organ-rich-a:hover {
+    color: #1d4ed8;
+}

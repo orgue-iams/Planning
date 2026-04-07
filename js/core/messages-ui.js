@@ -14,7 +14,7 @@ import {
 import { isPrivilegedUser } from './auth-logic.js';
 import { isBackendAuthConfigured } from './supabase-client.js';
 import { fetchOrganRulesRemote, saveOrganRulesRemote, fetchActiveAfterLoginMessage } from '../utils/org-content.js';
-import { formatSimpleRichHtml } from '../utils/rich-text.js';
+import { formatSimpleRichHtml, formatRichContentHtml } from '../utils/rich-text.js';
 
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -25,7 +25,7 @@ function escapeHtml(text) {
 function renderRulesView(text) {
     const el = document.getElementById('rules-view');
     if (!el) return;
-    el.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+    el.innerHTML = formatRichContentHtml(text);
 }
 
 export function initMessagesUi(currentUser) {
