@@ -6,6 +6,7 @@
 import { showToast } from '../utils/toast.js';
 import { getAccessToken, isBackendAuthConfigured, isPrivilegedUser } from './auth-logic.js';
 import { invokeCalendarBridge } from './calendar-bridge.js';
+import { getPlanningConfig } from './supabase-client.js';
 import { invokeSlotNotify } from './slot-notify-api.js';
 import { getDefaultReservationTitle, getProfile } from '../utils/user-profile.js';
 import { isPlanningRole } from './planning-roles.js';
@@ -213,94 +214,61 @@ export async function maybeNotifySlotOwnerAfterThirdPartyEdit({
 
 // --- 1. RENDU VISUEL DES CRÉNEAUX ---
 export function getEventContent(arg, currentUser) {
-    const title = arg.event.title || "Occupation";
+    const title = arg.event.title || 'Occupation';
     const start = arg.event.start;
     const end = arg.event.end;
-    
-    // Calcul de la durée en minutes
+
     const durationMs = end - start;
     const durationMin = Math.round(durationMs / (1000 * 60));
 
-    const isMine = currentUser && arg.event.extendedProps.owner === currentUser.email;
-    const type = arg.event.extendedProps.type || 'reservation';
-    let ownerRole = normalizeRole(arg.event.extendedProps.ownerRole);
-    if (!ownerRole && arg.event.extendedProps.owner) {
-        ownerRole = roleFromOwnerEmail(String(arg.event.extendedProps.owner));
-    }
-    const viewerRole = normalizeRole(currentUser?.role);
+    const ownerEmail = String(arg.event.extendedProps?.owner || '')
+        .trim()
+        .toLowerCase();
+    const me = String(currentUser?.email || '')
+        .trim()
+        .toLowerCase();
+    const isMine = Boolean(me && ownerEmail && ownerEmail === me);
+    const type = arg.event.extendedProps?.type || 'reservation';
 
     let colorClass = 'event-slot-default';
-
     if (type === 'fermeture') {
         colorClass = 'event-fermeture';
     } else if (type === 'cours' || type === 'maintenance') {
         colorClass = 'event-cours';
-    } else if (viewerRole === 'eleve') {
-        if (isMine) {
-            colorClass = 'event-mine-eleve';
-        } else if (ownerRole === 'prof') {
-            colorClass = 'event-by-prof';
-        } else if (ownerRole === 'admin') {
-            colorClass = 'event-by-admin';
-        } else if (ownerRole === 'consultation') {
-            colorClass = 'event-by-consultation';
-        } else {
-            colorClass = 'event-other-eleve';
-        }
-    } else if (viewerRole === 'prof' || viewerRole === 'admin') {
-        if (isMine) {
-            colorClass = 'event-mine-staff';
-        } else if (ownerRole === 'eleve') {
-            colorClass = 'event-student-block';
-        } else if (ownerRole === 'prof') {
-            colorClass = 'event-peer-prof';
-        } else if (ownerRole === 'admin') {
-            colorClass = 'event-admin-block';
-        } else if (ownerRole === 'consultation') {
-            colorClass = 'event-by-consultation';
-        } else {
-            colorClass = 'event-slot-default';
-        }
-    } else if (viewerRole === 'consultation') {
-        colorClass = isMine ? 'event-mine-consult' : 'event-readonly-consult';
     } else {
-        if (isMine) colorClass = 'event-mine-staff';
-        else colorClass = 'event-slot-default';
+        colorClass = isMine ? 'event-travail-mine' : 'event-travail-other';
     }
 
-    // Formatage de l'heure (HH:mm)
-    const formatTime = (date) => date.toLocaleTimeString('fr-FR', {
-        hour: '2-digit',
-        minute: '2-digit'
-    });
+    const formatTime = (date) =>
+        date.toLocaleTimeString('fr-FR', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
 
+    const endInclusive = new Date(end.getTime() - 1);
     const sameCalendarDay =
-        start.getFullYear() === end.getFullYear() &&
-        start.getMonth() === end.getMonth() &&
-        start.getDate() === end.getDate();
+        start.getFullYear() === endInclusive.getFullYear() &&
+        start.getMonth() === endInclusive.getMonth() &&
+        start.getDate() === endInclusive.getDate();
 
-    const formatShortDay = (d) =>
-        d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+    const formatShortDay = (d) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 
     let timeLine;
     if (!sameCalendarDay) {
-        timeLine = `${formatShortDay(start)} ${formatTime(start)} → ${formatShortDay(end)} ${formatTime(end)}`;
-    } else if (durationMin > 30) {
-        timeLine = `${formatTime(start)} – ${formatTime(end)}`;
+        timeLine = `${formatShortDay(start)} ${formatTime(start)} → ${formatShortDay(endInclusive)} ${formatTime(endInclusive)}`;
     } else {
-        timeLine = null;
+        timeLine = `${formatTime(start)} – ${formatTime(endInclusive)}`;
     }
 
-    // Construction du HTML interne
+    const showTitleRow = !sameCalendarDay || durationMin > 30;
+
     let innerHTML = `
         <div class="event-box flex flex-col h-full w-full ${colorClass}">
-            <div class="event-title event-title-fc">${escapeHtml(title)}</div>`;
-
-    if (timeLine) {
-        innerHTML += `
             <div class="event-time event-time-fc">${timeLine}</div>`;
+    if (showTitleRow) {
+        innerHTML += `
+            <div class="event-title event-title-fc">${escapeHtml(title)}</div>`;
     }
-
     innerHTML += `</div>`;
 
     return { html: innerHTML };
@@ -855,13 +823,31 @@ export function openModal(start, end, event, currentUser) {
     });
 }
 
+function calendarBridgeWanted() {
+    const { calendarBridgeUrl } = getPlanningConfig();
+    return Boolean(calendarBridgeUrl) && isBackendAuthConfigured();
+}
+
+/** Synchronisation Google ; pas de toast ici (l’appelant décide après fermeture modale / ordre des messages). */
 async function trySyncGoogleCalendar(eventsPayload) {
     if (!isBackendAuthConfigured()) return { ok: true, skipped: true, data: null };
+    const { calendarBridgeUrl } = getPlanningConfig();
+    if (!calendarBridgeUrl) return { ok: true, skipped: true, data: null };
+    if (!Array.isArray(eventsPayload) || eventsPayload.length === 0) {
+        return { ok: true, skipped: true, data: null };
+    }
     const token = await getAccessToken();
-    if (!token || !eventsPayload?.length) return { ok: true, skipped: true, data: null };
+    if (!token) {
+        return { ok: false, skipped: false, data: null, error: 'Session expirée (reconnectez-vous).' };
+    }
     const r = await invokeCalendarBridge(token, { action: 'upsert', events: eventsPayload });
     if (!r.ok && !r.skipped) {
-        showToast(`Synchronisation agenda : ${r.error || 'échec'}`, 'error');
+        return {
+            ok: false,
+            skipped: false,
+            data: null,
+            error: r.error ? String(r.error) : 'échec'
+        };
     }
     return { ok: r.ok, skipped: Boolean(r.skipped), data: r.data, error: r.error };
 }
@@ -929,6 +915,18 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
                 return;
             }
         }
+        const bridgeEvents = days.map((d) => ({
+            title,
+            start: `${d}T${tRecStart}:00`,
+            end: `${d}T${tRecEnd}:00`,
+            type: slotType,
+            owner: currentUser.email
+        }));
+        const syncMulti = await trySyncGoogleCalendar(bridgeEvents);
+        if (calendarBridgeWanted() && !syncMulti.ok && !syncMulti.skipped) {
+            showToast(`Synchronisation agenda : ${syncMulti.error || 'échec'}`, 'error');
+            return;
+        }
         const addedList = addOneEventPerDay(
             calendar,
             days,
@@ -940,20 +938,12 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
             currentUser.name || currentUser.email.split('@')[0],
             currentUser.role
         );
+        applyBridgeUpsertResults(addedList, syncMulti?.data?.results);
         document.getElementById('modal_reservation').close();
         showToast(`${days.length} créneau${days.length > 1 ? 'x' : ''} enregistré${days.length > 1 ? 's' : ''}.`);
         document.getElementById('event-recurring').checked = false;
         resetRecurringFormDefaults();
         setRecurringOptionsVisible(false);
-        const bridgeEvents = days.map((d) => ({
-            title,
-            start: `${d}T${tRecStart}:00`,
-            end: `${d}T${tRecEnd}:00`,
-            type: slotType,
-            owner: currentUser.email
-        }));
-        const syncMulti = await trySyncGoogleCalendar(bridgeEvents);
-        applyBridgeUpsertResults(addedList, syncMulti?.data?.results);
         return;
     }
 
@@ -998,6 +988,25 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         };
     }
 
+    const ownerForBridge = String(
+        currentEventRef?.extendedProps?.owner || currentUser.email || ''
+    ).trim();
+    const gid = currentEventRef ? bridgeGoogleIdFromFcEvent(currentEventRef) : '';
+    const payloadSingle = {
+        ...(gid ? { googleEventId: gid } : {}),
+        title,
+        start: startStr,
+        end: endStr,
+        type: slotType,
+        owner: ownerForBridge || currentUser.email
+    };
+
+    const syncSingle = await trySyncGoogleCalendar([payloadSingle]);
+    if (calendarBridgeWanted() && !syncSingle.ok && !syncSingle.skipped) {
+        showToast(`Synchronisation agenda : ${syncSingle.error || 'échec'}`, 'error');
+        return;
+    }
+
     const eventData = {
         title: title,
         start: startStr,
@@ -1012,7 +1021,6 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
 
     let addedSingle = /** @type {import('@fullcalendar/core').EventApi | null} */ (null);
     if (currentEventRef) {
-        // Mise à jour
         currentEventRef.setProp('title', title);
         currentEventRef.setDates(startStr, endStr);
         currentEventRef.setExtendedProp('type', slotType);
@@ -1020,25 +1028,12 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         addedSingle = calendar.addEvent(eventData);
     }
 
-    document.getElementById('modal_reservation').close();
-    showToast(currentEventRef ? 'Réservation mise à jour.' : 'Réservation enregistrée.');
-
-    const ownerForBridge = String(
-        currentEventRef?.extendedProps?.owner || currentUser.email || ''
-    ).trim();
-    const gid = currentEventRef ? bridgeGoogleIdFromFcEvent(currentEventRef) : '';
-    const payloadSingle = {
-        ...(gid ? { googleEventId: gid } : {}),
-        title,
-        start: startStr,
-        end: endStr,
-        type: slotType,
-        owner: ownerForBridge || currentUser.email
-    };
-    const syncSingle = await trySyncGoogleCalendar([payloadSingle]);
     if (!currentEventRef && addedSingle && syncSingle?.data?.results) {
         applyBridgeUpsertResults([addedSingle], syncSingle.data.results);
     }
+
+    document.getElementById('modal_reservation').close();
+    showToast(currentEventRef ? 'Réservation mise à jour.' : 'Réservation enregistrée.');
 
     if (currentEventRef && syncSingle.ok && prevSnapshot) {
         const changed =

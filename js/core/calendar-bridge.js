@@ -1,4 +1,4 @@
-import { getPlanningConfig } from './supabase-client.js';
+import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
 
 /**
  * Appelle le pont (Apps Script ou Edge Function) qui synchronise avec Google Agenda.
@@ -12,17 +12,7 @@ export async function invokeCalendarBridge(accessToken, body) {
         return { ok: true, skipped: true };
     }
 
-    try {
-        const res = await fetch(calendarBridgeUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(supabaseAnonKey ? { apikey: supabaseAnonKey } : {}),
-                ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
-            },
-            body: JSON.stringify(body)
-        });
-
+    const parseResponse = async (res) => {
         const text = await res.text();
         let data = null;
         try {
@@ -30,6 +20,37 @@ export async function invokeCalendarBridge(accessToken, body) {
         } catch {
             data = text;
         }
+        return { data };
+    };
+
+    try {
+        const doFetch = async (bearer) =>
+            fetch(calendarBridgeUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(supabaseAnonKey ? { apikey: supabaseAnonKey } : {}),
+                    ...(bearer ? { Authorization: `Bearer ${bearer}` } : {})
+                },
+                body: JSON.stringify(body)
+            });
+
+        let token = accessToken;
+        let res = await doFetch(token);
+        if (res.status === 401 && isBackendAuthConfigured()) {
+            const supabase = getSupabaseClient();
+            if (supabase) {
+                await supabase.auth.refreshSession();
+                const { data: { session } } = await supabase.auth.getSession();
+                const refreshed = session?.access_token ?? null;
+                if (refreshed && refreshed !== token) {
+                    token = refreshed;
+                    res = await doFetch(token);
+                }
+            }
+        }
+
+        const { data } = await parseResponse(res);
 
         if (!res.ok) {
             return {

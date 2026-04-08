@@ -3,7 +3,7 @@
  * Le type technique (couleur / règles) est dérivé du motif.
  */
 
-export const RESERVATION_MOTIFS = /** @type {const} */ ['Travail', 'Cours', 'Fermeture', 'Autre'];
+export const RESERVATION_MOTIFS = /** @type {const} */ ['Travail', 'Cours', 'Fermeture'];
 
 /** @param {string} motif */
 export function motifToSlotType(motif) {
@@ -16,7 +16,7 @@ export function motifToSlotType(motif) {
 /** @param {string} value */
 export function normalizeMotif(value) {
     const s = String(value || '').trim();
-    if (!s) return 'Travail';
+    if (!s || s === 'Autre') return 'Travail';
     if (RESERVATION_MOTIFS.includes(s)) return s;
-    return 'Autre';
+    return 'Travail';
 }

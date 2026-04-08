@@ -1,59 +1,22 @@
-/* Types « métier » */
-.event-cours {
-    background-color: #eef2ff !important;
-    color: #3730a3 !important;
-}
-
+/* Couleurs par type de réservation (toutes vues / tous rôles) */
 .event-fermeture {
-    background-color: #fef2f2 !important;
-    color: #991b1b !important;
+    background-color: #ff790a !important;
+    color: #1e293b !important;
 }
 
-/* Vue élève */
-.event-mine-eleve {
-    background-color: #d1fae5 !important;
-    color: #065f46 !important;
+.event-cours {
+    background-color: #f6e36a !important;
+    color: #3f3f1e !important;
 }
 
-.event-other-eleve {
-    background-color: #ffedd5 !important;
-    color: #9a3412 !important;
+.event-travail-mine {
+    background-color: #61c71b !important;
+    color: #0f2910 !important;
 }
 
-.event-by-prof {
-    background-color: #e0e7ff !important;
-    color: #312e81 !important;
-}
-
-.event-by-admin {
-    background-color: #fce7f3 !important;
-    color: #9d174d !important;
-}
-
-.event-by-consultation {
-    background-color: #cffafe !important;
-    color: #155e75 !important;
-}
-
-/* Vue prof / admin */
-.event-mine-staff {
-    background-color: #dbeafe !important;
-    color: #1e40af !important;
-}
-
-.event-student-block {
-    background-color: #ecfccb !important;
-    color: #3f6212 !important;
-}
-
-.event-peer-prof {
-    background-color: #ede9fe !important;
-    color: #5b21b6 !important;
-}
-
-.event-admin-block {
-    background-color: #f3f4f6 !important;
-    color: #374151 !important;
+.event-travail-other {
+    background-color: #68a1e5 !important;
+    color: #0f172a !important;
 }
 
 .event-slot-default {
@@ -61,15 +24,24 @@
     color: #1e293b !important;
 }
 
-/* Consultation */
+/* Anciennes classes (événements déjà en cache) — alignées sur Travail */
+.event-mine-eleve,
+.event-mine-staff,
 .event-mine-consult {
-    background-color: #ccfbf1 !important;
-    color: #0f766e !important;
+    background-color: #61c71b !important;
+    color: #0f2910 !important;
 }
 
+.event-other-eleve,
+.event-by-prof,
+.event-by-admin,
+.event-by-consultation,
+.event-student-block,
+.event-peer-prof,
+.event-admin-block,
 .event-readonly-consult {
-    background-color: #f1f5f9 !important;
-    color: #475569 !important;
+    background-color: #68a1e5 !important;
+    color: #0f172a !important;
 }
 
 /* Supprime les bordures/fonds FullCalendar par défaut autour des événements (grille). */
@@ -100,14 +72,14 @@
     background: transparent !important;
 }
 
-/* Texte dans les cases (FullCalendar injecte du HTML) */
+/* Ligne 1 = horaires, ligne 2 = titre (si hauteur > 30 min) */
 .event-title-fc {
     text-align: center;
     font-weight: 700;
     font-size: 0.625rem;
     line-height: 1.25;
     text-transform: none;
-    padding: 0.2rem 0.25rem 0;
+    padding: 0.15rem 0.25rem 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -121,16 +93,16 @@
 
 .event-time-fc {
     text-align: center;
-    font-size: 0.5625rem;
-    font-weight: 400;
-    opacity: 0.88;
-    padding-bottom: 0.2rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+    opacity: 0.95;
+    padding: 0.2rem 0.25rem 0.1rem;
     font-variant-numeric: tabular-nums;
 }
 
 @media (min-width: 640px) {
     .event-time-fc {
-        font-size: 0.625rem;
+        font-size: 0.6875rem;
     }
 }
 
@@ -154,31 +126,18 @@
     flex-shrink: 0;
 }
 
-.legend-swatch--mine-eleve {
-    background: #10b981;
-}
-
-.legend-swatch--other-eleve {
-    background: #ea580c;
-}
-
-.legend-swatch--prof {
-    background: #4f46e5;
+.legend-swatch--fermeture {
+    background: #ff790a;
 }
 
 .legend-swatch--cours {
-    background: #4f46e5;
-    opacity: 0.7;
+    background: #f6e36a;
 }
 
-.legend-swatch--fermeture {
-    background: #ef4444;
+.legend-swatch--travail-mine {
+    background: #61c71b;
 }
 
-.legend-swatch--student-block {
-    background: #65a30d;
-}
-
-.legend-swatch--staff {
-    background: #2563eb;
+.legend-swatch--travail-other {
+    background: #68a1e5;
 }

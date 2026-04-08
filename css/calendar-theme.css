@@ -1,6 +1,7 @@
 /* --- STRUCTURE DE LA GRILLE --- */
 .fc-timegrid-axis {
-    width: 44px !important;
+    width: 58px !important;
+    min-width: 58px !important;
 }
 
 /* Heures à gauche : plus compact ; aligné en haut de la case, centré horizontalement. */
@@ -100,12 +101,23 @@
     }
 
     .fc-timegrid-axis {
-        width: 40px !important;
+        width: 52px !important;
+        min-width: 52px !important;
     }
 
     .fc .fc-timegrid-slot-label {
         font-size: 0.625rem;
     }
+}
+
+/* Desktop : en-tête jour lisible (dayHeaderContent) */
+.fc .fc-day-head-plain {
+    text-align: center;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: #334155;
+    line-height: 1.2;
+    padding: 0.25rem 0.125rem;
 }
 
 /* En-têtes de colonnes (jours) — mobile ≤640px : 3 lettres fines, numéro gras dessous (type Google Agenda) */

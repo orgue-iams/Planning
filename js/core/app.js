@@ -40,12 +40,14 @@ import {
     isSupabasePasswordRecoveryPending,
     shouldResumeSupabasePasswordRecovery
 } from './auth-logic.js';
-import { initMessagesUi, tryShowBroadcastPopup } from './messages-ui.js';
-import { initProfileLabelsUi } from './profile-labels-ui.js';
+import { initMessagesUi, resetMessagesUiBindings, tryShowBroadcastPopup } from './messages-ui.js';
+import { initProfileLabelsUi, resetProfileLabelsUiBindings } from './profile-labels-ui.js';
 import { applyLoginBanner } from './login-banner.js';
-import { initAdminUsersUi } from './admin-users-ui.js';
-import { initAnnouncementsUi } from './announcements-ui.js';
+import { initAdminUsersUi, resetAdminUsersUiBindings } from './admin-users-ui.js';
+import { initAnnouncementsUi, resetAnnouncementsUiBindings } from './announcements-ui.js';
 import { showToast } from '../utils/toast.js';
+import { setPlanningSessionUser } from './session-user.js';
+import { formatVersionBadgeText } from '../config/version-info.js';
 
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register(new URL('../../sw.js', import.meta.url)).catch(() => {});
@@ -57,6 +59,11 @@ let currentUser = null;
 
 function performLogout() {
     currentUser = null;
+    setPlanningSessionUser(null);
+    resetMessagesUiBindings();
+    resetAnnouncementsUiBindings();
+    resetAdminUsersUiBindings();
+    resetProfileLabelsUiBindings();
     currentEvent = null;
     if (calendar) {
         calendar.destroy();
@@ -244,6 +251,13 @@ function wireDialogBackdropClose() {
 
 document.addEventListener('DOMContentLoaded', async () => {
     await loadUIComponents();
+    const versionText = formatVersionBadgeText();
+    const loginV = document.getElementById('login-version-badge');
+    const headerV = document.getElementById('app-version-badge');
+    const buildLegend = document.getElementById('app-build-badge');
+    if (loginV) loginV.textContent = versionText;
+    if (headerV) headerV.textContent = versionText;
+    if (buildLegend) buildLegend.textContent = versionText;
     setLogoutHandler(performLogout);
     wireDialogBackdropClose();
 
@@ -317,6 +331,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         : tryRestoreDemoSession();
     if (restored) {
         currentUser = restored;
+        setPlanningSessionUser(currentUser);
         refreshHeaderUser(currentUser);
         initCalendarAndRevealUi();
         document.getElementById('modal_login')?.close();
@@ -354,6 +369,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         );
         if (result.success) {
             currentUser = result.user;
+            setPlanningSessionUser(currentUser);
             refreshHeaderUser(currentUser);
             initCalendarAndRevealUi();
         }

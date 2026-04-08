@@ -27,12 +27,7 @@ import {
     isQuillAvailable,
     quillSetHtml
 } from '../utils/planning-quill.js';
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+import { getPlanningSessionUser } from './session-user.js';
 
 function renderRulesView(text) {
     const el = document.getElementById('rules-view');
@@ -65,7 +60,20 @@ function ensureFallbackRulesModal() {
     return dlg;
 }
 
-export function initMessagesUi(currentUser) {
+/** @type {AbortController | null} */
+let messagesUiAbort = null;
+
+export function resetMessagesUiBindings() {
+    messagesUiAbort?.abort();
+    messagesUiAbort = null;
+}
+
+/** @param {unknown} [_ignored] conservé pour compat. appelants ; utiliser getPlanningSessionUser(). */
+export function initMessagesUi(_ignored) {
+    resetMessagesUiBindings();
+    messagesUiAbort = new AbortController();
+    const { signal } = messagesUiAbort;
+
     const btnRules = document.getElementById('btn-rules') || document.querySelector('#app-header #btn-rules');
     const modalRules = document.getElementById('modal_rules');
     const modalBroadcast = document.getElementById('modal_broadcast');
@@ -82,9 +90,6 @@ export function initMessagesUi(currentUser) {
     const btnPublish = document.getElementById('broadcast-publish');
     const backendHint = document.getElementById('rules-backend-hint');
 
-    const priv = isPrivilegedUser(currentUser);
-    const backend = isBackendAuthConfigured();
-
     /** @type {any} */
     let rulesQuill = null;
     let editInitialHtml = '';
@@ -96,144 +101,184 @@ export function initMessagesUi(currentUser) {
 
     const rulesEditorHtml = () => (rulesQuill ? String(rulesQuill.root.innerHTML) : '');
 
-    if (priv) {
-        btnEdit?.classList.remove('hidden');
-        if (backend) {
-            adminBlock?.classList.add('hidden');
-            backendHint?.classList.remove('hidden');
+    const applyPrivVisibility = () => {
+        const u = getPlanningSessionUser();
+        const priv = isPrivilegedUser(u);
+        const backend = isBackendAuthConfigured();
+        if (priv) {
+            btnEdit?.classList.remove('hidden');
+            if (backend) {
+                adminBlock?.classList.add('hidden');
+                backendHint?.classList.remove('hidden');
+            } else {
+                adminBlock?.classList.remove('hidden');
+                backendHint?.classList.add('hidden');
+                const b = getBroadcast();
+                if (broadcastEditor) broadcastEditor.value = b?.text || '';
+            }
         } else {
-            adminBlock?.classList.remove('hidden');
+            btnEdit?.classList.add('hidden');
+            adminBlock?.classList.add('hidden');
             backendHint?.classList.add('hidden');
-            const b = getBroadcast();
-            if (broadcastEditor) broadcastEditor.value = b?.text || '';
         }
-    } else {
-        btnEdit?.classList.add('hidden');
-        adminBlock?.classList.add('hidden');
-        backendHint?.classList.add('hidden');
-    }
+    };
 
-    modalRules?.addEventListener('close', () => {
-        resetRulesQuill();
-    });
+    applyPrivVisibility();
 
-    btnRules?.addEventListener('click', async () => {
-        resetRulesQuill();
-        let text = getRulesText();
-        if (backend) {
-            try {
-                const remote = await fetchOrganRulesRemote();
-                if (remote !== null && remote !== '') text = remote;
-            } catch {
-                showToast("Impossible de charger les règles distantes. Affichage de la version locale.", 'info');
+    modalRules?.addEventListener(
+        'close',
+        () => {
+            resetRulesQuill();
+        },
+        { signal }
+    );
+
+    btnRules?.addEventListener(
+        'click',
+        async () => {
+            applyPrivVisibility();
+            resetRulesQuill();
+            let text = getRulesText();
+            const backend = isBackendAuthConfigured();
+            if (backend) {
+                try {
+                    const remote = await fetchOrganRulesRemote();
+                    if (remote !== null && remote !== '') text = remote;
+                } catch {
+                    showToast('Impossible de charger les règles distantes. Affichage de la version locale.', 'info');
+                }
             }
-        }
-        if (backend && (!text || String(text).trim() === '')) {
-            text = getRulesText();
-        }
-        if (!modalRules || !view) {
-            const fallback = ensureFallbackRulesModal();
-            const fallbackView = fallback?.querySelector?.('#rules-fallback-view');
-            if (fallbackView) {
-                const raw = String(text ?? '');
-                const inner = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
-                fallbackView.innerHTML = `<div class="organ-rich">${inner}</div>`;
+            if (backend && (!text || String(text).trim() === '')) {
+                text = getRulesText();
             }
-            fallback?.showModal?.();
-            return;
-        }
-        renderRulesView(text);
-        editWrap?.classList.add('hidden');
-        view?.classList.remove('hidden');
-        btnSave?.classList.add('hidden');
-        btnEdit?.classList.toggle('hidden', !priv);
-        modalRules?.showModal();
-    });
-
-    btnClose?.addEventListener('click', async () => {
-        const isEditing = !!editWrap && !editWrap.classList.contains('hidden');
-        if (isEditing && rulesQuill) {
-            const dirty = String(rulesEditorHtml()) !== String(editInitialHtml);
-            if (dirty) {
-                const ok = confirm('Fermer sans enregistrer les modifications ?');
-                if (!ok) return;
-            }
-        }
-        modalRules?.close();
-    });
-
-    btnEdit?.addEventListener('click', async () => {
-        if (!(rulesMount instanceof HTMLElement)) return;
-        if (!isQuillAvailable()) {
-            showToast("Éditeur indisponible. Rechargez la page.", 'error');
-            return;
-        }
-        let text = getRulesText();
-        if (backend) {
-            const r = await fetchOrganRulesRemote();
-            if (r !== null) text = r;
-        }
-        if (backend && (!text || String(text).trim() === '')) {
-            text = getRulesText();
-        }
-        resetRulesQuill();
-        rulesQuill = createPlanningQuill(rulesMount, {
-            placeholder: 'Saisissez les règles…'
-        });
-        const raw = String(text ?? '');
-        const initial = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
-        quillSetHtml(rulesQuill, initial);
-        editInitialHtml = rulesEditorHtml();
-
-        view?.classList.add('hidden');
-        editWrap?.classList.remove('hidden');
-        btnEdit?.classList.add('hidden');
-        btnSave?.classList.remove('hidden');
-    });
-
-    btnSave?.addEventListener('click', async () => {
-        if (!rulesQuill) return;
-        const html = rulesQuill.root.innerHTML;
-        const t = sanitizeRulesHtml(normalizeQuillMarkup(html));
-        if (backend) {
-            const res = await saveOrganRulesRemote(t);
-            if (!res.ok) {
-                showToast(res.error || 'Erreur', 'error');
+            if (!modalRules || !view) {
+                const fallback = ensureFallbackRulesModal();
+                const fallbackView = fallback?.querySelector('#rules-fallback-view');
+                if (fallbackView) {
+                    const raw = String(text ?? '');
+                    const inner = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
+                    fallbackView.innerHTML = `<div class="organ-rich">${inner}</div>`;
+                }
+                fallback?.showModal();
                 return;
             }
-        } else {
-            setRulesText(t);
-        }
-        resetRulesQuill();
-        editWrap?.classList.add('hidden');
-        view?.classList.remove('hidden');
-        btnEdit?.classList.remove('hidden');
-        btnSave?.classList.add('hidden');
-        renderRulesView(t);
-        editInitialHtml = '';
-        showToast('Règles enregistrées.');
-    });
+            renderRulesView(text);
+            editWrap?.classList.add('hidden');
+            view?.classList.remove('hidden');
+            btnSave?.classList.add('hidden');
+            const uOpen = getPlanningSessionUser();
+            btnEdit?.classList.toggle('hidden', !isPrivilegedUser(uOpen));
+            modalRules?.showModal();
+        },
+        { signal }
+    );
 
-    btnPublish?.addEventListener('click', () => {
-        if (backend) return;
-        const t = broadcastEditor?.value ?? '';
-        publishBroadcast(t);
-        showToast(t ? 'Annonce publiée (visible aux élèves et profs).' : 'Annonce effacée.');
-    });
+    btnClose?.addEventListener(
+        'click',
+        async () => {
+            const isEditing = !!(editWrap && !editWrap.classList.contains('hidden'));
+            if (isEditing && rulesQuill) {
+                const dirty = String(rulesEditorHtml()) !== String(editInitialHtml);
+                if (dirty) {
+                    const ok = confirm('Fermer sans enregistrer les modifications ?');
+                    if (!ok) return;
+                }
+            }
+            modalRules?.close();
+        },
+        { signal }
+    );
+
+    btnEdit?.addEventListener(
+        'click',
+        async () => {
+            if (!(rulesMount instanceof HTMLElement)) return;
+            if (!isQuillAvailable()) {
+                showToast('Éditeur indisponible. Rechargez la page.', 'error');
+                return;
+            }
+            let text = getRulesText();
+            const backend = isBackendAuthConfigured();
+            if (backend) {
+                const r = await fetchOrganRulesRemote();
+                if (r !== null) text = r;
+            }
+            if (backend && (!text || String(text).trim() === '')) {
+                text = getRulesText();
+            }
+            resetRulesQuill();
+            rulesQuill = createPlanningQuill(rulesMount, {
+                placeholder: 'Saisissez les règles…'
+            });
+            const raw = String(text ?? '');
+            const initial = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
+            quillSetHtml(rulesQuill, initial);
+            editInitialHtml = rulesEditorHtml();
+
+            view?.classList.add('hidden');
+            editWrap?.classList.remove('hidden');
+            btnEdit?.classList.add('hidden');
+            btnSave?.classList.remove('hidden');
+        },
+        { signal }
+    );
+
+    btnSave?.addEventListener(
+        'click',
+        async () => {
+            if (!rulesQuill) return;
+            const html = rulesQuill.root.innerHTML;
+            const t = sanitizeRulesHtml(normalizeQuillMarkup(html));
+            const backend = isBackendAuthConfigured();
+            if (backend) {
+                const res = await saveOrganRulesRemote(t);
+                if (!res.ok) {
+                    showToast(res.error || 'Erreur', 'error');
+                    return;
+                }
+            } else {
+                setRulesText(t);
+            }
+            resetRulesQuill();
+            editWrap?.classList.add('hidden');
+            view?.classList.remove('hidden');
+            btnEdit?.classList.remove('hidden');
+            btnSave?.classList.add('hidden');
+            renderRulesView(t);
+            editInitialHtml = '';
+            showToast('Règles enregistrées.');
+        },
+        { signal }
+    );
+
+    btnPublish?.addEventListener(
+        'click',
+        () => {
+            if (isBackendAuthConfigured()) return;
+            const t = broadcastEditor?.value ?? '';
+            publishBroadcast(t);
+            showToast(t ? 'Annonce publiée (visible aux élèves et profs).' : 'Annonce effacée.');
+        },
+        { signal }
+    );
 
     const btnBroadcastOk = document.getElementById('broadcast-btn-ok');
 
-    btnBroadcastOk?.addEventListener('click', () => {
-        const id = modalBroadcast?.dataset.broadcastId;
-        if (id) {
-            if (id.startsWith('sm_')) {
-                localStorage.setItem(`orgue_sm_seen_${id.slice(3)}`, '1');
-            } else {
-                markBroadcastSeen(id);
+    btnBroadcastOk?.addEventListener(
+        'click',
+        () => {
+            const id = modalBroadcast?.dataset.broadcastId;
+            if (id) {
+                if (id.startsWith('sm_')) {
+                    localStorage.setItem(`orgue_sm_seen_${id.slice(3)}`, '1');
+                } else {
+                    markBroadcastSeen(id);
+                }
             }
-        }
-        modalBroadcast?.close();
-    });
+            modalBroadcast?.close();
+        },
+        { signal }
+    );
 }
 
 export async function tryShowBroadcastPopup(currentUser) {

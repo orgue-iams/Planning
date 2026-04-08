@@ -1,49 +1,56 @@
 /**
- * Préférences de réservation par utilisateur : titre par défaut (cache local + `profiles.reservation_types`).
+ * Préférences de réservation par utilisateur : lignes de titre + ligne préférée (cache + `profiles.reservation_types`).
  */
 
 import { getSupabaseClient, isBackendAuthConfigured } from '../core/supabase-client.js';
-import { RESERVATION_MOTIFS } from '../core/reservation-motifs.js';
 
 function storageKey(email) {
     return `orgue_iams_profile_${String(email).trim().toLowerCase()}`;
 }
 
-/** @param {unknown} raw @returns {{ labels: string[], defaultTitle: string }} */
+/** @param {unknown} raw */
 function normalizeReservationPayload(raw) {
-    if (raw == null) return { labels: [], defaultTitle: '' };
+    if (raw == null) {
+        return { titleLines: [], preferredIndex: 0 };
+    }
     let obj = raw;
     if (typeof raw === 'string') {
         try {
             obj = JSON.parse(raw);
         } catch {
-            return { labels: [], defaultTitle: '' };
+            return { titleLines: [], preferredIndex: 0 };
         }
     }
-    if (typeof obj !== 'object' || !obj) return { labels: [], defaultTitle: '' };
-    const p = /** @type {{ labels?: unknown, favoriteLabel?: unknown, favoriteIndex?: unknown, defaultTitle?: unknown }} */ (obj);
-    const labels = Array.isArray(p.labels)
-        ? [...new Set(p.labels.map((s) => String(s).trim()).filter(Boolean))]
-        : [];
-    let defaultTitle = typeof p.defaultTitle === 'string' ? p.defaultTitle.trim() : '';
-    if (!defaultTitle) {
-        defaultTitle = typeof p.favoriteLabel === 'string' ? p.favoriteLabel.trim() : '';
+    if (typeof obj !== 'object' || !obj) {
+        return { titleLines: [], preferredIndex: 0 };
     }
-    if (typeof p.favoriteIndex === 'number' && labels[p.favoriteIndex]) {
-        defaultTitle = labels[p.favoriteIndex];
+    const p = /** @type {Record<string, unknown>} */ (obj);
+
+    let titleLines = [];
+    if (Array.isArray(p.titleLines)) {
+        titleLines = p.titleLines.map((s) => String(s).trim()).filter((s) => s.length > 0);
     }
-    if (!defaultTitle && labels.length) {
-        defaultTitle = labels[0];
+    let preferredIndex = typeof p.preferredIndex === 'number' ? p.preferredIndex : 0;
+
+    const defaultTitle =
+        typeof p.defaultTitle === 'string'
+            ? p.defaultTitle.trim()
+            : typeof p.favoriteLabel === 'string'
+              ? p.favoriteLabel.trim()
+              : '';
+
+    if (!titleLines.length && defaultTitle) {
+        titleLines = [defaultTitle];
     }
-    return { labels, defaultTitle };
+    if (titleLines.length && preferredIndex >= titleLines.length) preferredIndex = titleLines.length - 1;
+    if (titleLines.length && preferredIndex < 0) preferredIndex = 0;
+
+    return { titleLines, preferredIndex };
 }
 
-function writeProfileLocal(email, defaultTitle) {
-    const clean = String(defaultTitle || '').trim();
-    localStorage.setItem(
-        storageKey(email),
-        JSON.stringify({ labels: [...RESERVATION_MOTIFS], defaultTitle: clean })
-    );
+function writeProfileLocal(email, payload) {
+    const clean = normalizeReservationPayload(payload);
+    localStorage.setItem(storageKey(email), JSON.stringify(clean));
 }
 
 /**
@@ -53,27 +60,43 @@ function writeProfileLocal(email, defaultTitle) {
  */
 export function hydrateReservationTypesFromServer(email, reservationTypes) {
     if (!email) return;
-    const { labels, defaultTitle } = normalizeReservationPayload(reservationTypes);
-    const fallback = labels[0] || '';
-    writeProfileLocal(email, defaultTitle || fallback);
+    writeProfileLocal(email, reservationTypes);
 }
 
-/** @returns {{ labels: string[], defaultTitle: string }} */
+/**
+ * @returns {{ titleLines: string[], preferredIndex: number, defaultTitle: string }}
+ */
 export function getProfile(email) {
-    if (!email) return { labels: [...RESERVATION_MOTIFS], defaultTitle: '' };
+    if (!email) return { titleLines: [], preferredIndex: 0, defaultTitle: '' };
     try {
         const raw = localStorage.getItem(storageKey(email));
-        if (!raw) return { labels: [...RESERVATION_MOTIFS], defaultTitle: '' };
-        const { defaultTitle } = normalizeReservationPayload(raw);
-        return { labels: [...RESERVATION_MOTIFS], defaultTitle: String(defaultTitle || '').trim() };
+        if (!raw) return { titleLines: [], preferredIndex: 0, defaultTitle: '' };
+        const { titleLines, preferredIndex } = normalizeReservationPayload(raw);
+        const defaultTitle =
+            titleLines.length && titleLines[preferredIndex] != null
+                ? titleLines[preferredIndex]
+                : titleLines[0] || '';
+        return { titleLines, preferredIndex, defaultTitle: String(defaultTitle || '').trim() };
     } catch {
-        return { labels: [...RESERVATION_MOTIFS], defaultTitle: '' };
+        return { titleLines: [], preferredIndex: 0, defaultTitle: '' };
     }
 }
 
-export async function saveProfile(email, _labelsIgnored, defaultTitle) {
-    writeProfileLocal(email, defaultTitle);
-    const { labels: cleaned, defaultTitle: title } = getProfile(email);
+/**
+ * @param {string} email
+ * @param {string[]} titleLines
+ * @param {number} preferredIndex
+ */
+export async function saveProfile(email, titleLines, preferredIndex) {
+    const lines = Array.isArray(titleLines)
+        ? titleLines.map((s) => String(s).trim()).filter((s) => s.length > 0)
+        : [];
+    let idx = Number(preferredIndex) || 0;
+    if (lines.length === 0) idx = 0;
+    else if (idx < 0 || idx >= lines.length) idx = 0;
+
+    const payload = { titleLines: lines, preferredIndex: idx };
+    writeProfileLocal(email, payload);
 
     if (isBackendAuthConfigured()) {
         const supabase = getSupabaseClient();
@@ -83,7 +106,7 @@ export async function saveProfile(email, _labelsIgnored, defaultTitle) {
                 const { error } = await supabase
                     .from('profiles')
                     .update({
-                        reservation_types: { labels: cleaned, defaultTitle: title },
+                        reservation_types: payload,
                         updated_at: new Date().toISOString()
                     })
                     .eq('id', user.id);

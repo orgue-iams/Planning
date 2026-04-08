@@ -91,6 +91,10 @@ function resetCreateInviteForm() {
 
 let adminUsersHandlersBound = false;
 
+export function resetAdminUsersUiBindings() {
+    adminUsersHandlersBound = false;
+}
+
 export function initAdminUsersUi(currentUser) {
     const show = isBackendAuthConfigured() && isAdmin(currentUser);
     document.getElementById('menu-item-users-admin-wrap')?.classList.toggle('hidden', !show);

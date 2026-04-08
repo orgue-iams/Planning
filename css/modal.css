@@ -184,6 +184,44 @@
     content: 'Défaut';
 }
 
+/* Quill 1.x : libellés explicites si attr(data-value) manque sur les items */
+.planning-quill-mount .ql-snow .ql-picker.ql-size .ql-picker-item[data-value='10px']::before {
+    content: '10 px' !important;
+}
+.planning-quill-mount .ql-snow .ql-picker.ql-size .ql-picker-item[data-value='12px']::before {
+    content: '12 px' !important;
+}
+.planning-quill-mount .ql-snow .ql-picker.ql-size .ql-picker-item[data-value='14px']::before {
+    content: '14 px' !important;
+}
+.planning-quill-mount .ql-snow .ql-picker.ql-size .ql-picker-item[data-value='16px']::before {
+    content: '16 px' !important;
+}
+.planning-quill-mount .ql-snow .ql-picker.ql-size .ql-picker-item[data-value='18px']::before {
+    content: '18 px' !important;
+}
+.planning-quill-mount .ql-snow .ql-picker.ql-size .ql-picker-item[data-value='20px']::before {
+    content: '20 px' !important;
+}
+.planning-quill-mount .ql-snow .ql-picker.ql-size .ql-picker-label[data-value='10px']::before {
+    content: '10 px' !important;
+}
+.planning-quill-mount .ql-snow .ql-picker.ql-size .ql-picker-label[data-value='12px']::before {
+    content: '12 px' !important;
+}
+.planning-quill-mount .ql-snow .ql-picker.ql-size .ql-picker-label[data-value='14px']::before {
+    content: '14 px' !important;
+}
+.planning-quill-mount .ql-snow .ql-picker.ql-size .ql-picker-label[data-value='16px']::before {
+    content: '16 px' !important;
+}
+.planning-quill-mount .ql-snow .ql-picker.ql-size .ql-picker-label[data-value='18px']::before {
+    content: '18 px' !important;
+}
+.planning-quill-mount .ql-snow .ql-picker.ql-size .ql-picker-label[data-value='20px']::before {
+    content: '20 px' !important;
+}
+
 /* Renforce l’affichage des tailles (certaines versions Snow / WebView masquent data-value sur l’item) */
 .planning-quill-mount .ql-snow .ql-picker.ql-size .ql-picker-item {
     font-size: 11px;

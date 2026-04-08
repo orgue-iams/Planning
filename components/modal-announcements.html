@@ -1,8 +1,8 @@
 <dialog id="modal_announcements" class="modal">
     <div class="modal-box p-5 w-[96%] max-w-md max-h-[90dvh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col">
-        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest shrink-0">Annonces planifiées</h3>
+        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest shrink-0">Annonce écran de connexion</h3>
         <p class="text-[10px] text-slate-500 mb-3 leading-snug">
-            Le message s’affiche sur <strong>l’écran de connexion uniquement</strong> (bandeau sous le titre), pour la période indiquée. Même mise en forme que les règles (sans couleur) ; barre en haut, tailles en pixels (« Défaut » = taille du paragraphe).
+            Un seul message à la fois : <strong>publier</strong> remplace toute annonce précédente pour cet écran. Même mise en forme que les règles ; tailles en pixels (« Défaut » sur la barre = taille du paragraphe).
         </p>
 
         <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-3 space-y-2 mb-3 shrink-0">
@@ -17,11 +17,8 @@
                 </div>
             </div>
             <div id="ann-quill-mount" class="planning-quill-mount planning-quill-mount--compact"></div>
-            <button type="button" id="ann-publish-btn" class="btn btn-primary btn-sm w-full font-black text-[11px]">Publier</button>
+            <button type="button" id="ann-publish-btn" class="btn btn-primary btn-sm w-full font-black text-[11px]">Publier (remplace l’ancienne)</button>
         </div>
-
-        <p class="text-[10px] font-bold text-slate-500 mb-1">Messages récents</p>
-        <div id="ann-list" class="flex-1 min-h-0 overflow-y-auto space-y-2 text-xs border border-slate-100 rounded-lg p-2 max-h-[40vh]"></div>
 
         <div class="modal-action shrink-0 mt-2">
             <button type="button" class="btn btn-ghost btn-sm font-black text-[11px]" onclick="document.getElementById('modal_announcements').close()">Fermer</button>

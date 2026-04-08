@@ -1,6 +1,6 @@
 /**
  * Données de test pour la semaine du 6 avril 2026.
- * Titres = motifs canoniques : Travail, Cours, Fermeture, Autre.
+ * Titres d’exemple ; le motif (type) est dans extendedProps.type.
  */
 
 export const demoEvents = [
@@ -20,7 +20,7 @@ export const demoEvents = [
 
     // --- MARDI 7 AVRIL ---
     {
-        title: 'Autre',
+        title: 'Maintenance',
         start: '2026-04-07T08:00:00',
         end: '2026-04-07T12:00:00',
         extendedProps: { owner: 'admin@iams.fr', ownerDisplayName: 'Admin IAMS', ownerRole: 'admin', type: 'reservation' }

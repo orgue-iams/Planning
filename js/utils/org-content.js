@@ -81,6 +81,42 @@ export async function insertScheduledMessageRemote({ body, startsAt, endsAt }) {
     return { ok: true };
 }
 
+/** Une seule annonce à la fois : tout remplacer par le nouveau message. */
+export async function replaceLoginAnnouncementRemote({ body, startsAt, endsAt }) {
+    const sb = getSupabaseClient();
+    if (!sb) return { ok: false, error: 'Non connecté' };
+    const { data: u } = await sb.auth.getUser();
+    const { error: delErr } = await sb.from('scheduled_messages').delete().eq('channel', 'login');
+    if (delErr) return { ok: false, error: delErr.message };
+    const { error } = await sb.from('scheduled_messages').insert({
+        body: String(body || '').trim(),
+        starts_at: startsAt,
+        ends_at: endsAt,
+        channel: 'login',
+        created_by: u.user?.id ?? null
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+}
+
+/** Dernière annonce login (pour préremplir l’éditeur) ; il n’en reste qu’une après publication. */
+export async function fetchLatestLoginAnnouncementForEdit() {
+    const sb = getSupabaseClient();
+    if (!sb) return null;
+    const { data, error } = await sb
+        .from('scheduled_messages')
+        .select('id,body,starts_at,ends_at')
+        .eq('channel', 'login')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+    if (error) {
+        console.warn('[scheduled latest]', error.message);
+        return null;
+    }
+    return data ?? null;
+}
+
 export async function deleteScheduledMessageRemote(id) {
     const sb = getSupabaseClient();
     if (!sb) return { ok: false, error: 'Non connecté' };

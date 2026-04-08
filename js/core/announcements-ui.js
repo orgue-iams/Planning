@@ -4,12 +4,11 @@
 import { isPrivilegedUser } from './auth-logic.js';
 import { isBackendAuthConfigured } from './supabase-client.js';
 import {
-    listScheduledMessagesRemote,
-    insertScheduledMessageRemote,
-    deleteScheduledMessageRemote
+    replaceLoginAnnouncementRemote,
+    fetchLatestLoginAnnouncementForEdit
 } from '../utils/org-content.js';
 import { showToast } from '../utils/toast.js';
-import { formatSimpleRichHtml, normalizeQuillMarkup, sanitizeRulesHtml } from '../utils/rich-text.js';
+import { normalizeQuillMarkup, sanitizeRulesHtml } from '../utils/rich-text.js';
 import {
     createPlanningQuill,
     destroyPlanningQuillMount,
@@ -32,36 +31,13 @@ function fromLocalInputValue(s) {
     return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-async function renderList() {
-    const wrap = document.getElementById('ann-list');
-    if (!wrap) return;
-    const rows = await listScheduledMessagesRemote();
-    wrap.replaceChildren();
-    if (!rows.length) {
-        wrap.innerHTML = '<p class="text-slate-400 text-center py-4">Aucun message enregistré.</p>';
-        return;
-    }
-    for (const r of rows) {
-        const div = document.createElement('div');
-        div.className = 'rounded-lg border border-slate-200 bg-white p-2';
-        div.innerHTML = `
-            <div class="flex justify-between items-start gap-2">
-                <div>
-                    <p class="font-black text-[10px] text-slate-600">Écran de connexion</p>
-                    <p class="text-[9px] text-slate-400">${r.starts_at?.slice(0, 16)} → ${r.ends_at?.slice(0, 16)}</p>
-                </div>
-                <button type="button" class="btn btn-ghost btn-xs text-error font-black text-[9px] ann-del" data-id="${r.id}">Suppr.</button>
-            </div>
-            <div class="text-slate-700 mt-1 text-[11px] leading-snug ann-preview"></div>`;
-        const prev = div.querySelector('.ann-preview');
-        if (prev) prev.innerHTML = `<div class="organ-rich">${formatSimpleRichHtml(r.body || '')}</div>`;
-        wrap.appendChild(div);
-    }
-}
-
 let announcementsHandlersBound = false;
 /** @type {any} */
 let annQuill = null;
+
+export function resetAnnouncementsUiBindings() {
+    announcementsHandlersBound = false;
+}
 
 export function initAnnouncementsUi(currentUser) {
     const show = isBackendAuthConfigured() && isPrivilegedUser(currentUser);
@@ -75,7 +51,7 @@ export function initAnnouncementsUi(currentUser) {
     const ensureAnnQuill = () => {
         if (!(mount instanceof HTMLElement)) return null;
         if (!isQuillAvailable()) {
-            showToast("Éditeur indisponible. Rechargez la page.", 'error');
+            showToast('Éditeur indisponible. Rechargez la page.', 'error');
             return null;
         }
         destroyPlanningQuillMount(mount);
@@ -90,13 +66,22 @@ export function initAnnouncementsUi(currentUser) {
         annQuill = null;
     });
 
-    document.getElementById('menu-item-announcements')?.addEventListener('click', (e) => {
+    document.getElementById('menu-item-announcements')?.addEventListener('click', async (e) => {
         e.preventDefault();
         document.getElementById('btn-user-menu')?.blur();
-        presetAnnouncementDateInputs();
         void ensureAnnQuill();
+        const latest = await fetchLatestLoginAnnouncementForEdit();
+        if (latest?.body && annQuill) {
+            quillSetHtml(annQuill, sanitizeRulesHtml(latest.body));
+            const start = document.getElementById('ann-start');
+            const end = document.getElementById('ann-end');
+            if (start && latest.starts_at) start.value = toLocalInputValue(latest.starts_at);
+            if (end && latest.ends_at) end.value = toLocalInputValue(latest.ends_at);
+        } else {
+            presetAnnouncementDateInputs(true);
+            if (annQuill) quillSetHtml(annQuill, '');
+        }
         modal?.showModal();
-        void renderList();
     });
 
     document.getElementById('ann-publish-btn')?.addEventListener('click', async () => {
@@ -119,36 +104,24 @@ export function initAnnouncementsUi(currentUser) {
             showToast('La fin doit être après le début.', 'error');
             return;
         }
-        const res = await insertScheduledMessageRemote({ body, startsAt: starts, endsAt: ends });
+        const res = await replaceLoginAnnouncementRemote({ body, startsAt: starts, endsAt: ends });
         if (!res.ok) {
             showToast(res.error || 'Erreur', 'error');
             return;
         }
-        showToast('Annonce enregistrée.');
+        showToast('Annonce publiée (l’ancienne annonce est remplacée).');
         quillSetHtml(annQuill, '');
-        await renderList();
-    });
-
-    document.getElementById('ann-list')?.addEventListener('click', async (ev) => {
-        const btn = ev.target?.closest?.('.ann-del');
-        if (!btn) return;
-        const id = btn.getAttribute('data-id');
-        if (!id || !confirm('Supprimer cette annonce ?')) return;
-        const res = await deleteScheduledMessageRemote(id);
-        if (!res.ok) {
-            showToast(res.error || 'Erreur', 'error');
-            return;
-        }
-        showToast('Supprimé.');
-        await renderList();
     });
 }
 
-/** Valeurs par défaut pour les champs datetime (prochaine heure → +7 jours). */
-export function presetAnnouncementDateInputs() {
+/**
+ * @param {boolean} [force] — quand true, réinitialise les dates même si déjà remplies (réouverture modale).
+ */
+export function presetAnnouncementDateInputs(force = false) {
     const start = document.getElementById('ann-start');
     const end = document.getElementById('ann-end');
-    if (!start || !end || start.value) return;
+    if (!start || !end) return;
+    if (!force && start.value) return;
     const a = new Date();
     a.setMinutes(0, 0, 0);
     const b = new Date(a);

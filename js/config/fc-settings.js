@@ -215,14 +215,22 @@ export const getCalendarConfig = (handlers, currentUser) => {
         dayHeaderFormat: { weekday: 'short', day: 'numeric' },
 
         dayHeaderContent: (arg) => {
-            if (typeof window === 'undefined') return undefined;
-            if (!window.matchMedia('(max-width: 640px)').matches) return undefined;
+            if (typeof window === 'undefined') {
+                return { html: '' };
+            }
             const d = arg.date;
-            const longWd = d.toLocaleDateString('fr-FR', { weekday: 'long' });
-            const three = (longWd.slice(0, 3).charAt(0).toUpperCase() + longWd.slice(1, 3)).normalize('NFC');
-            const dom = d.getDate();
+            const mobile = window.matchMedia('(max-width: 640px)').matches;
+            if (mobile) {
+                const longWd = d.toLocaleDateString('fr-FR', { weekday: 'long' });
+                const three = (longWd.slice(0, 3).charAt(0).toUpperCase() + longWd.slice(1, 3)).normalize('NFC');
+                const dom = d.getDate();
+                return {
+                    html: `<div class="fc-day-head-gcal"><span class="fc-day-head-gcal__dow">${three}</span><span class="fc-day-head-gcal__dom">${dom}</span></div>`
+                };
+            }
+            const line = d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
             return {
-                html: `<div class="fc-day-head-gcal"><span class="fc-day-head-gcal__dow">${three}</span><span class="fc-day-head-gcal__dom">${dom}</span></div>`
+                html: `<div class="fc-day-head-plain">${line}</div>`
             };
         }
     };
