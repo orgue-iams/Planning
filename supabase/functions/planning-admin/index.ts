@@ -78,12 +78,19 @@ type GateOk = { user: { id: string; email?: string } };
 type GateErr = { error: string };
 async function requirePlanningAdmin(authHeader: string | null, anonKey: string, url: string): Promise<GateOk | GateErr> {
     if (!authHeader) return { error: 'Missing Authorization' };
-    const userClient = createClient(url, anonKey, { global: { headers: { Authorization: authHeader } } });
+    const jwt = authHeader.replace(/^Bearer\s+/i, '').trim();
+    if (!jwt) return { error: 'Missing Authorization' };
+    const userClient = createClient(url, anonKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+        global: { headers: { Authorization: `Bearer ${jwt}` } }
+    });
     const {
         data: { user },
         error: uerr
-    } = await userClient.auth.getUser();
-    if (uerr || !user) return { error: 'Unauthorized' };
+    } = await userClient.auth.getUser(jwt);
+    if (uerr || !user) {
+        return { error: uerr?.message?.trim() || 'Unauthorized' };
+    }
     const { data: row } = await userClient.from('profiles').select('role').eq('id', user.id).maybeSingle();
     if (row?.role !== 'admin') return { error: 'Forbidden: planning admin only' };
     return { user: { id: user.id, email: user.email } };

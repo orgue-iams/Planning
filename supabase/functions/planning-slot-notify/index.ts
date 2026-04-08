@@ -1,0 +1,200 @@
+/**
+ * Notification par e-mail (Brevo) : un utilisateur A a modifié / déplacé / supprimé
+ * un créneau appartenant à B → e-mail à B. L’appelant doit être A (JWT = actorEmail).
+ *
+ * Secrets :
+ *   BREVO_API_KEY — clé API SMTP & API (Brevo)
+ *   NOTIFY_FROM_EMAIL — expéditeur vérifié chez Brevo
+ *   NOTIFY_FROM_NAME — optionnel (défaut : Planning Orgue IAMS)
+ *
+ * Déploiement : supabase functions deploy planning-slot-notify
+ */
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
+
+const cors: Record<string, string> = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers':
+        'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-version'
+};
+
+type SlotAction = 'deleted' | 'moved' | 'modified';
+
+function json(data: unknown, status = 200) {
+    return new Response(JSON.stringify(data), {
+        status,
+        headers: { ...cors, 'Content-Type': 'application/json' }
+    });
+}
+
+function escapeHtml(s: string) {
+    return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function formatFrWhen(startIso: string, endIso: string) {
+    try {
+        const a = new Date(startIso);
+        const b = new Date(endIso);
+        if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return `${startIso} → ${endIso}`;
+        const opts: Intl.DateTimeFormatOptions = {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        };
+        return `${a.toLocaleString('fr-FR', opts)} — ${b.toLocaleString('fr-FR', opts)}`;
+    } catch {
+        return `${startIso} → ${endIso}`;
+    }
+}
+
+function actionLabelFr(action: SlotAction): string {
+    switch (action) {
+        case 'deleted':
+            return 'supprimé';
+        case 'moved':
+            return 'déplacé';
+        default:
+            return 'modifié';
+    }
+}
+
+Deno.serve(async (req) => {
+    if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+
+    if (req.method !== 'POST') {
+        return json({ ok: false, emailSent: false, error: 'Method not allowed' }, 405);
+    }
+
+    try {
+        const authHeader = req.headers.get('Authorization');
+        const jwt = authHeader?.replace(/^Bearer\s+/i, '').trim();
+        if (!jwt) return json({ ok: false, emailSent: false, error: 'Missing Authorization' }, 401);
+
+        const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+        const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+        const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+            auth: { autoRefreshToken: false, persistSession: false },
+            global: { headers: { Authorization: `Bearer ${jwt}` } }
+        });
+
+        const {
+            data: { user },
+            error: userErr
+        } = await userClient.auth.getUser(jwt);
+        if (userErr || !user?.email) {
+            return json({ ok: false, emailSent: false, error: 'Unauthorized' }, 401);
+        }
+
+        const me = user.email.trim().toLowerCase();
+
+        let body: Record<string, unknown>;
+        try {
+            body = (await req.json()) as Record<string, unknown>;
+        } catch {
+            return json({ ok: false, emailSent: false, error: 'JSON invalide' }, 400);
+        }
+
+        const targetEmail = String(body.targetEmail ?? '')
+            .trim()
+            .toLowerCase();
+        const actorEmail = String(body.actorEmail ?? '')
+            .trim()
+            .toLowerCase();
+        const action = String(body.action ?? '') as SlotAction;
+
+        if (!targetEmail || !actorEmail || !['deleted', 'moved', 'modified'].includes(action)) {
+            return json({ ok: false, emailSent: false, error: 'Requête invalide' }, 400);
+        }
+
+        if (actorEmail !== me) {
+            return json({ ok: false, emailSent: false, error: 'Forbidden' }, 403);
+        }
+
+        if (targetEmail === actorEmail) {
+            return json({ ok: true, emailSent: false, skipped: true }, 200);
+        }
+
+        const apiKey = Deno.env.get('BREVO_API_KEY')?.trim();
+        const fromEmail = Deno.env.get('NOTIFY_FROM_EMAIL')?.trim();
+        const fromName = (Deno.env.get('NOTIFY_FROM_NAME') ?? 'Planning Orgue IAMS').trim();
+
+        if (!apiKey || !fromEmail) {
+            return json({
+                ok: false,
+                emailSent: false,
+                error: 'EMAIL_NOT_CONFIGURED',
+                detail: 'Secrets BREVO_API_KEY et NOTIFY_FROM_EMAIL requis'
+            });
+        }
+
+        const actorDisplayName = String(body.actorDisplayName ?? '').trim() || actorEmail;
+        const slotTitle = String(body.slotTitle ?? 'Créneau').trim() || 'Créneau';
+        const slotStartIso = String(body.slotStartIso ?? '');
+        const slotEndIso = String(body.slotEndIso ?? '');
+        const previousStartIso = String(body.previousStartIso ?? '');
+        const previousEndIso = String(body.previousEndIso ?? '');
+
+        const verbe = actionLabelFr(action);
+        const subject = `Planning orgue — votre créneau a été ${verbe}`;
+
+        let detailHtml = '';
+        if (action === 'deleted') {
+            detailHtml = `<p>Créneau concerné : <strong>${escapeHtml(slotTitle)}</strong></p>
+<p>Période : ${escapeHtml(formatFrWhen(slotStartIso, slotEndIso))}</p>`;
+        } else if (action === 'moved' && previousStartIso && previousEndIso) {
+            detailHtml = `<p>Créneau : <strong>${escapeHtml(slotTitle)}</strong></p>
+<p>Ancienne plage : ${escapeHtml(formatFrWhen(previousStartIso, previousEndIso))}</p>
+<p>Nouvelle plage : ${escapeHtml(formatFrWhen(slotStartIso, slotEndIso))}</p>`;
+        } else {
+            detailHtml = `<p>Créneau : <strong>${escapeHtml(slotTitle)}</strong></p>
+<p>Plage actuelle : ${escapeHtml(formatFrWhen(slotStartIso, slotEndIso))}</p>`;
+            if (previousStartIso && previousEndIso) {
+                detailHtml += `<p>Ancienne plage : ${escapeHtml(formatFrWhen(previousStartIso, previousEndIso))}</p>`;
+            }
+        }
+
+        const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"/></head><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#222;">
+<p>Bonjour,</p>
+<p><strong>${escapeHtml(actorDisplayName)}</strong> (${escapeHtml(actorEmail)}) a <strong>${escapeHtml(verbe)}</strong> un de vos créneaux sur le planning orgue IAMS.</p>
+${detailHtml}
+<p>Ce message est automatique ; en cas de question, vous pouvez répondre directement à cette personne.</p>
+</body></html>`;
+
+        const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+                accept: 'application/json',
+                'content-type': 'application/json',
+                'api-key': apiKey
+            },
+            body: JSON.stringify({
+                sender: { name: fromName, email: fromEmail },
+                to: [{ email: targetEmail }],
+                subject,
+                htmlContent: html
+            })
+        });
+
+        if (!brevoRes.ok) {
+            const t = await brevoRes.text();
+            return json({
+                ok: false,
+                emailSent: false,
+                error: 'BREVO_SEND_FAILED',
+                detail: t.slice(0, 400)
+            });
+        }
+
+        return json({ ok: true, emailSent: true });
+    } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return json({ ok: false, emailSent: false, error: msg }, 500);
+    }
+});

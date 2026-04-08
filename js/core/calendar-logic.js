@@ -6,6 +6,7 @@
 import { showToast } from '../utils/toast.js';
 import { getAccessToken, isBackendAuthConfigured, isPrivilegedUser } from './auth-logic.js';
 import { invokeCalendarBridge } from './calendar-bridge.js';
+import { invokeSlotNotify } from './slot-notify-api.js';
 import { getProfile, getFavoriteLabel } from '../utils/user-profile.js';
 import { isPlanningRole } from './planning-roles.js';
 import { RESERVATION_MOTIFS, normalizeMotif, motifToSlotType } from './reservation-motifs.js';
@@ -21,7 +22,8 @@ function normalizeRole(role) {
     return isPlanningRole(r) ? r : '';
 }
 
-function ownerInfoFromEvent(event, currentUser) {
+/** @param {import('@fullcalendar/core').EventApi | null} event */
+export function ownerInfoFromEvent(event, currentUser) {
     const ownerEmail = String(
         event?.extendedProps?.owner || currentUser?.email || ''
     ).trim().toLowerCase();
@@ -69,6 +71,125 @@ function roleFromOwnerEmail(email) {
     if (e.startsWith('eleve') || e.startsWith('élève')) return 'eleve';
     if (e.startsWith('consultation')) return 'consultation';
     return '';
+}
+
+/** @param {import('@fullcalendar/core').EventApi[]} localEvents */
+function applyBridgeUpsertResults(localEvents, results) {
+    if (!Array.isArray(results) || !Array.isArray(localEvents)) return;
+    const n = Math.min(results.length, localEvents.length);
+    for (let i = 0; i < n; i++) {
+        const gid = results[i]?.googleEventId;
+        if (!gid) continue;
+        const ev = localEvents[i];
+        ev.setProp('id', String(gid));
+        ev.setExtendedProp('googleEventId', String(gid));
+    }
+}
+
+/** Snapshot début/fin avant redimensionnement (réf. objet événement FC). */
+const resizePreviousRange = new WeakMap();
+
+/** À brancher sur `eventResizeStart` FullCalendar. */
+export function captureResizeStart(info) {
+    const ev = info?.event;
+    if (ev?.start && ev?.end) {
+        resizePreviousRange.set(ev, {
+            startIso: ev.start.toISOString(),
+            endIso: ev.end.toISOString()
+        });
+    }
+}
+
+function bridgeGoogleIdFromFcEvent(event) {
+    if (!event) return '';
+    const raw = event.id ?? event.extendedProps?.googleEventId;
+    return raw != null && String(raw).trim() ? String(raw).trim() : '';
+}
+
+/**
+ * Après déplacement ou redimensionnement local : pousse la plage vers Google.
+ * @returns {Promise<{ ok: boolean, skipped?: boolean }>}
+ */
+export async function syncReservationEventToGoogle(calendarEvent) {
+    if (!calendarEvent || !isBackendAuthConfigured()) {
+        return { ok: false, skipped: true };
+    }
+    const token = await getAccessToken();
+    if (!token) return { ok: false };
+    const start = calendarEvent.start;
+    const end = calendarEvent.end;
+    if (!start || !end) return { ok: false };
+    const owner = String(calendarEvent.extendedProps?.owner || '').trim();
+    const type = calendarEvent.extendedProps?.type || 'reservation';
+    const gid = bridgeGoogleIdFromFcEvent(calendarEvent);
+    const title = normalizeMotif(calendarEvent.title || '');
+    const payload = {
+        ...(gid ? { googleEventId: gid } : {}),
+        title,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        type,
+        owner
+    };
+    const r = await invokeCalendarBridge(token, { action: 'upsert', events: [payload] });
+    if (!r.ok && !r.skipped) {
+        showToast(`Synchronisation agenda : ${r.error || 'échec'}`, 'error');
+        return { ok: false };
+    }
+    if (r.ok && r.data?.results?.[0]?.googleEventId && !gid) {
+        const ng = r.data.results[0].googleEventId;
+        calendarEvent.setProp('id', String(ng));
+        calendarEvent.setExtendedProp('googleEventId', String(ng));
+    }
+    return { ok: true, skipped: Boolean(r.skipped) };
+}
+
+/**
+ * E-mail au propriétaire du créneau si un autre utilisateur vient d’agir ; toast pour l’acteur.
+ * @param {'deleted'|'moved'|'modified'} action
+ */
+export async function maybeNotifySlotOwnerAfterThirdPartyEdit({
+    currentUser,
+    action,
+    targetOwnerEmail,
+    targetOwnerDisplayName,
+    slotTitle,
+    slotStart,
+    slotEnd,
+    previousStartIso,
+    previousEndIso
+}) {
+    if (!isBackendAuthConfigured()) return;
+    const actor = String(currentUser?.email ?? '')
+        .trim()
+        .toLowerCase();
+    const owner = String(targetOwnerEmail ?? '')
+        .trim()
+        .toLowerCase();
+    if (!actor || !owner || owner === actor) return;
+
+    const r = await invokeSlotNotify({
+        action,
+        targetEmail: owner,
+        actorEmail: actor,
+        actorDisplayName: String(currentUser?.name ?? '').trim() || actor,
+        slotTitle: String(slotTitle ?? '').trim() || 'Créneau',
+        slotStartIso: slotStart instanceof Date ? slotStart.toISOString() : String(slotStart ?? ''),
+        slotEndIso: slotEnd instanceof Date ? slotEnd.toISOString() : String(slotEnd ?? ''),
+        previousStartIso: String(previousStartIso ?? ''),
+        previousEndIso: String(previousEndIso ?? '')
+    });
+
+    const label = String(targetOwnerDisplayName ?? '').trim() || owner;
+    if (r.skipped) return;
+    if (r.emailSent) {
+        showToast(`Un e-mail a été envoyé à ${label} pour l’informer du changement.`, 'success');
+    } else {
+        showToast(
+            `L’e-mail n’a pas pu être envoyé à ${label}. Merci de le ou la prévenir directement.`,
+            'error'
+        );
+    }
 }
 
 // --- 1. RENDU VISUEL DES CRÉNEAUX ---
@@ -332,15 +453,43 @@ function overlapToastMessage(conflict) {
     return `Chevauchement avec « ${t} » (${tf(r.start)} – ${tf(r.end)}). Choisissez un autre horaire.`;
 }
 
-/** Annule le redimensionnement si la fin dépasse sur un autre jour (fin FC = exclusive). */
-export function handleEventResize(info) {
+/**
+ * Annule le redimensionnement si la fin dépasse sur un autre jour (fin FC = exclusive).
+ * Appeler après `captureResizeStart` (eventResizeStart).
+ */
+export async function handleEventResize(info, currentUser) {
     const start = info.event.start;
     const end = info.event.end;
     if (!start || !end) return;
     const endInclusive = new Date(end.getTime() - 1);
     if (!sameCalendarDay(start, endInclusive)) {
         info.revert();
+        resizePreviousRange.delete(info.event);
         showToast('Un créneau ne peut pas déborder sur le jour suivant.', 'error');
+        return;
+    }
+    const prev = resizePreviousRange.get(info.event);
+    resizePreviousRange.delete(info.event);
+
+    const sync = await syncReservationEventToGoogle(info.event);
+    if (!sync.ok) return;
+
+    const oi = ownerInfoFromEvent(info.event, currentUser);
+    const me = String(currentUser?.email ?? '')
+        .trim()
+        .toLowerCase();
+    if (oi.ownerEmail && oi.ownerEmail !== me && prev) {
+        await maybeNotifySlotOwnerAfterThirdPartyEdit({
+            currentUser,
+            action: 'modified',
+            targetOwnerEmail: oi.ownerEmail,
+            targetOwnerDisplayName: oi.ownerName,
+            slotTitle: info.event.title,
+            slotStart: info.event.start,
+            slotEnd: info.event.end,
+            previousStartIso: prev.startIso,
+            previousEndIso: prev.endIso
+        });
     }
 }
 
@@ -376,14 +525,15 @@ function selectedDowSet() {
     return set;
 }
 
-/** Un événement par jour (même horaire), rendu batch pour FullCalendar. */
+/** Un événement par jour (même horaire), rendu batch pour FullCalendar. @returns {import('@fullcalendar/core').EventApi[]} */
 function addOneEventPerDay(calendar, days, title, tStart, tEnd, type, ownerEmail, ownerDisplayName, ownerRole) {
+    const added = [];
     const run = () => {
         for (const d of days) {
             const s = `${d}T${tStart}:00`;
             const e = `${d}T${tEnd}:00`;
             if (new Date(e) <= new Date(s)) continue;
-            calendar.addEvent({
+            const ev = calendar.addEvent({
                 title,
                 start: s,
                 end: e,
@@ -395,6 +545,7 @@ function addOneEventPerDay(calendar, days, title, tStart, tEnd, type, ownerEmail
                     type
                 }
             });
+            if (ev) added.push(ev);
         }
     };
     if (typeof calendar.batchRendering === 'function') {
@@ -402,6 +553,7 @@ function addOneEventPerDay(calendar, days, title, tStart, tEnd, type, ownerEmail
     } else {
         run();
     }
+    return added;
 }
 
 export function getReservationTitleFromForm() {
@@ -441,7 +593,7 @@ export function addSlotEndFromStart(start, calendar) {
  * Glisser–déposer (souris ou doigt) : enregistrement immédiat, motif favori, type réservation.
  * Sur la vue mois, ou plage « all-day », ouvre la modale complète.
  */
-export function quickCreateFromSelection(calendar, selectInfo, currentUser) {
+export async function quickCreateFromSelection(calendar, selectInfo, currentUser) {
     if (!currentUser?.email) {
         showToast('Connectez-vous pour réserver.', 'error');
         return;
@@ -475,8 +627,9 @@ export function quickCreateFromSelection(calendar, selectInfo, currentUser) {
         return;
     }
 
+    let created = /** @type {import('@fullcalendar/core').EventApi | null} */ (null);
     const add = () => {
-        calendar.addEvent({
+        created = calendar.addEvent({
             title,
             start: selectInfo.start,
             end: selectInfo.end,
@@ -496,6 +649,19 @@ export function quickCreateFromSelection(calendar, selectInfo, currentUser) {
         add();
     }
     showToast('Créneau enregistré (rapide).');
+    const slotType = motifToSlotType(title);
+    const sync = await trySyncGoogleCalendar([
+        {
+            title,
+            start: selectInfo.start.toISOString(),
+            end: selectInfo.end.toISOString(),
+            type: slotType,
+            owner: currentUser.email
+        }
+    ]);
+    if (created && sync?.data?.results) {
+        applyBridgeUpsertResults([created], sync.data.results);
+    }
 }
 
 // --- 2. GESTION DE LA MODALE RÉSERVATION ---
@@ -652,13 +818,14 @@ export function openModal(start, end, event, currentUser) {
 }
 
 async function trySyncGoogleCalendar(eventsPayload) {
-    if (!isBackendAuthConfigured()) return;
+    if (!isBackendAuthConfigured()) return { ok: true, skipped: true, data: null };
     const token = await getAccessToken();
-    if (!token || !eventsPayload?.length) return;
+    if (!token || !eventsPayload?.length) return { ok: true, skipped: true, data: null };
     const r = await invokeCalendarBridge(token, { action: 'upsert', events: eventsPayload });
     if (!r.ok && !r.skipped) {
         showToast(`Synchronisation agenda : ${r.error || 'échec'}`, 'error');
     }
+    return { ok: r.ok, skipped: Boolean(r.skipped), data: r.data, error: r.error };
 }
 
 // --- 3. ACTIONS (SAUVEGARDE / SUPPRESSION) ---
@@ -723,7 +890,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
                 return;
             }
         }
-        addOneEventPerDay(
+        const addedList = addOneEventPerDay(
             calendar,
             days,
             title,
@@ -746,7 +913,8 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
             type: slotType,
             owner: currentUser.email
         }));
-        await trySyncGoogleCalendar(bridgeEvents);
+        const syncMulti = await trySyncGoogleCalendar(bridgeEvents);
+        applyBridgeUpsertResults(addedList, syncMulti?.data?.results);
         return;
     }
 
@@ -780,6 +948,17 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         return;
     }
 
+    /** @type {{ title: string, startStr: string, endStr: string, type: string } | null} */
+    let prevSnapshot = null;
+    if (currentEventRef) {
+        prevSnapshot = {
+            title: normalizeMotif(currentEventRef.title || ''),
+            startStr: currentEventRef.start ? new Date(currentEventRef.start).toISOString() : '',
+            endStr: currentEventRef.end ? new Date(currentEventRef.end).toISOString() : '',
+            type: currentEventRef.extendedProps?.type || 'reservation'
+        };
+    }
+
     const eventData = {
         title: title,
         start: startStr,
@@ -792,34 +971,102 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         }
     };
 
+    let addedSingle = /** @type {import('@fullcalendar/core').EventApi | null} */ (null);
     if (currentEventRef) {
         // Mise à jour
         currentEventRef.setProp('title', title);
         currentEventRef.setDates(startStr, endStr);
         currentEventRef.setExtendedProp('type', slotType);
     } else {
-        // Création
-        calendar.addEvent(eventData);
+        addedSingle = calendar.addEvent(eventData);
     }
 
     document.getElementById('modal_reservation').close();
     showToast(currentEventRef ? 'Réservation mise à jour.' : 'Réservation enregistrée.');
-    await trySyncGoogleCalendar([
-        {
-            title,
-            start: startStr,
-            end: endStr,
-            type: slotType,
-            owner: currentUser.email
+
+    const ownerForBridge = String(
+        currentEventRef?.extendedProps?.owner || currentUser.email || ''
+    ).trim();
+    const gid = currentEventRef ? bridgeGoogleIdFromFcEvent(currentEventRef) : '';
+    const payloadSingle = {
+        ...(gid ? { googleEventId: gid } : {}),
+        title,
+        start: startStr,
+        end: endStr,
+        type: slotType,
+        owner: ownerForBridge || currentUser.email
+    };
+    const syncSingle = await trySyncGoogleCalendar([payloadSingle]);
+    if (!currentEventRef && addedSingle && syncSingle?.data?.results) {
+        applyBridgeUpsertResults([addedSingle], syncSingle.data.results);
+    }
+
+    if (currentEventRef && syncSingle.ok && prevSnapshot) {
+        const changed =
+            prevSnapshot.title !== title ||
+            prevSnapshot.startStr !== startStr ||
+            prevSnapshot.endStr !== endStr ||
+            prevSnapshot.type !== slotType;
+        const actor = String(currentUser.email).trim().toLowerCase();
+        const ownerLower = String(ownerForBridge || '').trim().toLowerCase();
+        if (changed && ownerLower && ownerLower !== actor) {
+            const oi = ownerInfoFromEvent(currentEventRef, currentUser);
+            await maybeNotifySlotOwnerAfterThirdPartyEdit({
+                currentUser,
+                action: 'modified',
+                targetOwnerEmail: oi.ownerEmail,
+                targetOwnerDisplayName: oi.ownerName,
+                slotTitle: title,
+                slotStart: startStr,
+                slotEnd: endStr,
+                previousStartIso: prevSnapshot.startStr,
+                previousEndIso: prevSnapshot.endStr
+            });
         }
-    ]);
+    }
 }
 
-export function deleteReservation(calendar, currentEventRef) {
-    if (currentEventRef && confirm("Supprimer cette réservation ?")) {
-        currentEventRef.remove();
-        document.getElementById('modal_reservation').close();
-        showToast('Créneau supprimé.');
+export async function deleteReservation(calendar, currentEventRef, currentUser) {
+    if (!currentEventRef || !confirm('Supprimer cette réservation ?')) return;
+    if (!currentUser?.email) {
+        showToast('Connectez-vous pour supprimer.', 'error');
+        return;
+    }
+
+    const oi = ownerInfoFromEvent(currentEventRef, currentUser);
+    const titleDel = normalizeMotif(currentEventRef.title || '');
+    const startDel = currentEventRef.start;
+    const endDel = currentEventRef.end;
+
+    const gid = bridgeGoogleIdFromFcEvent(currentEventRef);
+    if (isBackendAuthConfigured() && gid) {
+        const token = await getAccessToken();
+        if (token) {
+            const r = await invokeCalendarBridge(token, { action: 'delete', googleEventId: gid });
+            if (!r.ok && !r.skipped) {
+                showToast(`Suppression agenda : ${r.error || 'échec'}`, 'error');
+                return;
+            }
+        }
+    }
+
+    currentEventRef.remove();
+    document.getElementById('modal_reservation').close();
+    showToast('Créneau supprimé.');
+
+    const me = String(currentUser.email).trim().toLowerCase();
+    if (oi.ownerEmail && oi.ownerEmail !== me && startDel && endDel) {
+        await maybeNotifySlotOwnerAfterThirdPartyEdit({
+            currentUser,
+            action: 'deleted',
+            targetOwnerEmail: oi.ownerEmail,
+            targetOwnerDisplayName: oi.ownerName,
+            slotTitle: titleDel,
+            slotStart: startDel,
+            slotEnd: endDel,
+            previousStartIso: '',
+            previousEndIso: ''
+        });
     }
 }
 

@@ -5,6 +5,8 @@
 
 import { showToast } from '../utils/toast.js';
 import { demoEvents } from '../data/mock-events.js';
+import { getAccessToken } from '../core/auth-logic.js';
+import { getPlanningConfig, isBackendAuthConfigured } from '../core/supabase-client.js';
 
 /** @deprecated Conservé pour d’éventuels appels ; la barre FC native est désactivée. */
 export function isCompactCalendarToolbar() {
@@ -27,16 +29,18 @@ function selectAllowSingleCalendarDay(selectInfo) {
     );
 }
 
-/** Recalcul du calendrier au redimensionnement (barre d’outils = HTML custom). */
+/** Recalcul du calendrier au redimensionnement (barre d’outils = HTML custom + en-têtes jours mobile). */
 export function bindResponsiveCalendarToolbar(calendar) {
     const mql = window.matchMedia('(max-width: 640px)');
-    const apply = () => calendar.updateSize();
+    const apply = () => {
+        calendar.render();
+        calendar.updateSize();
+    };
     mql.addEventListener('change', apply);
 }
 
 export const getCalendarConfig = (handlers, currentUser) => {
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    const compact = isCompactCalendarToolbar();
     const privileged =
         currentUser && (currentUser.role === 'admin' || currentUser.role === 'prof');
 
@@ -110,35 +114,113 @@ export const getCalendarConfig = (handlers, currentUser) => {
         },
 
         events: (fetchInfo, successCallback, failureCallback) => {
-            try {
-                let rows = demoEvents.map((e) => ({ ...e }));
-                const start = fetchInfo.start;
-                const end = fetchInfo.end;
-                rows = rows.filter((ev) => {
-                    const d = new Date(ev.start);
-                    return d >= start && d < end;
-                });
-                /* Vue « Mon planning » = liste sur 30 jours : seule fenêtre ~29–31 jours ici. */
-                const spanDays = Math.round((end.getTime() - start.getTime()) / 86400000);
-                if (spanDays >= 29 && spanDays <= 31 && currentUser?.email) {
-                    const me = String(currentUser.email).trim().toLowerCase();
-                    rows = rows.filter(
-                        (ev) => String(ev.extendedProps?.owner || '').trim().toLowerCase() === me
-                    );
-                } else if (spanDays >= 29 && spanDays <= 31 && !currentUser?.email) {
-                    rows = [];
+            void (async () => {
+                try {
+                    const start = fetchInfo.start;
+                    const end = fetchInfo.end;
+                    const spanDays = Math.round((end.getTime() - start.getTime()) / 86400000);
+
+                    const { calendarBridgeUrl } = getPlanningConfig();
+                    const useBridge =
+                        Boolean(calendarBridgeUrl) && isBackendAuthConfigured();
+
+                    let rows = [];
+
+                    if (useBridge) {
+                        const token = await getAccessToken();
+                        if (token) {
+                            const res = await fetch(calendarBridgeUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    Authorization: `Bearer ${token}`
+                                },
+                                body: JSON.stringify({
+                                    action: 'list',
+                                    timeMin: start.toISOString(),
+                                    timeMax: end.toISOString()
+                                })
+                            });
+                            const text = await res.text();
+                            let data = /** @type {{ ok?: boolean, error?: string, events?: unknown[] }} */ ({});
+                            try {
+                                data = text ? JSON.parse(text) : {};
+                            } catch {
+                                data = {};
+                            }
+                            if (!res.ok || data.ok === false) {
+                                const msg =
+                                    (typeof data.error === 'string' && data.error) ||
+                                    (typeof data === 'object' &&
+                                        data !== null &&
+                                        'error' in data &&
+                                        String(/** @type {{ error?: string }} */ (data).error)) ||
+                                    `HTTP ${res.status}`;
+                                showToast(`Agenda Google : ${msg}`, 'error');
+                                failureCallback(new Error(msg));
+                                return;
+                            }
+                            const raw = Array.isArray(data.events) ? data.events : [];
+                            rows = raw.map((ev) => {
+                                const o = /** @type {Record<string, unknown>} */ (ev);
+                                const ext = o.extendedProps;
+                                const xp =
+                                    ext && typeof ext === 'object' && !Array.isArray(ext)
+                                        ? { .../** @type {Record<string, unknown>} */ (ext) }
+                                        : {};
+                                const gid =
+                                    (typeof o.id === 'string' && o.id) ||
+                                    (typeof xp.googleEventId === 'string' && xp.googleEventId) ||
+                                    '';
+                                if (gid) {
+                                    xp.googleEventId = gid;
+                                    o.id = gid;
+                                }
+                                return { ...o, extendedProps: xp };
+                            });
+                        } else {
+                            rows = [];
+                        }
+                    } else {
+                        rows = demoEvents.map((e) => ({ ...e }));
+                        rows = rows.filter((ev) => {
+                            const d = new Date(ev.start);
+                            return d >= start && d < end;
+                        });
+                    }
+
+                    if (spanDays >= 29 && spanDays <= 31 && currentUser?.email) {
+                        const me = String(currentUser.email).trim().toLowerCase();
+                        rows = rows.filter(
+                            (ev) => String(ev.extendedProps?.owner || '').trim().toLowerCase() === me
+                        );
+                    } else if (spanDays >= 29 && spanDays <= 31 && !currentUser?.email) {
+                        rows = [];
+                    }
+
+                    successCallback(rows);
+                } catch (e) {
+                    failureCallback(e);
                 }
-                successCallback(rows);
-            } catch (e) {
-                failureCallback(e);
-            }
+            })();
         },
 
         select: (info) => handlers.onSelect(info),
         dateClick: (info) => handlers.onDateClick(info),
         eventClick: (info) => handlers.onEventClick(info),
-        eventDrop: (info) => handlers.onEventDrop(info),
-        eventResize: (info) => handlers.onEventResize(info),
+        eventResizeStart: (info) => handlers.onResizeStart?.(info),
+        eventDrop: (info) => {
+            const out = handlers.onEventDrop?.(info);
+            if (out && typeof out.catch === 'function') {
+                void out.catch((err) => console.error(err));
+            }
+        },
+        eventResize: (info) => {
+            const out = handlers.onEventResize?.(info);
+            if (out && typeof out.catch === 'function') {
+                void out.catch((err) => console.error(err));
+            }
+        },
 
         eventContent: (arg) => handlers.renderEventContent(arg),
 
@@ -147,8 +229,19 @@ export const getCalendarConfig = (handlers, currentUser) => {
             minute: '2-digit',
             meridiem: false
         },
-        dayHeaderFormat: compact
-            ? { weekday: 'narrow', day: 'numeric' }
-            : { weekday: 'short', day: 'numeric' }
+        /* Desktop / tablette : une ligne courte. Mobile (≤640px) : rendu type Google Agenda (voir dayHeaderContent + .fc-day-head-gcal). */
+        dayHeaderFormat: { weekday: 'short', day: 'numeric' },
+
+        dayHeaderContent: (arg) => {
+            if (typeof window === 'undefined') return undefined;
+            if (!window.matchMedia('(max-width: 640px)').matches) return undefined;
+            const d = arg.date;
+            const longWd = d.toLocaleDateString('fr-FR', { weekday: 'long' });
+            const three = (longWd.slice(0, 3).charAt(0).toUpperCase() + longWd.slice(1, 3)).normalize('NFC');
+            const dom = d.getDate();
+            return {
+                html: `<div class="fc-day-head-gcal"><span class="fc-day-head-gcal__dow">${three}</span><span class="fc-day-head-gcal__dom">${dom}</span></div>`
+            };
+        }
     };
 };

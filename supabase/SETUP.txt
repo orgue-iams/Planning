@@ -16,18 +16,31 @@ Démarrage option 2 — Supabase + Google Agenda
 3) Edge Functions
    - Installer la CLI : https://supabase.com/docs/guides/cli
    - supabase login && supabase link --project-ref <VOTRE_REF>
-   - Secrets du projet (Dashboard → Edge Functions → Secrets, ou CLI) pour le pont Google :
-       GOOGLE_BRIDGE_URL = URL Web App Apps Script (…/exec)
-       GOOGLE_BRIDGE_SECRET = chaîne longue aléatoire (la même dans Propriétés Apps Script → BRIDGE_SECRET)
+   - Secrets du projet (Dashboard → Edge Functions → Secrets, ou CLI) pour Google Calendar API :
+       GOOGLE_CALENDAR_ID = orgue.iams@google.com (ID du calendrier affiché dans les paramètres Google Agenda)
+       Option A — compte de service (recommandé une fois le calendrier partagé avec l’e-mail du SA) :
+         GOOGLE_SERVICE_ACCOUNT_JSON = contenu entier du fichier JSON de clé GCP (une seule ligne ou colle multiligne dans le dashboard)
+       Option B — OAuth (refresh token du compte orgue.iams@google.com, obtenu une fois hors Edge) :
+         GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, GOOGLE_OAUTH_REFRESH_TOKEN
+       Optionnel : GOOGLE_CALENDAR_TIMEZONE = Europe/Paris (défaut Europe/Paris)
+       Workspace + délégation domain-wide : GOOGLE_CALENDAR_IMPERSONATE = orgue.iams@google.com
+         et GOOGLE_CALENDAR_ID = primary (souvent le plus simple pour l’agenda principal).
    - supabase functions deploy calendar-bridge
    - supabase functions deploy planning-admin
+   - supabase functions deploy planning-slot-notify
    (La secrétaire a le rôle profiles.role = admin ; les fonctions « gestion comptes » passent par planning-admin.)
+   - E-mails « créneau modifié par un tiers » (Brevo API, distinct du SMTP Auth Supabase) :
+       BREVO_API_KEY — clé SMTP & API (Brevo → SMTP & API)
+       NOTIFY_FROM_EMAIL — expéditeur vérifié sur le domaine Brevo (ex. no-reply@…)
+       NOTIFY_FROM_NAME — optionnel (défaut : Planning Orgue IAMS)
 
-4) Google Apps Script
-   - Créer un projet, coller backend/google-apps-script/Code.gs
-   - Paramètres du projet → Script properties → BRIDGE_SECRET = même valeur que GOOGLE_BRIDGE_SECRET
-   - Déployer → Application Web : exécuter en tant que vous, accès « Moi » (ou restreint)
-   - Copier l’URL …/exec vers le secret Supabase GOOGLE_BRIDGE_URL (voir étape 3)
+4) Google Cloud (API Calendar, sans Apps Script)
+   - Console Google Cloud → activer l’API « Google Calendar » pour le projet.
+   - Compte de service → clé JSON → copier dans le secret GOOGLE_SERVICE_ACCOUNT_JSON.
+   - Dans Google Agenda (compte orgue.iams@google.com) : Paramètres du calendrier →
+     Partager avec l’adresse e-mail du compte de service (autorisation « Modifier les événements »),
+     sauf si vous utilisez la délégation domain-wide (Workspace) avec GOOGLE_CALENDAR_IMPERSONATE.
+   - Scopes OAuth si vous passez par refresh token : https://www.googleapis.com/auth/calendar
 
 5) Front (Planning)
    - js/config/planning.config.js :

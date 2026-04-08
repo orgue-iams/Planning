@@ -12,7 +12,11 @@ import {
     addSlotEndFromStart,
     setRecurringOptionsVisible,
     handleEventResize,
-    canCurrentUserEditEvent
+    canCurrentUserEditEvent,
+    syncReservationEventToGoogle,
+    captureResizeStart,
+    maybeNotifySlotOwnerAfterThirdPartyEdit,
+    ownerInfoFromEvent
 } from './calendar-logic.js';
 import {
     login,
@@ -105,11 +109,14 @@ function initCalendarAndRevealUi() {
 
     const handlers = {
         onDatesSet: null,
+        onResizeStart: (info) => captureResizeStart(info),
 
         /** Glisser / appui long puis plage : création rapide (motif favori, type réservation). */
         onSelect: (info) => {
             currentEvent = null;
-            quickCreateFromSelection(calendar, info, currentUser);
+            void quickCreateFromSelection(calendar, info, currentUser).catch((err) =>
+                console.error(err)
+            );
             calendar.unselect();
         },
         /** Clic simple : modale avec préremplissage (un créneau grille de durée). */
@@ -131,13 +138,36 @@ function initCalendarAndRevealUi() {
             currentEvent = info.event;
             openModal(info.event.start, info.event.end, info.event, currentUser);
         },
-        onEventDrop: (info) => {
+        onEventDrop: async (info) => {
             if (!canCurrentUserEditEvent(currentUser, info.event)) {
                 info.revert();
                 showToast('Vous ne pouvez pas déplacer ce créneau.', 'error');
                 return;
             }
-            /* synchro API à brancher */
+            const sync = await syncReservationEventToGoogle(info.event);
+            if (!sync.ok) return;
+            const oi = ownerInfoFromEvent(info.event, currentUser);
+            const me = String(currentUser?.email ?? '')
+                .trim()
+                .toLowerCase();
+            if (
+                oi.ownerEmail &&
+                oi.ownerEmail !== me &&
+                info.oldEvent?.start &&
+                info.oldEvent?.end
+            ) {
+                await maybeNotifySlotOwnerAfterThirdPartyEdit({
+                    currentUser,
+                    action: 'moved',
+                    targetOwnerEmail: oi.ownerEmail,
+                    targetOwnerDisplayName: oi.ownerName,
+                    slotTitle: info.event.title,
+                    slotStart: info.event.start,
+                    slotEnd: info.event.end,
+                    previousStartIso: info.oldEvent.start.toISOString(),
+                    previousEndIso: info.oldEvent.end.toISOString()
+                });
+            }
         },
         onEventResize: (info) => {
             if (!canCurrentUserEditEvent(currentUser, info.event)) {
@@ -145,7 +175,7 @@ function initCalendarAndRevealUi() {
                 showToast('Vous ne pouvez pas redimensionner ce créneau.', 'error');
                 return;
             }
-            handleEventResize(info);
+            void handleEventResize(info, currentUser).catch((err) => console.error(err));
         },
         renderEventContent: (arg) => getEventContent(arg, currentUser)
     };
@@ -172,7 +202,10 @@ function initCalendarAndRevealUi() {
             void saveReservation(calendar, currentUser, currentEvent).catch((err) =>
                 console.error(err)
             );
-        document.getElementById('btn-delete').onclick = () => deleteReservation(calendar, currentEvent);
+        document.getElementById('btn-delete').onclick = () =>
+            void deleteReservation(calendar, currentEvent, currentUser).catch((err) =>
+                console.error(err)
+            );
 
         // Recalcul grille + événements après que height:100% / flex soit appliqué (Chrome, Safari, etc.)
         calendar.updateSize();

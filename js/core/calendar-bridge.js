@@ -37,6 +37,14 @@ export async function invokeCalendarBridge(accessToken, body) {
             };
         }
 
+        if (typeof data === 'object' && data !== null && data.ok === false) {
+            return {
+                ok: false,
+                error: typeof data.error === 'string' ? data.error : 'Erreur pont agenda',
+                data
+            };
+        }
+
         return { ok: true, data };
     } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
