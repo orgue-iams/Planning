@@ -1,46 +1,48 @@
 /**
- * Motifs de réservation par utilisateur : cache local + persistance `profiles.reservation_types` (Supabase).
+ * Préférences de réservation par utilisateur : titre par défaut (cache local + `profiles.reservation_types`).
  */
 
 import { getSupabaseClient, isBackendAuthConfigured } from '../core/supabase-client.js';
-import { RESERVATION_MOTIFS, normalizeMotif } from '../core/reservation-motifs.js';
+import { RESERVATION_MOTIFS } from '../core/reservation-motifs.js';
 
 function storageKey(email) {
     return `orgue_iams_profile_${String(email).trim().toLowerCase()}`;
 }
 
-/** @param {unknown} raw @returns {{ labels: string[], favoriteLabel: string }} */
+/** @param {unknown} raw @returns {{ labels: string[], defaultTitle: string }} */
 function normalizeReservationPayload(raw) {
-    if (raw == null) return { labels: [], favoriteLabel: '' };
+    if (raw == null) return { labels: [], defaultTitle: '' };
     let obj = raw;
     if (typeof raw === 'string') {
         try {
             obj = JSON.parse(raw);
         } catch {
-            return { labels: [], favoriteLabel: '' };
+            return { labels: [], defaultTitle: '' };
         }
     }
-    if (typeof obj !== 'object' || !obj) return { labels: [], favoriteLabel: '' };
-    const p = /** @type {{ labels?: unknown, favoriteLabel?: unknown, favoriteIndex?: unknown }} */ (obj);
+    if (typeof obj !== 'object' || !obj) return { labels: [], defaultTitle: '' };
+    const p = /** @type {{ labels?: unknown, favoriteLabel?: unknown, favoriteIndex?: unknown, defaultTitle?: unknown }} */ (obj);
     const labels = Array.isArray(p.labels)
         ? [...new Set(p.labels.map((s) => String(s).trim()).filter(Boolean))]
         : [];
-    let favoriteLabel = typeof p.favoriteLabel === 'string' ? p.favoriteLabel.trim() : '';
+    let defaultTitle = typeof p.defaultTitle === 'string' ? p.defaultTitle.trim() : '';
+    if (!defaultTitle) {
+        defaultTitle = typeof p.favoriteLabel === 'string' ? p.favoriteLabel.trim() : '';
+    }
     if (typeof p.favoriteIndex === 'number' && labels[p.favoriteIndex]) {
-        favoriteLabel = labels[p.favoriteIndex];
+        defaultTitle = labels[p.favoriteIndex];
     }
-    if (favoriteLabel && !labels.includes(favoriteLabel)) {
-        favoriteLabel = labels[0] || '';
+    if (!defaultTitle && labels.length) {
+        defaultTitle = labels[0];
     }
-    if (!favoriteLabel && labels.length) favoriteLabel = labels[0];
-    return { labels, favoriteLabel };
+    return { labels, defaultTitle };
 }
 
-function writeProfileLocal(email, favoriteLabel) {
-    const fav = normalizeMotif(favoriteLabel);
+function writeProfileLocal(email, defaultTitle) {
+    const clean = String(defaultTitle || '').trim();
     localStorage.setItem(
         storageKey(email),
-        JSON.stringify({ labels: [...RESERVATION_MOTIFS], favoriteLabel: fav })
+        JSON.stringify({ labels: [...RESERVATION_MOTIFS], defaultTitle: clean })
     );
 }
 
@@ -51,28 +53,27 @@ function writeProfileLocal(email, favoriteLabel) {
  */
 export function hydrateReservationTypesFromServer(email, reservationTypes) {
     if (!email) return;
-    const { labels, favoriteLabel } = normalizeReservationPayload(reservationTypes);
-    const fav = normalizeMotif(favoriteLabel || labels[0] || 'Travail');
-    writeProfileLocal(email, fav);
+    const { labels, defaultTitle } = normalizeReservationPayload(reservationTypes);
+    const fallback = labels[0] || '';
+    writeProfileLocal(email, defaultTitle || fallback);
 }
 
-/** @returns {{ labels: string[], favoriteLabel: string }} */
+/** @returns {{ labels: string[], defaultTitle: string }} */
 export function getProfile(email) {
-    if (!email) return { labels: [...RESERVATION_MOTIFS], favoriteLabel: 'Travail' };
+    if (!email) return { labels: [...RESERVATION_MOTIFS], defaultTitle: '' };
     try {
         const raw = localStorage.getItem(storageKey(email));
-        if (!raw) return { labels: [...RESERVATION_MOTIFS], favoriteLabel: 'Travail' };
-        const { labels, favoriteLabel } = normalizeReservationPayload(raw);
-        const fav = normalizeMotif(favoriteLabel || labels[0] || 'Travail');
-        return { labels: [...RESERVATION_MOTIFS], favoriteLabel: fav };
+        if (!raw) return { labels: [...RESERVATION_MOTIFS], defaultTitle: '' };
+        const { defaultTitle } = normalizeReservationPayload(raw);
+        return { labels: [...RESERVATION_MOTIFS], defaultTitle: String(defaultTitle || '').trim() };
     } catch {
-        return { labels: [...RESERVATION_MOTIFS], favoriteLabel: 'Travail' };
+        return { labels: [...RESERVATION_MOTIFS], defaultTitle: '' };
     }
 }
 
-export async function saveProfile(email, _labelsIgnored, favoriteLabel) {
-    writeProfileLocal(email, favoriteLabel);
-    const { labels: cleaned, favoriteLabel: fav } = getProfile(email);
+export async function saveProfile(email, _labelsIgnored, defaultTitle) {
+    writeProfileLocal(email, defaultTitle);
+    const { labels: cleaned, defaultTitle: title } = getProfile(email);
 
     if (isBackendAuthConfigured()) {
         const supabase = getSupabaseClient();
@@ -82,7 +83,7 @@ export async function saveProfile(email, _labelsIgnored, favoriteLabel) {
                 const { error } = await supabase
                     .from('profiles')
                     .update({
-                        reservation_types: { labels: cleaned, favoriteLabel: fav },
+                        reservation_types: { labels: cleaned, defaultTitle: title },
                         updated_at: new Date().toISOString()
                     })
                     .eq('id', user.id);
@@ -92,6 +93,6 @@ export async function saveProfile(email, _labelsIgnored, favoriteLabel) {
     }
 }
 
-export function getFavoriteLabel(email) {
-    return getProfile(email).favoriteLabel;
+export function getDefaultReservationTitle(email) {
+    return getProfile(email).defaultTitle;
 }

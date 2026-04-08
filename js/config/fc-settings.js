@@ -7,6 +7,7 @@ import { showToast } from '../utils/toast.js';
 import { demoEvents } from '../data/mock-events.js';
 import { getAccessToken } from '../core/auth-logic.js';
 import { getPlanningConfig, isBackendAuthConfigured } from '../core/supabase-client.js';
+import { invokeCalendarBridge } from '../core/calendar-bridge.js';
 
 /** @deprecated Conservé pour d’éventuels appels ; la barre FC native est désactivée. */
 export function isCompactCalendarToolbar() {
@@ -129,37 +130,18 @@ export const getCalendarConfig = (handlers, currentUser) => {
                     if (useBridge) {
                         const token = await getAccessToken();
                         if (token) {
-                            const res = await fetch(calendarBridgeUrl, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    Authorization: `Bearer ${token}`
-                                },
-                                body: JSON.stringify({
-                                    action: 'list',
-                                    timeMin: start.toISOString(),
-                                    timeMax: end.toISOString()
-                                })
+                            const bridge = await invokeCalendarBridge(token, {
+                                action: 'list',
+                                timeMin: start.toISOString(),
+                                timeMax: end.toISOString()
                             });
-                            const text = await res.text();
-                            let data = /** @type {{ ok?: boolean, error?: string, events?: unknown[] }} */ ({});
-                            try {
-                                data = text ? JSON.parse(text) : {};
-                            } catch {
-                                data = {};
-                            }
-                            if (!res.ok || data.ok === false) {
-                                const msg =
-                                    (typeof data.error === 'string' && data.error) ||
-                                    (typeof data === 'object' &&
-                                        data !== null &&
-                                        'error' in data &&
-                                        String(/** @type {{ error?: string }} */ (data).error)) ||
-                                    `HTTP ${res.status}`;
+                            if (!bridge.ok) {
+                                const msg = bridge.error || 'Erreur de synchronisation agenda';
                                 showToast(`Agenda Google : ${msg}`, 'error');
                                 failureCallback(new Error(msg));
                                 return;
                             }
+                            const data = /** @type {{ events?: unknown[] }} */ (bridge.data || {});
                             const raw = Array.isArray(data.events) ? data.events : [];
                             rows = raw.map((ev) => {
                                 const o = /** @type {Record<string, unknown>} */ (ev);

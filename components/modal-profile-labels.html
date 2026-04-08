@@ -2,7 +2,7 @@
     <div class="modal-box max-w-md w-[94%] max-h-[90dvh] flex flex-col border border-slate-200 rounded-2xl">
         <h3 class="font-black text-sm uppercase tracking-wide text-slate-600 border-b pb-2 shrink-0">Mes réservations type</h3>
         <p class="text-[11px] text-slate-500 mt-2 leading-snug">
-            Les motifs de réservation sont <strong>fixés pour tout le planning</strong> (même liste que dans la fenêtre de réservation). Vous choisissez seulement celui proposé par défaut.
+            Les motifs de réservation sont <strong>fixés pour tout le planning</strong>. Ici, vous définissez uniquement le <strong>titre par défaut</strong> proposé lors d’une nouvelle réservation.
         </p>
         <div class="form-control mt-3">
             <label class="label py-0"><span class="label-text font-bold text-[11px] uppercase text-slate-500">Types de réservation</span></label>
@@ -14,8 +14,8 @@
             <p class="text-[10px] text-slate-400 mt-1">Travail, Cours, Fermeture, Autre — non modifiables ici.</p>
         </div>
         <div class="form-control mt-3">
-            <label class="label py-0" for="profile-favorite"><span class="label-text font-bold text-[11px] uppercase text-slate-500">Motif par défaut</span></label>
-            <select id="profile-favorite" class="select select-bordered select-sm w-full font-bold text-sm h-11 bg-slate-50"></select>
+            <label class="label py-0" for="profile-default-title"><span class="label-text font-bold text-[11px] uppercase text-slate-500">Titre par défaut</span></label>
+            <input id="profile-default-title" type="text" maxlength="120" class="input input-bordered input-sm w-full font-bold text-sm h-11 bg-slate-50" />
         </div>
         <div class="modal-action flex-wrap gap-2 mt-4 shrink-0 border-t border-slate-100 pt-3">
             <button type="button" id="profile-labels-btn-save" class="btn btn-primary btn-sm font-black text-[11px]">Enregistrer</button>

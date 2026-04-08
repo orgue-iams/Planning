@@ -6,16 +6,6 @@ import { showToast } from '../utils/toast.js';
 import { getProfile, saveProfile } from '../utils/user-profile.js';
 import { RESERVATION_MOTIFS } from './reservation-motifs.js';
 
-function refillFavoriteSelect(sel, selected) {
-    if (!sel) return;
-    sel.innerHTML = '';
-    for (const lab of RESERVATION_MOTIFS) {
-        sel.add(new Option(lab, lab));
-    }
-    if (selected && RESERVATION_MOTIFS.includes(selected)) sel.value = selected;
-    else if (RESERVATION_MOTIFS.length) sel.value = RESERVATION_MOTIFS[0];
-}
-
 function refillMotifsList(el) {
     if (!el) return;
     el.replaceChildren();
@@ -39,7 +29,7 @@ function refillMotifsList(el) {
 export function initProfileLabelsUi(currentUser) {
     const btn = document.getElementById('menu-item-reservation-types');
     const dlg = document.getElementById('modal_profile_labels');
-    const fav = document.getElementById('profile-favorite');
+    const titleInput = document.getElementById('profile-default-title');
     const listEl = document.getElementById('profile-motifs-list');
 
     btn?.addEventListener('click', (e) => {
@@ -48,7 +38,7 @@ export function initProfileLabelsUi(currentUser) {
         document.getElementById('btn-user-menu')?.blur();
         const p = getProfile(currentUser.email);
         refillMotifsList(listEl);
-        refillFavoriteSelect(fav, p.favoriteLabel);
+        if (titleInput) titleInput.value = p.defaultTitle || '';
         dlg?.showModal();
     });
 
@@ -56,7 +46,7 @@ export function initProfileLabelsUi(currentUser) {
 
     document.getElementById('profile-labels-btn-save')?.addEventListener('click', async () => {
         if (!currentUser?.email) return;
-        await saveProfile(currentUser.email, RESERVATION_MOTIFS, fav?.value || '');
+        await saveProfile(currentUser.email, RESERVATION_MOTIFS, titleInput?.value || '');
         dlg?.close();
         showToast('Réservations type enregistrées.');
     });

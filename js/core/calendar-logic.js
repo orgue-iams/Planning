@@ -7,7 +7,7 @@ import { showToast } from '../utils/toast.js';
 import { getAccessToken, isBackendAuthConfigured, isPrivilegedUser } from './auth-logic.js';
 import { invokeCalendarBridge } from './calendar-bridge.js';
 import { invokeSlotNotify } from './slot-notify-api.js';
-import { getProfile, getFavoriteLabel } from '../utils/user-profile.js';
+import { getDefaultReservationTitle, getProfile } from '../utils/user-profile.js';
 import { isPlanningRole } from './planning-roles.js';
 import { RESERVATION_MOTIFS, normalizeMotif, motifToSlotType } from './reservation-motifs.js';
 
@@ -73,6 +73,25 @@ function roleFromOwnerEmail(email) {
     return '';
 }
 
+function allowedMotifsForRole(role) {
+    const r = normalizeRole(role);
+    if (r === 'admin' || r === 'prof') return [...RESERVATION_MOTIFS];
+    return RESERVATION_MOTIFS.filter((m) => m !== 'Fermeture');
+}
+
+function defaultMotifForRole(role) {
+    const r = normalizeRole(role);
+    if (r === 'prof') return 'Cours';
+    return 'Travail';
+}
+
+function slotTypeToMotif(slotType) {
+    const s = String(slotType || '').trim().toLowerCase();
+    if (s === 'fermeture') return 'Fermeture';
+    if (s === 'cours' || s === 'maintenance') return 'Cours';
+    return 'Travail';
+}
+
 /** @param {import('@fullcalendar/core').EventApi[]} localEvents */
 function applyBridgeUpsertResults(localEvents, results) {
     if (!Array.isArray(results) || !Array.isArray(localEvents)) return;
@@ -122,7 +141,7 @@ export async function syncReservationEventToGoogle(calendarEvent) {
     const owner = String(calendarEvent.extendedProps?.owner || '').trim();
     const type = calendarEvent.extendedProps?.type || 'reservation';
     const gid = bridgeGoogleIdFromFcEvent(calendarEvent);
-    const title = normalizeMotif(calendarEvent.title || '');
+    const title = String(calendarEvent.title || '').trim() || 'Créneau';
     const payload = {
         ...(gid ? { googleEventId: gid } : {}),
         title,
@@ -556,24 +575,41 @@ function addOneEventPerDay(calendar, days, title, tStart, tEnd, type, ownerEmail
     return added;
 }
 
-export function getReservationTitleFromForm() {
-    const sel = document.getElementById('event-title-select');
-    return normalizeMotif(sel?.value || '');
+function getReservationMotifFromForm(currentUser) {
+    const sel = document.getElementById('event-motif-select');
+    const allowed = allowedMotifsForRole(currentUser?.role);
+    const v = normalizeMotif(sel?.value || defaultMotifForRole(currentUser?.role));
+    return allowed.includes(v) ? v : defaultMotifForRole(currentUser?.role);
 }
 
-/** Remplit la liste déroulante des motifs (Travail / Cours / Fermeture / Autre). */
-export function buildReservationTitleSelect(currentUser, existingTitle) {
-    const { favoriteLabel } = getProfile(currentUser?.email);
-    const sel = document.getElementById('event-title-select');
-    if (!sel) return;
+function getReservationTextTitleFromForm(currentUser, motif) {
+    const input = document.getElementById('event-title-input');
+    const typed = String(input?.value || '').trim();
+    if (typed) return typed;
+    const byProfile = String(getDefaultReservationTitle(currentUser?.email) || '').trim();
+    if (byProfile) return byProfile;
+    return motif;
+}
 
+/** Remplit motif + titre (règles de rôle + préférence utilisateur). */
+export function buildReservationFormFields(currentUser, event) {
+    const sel = document.getElementById('event-motif-select');
+    const titleInput = document.getElementById('event-title-input');
+    if (!sel || !titleInput) return;
+
+    const allowed = allowedMotifsForRole(currentUser?.role);
     sel.innerHTML = '';
-    for (const lab of RESERVATION_MOTIFS) {
-        sel.add(new Option(lab, lab));
-    }
+    for (const lab of allowed) sel.add(new Option(lab, lab));
 
-    const str = normalizeMotif(existingTitle || favoriteLabel);
-    sel.value = str;
+    const inferredMotif = event ? slotTypeToMotif(event.extendedProps?.type) : defaultMotifForRole(currentUser?.role);
+    sel.value = allowed.includes(inferredMotif) ? inferredMotif : defaultMotifForRole(currentUser?.role);
+
+    if (event) {
+        titleInput.value = String(event.title || '').trim();
+    } else {
+        const fallback = String(getProfile(currentUser?.email).defaultTitle || '').trim();
+        titleInput.value = fallback;
+    }
 }
 
 /** Fin de plage pour un clic simple (aligné sur snapDuration, pas sur la hauteur visuelle du slot). */
@@ -613,7 +649,8 @@ export async function quickCreateFromSelection(calendar, selectInfo, currentUser
         return;
     }
 
-    let title = normalizeMotif(getFavoriteLabel(currentUser.email).trim() || 'Travail');
+    const motif = defaultMotifForRole(currentUser.role);
+    let title = String(getDefaultReservationTitle(currentUser.email) || '').trim() || motif;
 
     const conflict = findOverlappingCalendarEvent(
         calendar,
@@ -638,7 +675,7 @@ export async function quickCreateFromSelection(calendar, selectInfo, currentUser
                 owner: currentUser.email,
                 ownerDisplayName: currentUser.name || currentUser.email.split('@')[0],
                 ownerRole: normalizeRole(currentUser.role) || 'eleve',
-                type: motifToSlotType(title)
+                type: motifToSlotType(motif)
             }
         });
     };
@@ -649,7 +686,7 @@ export async function quickCreateFromSelection(calendar, selectInfo, currentUser
         add();
     }
     showToast('Créneau enregistré (rapide).');
-    const slotType = motifToSlotType(title);
+    const slotType = motifToSlotType(motif);
     const sync = await trySyncGoogleCalendar([
         {
             title,
@@ -708,7 +745,7 @@ export function openModal(start, end, event, currentUser) {
     modalActions?.classList.remove('justify-end');
     modalActions?.classList.add('justify-between');
 
-    buildReservationTitleSelect(currentUser, event ? event.title : '');
+    buildReservationFormFields(currentUser, event || null);
 
     const toDateInput = (d) => d.toLocaleDateString('en-CA');
     const startEl = document.getElementById('event-start');
@@ -786,7 +823,8 @@ export function openModal(start, end, event, currentUser) {
 
     // Sécurité : Verrouillage si le créneau appartient à quelqu'un d'autre
     const fields = [
-        'event-title-select',
+        'event-motif-select',
+        'event-title-input',
         'event-date-start',
         'event-start',
         'event-end',
@@ -812,7 +850,7 @@ export function openModal(start, end, event, currentUser) {
 
     modal.showModal();
     requestAnimationFrame(() => {
-        const titleEl = document.getElementById('event-title-select');
+        const titleEl = document.getElementById('event-title-input');
         if (titleEl && !titleEl.disabled) titleEl.focus();
     });
 }
@@ -835,8 +873,9 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         return;
     }
 
-    const title = getReservationTitleFromForm();
-    const slotType = motifToSlotType(title);
+    const motif = getReservationMotifFromForm(currentUser);
+    const title = getReservationTextTitleFromForm(currentUser, motif);
+    const slotType = motifToSlotType(motif);
     const recurOn =
         isPrivilegedUser(currentUser) &&
         document.getElementById('event-recurring')?.checked &&
@@ -952,7 +991,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     let prevSnapshot = null;
     if (currentEventRef) {
         prevSnapshot = {
-            title: normalizeMotif(currentEventRef.title || ''),
+            title: String(currentEventRef.title || '').trim(),
             startStr: currentEventRef.start ? new Date(currentEventRef.start).toISOString() : '',
             endStr: currentEventRef.end ? new Date(currentEventRef.end).toISOString() : '',
             type: currentEventRef.extendedProps?.type || 'reservation'
@@ -1034,7 +1073,7 @@ export async function deleteReservation(calendar, currentEventRef, currentUser) 
     }
 
     const oi = ownerInfoFromEvent(currentEventRef, currentUser);
-    const titleDel = normalizeMotif(currentEventRef.title || '');
+    const titleDel = String(currentEventRef.title || '').trim() || 'Créneau';
     const startDel = currentEventRef.start;
     const endDel = currentEventRef.end;
 

@@ -7,7 +7,7 @@ import { getPlanningConfig } from './supabase-client.js';
  * @returns {Promise<{ ok: boolean, skipped?: boolean, error?: string, data?: unknown }>}
  */
 export async function invokeCalendarBridge(accessToken, body) {
-    const { calendarBridgeUrl } = getPlanningConfig();
+    const { calendarBridgeUrl, supabaseAnonKey } = getPlanningConfig();
     if (!calendarBridgeUrl) {
         return { ok: true, skipped: true };
     }
@@ -17,6 +17,7 @@ export async function invokeCalendarBridge(accessToken, body) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                ...(supabaseAnonKey ? { apikey: supabaseAnonKey } : {}),
                 ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
             },
             body: JSON.stringify(body)
