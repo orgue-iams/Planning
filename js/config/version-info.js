@@ -1,12 +1,20 @@
 /**
- * Libellé de build affiché sur l’écran de connexion et dans l’en-tête du planning.
- * Mettre à jour `APP_VERSION_LABEL` et `APP_BUILD_STAMP` à chaque déploiement.
+ * Affichage build : date et heure uniquement (écran de connexion + en-tête).
+ * Mettre à jour `APP_BUILD_STAMP` à chaque déploiement (ISO 8601 UTC).
  */
-export const APP_VERSION_LABEL = 'planning-2026.04.08';
+export const APP_BUILD_STAMP = '2026-04-08T16:42:58.659Z';
 
-/** Heure ISO UTC de génération / déploiement de cette build (précise). */
-export const APP_BUILD_STAMP = '2026-04-08T17:45:00.000Z';
-
+/** Libellé affiché (fuseau UTC, cohérent avec le tampon ISO). */
 export function formatVersionBadgeText() {
-    return `${APP_VERSION_LABEL} · ${APP_BUILD_STAMP}`;
+    const d = new Date(APP_BUILD_STAMP);
+    if (Number.isNaN(d.getTime())) return APP_BUILD_STAMP;
+    return `${d.toLocaleString('fr-FR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZone: 'UTC'
+    })} UTC`;
 }

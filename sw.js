@@ -1,4 +1,5 @@
-const CACHE_NAME = 'orgue-v33';
+/* Incrémenter à chaque mise en ligne pour invalider le cache (HTML/JS/CSS listés). */
+const CACHE_NAME = 'orgue-v35';
 
 /** Ressources locales (hors CDN) pour démarrage rapide / coquille hors-ligne */
 const ASSETS = [
@@ -21,6 +22,7 @@ const ASSETS = [
   './js/core/supabase-auth.js',
   './js/core/calendar-bridge.js',
   './js/config/planning.config.js',
+  './js/config/version-info.js',
   './js/config/fc-settings.js',
   './js/utils/loader.js',
   './js/utils/time-helpers.js',
@@ -41,6 +43,9 @@ const ASSETS = [
   './js/core/login-banner.js',
   './js/core/admin-api.js',
   './js/core/admin-users-ui.js',
+  './js/core/session-user.js',
+  './js/core/slot-notify-api.js',
+  './js/core/reservation-motifs.js',
   './js/core/announcements-ui.js',
   './js/utils/org-content.js',
   './js/utils/rich-text.js',
