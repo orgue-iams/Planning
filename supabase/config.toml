@@ -1,8 +1,12 @@
 # Généré / complété pour supabase CLI (optionnel). Commandes : supabase init (si besoin), puis déploiement des fonctions.
 # CI: push sur ce fichier déclenche migrations + functions deploy.
 
+# false : la passerelle ne déduit pas « Invalid JWT » avant notre code ; on valide via GoTrue /auth/v1/user.
 [functions.calendar-bridge]
-verify_jwt = true
+verify_jwt = false
 
 [functions.planning-admin]
-verify_jwt = true
+verify_jwt = false
+
+[functions.planning-slot-notify]
+verify_jwt = false

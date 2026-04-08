@@ -10,7 +10,7 @@
  * Déploiement : supabase functions deploy planning-slot-notify
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
+import { fetchAuthUser } from '../_shared/auth_gotrue.ts';
 
 const cors: Record<string, string> = {
     'Access-Control-Allow-Origin': '*',
@@ -79,17 +79,10 @@ Deno.serve(async (req) => {
 
         const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
         const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-        const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-            auth: { autoRefreshToken: false, persistSession: false },
-            global: { headers: { Authorization: `Bearer ${jwt}` } }
-        });
 
-        const {
-            data: { user },
-            error: userErr
-        } = await userClient.auth.getUser(jwt);
-        if (userErr || !user?.email) {
-            return json({ ok: false, emailSent: false, error: 'Unauthorized' }, 401);
+        const { user, error: authErr } = await fetchAuthUser(supabaseUrl, supabaseAnonKey, jwt);
+        if (authErr || !user?.email) {
+            return json({ ok: false, emailSent: false, error: authErr || 'Unauthorized' }, 401);
         }
 
         const me = user.email.trim().toLowerCase();

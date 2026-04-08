@@ -42,20 +42,21 @@ export async function invokeCalendarBridge(accessToken, body) {
             if (supabase) {
                 await supabase.auth.refreshSession();
                 const { data: { session } } = await supabase.auth.getSession();
-                const refreshed = session?.access_token ?? null;
-                if (refreshed && refreshed !== token) {
-                    token = refreshed;
-                    res = await doFetch(token);
-                }
+                token = session?.access_token ?? token;
+                res = await doFetch(token);
             }
         }
 
         const { data } = await parseResponse(res);
 
         if (!res.ok) {
+            const msg =
+                typeof data === 'string'
+                    ? data
+                    : data?.error || data?.message || data?.msg || res.statusText || `HTTP ${res.status}`;
             return {
                 ok: false,
-                error: typeof data === 'string' ? data : data?.error || res.statusText || `HTTP ${res.status}`
+                error: typeof msg === 'string' ? msg : `HTTP ${res.status}`
             };
         }
 

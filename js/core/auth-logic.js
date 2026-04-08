@@ -202,13 +202,22 @@ export async function tryRestoreSession() {
     return fetchAppUserFromSession(session);
 }
 
-/** JWT courant pour le pont Agenda (Apps Script / Edge Function). */
+/** JWT courant pour le pont Agenda et les Edge Functions (rafraîchi si proche de l’expiration). */
 export async function getAccessToken() {
     if (!isBackendAuthConfigured()) return null;
     const supabase = getSupabaseClient();
     if (!supabase) return null;
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token ?? null;
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error || !session) return null;
+    const exp = session.expires_at;
+    if (typeof exp === 'number') {
+        const now = Math.floor(Date.now() / 1000);
+        if (exp < now + 180) {
+            const { data: ref, error: rerr } = await supabase.auth.refreshSession();
+            if (!rerr && ref?.session?.access_token) return ref.session.access_token;
+        }
+    }
+    return session.access_token ?? null;
 }
 
 export async function updatePassword() {

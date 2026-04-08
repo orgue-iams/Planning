@@ -3,6 +3,7 @@
  * Secrets auto : SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
+import { fetchAuthUser } from '../_shared/auth_gotrue.ts';
 
 const MIN_PASSWORD_LEN = 6;
 
@@ -80,17 +81,14 @@ async function requirePlanningAdmin(authHeader: string | null, anonKey: string, 
     if (!authHeader) return { error: 'Missing Authorization' };
     const jwt = authHeader.replace(/^Bearer\s+/i, '').trim();
     if (!jwt) return { error: 'Missing Authorization' };
+    const { user, error: authErr } = await fetchAuthUser(url, anonKey, jwt);
+    if (authErr || !user) {
+        return { error: authErr?.trim() || 'Unauthorized' };
+    }
     const userClient = createClient(url, anonKey, {
         auth: { autoRefreshToken: false, persistSession: false },
         global: { headers: { Authorization: `Bearer ${jwt}` } }
     });
-    const {
-        data: { user },
-        error: uerr
-    } = await userClient.auth.getUser(jwt);
-    if (uerr || !user) {
-        return { error: uerr?.message?.trim() || 'Unauthorized' };
-    }
     const { data: row } = await userClient.from('profiles').select('role').eq('id', user.id).maybeSingle();
     if (row?.role !== 'admin') return { error: 'Forbidden: planning admin only' };
     return { user: { id: user.id, email: user.email } };

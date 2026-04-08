@@ -1,16 +1,18 @@
 /* --- STRUCTURE DE LA GRILLE --- */
 .fc-timegrid-axis {
-    width: 58px !important;
-    min-width: 58px !important;
+    width: 76px !important;
+    min-width: 76px !important;
 }
 
 /* Heures à gauche : plus compact ; aligné en haut de la case, centré horizontalement. */
 .fc .fc-timegrid-slot-label {
     font-size: 0.6875rem;
     font-weight: 600;
-    line-height: 1.1;
+    line-height: 1.15;
     font-variant-numeric: tabular-nums;
-    padding-inline-end: 0.125rem;
+    padding-inline-start: 0.125rem;
+    padding-inline-end: 0.25rem;
+    white-space: nowrap;
     vertical-align: top;
 }
 

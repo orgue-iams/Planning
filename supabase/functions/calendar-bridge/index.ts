@@ -19,8 +19,8 @@
  * Déploiement : supabase functions deploy calendar-bridge
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
 import { SignJWT, importPKCS8 } from 'https://deno.land/x/jose@v5.6.0/index.ts';
+import { fetchAuthUser } from '../_shared/auth_gotrue.ts';
 
 const CAL_SCOPE = 'https://www.googleapis.com/auth/calendar';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -251,17 +251,9 @@ Deno.serve(async (req) => {
             return jsonResponse({ error: 'Missing Authorization' }, 401);
         }
 
-        const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-            auth: { autoRefreshToken: false, persistSession: false },
-            global: { headers: { Authorization: authHeader } }
-        });
-
-        const {
-            data: { user },
-            error: userErr
-        } = await supabase.auth.getUser(jwt);
-        if (userErr || !user) {
-            return jsonResponse({ error: 'Unauthorized' }, 401);
+        const { user, error: authErr } = await fetchAuthUser(supabaseUrl, supabaseAnonKey, jwt);
+        if (authErr || !user) {
+            return jsonResponse({ error: authErr || 'Unauthorized' }, 401);
         }
 
         let body: BridgeBody;
