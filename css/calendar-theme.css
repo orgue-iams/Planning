@@ -107,3 +107,38 @@
         font-size: 0.625rem;
     }
 }
+
+/* En-têtes de colonnes (jours) — mobile ≤640px : 3 lettres fines, numéro gras dessous (type Google Agenda) */
+.fc .fc-day-head-gcal {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    line-height: 1.15;
+    gap: 0.1rem;
+    padding: 0.2rem 0.1rem;
+    min-width: 0;
+}
+
+.fc .fc-day-head-gcal__dow {
+    font-size: 0.6rem;
+    font-weight: 400;
+    color: #64748b;
+    letter-spacing: 0.02em;
+    text-transform: none;
+}
+
+.fc .fc-day-head-gcal__dom {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Laisser le hook dayHeaderContent gérer le mobile ; éviter le gras global du cushion sur ces cellules */
+.fc .fc-col-header-cell .fc-day-head-gcal__dow,
+.fc .fc-col-header-cell .fc-day-head-gcal__dom {
+    display: block;
+    width: 100%;
+}

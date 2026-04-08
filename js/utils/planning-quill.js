@@ -2,9 +2,8 @@
  * Éditeur WYSIWYG partagé (modales Règles + Annonces).
  * Requiert `window.Quill` chargé via CDN (voir index.html).
  *
- * Pas de sélecteur de police : affichage homogène et lisibilité du menu « taille »
- * (sans quoi Quill n’affiche que « Normal » pour les tailles personnalisées).
- * La barre d’outils est rendue sticky en CSS pour limiter le recouvrement par le menu Copier/Coller (mobile).
+ * Pas de police ni de couleur : évite les listes déroulantes où toutes les lignes affichent « Normal » (bug Snow + CSS).
+ * Tailles en px avec libellés explicites dans modal.css.
  */
 
 export function isQuillAvailable() {
@@ -40,8 +39,7 @@ export function createPlanningQuill(mountEl, opts = {}) {
             toolbar: [
                 ['bold', 'italic', 'underline'],
                 [{ list: 'bullet' }],
-                [{ size: ['10px', '12px', '14px', '16px', '18px', '20px'] }],
-                [{ color: [] }]
+                [{ size: ['10px', '12px', '14px', '16px', '18px', '20px'] }]
             ]
         }
     });
