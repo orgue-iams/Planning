@@ -37,6 +37,8 @@ Démarrage option 2 — Supabase + Google Agenda
 3) Edge Functions
    - Installer la CLI : https://supabase.com/docs/guides/cli
    - supabase login && supabase link --project-ref <VOTRE_REF>
+   - Déploiement local tout-en-un (migrations + toutes les fonctions) : à la racine du dépôt Planning, `npm run deploy:supabase`
+     (lit la ref dans `supabase/project-ref`, ou `SUPABASE_PROJECT_REF` si défini ; même ordre que la CI : db push puis functions deploy).
    - Secrets du projet (Dashboard → Edge Functions → Secrets, ou CLI) pour Google Calendar API :
        GOOGLE_CALENDAR_ID = orgue.iams@google.com (ID du calendrier affiché dans les paramètres Google Agenda)
        Option A — compte de service (recommandé une fois le calendrier partagé avec l’e-mail du SA) :
