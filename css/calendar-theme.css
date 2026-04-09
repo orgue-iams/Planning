@@ -1,12 +1,65 @@
 /* --- STRUCTURE DE LA GRILLE --- */
+/* Largeur axe temps : une seule valeur pour colgroup + cellules (évite le décalage en-tête / corps). */
+.fc {
+    --planning-axis-col-width: calc(5.5rem * 2 / 3);
+}
+
+/* Laisser FullCalendar gérer le tactile (sélection long-press + drag) sans imposer pan-y au parent. */
+#calendar {
+    touch-action: manipulation;
+}
+
+/* Pas de cadre extérieur sur la grille (thème FC = 1px sur .fc-scrollgrid). */
+#calendar .fc-scrollgrid {
+    border: 0 !important;
+}
+
+/*
+ * FC place la sélection en cours (.fc-highlight) au-dessus de la grille en position absolue.
+ * Sans pointer-events: none, le curseur/doigt « tape » la surbrillance au lieu de la couche
+ * de coordonnées : le drag ne reçoit plus les bons hits et la sélection ne se termine pas
+ * (le body garde user-select:none le temps que FC croit encore au drag).
+ */
+.fc .fc-highlight,
+.fc .fc-non-business,
+.fc .fc-bg-event {
+    pointer-events: none;
+}
+
+/* Conteneur des fonds (hors horaires, surbrillance) : sinon la zone vide du div capte encore les hits au-dessus des slats. */
+.fc .fc-timegrid-col-bg {
+    pointer-events: none;
+}
+
+.fc .fc-scrollgrid-sync-table {
+    box-sizing: border-box;
+}
+
+.fc .fc-scrollgrid-sync-table th,
+.fc .fc-scrollgrid-sync-table td {
+    box-sizing: border-box;
+}
+
+/* Alignement en-tête / corps des colonnes jour : voir `timegrid-column-sync.js` (<colgroup> en px). */
+.fc .fc-col-header-cell .fc-scrollgrid-sync-inner,
+.fc .fc-col-header-cell-cushion {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* Réserve l’espace de la barre de défilement verticale : les colonnes jour restent alignées avec l’en-tête. */
+.fc-timegrid-body .fc-scroller-harness-liquid .fc-scroller {
+    scrollbar-gutter: stable;
+}
+
 /* FullCalendar 6 : 1re colonne (heures) — plusieurs sélecteurs car la largeur est appliquée sur td/col/flex */
-/* Le 1er <col> n’a souvent pas de classe ; FC met width inline (~79px) → chevauchement du texte sur la colonne lun. */
 .fc-timegrid-slots table > colgroup > col:first-child,
 .fc-timegrid-cols table > colgroup > col:first-child,
 .fc-col-header table > colgroup > col:first-child {
-    width: calc(5.5rem * 2 / 3) !important;
-    min-width: calc(5.5rem * 2 / 3) !important;
-    max-width: none !important;
+    width: var(--planning-axis-col-width) !important;
+    min-width: var(--planning-axis-col-width) !important;
+    max-width: var(--planning-axis-col-width) !important;
 }
 
 .fc-timegrid-axis,
@@ -20,12 +73,12 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
 .fc .fc-scrollgrid-section-body > td:first-child,
 .fc .fc-scrollgrid-section-header > td:first-child,
 .fc-timegrid .fc-scrollgrid-sync-table tr > td:first-child {
-    width: calc(5.5rem * 2 / 3) !important;
-    min-width: calc(5.5rem * 2 / 3) !important;
-    max-width: none !important;
+    width: var(--planning-axis-col-width) !important;
+    min-width: var(--planning-axis-col-width) !important;
+    max-width: var(--planning-axis-col-width) !important;
 }
 
-/* Heures à gauche : plus compact ; aligné en haut de la case, centré horizontalement. */
+/* Colonne heures : typo (cellules mineures vides inchangées). */
 .fc .fc-timegrid-slot-label {
     font-size: 0.6875rem;
     font-weight: 600;
@@ -38,29 +91,90 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     overflow: visible;
 }
 
-.fc .fc-timegrid-slot-label-frame {
-    display: block;
-    width: 100%;
-    min-height: 100%;
-    box-sizing: border-box;
+/*
+ * Libellé majeur (heure) : le centre vertical du texte coïncide avec le trait horizontal
+ * en haut de la rangée (= début du créneau), au lieu d’être « dans » la case en dessous.
+ */
+.fc .fc-timegrid-slot-label.fc-scrollgrid-shrink {
+    padding-block: 0;
 }
 
-.fc .fc-timegrid-slot-label-cushion {
+.fc .fc-timegrid-slot-label.fc-scrollgrid-shrink .fc-timegrid-slot-label-frame {
     display: block;
     width: 100%;
-    /* Éviter min-width:0 qui laisse le libellé HH:mm se comprimer sous la largeur du texte */
+    min-height: 0;
+    box-sizing: border-box;
+    position: relative;
+    transform: translateY(-50%);
+    text-align: center;
+}
+
+.fc .fc-timegrid-slot-label.fc-scrollgrid-shrink .fc-timegrid-slot-label-cushion {
+    display: inline-block;
     min-width: min-content;
-    margin: 0 auto;
-    padding: 0.125rem 0.05rem 0;
+    margin: 0;
+    padding: 0 0.05rem;
     text-align: center;
     white-space: nowrap;
     box-sizing: border-box;
+    line-height: 1.1;
 }
 
+/* Sous-créneaux sans texte : garder une frame stable si FC en rend une */
+.fc .fc-timegrid-slot-label.fc-timegrid-slot-minor .fc-timegrid-slot-label-frame {
+    min-height: 0;
+}
+
+/* Lignes d’heure : bordure sur les « lanes » et la grille jours — pas sur les libellés d’heure (voir plus bas). */
 .fc-timegrid-slot {
-    /* Une ligne d’axe = 1 h (slotDuration 1 h) : hauteur ≈ 2 × l’ancien demi-créneau pour garder une densité lisible */
     height: 3.6rem !important;
     border-bottom: 1px solid #f1f5f9 !important;
+}
+
+/*
+ * Colonne libellés (fc-timegrid-slots, 1re colonne du sous-tableau) : aucun trait horizontal.
+ * Ne pas cibler .fc-timegrid-slot-lane : ce sont les marques d’heure qui continuent sous les jours.
+ */
+.fc-timegrid-slots td.fc-timegrid-slot-label,
+.fc-timegrid-slots td.fc-timegrid-slot-label .fc-timegrid-slot-label-frame,
+.fc-timegrid-slots td.fc-timegrid-slot-label .fc-timegrid-slot-label-cushion {
+    border-top: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+    background-image: none !important;
+}
+
+/* Fond sous le libellé (translateY sort une partie du texte hors de la cellule) ; pas de z-index élevé pour rester sous la ligne d’en-tête sticky. */
+.fc-timegrid-slots td.fc-timegrid-slot-label {
+    position: relative;
+    background-color: var(--fc-page-bg-color, #fff);
+    overflow: visible;
+}
+
+/* Première heure : ne pas remonter le texte sous la ligne d’en-tête */
+.fc-timegrid-slots tbody tr:first-child .fc-timegrid-slot-label.fc-scrollgrid-shrink .fc-timegrid-slot-label-frame {
+    transform: translateY(0);
+}
+
+/* Coin / en-tête au-dessus de la colonne heures */
+.fc-timegrid .fc-scrollgrid-section-header > table > tbody > tr > td:first-child,
+.fc-timegrid .fc-scrollgrid-section-header > table > tbody > tr > td:first-child * {
+    border-top: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+    background-image: none !important;
+}
+
+/* Variante DOM : axe dans .fc-timegrid-axis (table ou div interne) */
+.fc .fc-timegrid-axis table,
+.fc .fc-timegrid-axis tbody,
+.fc .fc-timegrid-axis tr,
+.fc .fc-timegrid-axis th,
+.fc .fc-timegrid-axis td {
+    border-top: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+    background-image: none !important;
 }
 
 /* Force le texte à prendre toute la largeur sans marges inutiles */
@@ -132,11 +246,16 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
         flex-shrink: 0;
     }
 
+    .fc {
+        --planning-axis-col-width: calc(4.75rem * 2 / 3);
+    }
+
     .fc-timegrid-slots table > colgroup > col:first-child,
     .fc-timegrid-cols table > colgroup > col:first-child,
     .fc-col-header table > colgroup > col:first-child {
-        width: calc(4.75rem * 2 / 3) !important;
-        min-width: calc(4.75rem * 2 / 3) !important;
+        width: var(--planning-axis-col-width) !important;
+        min-width: var(--planning-axis-col-width) !important;
+        max-width: var(--planning-axis-col-width) !important;
     }
 
     .fc-timegrid-axis,
@@ -150,26 +269,35 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     .fc .fc-scrollgrid-section-body > td:first-child,
     .fc .fc-scrollgrid-section-header > td:first-child,
     .fc-timegrid .fc-scrollgrid-sync-table tr > td:first-child {
-        width: calc(4.75rem * 2 / 3) !important;
-        min-width: calc(4.75rem * 2 / 3) !important;
+        width: var(--planning-axis-col-width) !important;
+        min-width: var(--planning-axis-col-width) !important;
+        max-width: var(--planning-axis-col-width) !important;
     }
 
     .fc .fc-timegrid-slot-label {
         font-size: 0.625rem;
     }
+
+    .fc .fc-day-head-gcal {
+        gap: 0.12rem;
+        padding: 0.2rem 0.06rem;
+    }
+
+    .fc .fc-day-head-gcal__dow {
+        font-size: 0.6rem;
+    }
+
+    .fc .fc-day-head-gcal__dom-badge {
+        min-width: 1.55rem;
+        height: 1.55rem;
+    }
+
+    .fc .fc-day-head-gcal__dom {
+        font-size: 0.78rem;
+    }
 }
 
-/* Desktop : en-tête jour lisible (dayHeaderContent) */
-.fc .fc-day-head-plain {
-    text-align: center;
-    font-size: 0.6875rem;
-    font-weight: 700;
-    color: #334155;
-    line-height: 1.2;
-    padding: 0.25rem 0.125rem;
-}
-
-/* En-têtes de colonnes (jours) — mobile ≤640px : 3 lettres fines, numéro gras dessous (type Google Agenda) */
+/* En-têtes colonnes jours : ligne 1 = jour, ligne 2 = numéro dans un rond (toutes largeurs). */
 .fc .fc-day-head-gcal {
     display: flex;
     flex-direction: column;
@@ -177,29 +305,58 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     justify-content: center;
     text-align: center;
     line-height: 1.15;
-    gap: 0.1rem;
-    padding: 0.2rem 0.1rem;
+    gap: 0.2rem;
+    padding: 0.25rem 0.1rem;
     min-width: 0;
 }
 
 .fc .fc-day-head-gcal__dow {
-    font-size: 0.6rem;
-    font-weight: 400;
+    font-size: 0.65rem;
+    font-weight: 500;
     color: #64748b;
     letter-spacing: 0.02em;
     text-transform: none;
 }
 
+.fc .fc-day-head-gcal__dom-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.65rem;
+    height: 1.65rem;
+    padding: 0 0.2rem;
+    border-radius: 9999px;
+    background: #e2e8f0;
+    box-sizing: border-box;
+}
+
 .fc .fc-day-head-gcal__dom {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 700;
     color: #0f172a;
     font-variant-numeric: tabular-nums;
+    line-height: 1;
 }
 
-/* Laisser le hook dayHeaderContent gérer le mobile ; éviter le gras global du cushion sur ces cellules */
-.fc .fc-col-header-cell .fc-day-head-gcal__dow,
-.fc .fc-col-header-cell .fc-day-head-gcal__dom {
+.fc .fc-day-head-gcal--today .fc-day-head-gcal__dom-badge {
+    background: #3b82f6;
+}
+
+.fc .fc-day-head-gcal--today .fc-day-head-gcal__dom {
+    color: #fff;
+}
+
+.fc .fc-day-head-gcal--today .fc-day-head-gcal__dow {
+    color: #3b82f6;
+    font-weight: 600;
+}
+
+/* Cushion FC : pas d’écraser le flex du hook dayHeaderContent */
+.fc .fc-col-header-cell .fc-day-head-gcal__dow {
     display: block;
     width: 100%;
+}
+
+.fc .fc-col-header-cell .fc-day-head-gcal__dom-badge {
+    flex-shrink: 0;
 }

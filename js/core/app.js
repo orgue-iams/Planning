@@ -3,13 +3,12 @@ import { getCalendarConfig, bindResponsiveCalendarToolbar } from '../config/fc-s
 import { initCalendarToolbar } from './calendar-toolbar.js';
 import { populateTimeSelects } from '../utils/time-helpers.js';
 import { initSwipe } from '../utils/touch-handler.js';
+import { bindTimeGridColumnSync, scheduleTimeGridColumnSync } from '../utils/timegrid-column-sync.js';
 import {
     getEventContent,
     openModal,
     saveReservation,
     deleteReservation,
-    quickCreateFromSelection,
-    addSlotEndFromStart,
     setRecurringOptionsVisible,
     handleEventResize,
     canCurrentUserEditEvent,
@@ -54,15 +53,20 @@ import { initAdminUsersUi, resetAdminUsersUiBindings } from './admin-users-ui.js
 import { initAnnouncementsUi, resetAnnouncementsUiBindings } from './announcements-ui.js';
 import { showToast } from '../utils/toast.js';
 import { setPlanningSessionUser } from './session-user.js';
-import { formatVersionBadgeText } from '../config/version-info.js';
+import { CACHE_NAME } from '../config/cache-name.js';
+import { normalizePlanningRole } from './planning-roles.js';
 
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register(new URL('../../sw.js', import.meta.url)).catch(() => {});
+    navigator.serviceWorker
+        .register(new URL('../../sw.js', import.meta.url), { type: 'module' })
+        .catch(() => {});
 }
 
 let calendar;
 let currentEvent = null;
 let currentUser = null;
+/** @type {(() => void) | null} */
+let unbindTimeGridColumnSync = null;
 
 function performLogout() {
     currentUser = null;
@@ -74,6 +78,8 @@ function performLogout() {
     resetProfileLabelsUiBindings();
     currentEvent = null;
     if (calendar) {
+        unbindTimeGridColumnSync?.();
+        unbindTimeGridColumnSync = null;
         calendar.destroy();
         calendar = null;
     }
@@ -88,7 +94,8 @@ function performLogout() {
         'modal_broadcast',
         'modal_users_admin',
         'modal_admin_password',
-        'modal_announcements'
+        'modal_announcements',
+        'modal_help'
     ].forEach((id) => document.getElementById(id)?.close());
     const loginDlg = document.getElementById('modal_login');
     void applyLoginBanner();
@@ -98,10 +105,29 @@ function performLogout() {
     requestAnimationFrame(() => document.getElementById('login-email')?.focus());
 }
 
+function syncHelpModalContent(user) {
+    const r = normalizePlanningRole(user?.role);
+    const isConsultation = r === 'consultation';
+    const isStaff = r === 'prof' || r === 'admin';
+    const isAdmin = r === 'admin';
+
+    document.getElementById('help-block-consultation')?.classList.toggle('hidden', !isConsultation);
+    document.getElementById('help-block-active')?.classList.toggle('hidden', isConsultation);
+
+    document.getElementById('help-block-staff')?.classList.toggle('hidden', !isStaff);
+    document.getElementById('help-block-menu-privileged')?.classList.toggle('hidden', !isStaff);
+
+    document.getElementById('help-li-announcements')?.classList.toggle('hidden', !isStaff);
+    document.getElementById('help-li-admin-users')?.classList.toggle('hidden', !isAdmin);
+
+    document.getElementById('help-block-eleve-notify')?.classList.toggle('hidden', r !== 'eleve');
+}
+
 function refreshHeaderUser(user) {
     const nameEl = document.getElementById('user-display-name');
     const roleEl = document.getElementById('user-display-role');
     const menuWrap = document.getElementById('user-menu-wrap');
+    const helpWrap = document.getElementById('header-help-wrap');
     if (!user?.email) {
         if (nameEl) nameEl.textContent = 'Invité';
         if (roleEl) {
@@ -109,6 +135,7 @@ function refreshHeaderUser(user) {
             roleEl.classList.add('hidden');
         }
         menuWrap?.classList.add('hidden');
+        helpWrap?.classList.add('hidden');
         return;
     }
     if (nameEl) nameEl.textContent = user.name;
@@ -117,6 +144,7 @@ function refreshHeaderUser(user) {
         roleEl.classList.remove('hidden');
     }
     menuWrap?.classList.remove('hidden');
+    helpWrap?.classList.remove('hidden');
 }
 
 function initCalendarAndRevealUi() {
@@ -127,30 +155,39 @@ function initCalendarAndRevealUi() {
         onDatesSet: null,
         onResizeStart: (info) => captureResizeStart(info),
 
-        /** Glisser / appui long puis plage : création rapide (motif favori, type réservation). */
+        /**
+         * Souris : clic + glisser sur la grille pour choisir [début, fin).
+         * Doigt : appui long (~250 ms) puis glisser (même plage).
+         * Ouvre la modale de réservation avec ces horaires (pas d’enregistrement immédiat).
+         * Le clic simple sans glisser reste géré par onDateClick (durée proposée ~1 h / libre).
+         */
         onSelect: (info) => {
-            suppressDateClickUntil = Date.now() + 700;
+            suppressDateClickUntil = Date.now() + 900;
             currentEvent = null;
-            void quickCreateFromSelection(calendar, info, currentUser).catch((err) =>
-                console.error(err)
-            );
+            if (!currentUser?.email) {
+                showToast('Connectez-vous pour réserver.', 'error');
+                calendar.unselect();
+                return;
+            }
+            openModal(info.start, info.end, null, currentUser);
             calendar.unselect();
         },
-        /** Clic simple : modale avec préremplissage (un créneau grille de durée). */
+        /** Clic simple (sans sélection par glisser) : modale avec créneau par défaut. */
         onDateClick: (info) => {
-            if (Date.now() < suppressDateClickUntil) return;
-            currentEvent = null;
-            let start = info.date;
-            const isMonthLike =
-                info.view.type === 'dayGridMonth' || info.view.type.startsWith('multiMonth');
-            if (isMonthLike) {
-                start = new Date(info.date);
-                if (info.allDay !== false) {
-                    start.setHours(8, 0, 0, 0);
+            queueMicrotask(() => {
+                if (Date.now() < suppressDateClickUntil) return;
+                currentEvent = null;
+                let start = info.date;
+                const isMonthLike =
+                    info.view.type === 'dayGridMonth' || info.view.type.startsWith('multiMonth');
+                if (isMonthLike) {
+                    start = new Date(info.date);
+                    if (info.allDay !== false) {
+                        start.setHours(8, 0, 0, 0);
+                    }
                 }
-            }
-            const end = addSlotEndFromStart(start, calendar);
-            openModal(start, end, null, currentUser);
+                openModal(start, null, null, currentUser, calendar);
+            });
         },
         onEventClick: (info) => {
             currentEvent = info.event;
@@ -257,7 +294,11 @@ function initCalendarAndRevealUi() {
         calendar.updateSize();
         requestAnimationFrame(() => {
             calendar.updateSize();
+            scheduleTimeGridColumnSync(calendarEl);
         });
+
+        unbindTimeGridColumnSync?.();
+        unbindTimeGridColumnSync = bindTimeGridColumnSync(calendarEl);
 
         initMessagesUi(currentUser);
         initProfileLabelsUi(currentUser);
@@ -290,11 +331,24 @@ function wireDialogBackdropClose() {
 
 document.addEventListener('DOMContentLoaded', async () => {
     await loadUIComponents();
-    const versionText = formatVersionBadgeText();
+
+    const dlgHelp = document.getElementById('modal_help');
+    document.getElementById('btn-help')?.addEventListener('click', () => {
+        syncHelpModalContent(currentUser);
+        dlgHelp?.showModal();
+    });
+    document.getElementById('help-btn-close')?.addEventListener('click', () => dlgHelp?.close());
+
     const loginV = document.getElementById('login-version-badge');
     const buildLegend = document.getElementById('app-build-badge');
-    if (loginV) loginV.textContent = versionText;
-    if (buildLegend) buildLegend.textContent = versionText;
+    if (loginV) {
+        loginV.textContent = CACHE_NAME;
+        loginV.title = CACHE_NAME;
+    }
+    if (buildLegend) {
+        buildLegend.textContent = CACHE_NAME;
+        buildLegend.title = CACHE_NAME;
+    }
     setLogoutHandler(performLogout);
     wireDialogBackdropClose();
 

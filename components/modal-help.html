@@ -1,0 +1,35 @@
+<dialog id="modal_help" class="modal">
+    <div class="modal-box max-w-lg w-[94%] max-h-[88dvh] flex flex-col border border-slate-200 rounded-2xl">
+        <h3 class="font-semibold text-base text-slate-800 border-b border-slate-100 pb-2 shrink-0">Aide — Planning orgue</h3>
+        <div id="help-modal-body" class="py-3 overflow-y-auto flex-1 min-h-0 text-sm text-slate-700 leading-relaxed space-y-4">
+
+            <div id="help-block-consultation" class="hidden">
+                <p>Ce compte est en <strong>consultation</strong> : vous voyez les créneaux du planning sans pouvoir réserver ni modifier.</p>
+            </div>
+
+            <div id="help-block-active" class="hidden space-y-3">
+                <p>Le planning affiche les réservations de l’orgue. La <strong>légende</strong> en bas indique le type de créneau (travail personnel, cours, fermeture, etc.). Sur <strong>téléphone ou tablette</strong>, un glissement horizontal sur la grille fait défiler la <strong>semaine précédente ou suivante</strong> (les flèches en haut restent disponibles partout).</p>
+                <p>Le bouton <strong>Règles d’utilisation de l’orgue</strong> (centre de la barre) ouvre le règlement. Dans le menu (icône personne), vous pouvez gérer <strong>vos préférences de réservation</strong>, votre mot de passe et vous déconnecter.</p>
+                <p>Vous pouvez créer ou modifier <strong>vos propres</strong> réservations sur les créneaux à venir, dans le respect des règles et des disponibilités.</p>
+                <p id="help-block-eleve-notify" class="hidden text-slate-600">Si un professeur ou un administrateur modifie l’un de vos créneaux, vous pouvez recevoir un <strong>e-mail d’information</strong>, lorsque la messagerie est activée sur le serveur.</p>
+            </div>
+
+            <div id="help-block-staff" class="hidden space-y-3 border-t border-slate-100 pt-3">
+                <p><strong>Professeurs et administrateurs</strong> peuvent aussi modifier ou déplacer certains créneaux d’<strong>élèves</strong> (et, pour les profs, des comptes « consultation »), lorsque l’outil l’autorise.</p>
+                <p id="help-block-email-note">Lorsqu’un tiers modifie, déplace ou supprime le créneau d’un autre utilisateur, un <strong>e-mail d’information</strong> est envoyé automatiquement au propriétaire du créneau, si la messagerie est activée sur le serveur (sinon un message peut vous le rappeler après l’action).</p>
+            </div>
+
+            <div id="help-block-menu-privileged" class="hidden space-y-2 border-t border-slate-100 pt-3">
+                <p class="font-medium text-slate-800">Menu utilisateur</p>
+                <ul class="list-disc pl-4 space-y-1">
+                    <li id="help-li-announcements" class="hidden"><strong>Annonces</strong> : messages ponctuels pour les personnes connectées.</li>
+                    <li id="help-li-admin-users" class="hidden"><strong>Gestion des comptes</strong> (administrateurs) : création et rôles des utilisateurs.</li>
+                </ul>
+            </div>
+
+        </div>
+        <div class="modal-action shrink-0 border-t border-slate-100 pt-3 mt-1">
+            <button type="button" id="help-btn-close" class="btn btn-ghost btn-sm font-semibold text-[13px] ml-auto">Fermer</button>
+        </div>
+    </div>
+</dialog>

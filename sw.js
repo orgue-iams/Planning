@@ -1,5 +1,5 @@
-/* Incrémenter à chaque mise en ligne pour invalider le cache (HTML/JS/CSS listés). */
-const CACHE_NAME = 'orgue-v43';
+/* Précache : voir CACHE_NAME dans js/config/cache-name.js (une seule valeur à incrémenter). */
+import { CACHE_NAME } from './js/config/cache-name.js';
 
 /** Ressources locales (hors CDN) pour démarrage rapide / coquille hors-ligne */
 const ASSETS = [
@@ -24,6 +24,7 @@ const ASSETS = [
   './js/core/calendar-bridge.js',
   './js/config/planning.config.js',
   './js/config/version-info.js',
+  './js/config/cache-name.js',
   './js/config/fc-settings.js',
   './js/utils/loader.js',
   './js/utils/time-helpers.js',
@@ -36,6 +37,7 @@ const ASSETS = [
   './components/modal-password.html',
   './components/modal-forgot-password.html',
   './components/modal-rules.html',
+  './components/modal-help.html',
   './components/modal-broadcast.html',
   './js/utils/messaging.js',
   './js/core/messages-ui.js',

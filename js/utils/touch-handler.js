@@ -1,9 +1,23 @@
 /**
- * Swipe horizontal pour naviguer entre périodes.
- * Robuste mobile/tablette: Hammer.js si dispo + fallback natif touch.
+ * Swipe horizontal pour naviguer entre périodes (tactile natif, sans Hammer sur le calendrier).
+ *
+ * Désactivé sur poste classique (souris, Mac/PC) : `(pointer: fine)` + survol au pointeur principal.
+ * Activé sur téléphone / tablette : pointeur principal grossier, ou pas de survol (`hover: none`) avec écran tactile.
+ */
+export function isTouchSwipeWeekNavigationEnabled() {
+    if (typeof window === 'undefined') return false;
+    if (navigator.maxTouchPoints === 0) return false;
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
+    const hoverNone = window.matchMedia('(hover: none)').matches;
+    return coarse || hoverNone;
+}
+
+/**
+ * Swipe horizontal pour naviguer entre périodes (tactile natif, sans Hammer sur le calendrier).
  */
 export function initSwipe(calendarEl, calendar) {
     if (!(calendarEl instanceof HTMLElement) || !calendar) return;
+    if (!isTouchSwipeWeekNavigationEnabled()) return;
 
     /** Cibles qui indiquent un geste sur un créneau (drag FC, clic, etc.). */
     const EVENT_SURFACE_SEL =
@@ -20,6 +34,11 @@ export function initSwipe(calendarEl, calendar) {
         return false;
     }
 
+    /** Sélection de plage (clic-glisser / appui long) : ne pas changer de semaine au relâchement. */
+    function dateSelectInProgress() {
+        return Boolean(calendarEl.querySelector('.fc-highlight'));
+    }
+
     let lastNavAt = 0;
     let horizontalSwipeStartedOnEvent = false;
     const NAV_COOLDOWN_MS = 350;
@@ -28,13 +47,14 @@ export function initSwipe(calendarEl, calendar) {
         if (!canNavigateNow()) return;
         if (document.querySelector('dialog[open]')) return;
         if (eventDragInProgress()) return;
+        if (dateSelectInProgress()) return;
         if (horizontalSwipeStartedOnEvent) return;
         lastNavAt = Date.now();
         if (dir === 'next') calendar.next();
         else calendar.prev();
     };
 
-    // --- Fallback natif TouchEvent (utile si Hammer ne capte pas correctement).
+    // --- TouchEvent natif (swipe horizontal).
     let startX = 0;
     let startY = 0;
     let tracking = false;
@@ -84,20 +104,10 @@ export function initSwipe(calendarEl, calendar) {
     calendarEl.addEventListener('touchstart', onTouchStart, { passive: true });
     calendarEl.addEventListener('touchend', onTouchEnd, { passive: true });
 
-    // --- Hammer.js (si dispo) : garde le comportement historique.
-    const HammerRef = typeof window !== 'undefined' ? window.Hammer : undefined;
-    if (!HammerRef) {
-        return;
-    }
-    const mc = new HammerRef(calendarEl, { touchAction: 'pan-y' });
-    mc.get('swipe').set({ direction: HammerRef.DIRECTION_HORIZONTAL, threshold: 30, velocity: 0.2 });
-    mc.on('swipeleft swiperight', (ev) => {
-        const src = ev.srcEvent ?? ev.originalEvent;
-        const tgt = src && 'target' in src ? src.target : null;
-        if (targetTouchesEventSurface(tgt)) return;
-        if (eventDragInProgress()) return;
-        if (horizontalSwipeStartedOnEvent) return;
-        if (ev.type === 'swipeleft') navigate('next');
-        else navigate('prev');
-    });
+    /*
+     * Hammer sur #calendar était évité : `touchAction: 'pan-y'` sur le conteneur faisait traiter
+     * les glissements verticaux comme du scroll natif, ce qui cassait la sélection de plage
+     * (appui long + drag) de FullCalendar. Le swipe horizontal (téléphone / tablette uniquement)
+     * reste assuré par touchstart/touchend ci-dessus (seuils dx/dy).
+     */
 }

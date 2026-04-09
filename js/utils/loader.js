@@ -9,6 +9,7 @@ export async function loadUIComponents() {
         { id: 'app-modals', file: 'components/modal-password.html', append: true },
         { id: 'app-modals', file: 'components/modal-forgot-password.html', append: true },
         { id: 'app-modals', file: 'components/modal-rules.html', append: true },
+        { id: 'app-modals', file: 'components/modal-help.html', append: true },
         { id: 'app-modals', file: 'components/modal-broadcast.html', append: true },
         { id: 'app-modals', file: 'components/modal-profile-labels.html', append: true },
         { id: 'app-modals', file: 'components/modal-users-admin.html', append: true },

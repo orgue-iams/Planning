@@ -8,17 +8,14 @@ import { demoEvents } from '../data/mock-events.js';
 import { getAccessToken } from '../core/auth-logic.js';
 import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from '../core/supabase-client.js';
 import { invokeCalendarBridge } from '../core/calendar-bridge.js';
-import { isReservationStartBeforeTodayLocal } from '../core/calendar-logic.js';
+import { fcDragResizePropsForEventStart } from '../core/calendar-logic.js';
+import { scheduleTimeGridColumnSync } from '../utils/timegrid-column-sync.js';
 
-/** Créneaux passés : pas de glisser/redimensionner (FullCalendar respecte `editable` par événement). */
-function eventRowDisallowPastInteraction(ev) {
-    if (!isReservationStartBeforeTodayLocal({ start: ev.start })) return ev;
-    return {
-        ...ev,
-        editable: false,
-        startEditable: false,
-        durationEditable: false
-    };
+function escapeHtmlText(s) {
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 }
 
 /** @deprecated Conservé pour d’éventuels appels ; la barre FC native est désactivée. */
@@ -53,7 +50,6 @@ export function bindResponsiveCalendarToolbar(calendar) {
 }
 
 export const getCalendarConfig = (handlers, currentUser) => {
-    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     const privileged =
         currentUser && (currentUser.role === 'admin' || currentUser.role === 'prof');
 
@@ -94,12 +90,19 @@ export const getCalendarConfig = (handlers, currentUser) => {
         selectable: true,
         selectMirror: true,
         unselectAuto: true,
+        /* 0 : même timing que DateClicking (1er pixel de mouvement) — sinon la sélection restait « en retard »
+         * et pouvait ne jamais atteindre le seuil si un autre gestionnaire captait le geste. */
+        selectMinDistance: 0,
 
         longPressDelay: 250,
         selectLongPressDelay: 250,
 
         selectAllow: (selectInfo) => {
-            if (selectInfo.view.type.startsWith('list')) {
+            /* FC appelle parfois ce hook pendant handleHitUpdate avec seulement start/end (sans `view`) :
+             * accéder à `view.type` plantait et cassait toute la sélection cliquer-glisser. */
+            if (!selectInfo?.start || !selectInfo?.end) return true;
+            const viewType = selectInfo.view?.type ?? '';
+            if (viewType.startsWith('list')) {
                 showToast('Utilisez la vue Semaine ou Jour pour sélectionner une plage sur la grille.', 'info');
                 return false;
             }
@@ -114,9 +117,12 @@ export const getCalendarConfig = (handlers, currentUser) => {
         eventOverlap: false,
         selectOverlap: false,
 
-        editable: !!privileged,
-        eventStartEditable: !!privileged,
-        eventDurationEditable: !!privileged && !isTouchDevice,
+        /* editable au niveau calendrier : nécessaire pour que la sélection plage (clic-glisser sur la grille)
+         * reste fiable avec l’interaction plugin ; le drag des créneaux reste désactivé par défaut via
+         * eventStartEditable / eventDurationEditable false, puis opt-in par événement (fcDragResizePropsForEventStart). */
+        editable: true,
+        eventStartEditable: false,
+        eventDurationEditable: false,
 
         datesSet: () => {
             try {
@@ -124,6 +130,11 @@ export const getCalendarConfig = (handlers, currentUser) => {
             } catch {
                 /* */
             }
+            scheduleTimeGridColumnSync(document.getElementById('calendar'));
+        },
+
+        viewDidMount: () => {
+            scheduleTimeGridColumnSync(document.getElementById('calendar'));
         },
 
         events: (fetchInfo, successCallback, failureCallback) => {
@@ -244,7 +255,10 @@ export const getCalendarConfig = (handlers, currentUser) => {
                         byKey.set(key, ev);
                     }
                     rows = [...byKey.values()];
-                    rows = rows.map(eventRowDisallowPastInteraction);
+                    rows = rows.map((ev) => ({
+                        ...ev,
+                        ...fcDragResizePropsForEventStart(ev.start, currentUser)
+                    }));
 
                     successCallback(rows);
                 } catch (e) {
@@ -279,7 +293,7 @@ export const getCalendarConfig = (handlers, currentUser) => {
             minute: '2-digit',
             meridiem: false
         },
-        /* Desktop / tablette : une ligne courte. Mobile (≤640px) : rendu type Google Agenda (voir dayHeaderContent + .fc-day-head-gcal). */
+        /* dayHeaderContent remplace l’affichage ; dayHeaderFormat sert au titre / accessibilité FC. */
         dayHeaderFormat: { weekday: 'short', day: 'numeric' },
 
         dayHeaderContent: (arg) => {
@@ -288,17 +302,24 @@ export const getCalendarConfig = (handlers, currentUser) => {
             }
             const d = arg.date;
             const mobile = window.matchMedia('(max-width: 640px)').matches;
+            let dowText;
             if (mobile) {
                 const longWd = d.toLocaleDateString('fr-FR', { weekday: 'long' });
-                const three = (longWd.slice(0, 3).charAt(0).toUpperCase() + longWd.slice(1, 3)).normalize('NFC');
-                const dom = d.getDate();
-                return {
-                    html: `<div class="fc-day-head-gcal"><span class="fc-day-head-gcal__dow">${three}</span><span class="fc-day-head-gcal__dom">${dom}</span></div>`
-                };
+                dowText = (longWd.slice(0, 3).charAt(0).toUpperCase() + longWd.slice(1, 3)).normalize('NFC');
+            } else {
+                dowText = d.toLocaleDateString('fr-FR', { weekday: 'short' });
             }
-            const line = d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
+            const dom = d.getDate();
+            const todayCls = arg.isToday ? ' fc-day-head-gcal--today' : '';
+            const dow = escapeHtmlText(dowText);
+            const domStr = escapeHtmlText(String(dom));
             return {
-                html: `<div class="fc-day-head-plain">${line}</div>`
+                html:
+                    `<div class="fc-day-head-gcal${todayCls}">` +
+                    `<span class="fc-day-head-gcal__dow">${dow}</span>` +
+                    `<span class="fc-day-head-gcal__dom-badge">` +
+                    `<span class="fc-day-head-gcal__dom">${domStr}</span>` +
+                    `</span></div>`
             };
         }
     };

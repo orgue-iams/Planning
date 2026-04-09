@@ -60,6 +60,27 @@ export function isReservationStartBeforeTodayLocal(eventLike) {
     return d.getTime() < today.getTime();
 }
 
+/**
+ * Drag / redimensionnement : defaults calendrier eventStartEditable / eventDurationEditable à false ;
+ * on n’active le drag que par événement (prof/admin, créneau non passé). Les créneaux passés restent
+ * explicitement non éditables pour limiter le drag tactile Android.
+ */
+export function fcDragResizePropsForEventStart(startLike, currentUser) {
+    const privileged = isPrivilegedUser(currentUser);
+    const touch =
+        typeof window !== 'undefined' &&
+        ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    const start = startLike instanceof Date ? startLike : new Date(startLike);
+    if (Number.isNaN(start.getTime())) {
+        return { editable: false, startEditable: false, durationEditable: false };
+    }
+    if (isReservationStartBeforeTodayLocal({ start })) {
+        return { editable: false, startEditable: false, durationEditable: false };
+    }
+    if (!privileged) return {};
+    return { editable: true, startEditable: true, durationEditable: !touch };
+}
+
 function canCurrentUserEditEventIgnoringPast(currentUser, event) {
     if (!currentUser?.email || !event) return false;
     const meRole = normalizeRole(currentUser.role);
@@ -618,7 +639,18 @@ function selectedDowSet() {
 }
 
 /** Un événement par jour (même horaire), rendu batch pour FullCalendar. @returns {import('@fullcalendar/core').EventApi[]} */
-function addOneEventPerDay(calendar, days, title, tStart, tEnd, type, ownerEmail, ownerDisplayName, ownerRole) {
+function addOneEventPerDay(
+    calendar,
+    days,
+    title,
+    tStart,
+    tEnd,
+    type,
+    ownerEmail,
+    ownerDisplayName,
+    ownerRole,
+    currentUser
+) {
     const added = [];
     const run = () => {
         for (const d of days) {
@@ -635,7 +667,8 @@ function addOneEventPerDay(calendar, days, title, tStart, tEnd, type, ownerEmail
                     ownerDisplayName: ownerDisplayName || ownerEmail.split('@')[0],
                     ownerRole: normalizeRole(ownerRole) || 'eleve',
                     type
-                }
+                },
+                ...fcDragResizePropsForEventStart(s, currentUser)
             });
             if (ev) added.push(ev);
         }
@@ -662,6 +695,99 @@ function getReservationTextTitleFromForm(currentUser, motif) {
     const byProfile = String(getDefaultReservationTitle(currentUser?.email) || '').trim();
     if (byProfile) return byProfile;
     return motif;
+}
+
+/** Fin de journée affichable (slotMaxTime) le même jour calendaire que `start`. */
+function slotMaxInstantOnSameDay(start, calendar) {
+    const raw = calendar?.getOption?.('slotMaxTime');
+    let h = 22;
+    let m = 0;
+    let s = 0;
+    if (typeof raw === 'string') {
+        const match = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+        if (match) {
+            h = +match[1];
+            m = +match[2];
+            s = +(match[3] || 0);
+        }
+    } else if (raw && typeof raw === 'object') {
+        h = /** @type {{ hours?: number }} */ (raw).hours ?? 0;
+        m = /** @type {{ minutes?: number }} */ (raw).minutes ?? 0;
+        s = /** @type {{ seconds?: number }} */ (raw).seconds ?? 0;
+    }
+    const d = new Date(start);
+    d.setHours(h, m, s, 0);
+    return d;
+}
+
+/**
+ * Première borne (instant) après `start` où la plage cesse d’être libre : début du prochain événement
+ * le même jour, ou slotMax. [start, retour) est théoriquement libre (hors chevauchement anormal).
+ */
+function nextExclusiveFreeBoundary(start, calendar) {
+    const limit = slotMaxInstantOnSameDay(start, calendar).getTime();
+    let boundary = limit;
+    const startMs = start.getTime();
+
+    for (const ev of calendar.getEvents()) {
+        if (ev.display === 'background') continue;
+        const r = eventRangeForOverlap(ev);
+        if (!r) continue;
+        const es = r.start.getTime();
+        const ee = r.end.getTime();
+        if (ee <= startMs) continue;
+        if (es <= startMs && ee > startMs) {
+            return new Date(startMs);
+        }
+        if (es > startMs && sameCalendarDay(r.start, start)) {
+            boundary = Math.min(boundary, es);
+        }
+    }
+    return new Date(boundary);
+}
+
+/**
+ * Dernière heure de fin autorisée sur la grille HH:mm des `<select>` (8:00 … 22:00, pas de 22:30).
+ * @param {Date} hardCap — fin exclusive max (début du prochain occupé ou slot max)
+ */
+function floorEndToSelectGrid(start, rawEnd, hardCap) {
+    const y = start.getFullYear();
+    const mo = start.getMonth();
+    const d = start.getDate();
+    const startMs = start.getTime();
+    const capMs = Math.min(rawEnd.getTime(), hardCap.getTime());
+    let bestMs = -Infinity;
+    for (let hour = 8; hour <= 22; hour++) {
+        for (const minute of [0, 30]) {
+            if (hour === 22 && minute > 0) break;
+            const t = new Date(y, mo, d, hour, minute, 0, 0).getTime();
+            if (t <= startMs || t > capMs) continue;
+            bestMs = Math.max(bestMs, t);
+        }
+    }
+    if (bestMs !== -Infinity) return new Date(bestMs);
+    if (capMs > startMs) return new Date(capMs);
+    return new Date(startMs + 30 * 60 * 1000);
+}
+
+const DEFAULT_NEW_RESERVATION_DURATION_MS = 60 * 60 * 1000;
+
+/**
+ * Clic grille / mois (8h) : fin proposée = 1h si libre, sinon réduction jusqu’au prochain créneau occupé,
+ * arrondie à la grille des listes déroulantes.
+ */
+function proposeReservationRangeFromAnchor(anchor, calendar) {
+    const boundary = nextExclusiveFreeBoundary(anchor, calendar);
+    const preferredEnd = new Date(anchor.getTime() + DEFAULT_NEW_RESERVATION_DURATION_MS);
+    const rawEnd = new Date(Math.min(preferredEnd.getTime(), boundary.getTime()));
+    let end = floorEndToSelectGrid(anchor, rawEnd, boundary);
+    if (end.getTime() <= anchor.getTime()) {
+        const bumped = new Date(
+            Math.min(anchor.getTime() + 30 * 60 * 1000, boundary.getTime())
+        );
+        end = floorEndToSelectGrid(anchor, bumped, boundary);
+    }
+    return { start: anchor, end };
 }
 
 /** Remplit motif + titre (règles de rôle + préférence utilisateur). */
@@ -761,7 +887,8 @@ export async function quickCreateFromSelection(calendar, selectInfo, currentUser
                 ownerDisplayName: currentUser.name || currentUser.email.split('@')[0],
                 ownerRole: normalizeRole(currentUser.role) || 'eleve',
                 type: motifToSlotType(motif)
-            }
+            },
+            ...fcDragResizePropsForEventStart(selectInfo.start, currentUser)
         });
     };
 
@@ -792,7 +919,11 @@ export async function quickCreateFromSelection(calendar, selectInfo, currentUser
 }
 
 // --- 2. GESTION DE LA MODALE RÉSERVATION ---
-export function openModal(start, end, event, currentUser) {
+/**
+ * @param {import('@fullcalendar/core').Calendar | null} [calendarForClip] — si défini (ex. clic sur la grille),
+ * propose une fin cohérente avec les occupations (max 1 h si tout est libre).
+ */
+export function openModal(start, end, event, currentUser, calendarForClip = null) {
     const modal = document.getElementById('modal_reservation');
     if (!modal) return;
     if (!event && normalizeRole(currentUser?.role) === 'consultation') {
@@ -861,15 +992,35 @@ export function openModal(start, end, event, currentUser) {
             start.getSeconds() === 0 &&
             start.getMilliseconds() === 0;
 
-        dateStartVal = toDateInput(start);
-        if (midnight) {
+        const endOk =
+            end instanceof Date && !Number.isNaN(end.getTime()) && end.getTime() > start.getTime();
+
+        if (midnight && endOk) {
+            dateStartVal = toDateInput(start);
+            startInstant = start;
+            endInstant = selectionEndDisplay(end);
+        } else if (calendarForClip) {
+            let anchor = start;
+            if (midnight) {
+                anchor = new Date(start);
+                anchor.setHours(8, 0, 0, 0);
+            }
+            dateStartVal = toDateInput(anchor);
+            const range = proposeReservationRangeFromAnchor(anchor, calendarForClip);
+            startInstant = range.start;
+            endInstant = range.end;
+        } else if (midnight) {
+            dateStartVal = toDateInput(start);
             const ds = new Date(start);
             ds.setHours(8, 0, 0, 0);
             startInstant = ds;
             endInstant = new Date(ds.getTime() + 60 * 60 * 1000);
         } else {
+            dateStartVal = toDateInput(start);
             startInstant = start;
-            endInstant = new Date(start.getTime() + 60 * 60 * 1000);
+            endInstant = endOk
+                ? selectionEndDisplay(end)
+                : new Date(start.getTime() + 60 * 60 * 1000);
         }
     }
 
@@ -1198,7 +1349,8 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
             slotType,
             currentUser.email,
             currentUser.name || currentUser.email.split('@')[0],
-            currentUser.role
+            currentUser.role,
+            currentUser
         );
         applyBridgeUpsertResults(addedList, syncMulti?.data?.results);
         document.getElementById('modal_reservation').close();
@@ -1291,7 +1443,8 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
             ownerDisplayName: currentUser.name || currentUser.email.split('@')[0],
             ownerRole: normalizeRole(currentUser.role) || 'eleve',
             type: slotType
-        }
+        },
+        ...fcDragResizePropsForEventStart(startStr, currentUser)
     };
 
     let addedSingle = /** @type {import('@fullcalendar/core').EventApi | null} */ (null);
