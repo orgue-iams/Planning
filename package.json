@@ -1,0 +1,31 @@
+{
+  "name": "planning",
+  "version": "1.0.0",
+  "description": "",
+  "main": "sw.js",
+  "scripts": {
+    "build": "npm run build:css",
+    "build:css": "npx @tailwindcss/cli -i ./css/tailwind.input.css -o ./css/tailwind.generated.css --minify",
+    "predeploy": "npm run build:css",
+    "deploy:pages": "node scripts/publish-site.mjs",
+    "watch:css": "npx @tailwindcss/cli -i ./css/tailwind.input.css -o ./css/tailwind.generated.css --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/orgue-iams/Planning.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/orgue-iams/Planning/issues"
+  },
+  "homepage": "https://github.com/orgue-iams/Planning#readme",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.2.2",
+    "daisyui": "^5.5.19",
+    "tailwindcss": "^4.2.2"
+  }
+}

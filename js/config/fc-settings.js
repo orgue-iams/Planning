@@ -6,8 +6,20 @@
 import { showToast } from '../utils/toast.js';
 import { demoEvents } from '../data/mock-events.js';
 import { getAccessToken } from '../core/auth-logic.js';
-import { getPlanningConfig, isBackendAuthConfigured } from '../core/supabase-client.js';
+import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from '../core/supabase-client.js';
 import { invokeCalendarBridge } from '../core/calendar-bridge.js';
+import { isReservationStartBeforeTodayLocal } from '../core/calendar-logic.js';
+
+/** Créneaux passés : pas de glisser/redimensionner (FullCalendar respecte `editable` par événement). */
+function eventRowDisallowPastInteraction(ev) {
+    if (!isReservationStartBeforeTodayLocal({ start: ev.start })) return ev;
+    return {
+        ...ev,
+        editable: false,
+        startEditable: false,
+        durationEditable: false
+    };
+}
 
 /** @deprecated Conservé pour d’éventuels appels ; la barre FC native est désactivée. */
 export function isCompactCalendarToolbar() {
@@ -120,6 +132,10 @@ export const getCalendarConfig = (handlers, currentUser) => {
                     const start = fetchInfo.start;
                     const end = fetchInfo.end;
                     const spanDays = Math.round((end.getTime() - start.getTime()) / 86400000);
+                    const loadSignal =
+                        fetchInfo && typeof fetchInfo === 'object' && 'signal' in fetchInfo
+                            ? /** @type {AbortSignal | undefined} */ (fetchInfo.signal)
+                            : undefined;
 
                     const { calendarBridgeUrl } = getPlanningConfig();
                     const useBridge =
@@ -128,15 +144,50 @@ export const getCalendarConfig = (handlers, currentUser) => {
                     let rows = [];
 
                     if (useBridge) {
-                        const token = await getAccessToken();
+                        if (loadSignal?.aborted) return;
+                        let token = await getAccessToken();
+                        if (!token) {
+                            const supabase = getSupabaseClient();
+                            if (supabase) {
+                                await supabase.auth.refreshSession();
+                                token = await getAccessToken();
+                            }
+                        }
+                        if (loadSignal?.aborted) return;
                         if (token) {
-                            const bridge = await invokeCalendarBridge(token, {
+                            const listPayload = {
                                 action: 'list',
                                 timeMin: start.toISOString(),
                                 timeMax: end.toISOString()
-                            });
+                            };
+                            const bridgeOpts = loadSignal ? { signal: loadSignal } : undefined;
+                            let bridge = await invokeCalendarBridge(token, listPayload, bridgeOpts);
+                            if (loadSignal?.aborted || bridge.aborted) {
+                                return;
+                            }
+                            const authFail = (r) => {
+                                const s = String(r || '');
+                                return /401|403|unauthorized|invalid\s*jwt|jwt\s*expired|session/i.test(s);
+                            };
+                            if (!bridge.ok && authFail(bridge.error)) {
+                                const supabase = getSupabaseClient();
+                                if (supabase && !loadSignal?.aborted) {
+                                    await supabase.auth.refreshSession();
+                                    const t2 = await getAccessToken();
+                                    if (t2) {
+                                        bridge = await invokeCalendarBridge(t2, listPayload, bridgeOpts);
+                                    }
+                                }
+                            }
+                            if (loadSignal?.aborted || bridge.aborted) {
+                                return;
+                            }
                             if (!bridge.ok) {
-                                const msg = bridge.error || 'Erreur de synchronisation agenda';
+                                const raw = String(bridge.error || 'Erreur de synchronisation agenda').trim();
+                                const msg =
+                                    /^not\s*found$/i.test(raw) || raw === '404'
+                                        ? 'Calendrier introuvable (vérifiez GOOGLE_CALENDAR_ID ou le déploiement de calendar-bridge).'
+                                        : raw;
                                 showToast(`Agenda Google : ${msg}`, 'error');
                                 failureCallback(new Error(msg));
                                 return;
@@ -180,6 +231,21 @@ export const getCalendarConfig = (handlers, currentUser) => {
                         rows = [];
                     }
 
+                    /* Dédoublonnage défensif : évite les superpositions après navigation semaine suivante/précédente. */
+                    const byKey = new Map();
+                    for (const ev of rows) {
+                        const id = String(ev?.id ?? ev?.extendedProps?.googleEventId ?? '').trim();
+                        const startIso = String(ev?.start ?? '').trim();
+                        const endIso = String(ev?.end ?? '').trim();
+                        const owner = String(ev?.extendedProps?.owner ?? '').trim().toLowerCase();
+                        const title = String(ev?.title ?? '').trim();
+                        const key = id || `${startIso}|${endIso}|${owner}|${title}`;
+                        if (!key) continue;
+                        byKey.set(key, ev);
+                    }
+                    rows = [...byKey.values()];
+                    rows = rows.map(eventRowDisallowPastInteraction);
+
                     successCallback(rows);
                 } catch (e) {
                     failureCallback(e);
@@ -191,6 +257,8 @@ export const getCalendarConfig = (handlers, currentUser) => {
         dateClick: (info) => handlers.onDateClick(info),
         eventClick: (info) => handlers.onEventClick(info),
         eventResizeStart: (info) => handlers.onResizeStart?.(info),
+        eventDragStart: (info) => handlers.onEventDragStart?.(info),
+        eventDragStop: (info) => handlers.onEventDragStop?.(info),
         eventDrop: (info) => {
             const out = handlers.onEventDrop?.(info);
             if (out && typeof out.catch === 'function') {

@@ -11,7 +11,28 @@ Démarrage option 2 — Supabase + Google Agenda
 2) SQL complémentaire (règles + annonces + trigger invite)
    - SQL Editor → exécuter supabase/migrations/002_admin_content.sql
    - Si la base existe déjà, exécuter aussi supabase/migrations/003_consultation_role.sql
+     puis supabase/migrations/004_reservation_types.sql et supabase/migrations/005_planning_admin_list_users_rpc.sql
    - Pour créer les comptes de base demandés (admin/élèves/prof), exécuter supabase/seed-users.sql
+     (le script crée bien auth.users + auth.identities + profiles ; ne pas recopier d’ancienne variante
+     qui n’insérait que auth.users — cela cassait GET /auth/v1/admin/users / « Gestion des comptes ».)
+   - Si la base a encore des utilisateurs sans identités (erreur admin liste) : exécuter une fois
+     supabase/fix-missing-auth-identities.sql puis retester l’API admin.
+   - Si l’API admin liste échoue encore : exécuter supabase/fix-auth-users-instance-id.sql
+     (anciens seeds utilisaient instance_id = 00000000-… au lieu de auth.instances.id).
+   - Si auth.instances est vide (0 lignes) et tous les instance_id restent 0000… (y compris après
+     Add user) : exécuter une fois supabase/bootstrap-auth-instance.sql (voir en-tête du fichier),
+     puis retester curl /auth/v1/admin/users.
+   - Si la connexion échoue après seed SQL (identifiants invalides) : exécuter
+     supabase/fix-auth-login-tokens-and-passwords.sql ou rejouer seed-users.sql à jour ;
+     en dernier recours : Dashboard → Users → définir le mot de passe (hash généré par GoTrue).
+
+2bis) Reprise à zéro (prototype)
+   - Option A — même projet : Database → (si besoin) supprimer les données métier dans public.* ;
+     pour Auth, supprimer les utilisateurs via Authentication → Users, ou exécuter avec prudence un
+     script de nettoyage ; puis rejouer schema.sql + migrations + seed corrigé.
+   - Option B — nouveau projet : créer un projet neuf, noter ref + clé anon, supabase link, db push
+     des migrations, redeploy functions, recopier les secrets (GOOGLE_*, BREVO, etc.), puis mettre à jour
+     js/config/planning.config.js (supabaseUrl, supabaseAnonKey, calendarBridgeUrl).
 
 3) Edge Functions
    - Installer la CLI : https://supabase.com/docs/guides/cli

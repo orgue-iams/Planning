@@ -197,6 +197,7 @@ export function initMessagesUi(_ignored) {
                 showToast('Éditeur indisponible. Rechargez la page.', 'error');
                 return;
             }
+            resetRulesQuill();
             let text = getRulesText();
             const backend = isBackendAuthConfigured();
             if (backend) {
@@ -206,12 +207,15 @@ export function initMessagesUi(_ignored) {
             if (backend && (!text || String(text).trim() === '')) {
                 text = getRulesText();
             }
+            /* Après tout await : re-vider le mount (évite barres empilées si close / ré-init pendant le fetch). */
             resetRulesQuill();
             rulesQuill = createPlanningQuill(rulesMount, {
                 placeholder: 'Saisissez les règles…'
             });
             const raw = String(text ?? '');
-            const initial = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
+            const initial = looksLikeHtml(raw)
+                ? sanitizeRulesHtml(normalizeQuillMarkup(raw))
+                : plainTextToSafeHtml(raw);
             quillSetHtml(rulesQuill, initial);
             editInitialHtml = rulesEditorHtml();
 

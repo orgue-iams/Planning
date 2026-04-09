@@ -1,0 +1,16 @@
+---
+description: Tailwind local - build CSS obligatoire avant push/deploy
+alwaysApply: true
+---
+
+# Build CSS (obligatoire)
+
+- Le projet n'utilise plus `cdn.tailwindcss.com` en production.
+- Les classes utilitaires Tailwind/DaisyUI sont compilées dans `css/tailwind.generated.css`.
+
+## Règles pour l'assistant
+
+- Après toute modification de markup/classes (`index.html`, `components/*.html`, `js/**/*.js` qui injecte du HTML), exécuter `npm run build:css`.
+- Avant tout push ou déploiement, exécuter `npm run build:css`.
+- Vérifier que `css/tailwind.generated.css` est à jour dans les changements.
+- Ne pas réintroduire le script CDN Tailwind dans `index.html`.

@@ -31,19 +31,24 @@ function fromLocalInputValue(s) {
     return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-let announcementsHandlersBound = false;
+/** @type {AbortController | null} */
+let annUiAbort = null;
 /** @type {any} */
 let annQuill = null;
 
 export function resetAnnouncementsUiBindings() {
-    announcementsHandlersBound = false;
+    annUiAbort?.abort();
+    annUiAbort = null;
 }
 
 export function initAnnouncementsUi(currentUser) {
     const show = isBackendAuthConfigured() && isPrivilegedUser(currentUser);
     document.getElementById('menu-item-announcements-wrap')?.classList.toggle('hidden', !show);
-    if (!show || announcementsHandlersBound) return;
-    announcementsHandlersBound = true;
+    if (!show) return;
+
+    annUiAbort?.abort();
+    annUiAbort = new AbortController();
+    const { signal } = annUiAbort;
 
     const modal = document.getElementById('modal_announcements');
     const mount = document.getElementById('ann-quill-mount');
@@ -54,64 +59,91 @@ export function initAnnouncementsUi(currentUser) {
             showToast('Éditeur indisponible. Rechargez la page.', 'error');
             return null;
         }
-        destroyPlanningQuillMount(mount);
-        annQuill = createPlanningQuill(mount, {
-            placeholder: 'Votre message…'
-        });
+        annQuill = null;
+        annQuill = createPlanningQuill(mount, { placeholder: 'Votre message…' });
         return annQuill;
     };
 
-    modal?.addEventListener('close', () => {
-        if (mount instanceof HTMLElement) destroyPlanningQuillMount(mount);
-        annQuill = null;
-    });
+    modal?.addEventListener(
+        'close',
+        () => {
+            annQuill = null;
+            if (mount instanceof HTMLElement) destroyPlanningQuillMount(mount);
+        },
+        { signal }
+    );
 
-    document.getElementById('menu-item-announcements')?.addEventListener('click', async (e) => {
-        e.preventDefault();
-        document.getElementById('btn-user-menu')?.blur();
-        void ensureAnnQuill();
-        const latest = await fetchLatestLoginAnnouncementForEdit();
-        if (latest?.body && annQuill) {
-            quillSetHtml(annQuill, sanitizeRulesHtml(latest.body));
-            const start = document.getElementById('ann-start');
-            const end = document.getElementById('ann-end');
-            if (start && latest.starts_at) start.value = toLocalInputValue(latest.starts_at);
-            if (end && latest.ends_at) end.value = toLocalInputValue(latest.ends_at);
-        } else {
-            presetAnnouncementDateInputs(true);
-            if (annQuill) quillSetHtml(annQuill, '');
-        }
-        modal?.showModal();
-    });
+    document.getElementById('menu-item-announcements')?.addEventListener(
+        'click',
+        async (e) => {
+            e.preventDefault();
+            document.getElementById('btn-user-menu')?.blur();
+            /* Charger d’abord, puis créer Quill une seule fois (évite barres dupliquées si fermeture pendant le fetch). */
+            const latest = await fetchLatestLoginAnnouncementForEdit();
+            ensureAnnQuill();
+            if (!annQuill) {
+                modal?.showModal();
+                return;
+            }
+            if (latest) {
+                const start = document.getElementById('ann-start');
+                const end = document.getElementById('ann-end');
+                if (start && latest.starts_at) start.value = toLocalInputValue(latest.starts_at);
+                if (end && latest.ends_at) end.value = toLocalInputValue(latest.ends_at);
+                const prepared = sanitizeRulesHtml(normalizeQuillMarkup(String(latest.body ?? '')));
+                quillSetHtml(annQuill, prepared);
+            } else {
+                presetAnnouncementDateInputs(true);
+                quillSetHtml(annQuill, '');
+            }
+            modal?.showModal();
+        },
+        { signal }
+    );
 
-    document.getElementById('ann-publish-btn')?.addEventListener('click', async () => {
-        if (!annQuill) {
-            void ensureAnnQuill();
-        }
-        if (!annQuill) return;
-        const body = sanitizeRulesHtml(normalizeQuillMarkup(annQuill.root.innerHTML));
-        if (!quillGetPlainText(annQuill)) {
-            showToast('Saisissez un message.', 'error');
-            return;
-        }
-        const starts = fromLocalInputValue(document.getElementById('ann-start')?.value || '');
-        const ends = fromLocalInputValue(document.getElementById('ann-end')?.value || '');
-        if (!starts || !ends) {
-            showToast('Indiquez début et fin.', 'error');
-            return;
-        }
-        if (new Date(ends) <= new Date(starts)) {
-            showToast('La fin doit être après le début.', 'error');
-            return;
-        }
-        const res = await replaceLoginAnnouncementRemote({ body, startsAt: starts, endsAt: ends });
-        if (!res.ok) {
-            showToast(res.error || 'Erreur', 'error');
-            return;
-        }
-        showToast('Annonce publiée (l’ancienne annonce est remplacée).');
-        quillSetHtml(annQuill, '');
-    });
+    document.getElementById('ann-publish-btn')?.addEventListener(
+        'click',
+        async () => {
+            if (!annQuill) {
+                ensureAnnQuill();
+            }
+            if (!annQuill) return;
+            const body = sanitizeRulesHtml(normalizeQuillMarkup(annQuill.root.innerHTML));
+            if (!quillGetPlainText(annQuill)) {
+                showToast('Saisissez un message.', 'error');
+                return;
+            }
+            const starts = fromLocalInputValue(document.getElementById('ann-start')?.value || '');
+            const ends = fromLocalInputValue(document.getElementById('ann-end')?.value || '');
+            if (!starts || !ends) {
+                showToast('Indiquez début et fin.', 'error');
+                return;
+            }
+            if (new Date(ends) <= new Date(starts)) {
+                showToast('La fin doit être après le début.', 'error');
+                return;
+            }
+            const res = await replaceLoginAnnouncementRemote({ body, startsAt: starts, endsAt: ends });
+            if (!res.ok) {
+                showToast(res.error || 'Erreur', 'error');
+                return;
+            }
+            showToast('Annonce publiée (l’ancienne annonce est remplacée).');
+            /* Afficher exactement ce qui est en base (évite écran vide ou texte obsolète à la réouverture). */
+            let row = res.row;
+            if (!row) {
+                row = await fetchLatestLoginAnnouncementForEdit();
+            }
+            if (row?.body != null && annQuill) {
+                quillSetHtml(annQuill, sanitizeRulesHtml(normalizeQuillMarkup(String(row.body))));
+                const startEl = document.getElementById('ann-start');
+                const endEl = document.getElementById('ann-end');
+                if (startEl && row.starts_at) startEl.value = toLocalInputValue(row.starts_at);
+                if (endEl && row.ends_at) endEl.value = toLocalInputValue(row.ends_at);
+            }
+        },
+        { signal }
+    );
 }
 
 /**

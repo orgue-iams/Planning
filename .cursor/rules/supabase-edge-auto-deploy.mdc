@@ -1,0 +1,19 @@
+---
+description: Après changement Edge Functions, tenter le déploiement Supabase sans renvoyer la charge à l’utilisateur
+alwaysApply: true
+---
+
+# Déploiement Edge Functions (Supabase)
+
+Quand vous modifiez un fichier sous `supabase/functions/` ou `supabase/config.toml` de façon à impacter les fonctions déployées :
+
+1. **Tenter vous-même le déploiement** en fin de tâche. Ne pas se contenter de dire à l’utilisateur « déployez avec supabase » sans avoir essayé.
+2. **Shell Windows (PowerShell)** : utiliser `Set-Location "c:\Developpement\Planning"` puis la commande ; ne pas chaîner avec `&&` (non supporté).
+3. **Ordre de tentative** :
+   - `supabase functions deploy <nom>` si la CLI est disponible et le projet déjà lié (dossier `.supabase` / `supabase link`).
+   - Sinon `npx supabase functions deploy <nom> --project-ref <REF>` avec `SUPABASE_ACCESS_TOKEN` défini dans l’environnement si présent (voir [CLI deploy](https://supabase.com/docs/guides/functions/deploy)).
+   - Pour déployer **toutes** les fonctions : `supabase functions deploy` (ou équivalent avec `--project-ref`).
+4. Si la CI du dépôt déploie déjà sur `push` vers `main` / `master` (voir `.github/workflows/deploy-supabase-functions.yml`), une alternative est de **committer et pousser** les changements pour déclencher le workflow — à faire si le déploiement local est impossible dans la session.
+5. Si aucun déploiement n’est possible (pas de CLI, pas de secrets, pas de git push autorisé), le dire **une fois** avec la raison précise ; ne pas répéter la même consigne à chaque message.
+
+Fonctions courantes du projet : `planning-admin`, `calendar-bridge`, `planning-slot-notify` (vérifier `supabase/functions/` et `config.toml`).

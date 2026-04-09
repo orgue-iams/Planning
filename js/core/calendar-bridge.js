@@ -4,9 +4,10 @@ import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from '.
  * Appelle le pont (Apps Script ou Edge Function) qui synchronise avec Google Agenda.
  * @param {string | null} accessToken — JWT Supabase (Authorization: Bearer)
  * @param {Record<string, unknown>} body — ex. { action: 'upsert', events: [...] }
- * @returns {Promise<{ ok: boolean, skipped?: boolean, error?: string, data?: unknown }>}
+ * @param {{ signal?: AbortSignal } | undefined} options — pour annuler une requête obsolète (changement de semaine)
+ * @returns {Promise<{ ok: boolean, skipped?: boolean, aborted?: boolean, error?: string, data?: unknown }>}
  */
-export async function invokeCalendarBridge(accessToken, body) {
+export async function invokeCalendarBridge(accessToken, body, options) {
     const { calendarBridgeUrl, supabaseAnonKey } = getPlanningConfig();
     if (!calendarBridgeUrl) {
         return { ok: true, skipped: true };
@@ -23,10 +24,13 @@ export async function invokeCalendarBridge(accessToken, body) {
         return { data };
     };
 
+    const signal = options?.signal;
+
     try {
         const doFetch = async (bearer) =>
             fetch(calendarBridgeUrl, {
                 method: 'POST',
+                signal,
                 headers: {
                     'Content-Type': 'application/json',
                     ...(supabaseAnonKey ? { apikey: supabaseAnonKey } : {}),
@@ -37,13 +41,20 @@ export async function invokeCalendarBridge(accessToken, body) {
 
         let token = accessToken;
         let res = await doFetch(token);
-        if (res.status === 401 && isBackendAuthConfigured()) {
+        /* Passerelle ou JWT expiré : rafraîchir et réessayer (403 aussi selon les proxies). */
+        if ((res.status === 401 || res.status === 403) && isBackendAuthConfigured()) {
             const supabase = getSupabaseClient();
             if (supabase) {
-                await supabase.auth.refreshSession();
-                const { data: { session } } = await supabase.auth.getSession();
-                token = session?.access_token ?? token;
-                res = await doFetch(token);
+                const { data: refData } = await supabase.auth.refreshSession();
+                let nextTok = refData?.session?.access_token ?? null;
+                if (!nextTok) {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    nextTok = session?.access_token ?? null;
+                }
+                if (nextTok) {
+                    token = nextTok;
+                    res = await doFetch(token);
+                }
             }
         }
 
@@ -70,6 +81,9 @@ export async function invokeCalendarBridge(accessToken, body) {
 
         return { ok: true, data };
     } catch (e) {
+        if (e instanceof Error && e.name === 'AbortError') {
+            return { ok: false, aborted: true };
+        }
         const msg = e instanceof Error ? e.message : String(e);
         return { ok: false, error: msg };
     }

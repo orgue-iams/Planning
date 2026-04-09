@@ -10,8 +10,23 @@ function parseFunctionsBody(text) {
     }
 }
 
+/** Si le serveur renvoie une chaîne JSON GoTrue dans `error`, n’afficher que `message`. */
+function unwrapNestedJsonMessage(s) {
+    if (!s || typeof s !== 'string') return s;
+    const t = s.trim();
+    if (!t.startsWith('{') || !t.includes('"message"')) return t;
+    try {
+        const o = JSON.parse(t);
+        if (o && typeof o.message === 'string' && o.message.trim()) return o.message.trim();
+    } catch {
+        /* */
+    }
+    return t;
+}
+
 function errorMessageFromResponse(res, text, json) {
-    const err = typeof json.error === 'string' ? json.error.trim() : '';
+    let err = typeof json.error === 'string' ? json.error.trim() : '';
+    err = unwrapNestedJsonMessage(err) || err;
     const msg = typeof json.message === 'string' ? json.message.trim() : '';
     if (err || msg) return err || msg;
     const trimmed = text.trim();

@@ -121,6 +121,56 @@
     padding: 6px 8px;
 }
 
+/* Boutons T (petit / moyen / grand) — remplace la liste déroulante de taille Quill */
+.planning-quill-mount .planning-quill-fs-group {
+    display: inline-flex;
+    gap: 3px;
+    align-items: center;
+    margin-left: 2px;
+    vertical-align: middle;
+}
+
+.planning-quill-mount .planning-fs-btn {
+    box-sizing: border-box;
+    font-weight: 800;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    line-height: 1;
+    width: 1.65rem;
+    height: 1.5rem;
+    padding: 0;
+    margin: 0;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background: #fff;
+    color: #334155;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.planning-quill-mount .planning-fs-btn:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+}
+
+.planning-quill-mount .planning-fs-btn:focus-visible {
+    outline: 2px solid #64748b;
+    outline-offset: 1px;
+}
+
+.planning-quill-mount .planning-fs-sm {
+    font-size: 10px;
+}
+
+.planning-quill-mount .planning-fs-md {
+    font-size: 13px;
+}
+
+.planning-quill-mount .planning-fs-lg {
+    font-size: 17px;
+}
+
 .planning-quill-mount .ql-container.ql-snow {
     border: 1px solid #e2e8f0;
     border-top: 0;

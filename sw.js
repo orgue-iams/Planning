@@ -1,5 +1,5 @@
 /* Incrémenter à chaque mise en ligne pour invalider le cache (HTML/JS/CSS listés). */
-const CACHE_NAME = 'orgue-v35';
+const CACHE_NAME = 'orgue-v43';
 
 /** Ressources locales (hors CDN) pour démarrage rapide / coquille hors-ligne */
 const ASSETS = [
@@ -7,6 +7,7 @@ const ASSETS = [
   './index.html',
   './favicon.svg',
   './manifest.json',
+  './css/tailwind.generated.css',
   './css/main.css',
   './css/calendar-toolbar.css',
   './css/calendar-theme.css',

@@ -18,7 +18,25 @@ declare
     v_display_name text;
     v_role text;
     v_uid uuid;
+    v_instance_id uuid;
 begin
+    select inst.id into v_instance_id from auth.instances inst order by inst.id limit 1;
+
+    if v_instance_id is null then
+        select u.instance_id into v_instance_id
+        from auth.users u
+        where u.instance_id is not null
+          and u.instance_id <> '00000000-0000-0000-0000-000000000000'::uuid
+        group by u.instance_id
+        order by count(*) desc
+        limit 1;
+    end if;
+
+    if v_instance_id is null then
+        raise exception
+            'Impossible de déterminer instance_id : créez d’abord un compte via Dashboard → Authentication → Add user, puis relancez ce script.';
+    end if;
+
     for v_item in select * from jsonb_array_elements(v_users)
     loop
         v_email := lower(trim(v_item ->> 'email'));
@@ -39,7 +57,7 @@ begin
             )
             values (
                 v_uid,
-                '00000000-0000-0000-0000-000000000000',
+                v_instance_id,
                 'authenticated',
                 'authenticated',
                 v_email,
@@ -59,6 +77,34 @@ begin
                 updated_at = now()
             where id = v_uid;
         end if;
+
+        if not exists (
+            select 1 from auth.identities i where i.user_id = v_uid and i.provider = 'email'
+        ) then
+            insert into auth.identities (
+                id, user_id, provider_id, provider, identity_data,
+                last_sign_in_at, created_at, updated_at
+            )
+            values (
+                gen_random_uuid(),
+                v_uid,
+                v_uid::text,
+                'email',
+                jsonb_build_object(
+                    'sub', v_uid::text,
+                    'email', v_email,
+                    'email_verified', true,
+                    'phone_verified', false
+                ),
+                now(),
+                now(),
+                now()
+            );
+        end if;
+
+        update auth.users
+        set instance_id = v_instance_id
+        where id = v_uid and instance_id is distinct from v_instance_id;
 
         insert into public.profiles (id, display_name, role, updated_at)
         values (v_uid, v_display_name, v_role, now())

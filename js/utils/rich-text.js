@@ -42,7 +42,7 @@ function sanitizeStyleAttr(styleText) {
         const v = sanitizeCssValue(vRaw);
         if (!v) continue;
         if (k === 'font-size') {
-            if (/^\d{1,2}px$/.test(v) || /^\d{1,2}(\.\d)?rem$/.test(v)) keep.push(`font-size:${v}`);
+            if (/^\d{1,3}px$/.test(v) || /^\d{1,2}(\.\d+)?rem$/.test(v)) keep.push(`font-size:${v}`);
         }
         if (k === 'text-decoration') {
             if (/^(underline|none)$/i.test(v)) keep.push(`text-decoration:${v}`);

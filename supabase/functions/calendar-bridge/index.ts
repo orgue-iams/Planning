@@ -136,8 +136,17 @@ async function getGoogleAccessToken(): Promise<string> {
 }
 
 function calendarId(): string {
-    const id = (Deno.env.get('GOOGLE_CALENDAR_ID') ?? '').trim();
+    let id = (Deno.env.get('GOOGLE_CALENDAR_ID') ?? '').trim();
     if (!id) throw new Error('GOOGLE_CALENDAR_ID manquant');
+    /* Éviter un double encodage (%40…) qui casse l’URL `/calendars/{id}/events` → 404 Not Found. */
+    try {
+        if (id.includes('%')) {
+            const once = decodeURIComponent(id);
+            if (once && !once.includes('%')) id = once;
+        }
+    } catch {
+        /* garder id tel quel */
+    }
     return id;
 }
 
@@ -153,6 +162,22 @@ type GCalEvent = {
     end?: { dateTime?: string; date?: string; timeZone?: string };
     extendedProperties?: { private?: Record<string, string> };
 };
+
+/**
+ * Couleur d’événement Google Calendar (palette fixe 1–11).
+ * Aligné sur les teintes saturées de la grille Planning (events.css --slot-bg-strong) :
+ * - Fermeture : orange (#ff790a → proche Tangerine)
+ * - Cours : jaune (#f6e36a → Banana)
+ * - Travail (reservation) : toujours bleu « Autres » (#68a1e5 → Peacock), sans distinguer propriétaire
+ * @see https://developers.google.com/calendar/api/v3/reference/events#resource
+ */
+function googleColorIdForPlanningType(type: string): string {
+    const t = String(type || '').trim().toLowerCase();
+    if (t === 'fermeture') return '6'; /* Tangerine — orange */
+    if (t === 'cours' || t === 'maintenance') return '5'; /* Banana — jaune */
+    /* reservation et défaut = Travail → bleu (même teinte côté app que « travail other / Autres ») */
+    return '7'; /* Peacock — bleu */
+}
 
 function parseDescription(desc: string | undefined): { type: string; owner: string } {
     let type = 'reservation';
@@ -202,11 +227,13 @@ function googleEventResource(ev: {
     owner: string;
 }): Record<string, unknown> {
     const tz = timeZone();
+    const colorId = googleColorIdForPlanningType(ev.type);
     return {
         summary: ev.title,
         description: `type=${ev.type || ''} owner=${ev.owner || ''}`,
         start: { dateTime: ev.start, timeZone: tz },
         end: { dateTime: ev.end, timeZone: tz },
+        colorId,
         extendedProperties: {
             private: {
                 planningType: String(ev.type || 'reservation'),
@@ -283,12 +310,23 @@ Deno.serve(async (req) => {
                 maxResults: '2500'
             });
             const res = await gcalFetch(accessToken, `/calendars/${calId}/events?${params}`);
-            const data = (await res.json()) as { items?: GCalEvent[]; error?: { message?: string } };
+            const data = (await res.json()) as {
+                items?: GCalEvent[];
+                error?: { message?: string; errors?: Array<{ message?: string; reason?: string }> };
+            };
             if (!res.ok) {
+                let gErr = typeof data.error?.message === 'string' ? data.error.message.trim() : '';
+                if (!gErr && Array.isArray(data.error?.errors) && data.error.errors.length > 0) {
+                    const e0 = data.error.errors[0];
+                    gErr =
+                        (typeof e0?.message === 'string' && e0.message.trim()) ||
+                        (typeof e0?.reason === 'string' && e0.reason.trim()) ||
+                        '';
+                }
                 return jsonResponse(
                     {
                         ok: false,
-                        error: data.error?.message || `Calendar list HTTP ${res.status}`
+                        error: gErr || `Calendar list HTTP ${res.status}`
                     },
                     200
                 );

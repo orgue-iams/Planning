@@ -1,7 +1,7 @@
 /**
  * Modale réservée au rôle planning admin (secrétaire) — Edge Function planning-admin.
  */
-import { isAdmin } from './auth-logic.js';
+import { isAdmin, PASSWORD_MIN_LENGTH, PASSWORD_POLICY_LINES } from './auth-logic.js';
 import { isBackendAuthConfigured } from './supabase-client.js';
 import { planningAdminInvoke } from './admin-api.js';
 import { showToast } from '../utils/toast.js';
@@ -38,21 +38,21 @@ function renderUsersTable(users) {
         const tr = document.createElement('tr');
         const suspended = u.banned_until && new Date(u.banned_until) > new Date();
         tr.innerHTML = `
-            <td class="text-[10px] font-bold break-all">${escapeTd(u.email)}</td>
+            <td class="text-[11px] font-normal break-all">${escapeTd(u.email)}</td>
             <td>
-                <select class="select select-xs select-bordered admin-role-sel max-w-[7.5rem]" data-user-id="${escapeAttr(u.id)}">
+                <select class="select select-xs select-bordered text-[10px] admin-role-sel w-full max-w-[9.5rem]" data-user-id="${escapeAttr(u.id)}">
                     ${roleSelectOptionsHtml(u.role)}
                 </select>
             </td>
-            <td class="text-[10px]">${suspended ? '<span class="text-error font-bold">Suspendu</span>' : '<span class="text-success">Actif</span>'}</td>
+            <td class="text-[10px]">${suspended ? '<span class="text-error font-medium">Suspendu</span>' : '<span class="text-emerald-700 font-medium">Actif</span>'}</td>
             <td>
-                <div class="flex flex-col gap-1">
-                    <button type="button" class="btn btn-xs btn-outline font-black text-[9px] admin-btn-apply" data-user-id="${escapeAttr(u.id)}">Appliquer rôle</button>
-                    <button type="button" class="btn btn-xs btn-ghost font-black text-[9px] admin-btn-pw" data-email="${escapeAttr(u.email)}" data-user-id="${escapeAttr(u.id)}">Mot de passe</button>
+                <div class="flex flex-col sm:flex-row sm:flex-wrap gap-1 sm:gap-1.5">
+                    <button type="button" class="btn btn-xs btn-outline font-normal text-[9px] shrink-0 admin-btn-apply" data-user-id="${escapeAttr(u.id)}">Appliquer rôle</button>
+                    <button type="button" class="btn btn-xs btn-outline border-slate-300 text-slate-700 hover:border-slate-400 hover:bg-slate-100 font-normal text-[9px] shrink-0 admin-btn-pw" data-email="${escapeAttr(u.email)}" data-user-id="${escapeAttr(u.id)}">Mot de passe</button>
                     ${suspended
-                        ? `<button type="button" class="btn btn-xs btn-success btn-outline font-black text-[9px] admin-btn-unsuspend" data-user-id="${escapeAttr(u.id)}">Réactiver</button>`
-                        : `<button type="button" class="btn btn-xs btn-warning btn-outline font-black text-[9px] admin-btn-suspend" data-user-id="${escapeAttr(u.id)}">Suspendre</button>`}
-                    <button type="button" class="btn btn-xs btn-error btn-outline font-black text-[9px] admin-btn-delete" data-user-id="${escapeAttr(u.id)}">Supprimer</button>
+                        ? `<button type="button" class="btn btn-xs btn-success btn-outline font-normal text-[9px] shrink-0 admin-btn-unsuspend" data-user-id="${escapeAttr(u.id)}">Réactiver</button>`
+                        : `<button type="button" class="btn btn-xs btn-outline border-orange-500 text-orange-700 hover:bg-orange-50 hover:border-orange-600 font-normal text-[9px] shrink-0 admin-btn-suspend" data-user-id="${escapeAttr(u.id)}">Suspendre</button>`}
+                    <button type="button" class="btn btn-xs btn-error btn-outline font-normal text-[9px] shrink-0 admin-btn-delete" data-user-id="${escapeAttr(u.id)}">Supprimer</button>
                 </div>
             </td>`;
         tb.appendChild(tr);
@@ -78,6 +78,21 @@ async function refreshUserList() {
     }
 }
 
+function setAdminCreatePassVisible(visible) {
+    const pw = document.getElementById('admin-create-password');
+    const btn = document.getElementById('admin-create-pw-toggle');
+    const iconShow = document.getElementById('admin-create-pw-icon-show');
+    const iconHide = document.getElementById('admin-create-pw-icon-hide');
+    pw?.setAttribute('type', visible ? 'text' : 'password');
+    btn?.setAttribute('aria-pressed', String(visible));
+    btn?.setAttribute(
+        'aria-label',
+        visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'
+    );
+    iconShow?.classList.toggle('hidden', visible);
+    iconHide?.classList.toggle('hidden', !visible);
+}
+
 function resetCreateInviteForm() {
     const emailEl = document.getElementById('admin-invite-email');
     const nameEl = document.getElementById('admin-invite-name');
@@ -86,7 +101,35 @@ function resetCreateInviteForm() {
     if (emailEl) emailEl.value = '';
     if (nameEl) nameEl.value = '';
     if (pwEl) pwEl.value = '';
+    setAdminCreatePassVisible(false);
     if (roleSel) roleSel.value = 'eleve';
+}
+
+function fillPasswordPolicyLists() {
+    const pwUl = document.getElementById('admin-pw-policy');
+    if (pwUl) {
+        pwUl.replaceChildren();
+        for (const line of PASSWORD_POLICY_LINES) {
+            const li = document.createElement('li');
+            li.textContent = line;
+            pwUl.appendChild(li);
+        }
+    }
+    const createUl = document.getElementById('admin-create-pw-policy');
+    if (createUl) {
+        createUl.replaceChildren();
+        for (const line of PASSWORD_POLICY_LINES) {
+            const li = document.createElement('li');
+            li.textContent = line;
+            createUl.appendChild(li);
+        }
+    }
+}
+
+function setAdminPwFieldsVisible(visible) {
+    const t = visible ? 'text' : 'password';
+    document.getElementById('admin-pw-new')?.setAttribute('type', t);
+    document.getElementById('admin-pw-new2')?.setAttribute('type', t);
 }
 
 let adminUsersHandlersBound = false;
@@ -100,6 +143,19 @@ export function initAdminUsersUi(currentUser) {
     document.getElementById('menu-item-users-admin-wrap')?.classList.toggle('hidden', !show);
     if (!show || adminUsersHandlersBound) return;
     adminUsersHandlersBound = true;
+
+    fillPasswordPolicyLists();
+
+    document.getElementById('admin-pw-show-plain')?.addEventListener('change', (e) => {
+        const el = e.target;
+        setAdminPwFieldsVisible(el instanceof HTMLInputElement && el.checked);
+    });
+
+    document.getElementById('admin-create-pw-toggle')?.addEventListener('click', () => {
+        const pw = document.getElementById('admin-create-password');
+        const vis = pw?.getAttribute('type') === 'text';
+        setAdminCreatePassVisible(!vis);
+    });
 
     document.getElementById('menu-item-users-admin')?.addEventListener('click', (e) => {
         e.preventDefault();
@@ -135,8 +191,8 @@ export function initAdminUsersUi(currentUser) {
             showToast('Rôle invalide.', 'error');
             return;
         }
-        if (password.length < 6) {
-            showToast('Mot de passe : au moins 6 caractères.', 'error');
+        if (password.length < PASSWORD_MIN_LENGTH) {
+            showToast(`Mot de passe : au moins ${PASSWORD_MIN_LENGTH} caractères.`, 'error');
             return;
         }
         try {
@@ -239,6 +295,9 @@ export function initAdminUsersUi(currentUser) {
             document.getElementById('admin-pw-target-email').textContent = email;
             document.getElementById('admin-pw-new').value = '';
             document.getElementById('admin-pw-new2').value = '';
+            const showCb = document.getElementById('admin-pw-show-plain');
+            if (showCb instanceof HTMLInputElement) showCb.checked = false;
+            setAdminPwFieldsVisible(false);
             document.getElementById('modal_admin_password')?.showModal();
         }
     });
@@ -251,8 +310,8 @@ export function initAdminUsersUi(currentUser) {
             showToast('Les deux mots de passe diffèrent.', 'error');
             return;
         }
-        if (a.length < 6) {
-            showToast('Au moins 6 caractères.', 'error');
+        if (a.length < PASSWORD_MIN_LENGTH) {
+            showToast(`Au moins ${PASSWORD_MIN_LENGTH} caractères.`, 'error');
             return;
         }
         try {

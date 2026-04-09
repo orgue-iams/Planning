@@ -44,29 +44,22 @@ type ListedUser = {
     created_at?: string | null;
 };
 
-/** Appel direct GoTrue (même endpoint que auth-js) : évite les écarts de forme de `data` avec certains bundles Deno/esm. */
-async function fetchAuthUsersPage(
-    projectUrl: string,
-    serviceKey: string,
-    page: number,
-    perPage: number
-): Promise<ListedUser[]> {
-    const base = projectUrl.replace(/\/$/, '');
-    const qs = new URLSearchParams({ page: String(page), per_page: String(perPage) });
-    const res = await fetch(`${base}/auth/v1/admin/users?${qs}`, {
-        headers: {
-            Authorization: `Bearer ${serviceKey}`,
-            apikey: serviceKey,
-            'Content-Type': 'application/json',
-            'X-Supabase-Api-Version': '2024-01-01'
-        }
-    });
-    if (!res.ok) {
-        const t = await res.text();
-        throw new Error(t.trim() || `Liste utilisateurs Auth : HTTP ${res.status}`);
+/** Message lisible pour l’admin GoTrue / liste utilisateurs (évite un toast JSON brut). */
+function formatAuthListUsersError(err: unknown): string {
+    let m = '';
+    if (typeof err === 'string') {
+        m = err.trim();
+    } else if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
+        m = (err as { message: string }).message.trim();
     }
-    const body = (await res.json()) as { users?: unknown };
-    return Array.isArray(body.users) ? (body.users as ListedUser[]) : [];
+    if (!m) return 'Impossible de lister les comptes (erreur Auth serveur).';
+    if (/database error finding users/i.test(m)) {
+        return (
+            `${m} — Côté projet Supabase : vérifier l’onglet Auth / SQL ; une table public.users ou un search_path peut perturber GoTrue. ` +
+            `Si besoin : Dashboard → SQL → pas de table public.users en conflit ; migrations auth à jour.`
+        );
+    }
+    return m;
 }
 
 const cors: Record<string, string> = {
@@ -146,41 +139,83 @@ Deno.serve(async (req) => {
 
     try {
         if (action === 'list_users') {
-            const perPage = 200;
-            let page = 1;
-            const all: Array<{
+            type RpcRow = {
                 id: string;
-                email: string;
-                display_name: string | null;
-                role: string;
-                banned_until: string | null;
-                created_at: string | null;
-            }> = [];
+                email?: string | null;
+                created_at?: string | null;
+                banned_until?: string | null;
+                display_name?: string | null;
+                profile_role?: string | null;
+            };
 
-            while (true) {
-                const users = await fetchAuthUsersPage(url, serviceKey, page, perPage);
-                if (users.length === 0) break;
+            const { data: rpcRaw, error: rpcErr } = await admin.rpc('planning_admin_list_auth_users');
+            if (rpcErr) {
+                /* Fallback si la migration 005 n’est pas encore appliquée. */
+                const perPage = 200;
+                let page = 1;
+                const all: Array<{
+                    id: string;
+                    email: string;
+                    display_name: string | null;
+                    role: string;
+                    banned_until: string | null;
+                    created_at: string | null;
+                }> = [];
 
-                const ids = users.map((u) => u.id).filter(Boolean);
-                const pmap = await profileRowsForUserIds(admin, ids);
+                while (true) {
+                    const { data: pageData, error: listErr } = await admin.auth.admin.listUsers({ page, perPage });
+                    if (listErr) {
+                        throw new Error(formatAuthListUsersError(listErr));
+                    }
+                    const users = (pageData?.users ?? []) as ListedUser[];
+                    if (users.length === 0) break;
 
-                for (const u of users) {
-                    if (!u?.id) continue;
-                    const p = pmap.get(u.id);
-                    const ban = u.banned_until ?? null;
-                    const dbRole = p?.role != null ? String(p.role) : '';
-                    all.push({
-                        id: u.id,
-                        email: u.email ?? '',
-                        display_name: p?.display_name ?? null,
-                        role: normalizePlanningRole(dbRole),
-                        banned_until: ban ?? null,
-                        created_at: u.created_at ?? null
-                    });
+                    const ids = users.map((u) => u.id).filter(Boolean);
+                    const pmap = await profileRowsForUserIds(admin, ids);
+
+                    for (const u of users) {
+                        if (!u?.id) continue;
+                        const p = pmap.get(u.id);
+                        const ban = u.banned_until ?? null;
+                        const dbRole = p?.role != null ? String(p.role) : '';
+                        all.push({
+                            id: u.id,
+                            email: u.email ?? '',
+                            display_name: p?.display_name ?? null,
+                            role: normalizePlanningRole(dbRole),
+                            banned_until: ban ?? null,
+                            created_at: u.created_at ?? null
+                        });
+                    }
+                    if (users.length < perPage) break;
+                    page++;
                 }
-                if (users.length < perPage) break;
-                page++;
+
+                return new Response(JSON.stringify({ ok: true, users: all }), {
+                    headers: { ...cors, 'Content-Type': 'application/json' }
+                });
             }
+
+            let parsed: unknown = rpcRaw;
+            if (typeof rpcRaw === 'string') {
+                try {
+                    parsed = JSON.parse(rpcRaw);
+                } catch {
+                    parsed = [];
+                }
+            }
+            const rows = Array.isArray(parsed) ? (parsed as RpcRow[]) : [];
+            const all = rows.map((row) => {
+                const dbRole = row.profile_role != null ? String(row.profile_role) : '';
+                return {
+                    id: String(row.id ?? ''),
+                    email: String(row.email ?? ''),
+                    display_name: row.display_name != null ? String(row.display_name) : null,
+                    role: normalizePlanningRole(dbRole),
+                    banned_until: row.banned_until != null ? String(row.banned_until) : null,
+                    created_at: row.created_at != null ? String(row.created_at) : null
+                };
+            });
 
             return new Response(JSON.stringify({ ok: true, users: all }), {
                 headers: { ...cors, 'Content-Type': 'application/json' }

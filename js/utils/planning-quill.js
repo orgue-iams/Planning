@@ -2,21 +2,74 @@
  * Éditeur WYSIWYG partagé (modales Règles + Annonces).
  * Requiert `window.Quill` chargé via CDN (voir index.html).
  *
- * Pas de police ni de couleur : évite les listes déroulantes où toutes les lignes affichent « Normal » (bug Snow + CSS).
- * Tailles en px avec libellés explicites dans modal.css.
+ * Tailles : format Quill `size` (px) + boutons T petit / moyen / grand (pas de liste déroulante).
  */
+
+const PLANNING_QUILL_SIZE_VER = 'style-px-v2';
+
+/** @param {any} quill */
+function applyPlanningFontSize(quill, px) {
+    if (!quill) return;
+    const range = quill.getSelection(true);
+    if (range && range.length > 0) {
+        quill.formatText(range.index, range.length, 'size', px, 'user');
+    } else {
+        quill.format('size', px, 'user');
+    }
+}
+
+/** @param {any} quill */
+function injectPlanningFontSizeButtons(quill) {
+    const tb = quill?.getModule?.('toolbar');
+    const container = tb?.container;
+    if (!(container instanceof HTMLElement)) return;
+    const wrap = document.createElement('span');
+    wrap.className = 'ql-formats planning-quill-fs-group';
+    wrap.setAttribute('aria-label', 'Taille du texte');
+    const sizes = [
+        { px: '12px', cls: 'planning-fs-sm', title: 'Petit' },
+        { px: '16px', cls: 'planning-fs-md', title: 'Moyen' },
+        { px: '20px', cls: 'planning-fs-lg', title: 'Grand' }
+    ];
+    for (const { px, cls, title } of sizes) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `planning-fs-btn ${cls}`;
+        b.textContent = 'T';
+        b.title = title;
+        b.setAttribute('aria-label', `${title} (${px})`);
+        b.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            applyPlanningFontSize(quill, px);
+        });
+        wrap.appendChild(b);
+    }
+    container.appendChild(wrap);
+}
 
 export function isQuillAvailable() {
     return typeof window !== 'undefined' && typeof window.Quill === 'function';
 }
 
 function registerPlanningSizeFormat() {
-    if (window.__planningQuillSizeRegistered) return;
+    if (window.__planningQuillSizeVer === PLANNING_QUILL_SIZE_VER) return;
     const Quill = window.Quill;
-    const Size = Quill.import('formats/size');
-    Size.whitelist = ['10px', '12px', '14px', '16px', '18px', '20px'];
-    Quill.register(Size, true);
-    window.__planningQuillSizeRegistered = true;
+    try {
+        const SizeStyle = Quill.import('attributors/style/size');
+        SizeStyle.whitelist = ['10px', '12px', '14px', '16px', '18px', '20px'];
+        Quill.register(SizeStyle, true);
+    } catch (e) {
+        console.warn('[planning-quill] attributors/style/size indisponible, repli formats/size', e);
+        const Size = Quill.import('formats/size');
+        Size.whitelist = ['10px', '12px', '14px', '16px', '18px', '20px'];
+        Quill.register(Size, true);
+    }
+    window.__planningQuillSizeVer = PLANNING_QUILL_SIZE_VER;
+    try {
+        delete window.__planningQuillSizeRegistered;
+    } catch {
+        /* */
+    }
 }
 
 /**
@@ -29,26 +82,28 @@ export function createPlanningQuill(mountEl, opts = {}) {
         console.warn('[planning-quill] Quill indisponible');
         return null;
     }
-    mountEl.replaceChildren();
+    destroyPlanningQuillMount(mountEl);
     registerPlanningSizeFormat();
     const Quill = window.Quill;
-    return new Quill(mountEl, {
+    const q = new Quill(mountEl, {
         theme: 'snow',
         placeholder: opts.placeholder ?? '',
         modules: {
-            toolbar: [
-                ['bold', 'italic', 'underline'],
-                [{ list: 'bullet' }],
-                [{ size: ['10px', '12px', '14px', '16px', '18px', '20px'] }]
-            ]
+            toolbar: [['bold', 'italic', 'underline'], [{ list: 'bullet' }]]
         }
     });
+    injectPlanningFontSizeButtons(q);
+    return q;
 }
 
-/** Vide le conteneur Quill (barre + éditeur). */
+/** Vide le conteneur Quill (barre + éditeur) et retire toute barre orpheline (frères du mount, ex. ré-init). */
 export function destroyPlanningQuillMount(mountEl) {
     if (!(mountEl instanceof HTMLElement)) return;
-    mountEl.innerHTML = '';
+    mountEl.replaceChildren();
+    const parent = mountEl.parentElement;
+    if (parent instanceof HTMLElement) {
+        parent.querySelectorAll(':scope > .ql-toolbar').forEach((n) => n.remove());
+    }
 }
 
 /**
@@ -62,11 +117,29 @@ export function quillSetHtml(quill, html) {
         quill.setContents([]);
         return;
     }
+    const plainLen = raw.replace(/<[^>]+>/g, '').replace(/\u00a0/g, ' ').trim().length;
     try {
         const delta = quill.clipboard.convert({ html: raw });
         quill.setContents(delta, 'silent');
     } catch {
         quill.setContents([]);
+    }
+    if (plainLen > 0) {
+        const after = quill.getText().replace(/\u00a0/g, ' ').replace(/\n+$/, '').trim();
+        if (after.length === 0) {
+            try {
+                quill.setContents([], 'silent');
+                const clip = quill.clipboard;
+                if (clip && typeof clip.dangerouslyPasteHTML === 'function') {
+                    clip.dangerouslyPasteHTML(0, raw, 'silent');
+                } else {
+                    quill.root.innerHTML = raw;
+                    quill.update('silent');
+                }
+            } catch {
+                /* */
+            }
+        }
     }
 }
 

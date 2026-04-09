@@ -1,7 +1,28 @@
 /* --- STRUCTURE DE LA GRILLE --- */
-.fc-timegrid-axis {
-    width: 76px !important;
-    min-width: 76px !important;
+/* FullCalendar 6 : 1re colonne (heures) — plusieurs sélecteurs car la largeur est appliquée sur td/col/flex */
+/* Le 1er <col> n’a souvent pas de classe ; FC met width inline (~79px) → chevauchement du texte sur la colonne lun. */
+.fc-timegrid-slots table > colgroup > col:first-child,
+.fc-timegrid-cols table > colgroup > col:first-child,
+.fc-col-header table > colgroup > col:first-child {
+    width: calc(5.5rem * 2 / 3) !important;
+    min-width: calc(5.5rem * 2 / 3) !important;
+    max-width: none !important;
+}
+
+.fc-timegrid-axis,
+.fc .fc-timegrid-axis,
+td.fc-timegrid-axis,
+th.fc-timegrid-axis,
+td.fc-timegrid-slot-label.fc-scrollgrid-shrink,
+th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
+.fc col.fc-timegrid-axis-col,
+.fc .fc-timegrid-axis-frame,
+.fc .fc-scrollgrid-section-body > td:first-child,
+.fc .fc-scrollgrid-section-header > td:first-child,
+.fc-timegrid .fc-scrollgrid-sync-table tr > td:first-child {
+    width: calc(5.5rem * 2 / 3) !important;
+    min-width: calc(5.5rem * 2 / 3) !important;
+    max-width: none !important;
 }
 
 /* Heures à gauche : plus compact ; aligné en haut de la case, centré horizontalement. */
@@ -10,20 +31,29 @@
     font-weight: 600;
     line-height: 1.15;
     font-variant-numeric: tabular-nums;
-    padding-inline-start: 0.125rem;
+    padding-inline-start: 0.2rem;
     padding-inline-end: 0.25rem;
     white-space: nowrap;
     vertical-align: top;
+    overflow: visible;
 }
 
-.fc .fc-timegrid-slot-label-cushion,
 .fc .fc-timegrid-slot-label-frame {
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
+    display: block;
     width: 100%;
     min-height: 100%;
-    padding-top: 0.125rem;
+    box-sizing: border-box;
+}
+
+.fc .fc-timegrid-slot-label-cushion {
+    display: block;
+    width: 100%;
+    /* Éviter min-width:0 qui laisse le libellé HH:mm se comprimer sous la largeur du texte */
+    min-width: min-content;
+    margin: 0 auto;
+    padding: 0.125rem 0.05rem 0;
+    text-align: center;
+    white-space: nowrap;
     box-sizing: border-box;
 }
 
@@ -47,7 +77,7 @@
     align-items: center;      /* Centré horizontalement */
     height: 100%;
     width: 100%;
-    border-radius: 4px;
+    border-radius: 7px;
     overflow: hidden;
     padding: 2px;
 }
@@ -102,9 +132,26 @@
         flex-shrink: 0;
     }
 
-    .fc-timegrid-axis {
-        width: 52px !important;
-        min-width: 52px !important;
+    .fc-timegrid-slots table > colgroup > col:first-child,
+    .fc-timegrid-cols table > colgroup > col:first-child,
+    .fc-col-header table > colgroup > col:first-child {
+        width: calc(4.75rem * 2 / 3) !important;
+        min-width: calc(4.75rem * 2 / 3) !important;
+    }
+
+    .fc-timegrid-axis,
+    .fc .fc-timegrid-axis,
+    td.fc-timegrid-axis,
+    th.fc-timegrid-axis,
+    td.fc-timegrid-slot-label.fc-scrollgrid-shrink,
+    th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
+    .fc col.fc-timegrid-axis-col,
+    .fc .fc-timegrid-axis-frame,
+    .fc .fc-scrollgrid-section-body > td:first-child,
+    .fc .fc-scrollgrid-section-header > td:first-child,
+    .fc-timegrid .fc-scrollgrid-sync-table tr > td:first-child {
+        width: calc(4.75rem * 2 / 3) !important;
+        min-width: calc(4.75rem * 2 / 3) !important;
     }
 
     .fc .fc-timegrid-slot-label {

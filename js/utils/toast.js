@@ -6,9 +6,10 @@ export function showToast(message, variant = 'success') {
     if (!root) {
         root = document.createElement('div');
         root.id = 'toast-root';
-        root.className = 'toast toast-top toast-end z-[200] gap-2 p-0 top-4 end-4';
         document.body.appendChild(root);
     }
+    /* Bas-droite : ne pas recouvrir la barre fixe / menu utilisateur (haut-droite). */
+    root.className = 'toast toast-bottom toast-end z-[100] gap-2 p-0 bottom-4 end-4';
 
     const alertClass =
         variant === 'error' ? 'alert-error' : variant === 'info' ? 'alert-info' : 'alert-success';

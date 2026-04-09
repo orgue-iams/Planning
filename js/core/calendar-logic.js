@@ -47,8 +47,21 @@ function ownerIdentityLabel(owner) {
     return `Réservé par ${name}`;
 }
 
-export function canCurrentUserEditEvent(currentUser, event) {
-    if (!currentUser?.email) return false;
+/** Début du créneau strictement avant aujourd’hui (minuit local). */
+export function isReservationStartBeforeTodayLocal(eventLike) {
+    const raw = eventLike?.start;
+    if (!raw) return false;
+    const start = raw instanceof Date ? raw : new Date(raw);
+    if (Number.isNaN(start.getTime())) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const d = new Date(start);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime() < today.getTime();
+}
+
+function canCurrentUserEditEventIgnoringPast(currentUser, event) {
+    if (!currentUser?.email || !event) return false;
     const meRole = normalizeRole(currentUser.role);
     if (meRole === 'consultation') return false;
     if (meRole === 'admin') return true;
@@ -62,6 +75,12 @@ export function canCurrentUserEditEvent(currentUser, event) {
         return ownerRole === 'eleve' || ownerRole === 'consultation';
     }
     return false;
+}
+
+export function canCurrentUserEditEvent(currentUser, event) {
+    if (!currentUser?.email || !event) return false;
+    if (isReservationStartBeforeTodayLocal(event)) return false;
+    return canCurrentUserEditEventIgnoringPast(currentUser, event);
 }
 
 function roleFromOwnerEmail(email) {
@@ -120,7 +139,73 @@ export function captureResizeStart(info) {
     }
 }
 
-function bridgeGoogleIdFromFcEvent(event) {
+/** Snapshot pour annuler un relâchement hors grille (barre « semaine », en-tête app, etc.). */
+let eventDragSnapshot = null;
+
+function clientCoordsFromPointerLike(jsEvent) {
+    if (!jsEvent) return null;
+    if (typeof jsEvent.clientX === 'number' && typeof jsEvent.clientY === 'number') {
+        return { x: jsEvent.clientX, y: jsEvent.clientY };
+    }
+    const te = /** @type {TouchEvent} */ (jsEvent);
+    const t = te.changedTouches?.[0] || te.targetTouches?.[0] || te.touches?.[0];
+    if (t && typeof t.clientX === 'number' && typeof t.clientY === 'number') {
+        return { x: t.clientX, y: t.clientY };
+    }
+    return null;
+}
+
+/**
+ * Le relâchement doit rester dans le cadre FullCalendar (`#calendar`), pas dans la barre « semaine »
+ * (`#calendar-toolbar`), l’en-tête app, la légende, ni à l’extérieur du widget.
+ * À l’intérieur de `#calendar`, les en-têtes de jours FC restent acceptés.
+ */
+export function isCalendarEventDropLocationValid(jsEvent) {
+    const c = clientCoordsFromPointerLike(jsEvent);
+    if (!c) return false;
+    const stack = document.elementsFromPoint(c.x, c.y);
+    for (const node of stack) {
+        if (!(node instanceof Element)) continue;
+        if (node.classList.contains('fc-event-mirror')) continue;
+
+        if (node.closest('#calendar-toolbar')) return false;
+        if (node.closest('#app-header')) return false;
+        if (node.closest('#planning-legend')) return false;
+
+        if (node.closest('#calendar')) return true;
+    }
+    return false;
+}
+
+export function onCalendarEventDragStart(info) {
+    const e = info?.event;
+    if (!e?.start || !e?.end) {
+        eventDragSnapshot = null;
+        return;
+    }
+    eventDragSnapshot = {
+        start: new Date(e.start),
+        end: new Date(e.end),
+        allDay: Boolean(e.allDay)
+    };
+}
+
+export function onCalendarEventDragStop(info) {
+    const c = clientCoordsFromPointerLike(info?.jsEvent);
+    const snap = eventDragSnapshot;
+    eventDragSnapshot = null;
+    if (!snap || !info?.event?.start || !info?.event?.end) return;
+    if (c && isCalendarEventDropLocationValid(info.jsEvent)) return;
+    const ev = info.event;
+    const moved =
+        ev.start.getTime() !== snap.start.getTime() || ev.end.getTime() !== snap.end.getTime();
+    if (!moved) return;
+    ev.setDates(snap.start, snap.end);
+    if (typeof ev.setAllDay === 'function') ev.setAllDay(snap.allDay);
+    showToast('Déposez le créneau sur la grille du planning.', 'error');
+}
+
+export function bridgeGoogleIdFromFcEvent(event) {
     if (!event) return '';
     const raw = event.id ?? event.extendedProps?.googleEventId;
     return raw != null && String(raw).trim() ? String(raw).trim() : '';
@@ -245,19 +330,19 @@ export function getEventContent(arg, currentUser) {
             minute: '2-digit'
         });
 
-    const endInclusive = new Date(end.getTime() - 1);
+    const endDisplay = new Date(end);
     const sameCalendarDay =
-        start.getFullYear() === endInclusive.getFullYear() &&
-        start.getMonth() === endInclusive.getMonth() &&
-        start.getDate() === endInclusive.getDate();
+        start.getFullYear() === endDisplay.getFullYear() &&
+        start.getMonth() === endDisplay.getMonth() &&
+        start.getDate() === endDisplay.getDate();
 
     const formatShortDay = (d) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 
     let timeLine;
     if (!sameCalendarDay) {
-        timeLine = `${formatShortDay(start)} ${formatTime(start)} → ${formatShortDay(endInclusive)} ${formatTime(endInclusive)}`;
+        timeLine = `${formatShortDay(start)} ${formatTime(start)} → ${formatShortDay(endDisplay)} ${formatTime(endDisplay)}`;
     } else {
-        timeLine = `${formatTime(start)} – ${formatTime(endInclusive)}`;
+        timeLine = `${formatTime(start)} – ${formatTime(endDisplay)}`;
     }
 
     const showTitleRow = !sameCalendarDay || durationMin > 30;
@@ -274,9 +359,9 @@ export function getEventContent(arg, currentUser) {
     return { html: innerHTML };
 }
 
-/** Fin de sélection affichable (FullCalendar : `end` exclusif sur les plages horaires). */
+/** Fin affichée : conserver l'heure exacte de fin (ex. 12:00), sans -1 minute. */
 function selectionEndDisplay(endExclusive) {
-    return new Date(endExclusive.getTime() - 1);
+    return new Date(endExclusive);
 }
 
 /** Aligné sur les `<option>` HH:mm (toLocaleTimeString fr-FR ne correspond pas toujours). */
@@ -448,6 +533,12 @@ export async function handleEventResize(info, currentUser) {
     const start = info.event.start;
     const end = info.event.end;
     if (!start || !end) return;
+    if (isReservationStartBeforeTodayLocal(info.event)) {
+        info.revert();
+        resizePreviousRange.delete(info.event);
+        showToast('Les créneaux passés ne sont pas modifiables.', 'error');
+        return;
+    }
     const endInclusive = new Date(end.getTime() - 1);
     if (!sameCalendarDay(start, endInclusive)) {
         info.revert();
@@ -457,6 +548,20 @@ export async function handleEventResize(info, currentUser) {
     }
     const prev = resizePreviousRange.get(info.event);
     resizePreviousRange.delete(info.event);
+
+    const cal = info.view?.calendar;
+    if (
+        cal &&
+        !(await ensureGoogleAgendaSlotsFreeOrAbort(
+            cal,
+            [{ start, end }],
+            bridgeGoogleIdFromFcEvent(info.event)
+        ))
+    ) {
+        info.revert();
+        resizePreviousRange.delete(info.event);
+        return;
+    }
 
     const sync = await syncReservationEventToGoogle(info.event);
     if (!sync.ok) return;
@@ -632,6 +737,18 @@ export async function quickCreateFromSelection(calendar, selectInfo, currentUser
         return;
     }
 
+    if (calendarBridgeWanted()) {
+        const ok = await ensureGoogleAgendaSlotsFreeOrAbort(
+            calendar,
+            [{ start: selectInfo.start, end: selectInfo.end }],
+            ''
+        );
+        if (!ok) {
+            calendar.unselect();
+            return;
+        }
+    }
+
     let created = /** @type {import('@fullcalendar/core').EventApi | null} */ (null);
     const add = () => {
         created = calendar.addEvent({
@@ -664,6 +781,11 @@ export async function quickCreateFromSelection(calendar, selectInfo, currentUser
             owner: currentUser.email
         }
     ]);
+    if (calendarBridgeWanted() && sync.ok && !sync.skipped) {
+        if (created) created.remove();
+        await calendar.refetchEvents();
+        return;
+    }
     if (created && sync?.data?.results) {
         applyBridgeUpsertResults([created], sync.data.results);
     }
@@ -677,6 +799,7 @@ export function openModal(start, end, event, currentUser) {
         showToast('Le profil consultation est en lecture seule.', 'error');
         return;
     }
+    const isPastSlot = Boolean(event && isReservationStartBeforeTodayLocal(event));
     const canEditEvent = !event || canCurrentUserEditEvent(currentUser, event);
     const owner = ownerInfoFromEvent(event, currentUser);
     const ownerText = ownerIdentityLabel(owner);
@@ -684,12 +807,15 @@ export function openModal(start, end, event, currentUser) {
     const wrapRead = document.getElementById('wrap-reservation-readonly');
     const wrapEdit = document.getElementById('wrap-reservation-editor');
     const modalActions = document.querySelector('#modal_reservation .modal-action');
+    const pastHint = document.getElementById('event-readonly-past-hint');
+    if (pastHint) pastHint.classList.add('hidden');
 
     if (event && !canEditEvent) {
         if (wrapRead && wrapEdit) {
             wrapRead.classList.remove('hidden');
             wrapEdit.classList.add('hidden');
         }
+        if (pastHint && isPastSlot) pastHint.classList.remove('hidden');
         const desc = document.getElementById('event-readonly-description');
         const ownerEl = document.getElementById('event-readonly-owner');
         const whenEl = document.getElementById('event-readonly-when');
@@ -828,6 +954,121 @@ function calendarBridgeWanted() {
     return Boolean(calendarBridgeUrl) && isBackendAuthConfigured();
 }
 
+/** @param {{ start: Date | string, end: Date | string }[]} ranges */
+function unionListRangesBounds(ranges) {
+    if (!Array.isArray(ranges) || ranges.length === 0) return null;
+    let minT = Infinity;
+    let maxT = -Infinity;
+    for (const raw of ranges) {
+        const s = raw.start instanceof Date ? raw.start : new Date(raw.start);
+        const e = raw.end instanceof Date ? raw.end : new Date(raw.end);
+        if (!Number.isNaN(s.getTime())) minT = Math.min(minT, s.getTime());
+        if (!Number.isNaN(e.getTime())) maxT = Math.max(maxT, e.getTime());
+    }
+    if (!Number.isFinite(minT) || !Number.isFinite(maxT)) return null;
+    return { min: new Date(minT), max: new Date(maxT) };
+}
+
+/**
+ * Chevauchement avec un événement renvoyé par le pont (même logique que la grille locale).
+ * @param {unknown[]} rows
+ * @param {Date} rangeStart
+ * @param {Date} rangeEnd
+ * @param {string} excludeGoogleId — événement édité / déplacé
+ */
+function findOverlappingBridgeRow(rows, rangeStart, rangeEnd, excludeGoogleId) {
+    const rs = rangeStart instanceof Date ? rangeStart : new Date(rangeStart);
+    const re = rangeEnd instanceof Date ? rangeEnd : new Date(rangeEnd);
+    if (Number.isNaN(rs.getTime()) || Number.isNaN(re.getTime()) || re.getTime() <= rs.getTime()) {
+        return null;
+    }
+    const ex = String(excludeGoogleId || '').trim();
+    if (!Array.isArray(rows)) return null;
+    for (const row of rows) {
+        const o = /** @type {Record<string, unknown>} */ (row);
+        if (!o || o.start == null || o.end == null) continue;
+        const xp = o.extendedProps;
+        const ext =
+            xp && typeof xp === 'object' && !Array.isArray(xp)
+                ? /** @type {Record<string, unknown>} */ (xp)
+                : {};
+        const gid = String(o.id ?? ext.googleEventId ?? '').trim();
+        if (ex && gid && gid === ex) continue;
+        const fakeEv = {
+            start: new Date(/** @type {string | Date} */ (o.start)),
+            end: new Date(/** @type {string | Date} */ (o.end)),
+            allDay: Boolean(o.allDay)
+        };
+        const r = eventRangeForOverlap(fakeEv);
+        if (!r) continue;
+        if (calendarRangesOverlap(rs, re, r.start, r.end)) {
+            return {
+                title: o.title,
+                start: fakeEv.start,
+                end: fakeEv.end,
+                allDay: fakeEv.allDay
+            };
+        }
+    }
+    return null;
+}
+
+/**
+ * Liste Google immédiate + contrôle des plages (hors pont ou sans session : ok).
+ * @param {{ start: Date | string, end: Date | string }[]} ranges
+ * @param {string} excludeGoogleId
+ * @returns {Promise<{ ok: true } | { ok: false, conflict: object } | { ok: false, error: string }>}
+ */
+async function verifySlotsFreeOnGoogleCalendar(ranges, excludeGoogleId) {
+    if (!calendarBridgeWanted()) return { ok: true };
+    const bounds = unionListRangesBounds(ranges);
+    if (!bounds) return { ok: false, error: 'Plage horaire invalide.' };
+    const token = await getAccessToken();
+    if (!token) return { ok: false, error: 'Session expirée (reconnectez-vous).' };
+    const r = await invokeCalendarBridge(token, {
+        action: 'list',
+        timeMin: bounds.min.toISOString(),
+        timeMax: bounds.max.toISOString()
+    });
+    if (r.aborted) return { ok: false, error: 'Vérification agenda annulée.' };
+    if (!r.ok || r.skipped) {
+        return {
+            ok: false,
+            error: r.error ? String(r.error) : 'Impossible de vérifier l’agenda Google.'
+        };
+    }
+    const data = /** @type {{ events?: unknown[] }} */ (r.data || {});
+    const rows = Array.isArray(data.events) ? data.events : [];
+    for (const range of ranges) {
+        const rs = range.start instanceof Date ? range.start : new Date(range.start);
+        const re = range.end instanceof Date ? range.end : new Date(range.end);
+        const hit = findOverlappingBridgeRow(rows, rs, re, excludeGoogleId);
+        if (hit) return { ok: false, conflict: hit };
+    }
+    return { ok: true };
+}
+
+/**
+ * Contrôle concurrentiel côté Google au moment de la sauvegarde.
+ * @param {import('@fullcalendar/core').Calendar} calendar
+ * @param {{ start: Date | string, end: Date | string }[]} ranges
+ * @param {string} excludeGoogleId
+ * @returns {Promise<boolean>} true si on peut poursuivre la sauvegarde
+ */
+export async function ensureGoogleAgendaSlotsFreeOrAbort(calendar, ranges, excludeGoogleId) {
+    const v = await verifySlotsFreeOnGoogleCalendar(ranges, excludeGoogleId);
+    if (v.ok) return true;
+    if (v.conflict) {
+        showToast(overlapToastMessage(v.conflict), 'error');
+    } else {
+        showToast(v.error || 'Impossible de vérifier l’agenda Google.', 'error');
+    }
+    if (calendar && typeof calendar.refetchEvents === 'function') {
+        await calendar.refetchEvents();
+    }
+    return false;
+}
+
 /** Synchronisation Google ; pas de toast ici (l’appelant décide après fermeture modale / ordre des messages). */
 async function trySyncGoogleCalendar(eventsPayload) {
     if (!isBackendAuthConfigured()) return { ok: true, skipped: true, data: null };
@@ -856,6 +1097,10 @@ async function trySyncGoogleCalendar(eventsPayload) {
 export async function saveReservation(calendar, currentUser, currentEventRef) {
     if (!currentUser || !currentUser.email) {
         showToast('Veuillez vous connecter pour enregistrer une réservation.', 'error');
+        return;
+    }
+    if (currentEventRef && isReservationStartBeforeTodayLocal(currentEventRef)) {
+        showToast('Les créneaux passés ne sont pas modifiables.', 'error');
         return;
     }
 
@@ -915,6 +1160,14 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
                 return;
             }
         }
+        if (calendarBridgeWanted()) {
+            const ranges = days.map((d) => ({
+                start: new Date(`${d}T${tRecStart}:00`),
+                end: new Date(`${d}T${tRecEnd}:00`)
+            }));
+            const ok = await ensureGoogleAgendaSlotsFreeOrAbort(calendar, ranges, '');
+            if (!ok) return;
+        }
         const bridgeEvents = days.map((d) => ({
             title,
             start: `${d}T${tRecStart}:00`,
@@ -925,6 +1178,15 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         const syncMulti = await trySyncGoogleCalendar(bridgeEvents);
         if (calendarBridgeWanted() && !syncMulti.ok && !syncMulti.skipped) {
             showToast(`Synchronisation agenda : ${syncMulti.error || 'échec'}`, 'error');
+            return;
+        }
+        if (calendarBridgeWanted() && syncMulti.ok && !syncMulti.skipped) {
+            document.getElementById('modal_reservation').close();
+            showToast(`${days.length} créneau${days.length > 1 ? 'x' : ''} enregistré${days.length > 1 ? 's' : ''}.`);
+            document.getElementById('event-recurring').checked = false;
+            resetRecurringFormDefaults();
+            setRecurringOptionsVisible(false);
+            await calendar.refetchEvents();
             return;
         }
         const addedList = addOneEventPerDay(
@@ -977,6 +1239,11 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         return;
     }
 
+    if (currentEventRef && isReservationStartBeforeTodayLocal({ start: new Date(startStr) })) {
+        showToast('Impossible d’enregistrer une date antérieure à aujourd’hui.', 'error');
+        return;
+    }
+
     /** @type {{ title: string, startStr: string, endStr: string, type: string } | null} */
     let prevSnapshot = null;
     if (currentEventRef) {
@@ -992,6 +1259,14 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         currentEventRef?.extendedProps?.owner || currentUser.email || ''
     ).trim();
     const gid = currentEventRef ? bridgeGoogleIdFromFcEvent(currentEventRef) : '';
+    if (calendarBridgeWanted()) {
+        const ok = await ensureGoogleAgendaSlotsFreeOrAbort(
+            calendar,
+            [{ start: new Date(startStr), end: new Date(endStr) }],
+            gid
+        );
+        if (!ok) return;
+    }
     const payloadSingle = {
         ...(gid ? { googleEventId: gid } : {}),
         title,
@@ -1024,6 +1299,9 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         currentEventRef.setProp('title', title);
         currentEventRef.setDates(startStr, endStr);
         currentEventRef.setExtendedProp('type', slotType);
+    } else if (calendarBridgeWanted() && syncSingle.ok && !syncSingle.skipped) {
+        /* En mode bridge, éviter l'optimisme local : recharger depuis Google pour ne pas dupliquer. */
+        await calendar.refetchEvents();
     } else {
         addedSingle = calendar.addEvent(eventData);
     }
@@ -1064,6 +1342,10 @@ export async function deleteReservation(calendar, currentEventRef, currentUser) 
     if (!currentEventRef || !confirm('Supprimer cette réservation ?')) return;
     if (!currentUser?.email) {
         showToast('Connectez-vous pour supprimer.', 'error');
+        return;
+    }
+    if (isReservationStartBeforeTodayLocal(currentEventRef)) {
+        showToast('Les créneaux passés ne sont pas modifiables.', 'error');
         return;
     }
 

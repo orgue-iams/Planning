@@ -13,7 +13,13 @@ import {
     setRecurringOptionsVisible,
     handleEventResize,
     canCurrentUserEditEvent,
+    isReservationStartBeforeTodayLocal,
+    isCalendarEventDropLocationValid,
+    onCalendarEventDragStart,
+    onCalendarEventDragStop,
     syncReservationEventToGoogle,
+    bridgeGoogleIdFromFcEvent,
+    ensureGoogleAgendaSlotsFreeOrAbort,
     captureResizeStart,
     maybeNotifySlotOwnerAfterThirdPartyEdit,
     ownerInfoFromEvent
@@ -41,6 +47,7 @@ import {
     shouldResumeSupabasePasswordRecovery
 } from './auth-logic.js';
 import { initMessagesUi, resetMessagesUiBindings, tryShowBroadcastPopup } from './messages-ui.js';
+import { destroyPlanningQuillMount } from '../utils/planning-quill.js';
 import { initProfileLabelsUi, resetProfileLabelsUiBindings } from './profile-labels-ui.js';
 import { applyLoginBanner } from './login-banner.js';
 import { initAdminUsersUi, resetAdminUsersUiBindings } from './admin-users-ui.js';
@@ -60,6 +67,7 @@ let currentUser = null;
 function performLogout() {
     currentUser = null;
     setPlanningSessionUser(null);
+    destroyPlanningQuillMount(document.getElementById('rules-quill-mount'));
     resetMessagesUiBindings();
     resetAnnouncementsUiBindings();
     resetAdminUsersUiBindings();
@@ -113,6 +121,7 @@ function refreshHeaderUser(user) {
 
 function initCalendarAndRevealUi() {
     if (calendar) return;
+    let suppressDateClickUntil = 0;
 
     const handlers = {
         onDatesSet: null,
@@ -120,6 +129,7 @@ function initCalendarAndRevealUi() {
 
         /** Glisser / appui long puis plage : création rapide (motif favori, type réservation). */
         onSelect: (info) => {
+            suppressDateClickUntil = Date.now() + 700;
             currentEvent = null;
             void quickCreateFromSelection(calendar, info, currentUser).catch((err) =>
                 console.error(err)
@@ -128,6 +138,7 @@ function initCalendarAndRevealUi() {
         },
         /** Clic simple : modale avec préremplissage (un créneau grille de durée). */
         onDateClick: (info) => {
+            if (Date.now() < suppressDateClickUntil) return;
             currentEvent = null;
             let start = info.date;
             const isMonthLike =
@@ -145,10 +156,38 @@ function initCalendarAndRevealUi() {
             currentEvent = info.event;
             openModal(info.event.start, info.event.end, info.event, currentUser);
         },
+        onEventDragStart: (info) => onCalendarEventDragStart(info),
+        onEventDragStop: (info) => onCalendarEventDragStop(info),
         onEventDrop: async (info) => {
+            if (!isCalendarEventDropLocationValid(info.jsEvent)) {
+                info.revert();
+                showToast('Déposez le créneau sur la grille du planning.', 'error');
+                return;
+            }
+            if (isReservationStartBeforeTodayLocal(info.event)) {
+                info.revert();
+                const hadRight =
+                    info.oldEvent && canCurrentUserEditEvent(currentUser, info.oldEvent);
+                showToast(
+                    hadRight
+                        ? 'Impossible de placer un créneau avant aujourd’hui.'
+                        : 'Vous ne pouvez pas déplacer ce créneau.',
+                    'error'
+                );
+                return;
+            }
             if (!canCurrentUserEditEvent(currentUser, info.event)) {
                 info.revert();
                 showToast('Vous ne pouvez pas déplacer ce créneau.', 'error');
+                return;
+            }
+            const okGoogle = await ensureGoogleAgendaSlotsFreeOrAbort(
+                info.view.calendar,
+                [{ start: info.event.start, end: info.event.end }],
+                bridgeGoogleIdFromFcEvent(info.event)
+            );
+            if (!okGoogle) {
+                info.revert();
                 return;
             }
             const sync = await syncReservationEventToGoogle(info.event);
@@ -253,10 +292,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadUIComponents();
     const versionText = formatVersionBadgeText();
     const loginV = document.getElementById('login-version-badge');
-    const headerV = document.getElementById('app-version-badge');
     const buildLegend = document.getElementById('app-build-badge');
     if (loginV) loginV.textContent = versionText;
-    if (headerV) headerV.textContent = versionText;
     if (buildLegend) buildLegend.textContent = versionText;
     setLogoutHandler(performLogout);
     wireDialogBackdropClose();
