@@ -29,6 +29,10 @@ function main() {
         const dest = join(outDir, name);
         cpSync(src, dest, { recursive: true });
     }
+    const imgDir = join(root, 'images');
+    if (existsSync(imgDir)) {
+        cpSync(imgDir, join(outDir, 'images'), { recursive: true });
+    }
     console.log('publish-site: ready →', outDir);
 }
 

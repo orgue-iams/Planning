@@ -9,6 +9,7 @@ const ASSETS = [
   './manifest.json',
   './css/tailwind.generated.css',
   './css/main.css',
+  './css/planning-background.css',
   './css/calendar-toolbar.css',
   './css/calendar-theme.css',
   './css/events.css',

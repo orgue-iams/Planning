@@ -1,0 +1,141 @@
+/*
+ * Arrière-plan photo de la zone planning (#app-shell), voilé, derrière la grille.
+ * Image : images/planning-bg.png (ou .jpg en adaptant l’URL ci-dessous).
+ */
+
+#app-shell.planning-app-shell {
+    position: relative;
+    isolation: isolate;
+}
+
+/* Couche 1 : photo (désaturée / adoucie) ; couche 2 : voile clair */
+.planning-page-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+    border-radius: 0.25rem;
+}
+
+.planning-page-bg::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    background-color: #e2e8f0;
+    background-image: url('../images/planning-bg.png');
+    background-size: cover;
+    background-position: center;
+    filter: grayscale(0.45) brightness(1.08) contrast(0.9) saturate(0.75);
+}
+
+.planning-page-bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(248, 250, 252, 0.78);
+    backdrop-filter: saturate(0.7) blur(0.5px);
+}
+
+/* Contenu au-dessus du fond (la barre d’outils garde z-index: 30 dans calendar-toolbar.css) */
+#app-shell.planning-app-shell > #calendar,
+#app-shell.planning-app-shell > #planning-legend {
+    position: relative;
+    z-index: 1;
+}
+
+/* Barre d’outils + légende : lisibles sur le fond */
+.calendar-toolbar {
+    background: rgb(255 255 255 / 0.82) !important;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+}
+
+#planning-legend.planning-legend-frosted {
+    background: rgb(255 255 255 / 0.82) !important;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+}
+
+/* Calendrier : pas de panneau blanc opaque */
+#calendar.planning-calendar-transparent {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+/* FullCalendar : zones « page » transparentes ; créneaux vides = fond visible */
+#calendar .fc {
+    --fc-page-bg-color: transparent;
+    --fc-today-bg-color: rgba(255, 220, 40, 0.12);
+}
+
+#calendar .fc-scrollgrid,
+#calendar .fc-scrollgrid table,
+#calendar .fc-timegrid-body,
+#calendar .fc-timegrid-slots,
+#calendar .fc-timegrid-cols,
+#calendar .fc-timegrid-col-frame,
+#calendar .fc-timegrid-col-events,
+#calendar .fc-view-harness,
+#calendar .fc-view-harness .fc-view {
+    background: transparent !important;
+}
+
+/*
+ * Bandeaux sticky hors la ligne « jours » : léger givrage.
+ * La ligne d’en-tête (header + sticky) est exclue : elle est en blanc opaque plus bas.
+ */
+#calendar .fc-scrollgrid-section-sticky:not(.fc-scrollgrid-section-header) > * {
+    background: rgb(255 255 255 / 0.82) !important;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+}
+
+/*
+ * Première ligne d’en-tête (jours + coin heures) : blanc opaque, au-dessus du fond photo.
+ * (Annule le voile 82 % des sticky et le transparent imposé au harness.)
+ */
+#calendar .fc-scrollgrid-section-header {
+    position: relative;
+    z-index: 3;
+}
+
+#calendar .fc-scrollgrid-section-header .fc-scroller,
+#calendar .fc-scrollgrid-section-header .fc-scroller-harness,
+#calendar .fc-scrollgrid-section-header table,
+#calendar .fc-scrollgrid-section-header .fc-col-header,
+#calendar .fc-scrollgrid-section-header th,
+#calendar .fc-scrollgrid-section-header td,
+#calendar .fc-scrollgrid-section-header .fc-col-header-cell,
+#calendar .fc-scrollgrid-section-header .fc-col-header-cell-cushion,
+#calendar .fc-scrollgrid-section-header .fc-scrollgrid-sync-inner,
+#calendar .fc-scrollgrid-section-header .fc-timegrid-axis,
+#calendar .fc-scrollgrid-section-header .fc-timegrid-axis-frame {
+    background-color: #fff !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* Corps timegrid + slats : cellules transparentes */
+#calendar .fc-timegrid-body .fc-theme-standard td,
+#calendar .fc-timegrid-body .fc-theme-standard th,
+#calendar .fc-timegrid-slots .fc-theme-standard td,
+#calendar .fc-timegrid-slots .fc-theme-standard th {
+    background-color: transparent !important;
+}
+
+/* Lignes d’heure « lane » : pas de fond opaque */
+#calendar .fc-timegrid-slot-lane {
+    background: transparent !important;
+}
+
+/* Vues liste : fond général transparent */
+#calendar .fc-list,
+#calendar .fc-list-table,
+#calendar .fc-list-sticky .fc-list-day > * {
+    background: transparent !important;
+}
+
+#calendar .fc-list-event:hover td {
+    background: rgb(241 245 249 / 0.65) !important;
+}
