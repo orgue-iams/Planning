@@ -1,17 +1,22 @@
 /**
- * Règles d’utilisation et annonces (stockage local, démo — à remplacer par Apps Script).
+ * Consignes (texte local) et annonces (stockage local en démo).
  */
 
 const KEY_RULES = 'orgue_iams_rules';
 const KEY_BROADCAST = 'orgue_iams_broadcast';
 const KEY_BROADCAST_SEEN = 'orgue_iams_broadcast_seen';
 
-const DEFAULT_RULES = `Règles d’utilisation de l’orgue — Orgue Gérard Bancells (IAMS)
+const DEFAULT_RULES = `Consignes
 
-• Respecter les créneaux réservés et la signalétique sur place.
-• Ne pas toucher aux jeux, à l’électronique ou à la mécanique sans accord du professeur.
-• Arriver à l’heure ; en cas d’empêchement, libérer ou modifier votre réservation.
-• Signaler tout incident ou anomalie au responsable.`;
+Horaires de l'ICT:
+À compter du 8 septembre lundi, mardi, mercredi et vendredi de 9h à 20h45, jeudi de 9h à 21h45.
+
+Travail personnel :
+2 h par semaine / par personne. Il est possible de réserver des créneaux sur 3 semaines consécutives.
+
+Messe à 12h40: il n'est pas possible de réserver entre 12h et 13h30
+
+Chapelle réservée pour le chœur grégorien le mardi de 17h30 à 20h30 pour les dates suivantes: 25/11, 2/12, 20/01, 25/02, 17/03, 26/05, 23/06, 30/06`;
 
 export function getRulesText() {
     try {

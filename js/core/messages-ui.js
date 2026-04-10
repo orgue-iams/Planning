@@ -1,5 +1,5 @@
 /**
- * Modale Règles + popup annonce après connexion (localStorage en démo, Supabase en prod).
+ * Modale Consignes + popup annonce après connexion (localStorage en démo, Supabase en prod).
  */
 
 import { showToast } from '../utils/toast.js';
@@ -47,7 +47,7 @@ function ensureFallbackRulesModal() {
         dlg.className = 'modal';
         dlg.innerHTML = `
             <div class="modal-box max-w-2xl w-[94%] max-h-[90dvh] flex flex-col border border-slate-200 rounded-2xl">
-                <h3 class="font-black text-sm uppercase tracking-wide text-slate-600 border-b pb-2 shrink-0">Règles d'utilisation de l'orgue</h3>
+                <h3 class="font-black text-sm uppercase tracking-wide text-slate-600 border-b pb-2 shrink-0">Consignes</h3>
                 <div id="rules-fallback-view" class="text-sm text-slate-700 leading-relaxed py-4 overflow-y-auto flex-1 min-h-0"></div>
                 <div class="modal-action shrink-0 border-t border-slate-100 mt-2 pt-3">
                     <button type="button" id="rules-fallback-close" class="btn btn-ghost btn-sm font-black text-[11px] ml-auto">Fermer</button>
@@ -145,7 +145,7 @@ export function initMessagesUi(_ignored) {
                     const remote = await fetchOrganRulesRemote();
                     if (remote !== null && remote !== '') text = remote;
                 } catch {
-                    showToast('Impossible de charger les règles distantes. Affichage de la version locale.', 'info');
+                    showToast('Impossible de charger les consignes distantes. Affichage de la version locale.', 'info');
                 }
             }
             if (backend && (!text || String(text).trim() === '')) {
@@ -210,7 +210,7 @@ export function initMessagesUi(_ignored) {
             /* Après tout await : re-vider le mount (évite barres empilées si close / ré-init pendant le fetch). */
             resetRulesQuill();
             rulesQuill = createPlanningQuill(rulesMount, {
-                placeholder: 'Saisissez les règles…'
+                placeholder: 'Saisissez les consignes…'
             });
             const raw = String(text ?? '');
             const initial = looksLikeHtml(raw)
@@ -250,7 +250,7 @@ export function initMessagesUi(_ignored) {
             btnSave?.classList.add('hidden');
             renderRulesView(t);
             editInitialHtml = '';
-            showToast('Règles enregistrées.');
+            showToast('Consignes enregistrées.');
         },
         { signal }
     );
