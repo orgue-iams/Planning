@@ -51,3 +51,13 @@ html, body {
     overflow: hidden;
     padding-bottom: max(0.25rem, env(safe-area-inset-bottom, 0px));
 }
+
+/* Smartphone : navbar + barre calendrier = une colonne compacte (hauteur réduite, bloc visuel uni). */
+@media (max-width: 639px) {
+    #app-header .app-navbar {
+        /* pt (safe-area) + ~2,25 rem de contenu + pb-1 : aligné avec #app-shell max-sm:pt-[calc(2.5rem+env(...))] */
+        min-height: calc(2.5rem + env(safe-area-inset-top, 0px));
+        align-content: center;
+        box-shadow: 0 1px 0 rgb(226 232 240);
+    }
+}
