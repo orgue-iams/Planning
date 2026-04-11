@@ -40,6 +40,8 @@ Démarrage option 2 — Supabase + Google Agenda
      `scripts/google-create-planning-calendars.gs` (voir l’en-tête du fichier : script.google.com,
      exécuter connecté en orgue.iams@…). Il crée les agendas et une feuille avec les IDs à saisir
      dans « Gestion des comptes » → pool, ou via INSERT SQL sur `google_calendar_pool`.
+   - Google limite souvent la création à ~25–30 calendriers d’affilée : le script utilise par défaut
+     une plage (ex. 1–26) ; reprendre plus tard avec START_NUM / END_NUM (ex. 27–60) après une pause.
 
 3) Edge Functions
    - Installer la CLI : https://supabase.com/docs/guides/cli
