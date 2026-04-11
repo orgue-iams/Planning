@@ -4,6 +4,7 @@
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
 import { fetchAuthUser } from '../_shared/auth_gotrue.ts';
+import { normalizeGoogleCalendarId } from '../_shared/normalize_google_calendar_id.ts';
 
 const MIN_PASSWORD_LEN = 6;
 
@@ -602,7 +603,7 @@ Deno.serve(async (req) => {
         }
 
         if (action === 'add_calendar_pool') {
-            const google_calendar_id = String(body.google_calendar_id ?? '').trim();
+            const google_calendar_id = normalizeGoogleCalendarId(String(body.google_calendar_id ?? ''));
             const label = String(body.label ?? '').trim() || null;
             const sort_order = Number.isFinite(Number(body.sort_order)) ? Math.trunc(Number(body.sort_order)) : 0;
             if (!google_calendar_id) {

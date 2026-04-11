@@ -2,6 +2,10 @@
 
 Le projet compile Tailwind + DaisyUI en local (pas de script CDN Tailwind en prod).
 
+## Documentation projet
+
+- **[docs/README.md](./docs/README.md)** — index (spécification, architecture, roadmap).
+
 ## Commandes
 
 - Build CSS : `npm run build:css`

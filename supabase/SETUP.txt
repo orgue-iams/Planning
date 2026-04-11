@@ -47,6 +47,11 @@ Démarrage option 2 — Supabase + Google Agenda
    - Pour insérer les 26 calendriers dans le pool Supabase : exécuter
      `supabase/manual/seed-planning-iams-pool-26.sql` (IDs réels Planning IAMS 01–26 ; sur un autre
      compte Google, régénérer le fichier via Apps Script puis remplacer les valeurs).
+   - Miroir agenda perso (Edge calendar-bridge) : chaque calendrier du pool doit être partagé avec le
+     même compte Google que pour GOOGLE_CALENDAR_ID (e-mail du compte de service ou compte OAuth),
+     droit « Modifier les événements ». Sinon l’API renvoie souvent « Not Found » sur le calendrier secondaire.
+     En base, stocker l’ID `xxx@group.calendar.google.com` (pas l’URL embed entière) — l’admin et le bridge
+     normalisent désormais les URLs `?src=…`.
 
 3) Edge Functions
    - Installer la CLI : https://supabase.com/docs/guides/cli

@@ -21,6 +21,7 @@
 
 import { SignJWT, importPKCS8 } from 'https://deno.land/x/jose@v5.6.0/index.ts';
 import { fetchAuthUser } from '../_shared/auth_gotrue.ts';
+import { normalizeGoogleCalendarId } from '../_shared/normalize_google_calendar_id.ts';
 
 const CAL_SCOPE = 'https://www.googleapis.com/auth/calendar';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -31,6 +32,20 @@ const corsHeaders: Record<string, string> = {
     'Access-Control-Allow-Headers':
         'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-version'
 };
+
+/** E-mail issu du JWT (claim `email`) si absent de la réponse GoTrue /auth/v1/user. */
+function emailFromSupabaseJwt(accessToken: string): string {
+    try {
+        const parts = accessToken.split('.');
+        if (parts.length < 2) return '';
+        let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        while (b64.length % 4) b64 += '=';
+        const payload = JSON.parse(atob(b64)) as { email?: string };
+        return typeof payload.email === 'string' ? payload.email.trim() : '';
+    } catch {
+        return '';
+    }
+}
 
 type ServiceAccountCreds = { client_email: string; private_key: string };
 
@@ -51,6 +66,8 @@ type BridgeBody = {
         /** E-mails élèves séparés par virgule (description + private). */
         inscrits?: string;
         templateLineId?: string;
+        /** ID de l’événement miroir sur l’agenda perso (pool) — stocké en private sur l’événement principal. */
+        poolGoogleEventId?: string;
     }>;
     googleEventId?: string;
 };
@@ -232,6 +249,7 @@ function fcEventFromGoogle(e: GCalEvent) {
     let owner = priv?.planningOwner?.trim() || '';
     let inscrits = parseInscritsCsv(priv?.planningInscrits);
     const templateLineId = String(priv?.planningTemplateLineId ?? '').trim();
+    const poolGoogleEventId = String(priv?.planningPoolEventId ?? '').trim();
     const parsed = parseDescription(e.description);
     if (!type) type = parsed.type;
     if (!owner) owner = parsed.owner;
@@ -253,12 +271,13 @@ function fcEventFromGoogle(e: GCalEvent) {
             ownerRole: '',
             type,
             inscrits,
-            ...(templateLineId ? { templateLineId } : {})
+            ...(templateLineId ? { templateLineId } : {}),
+            ...(poolGoogleEventId ? { poolGoogleEventId } : {})
         }
     };
 }
 
-function googleEventResource(ev: {
+type EventPayloadInput = {
     title: string;
     start: string;
     end: string;
@@ -266,7 +285,14 @@ function googleEventResource(ev: {
     owner: string;
     inscrits?: string;
     templateLineId?: string;
-}): Record<string, unknown> {
+    poolGoogleEventId?: string;
+};
+
+/** Sur l’événement « miroir » du calendrier pool, ne pas recopier planningPoolEventId (réservé au principal). */
+function googleEventResource(
+    ev: EventPayloadInput,
+    opts?: { forPoolCalendarWrite?: boolean }
+): Record<string, unknown> {
     const tz = timeZone();
     const colorId = googleColorIdForPlanningType(ev.type);
     const insc = (ev.inscrits ?? '').trim();
@@ -279,6 +305,8 @@ function googleEventResource(ev: {
     if (insc) priv.planningInscrits = insc.replace(/\s+/g, '');
     const tid = (ev.templateLineId ?? '').trim();
     if (tid) priv.planningTemplateLineId = tid;
+    const poolGid = (ev.poolGoogleEventId ?? '').trim();
+    if (poolGid && !opts?.forPoolCalendarWrite) priv.planningPoolEventId = poolGid;
     return {
         summary: ev.title,
         description: descParts.join(' '),
@@ -300,6 +328,144 @@ async function gcalFetch(accessToken: string, pathWithQuery: string, init?: Requ
         }
     });
     return res;
+}
+
+async function fetchPlanningPoolCalendarId(
+    projectUrl: string,
+    anonKey: string,
+    jwt: string,
+    userId: string
+): Promise<string> {
+    const base = projectUrl.replace(/\/$/, '');
+    const res = await fetch(`${base}/rest/v1/rpc/planning_pool_calendar_id`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            apikey: anonKey,
+            Authorization: `Bearer ${jwt}`
+        },
+        body: JSON.stringify({ p_user_id: userId })
+    });
+    if (!res.ok) return '';
+    const t = await res.text();
+    if (!t || t === 'null') return '';
+    try {
+        const j = JSON.parse(t) as unknown;
+        if (typeof j === 'string') return j.trim();
+        return '';
+    } catch {
+        return String(t).replace(/^"|"$/g, '').trim();
+    }
+}
+
+/**
+ * Après écriture sur le calendrier principal : copie sur l’agenda Google « pool » du même utilisateur
+ * (JWT = propriétaire du créneau). Évite de dépendre du client (id session, double requête).
+ */
+async function mirrorOwnerPersonalCalendarIfNeeded(
+    accessToken: string,
+    user: { id: string; email?: string },
+    jwt: string,
+    supabaseUrl: string,
+    supabaseAnonKey: string,
+    ev: NonNullable<BridgeBody['events']>[0],
+    body: BridgeBody,
+    mainCalendarEventId: string
+): Promise<void> {
+    if (!supabaseUrl || !supabaseAnonKey || !user.id) return;
+    const me = String(user.email || '').trim().toLowerCase();
+    if (!me) return;
+
+    const mainCal = calendarId();
+    const targetCal = resolveCalendarId(ev.calendarId ?? body.calendarId);
+    if (targetCal !== mainCal) return;
+
+    const ownerRaw = String(ev.owner || '').trim().toLowerCase();
+    /* owner vide = créneau imputé au compte connecté (évite un miroir bloqué si le client n’envoie pas owner). */
+    if (ownerRaw && ownerRaw !== me) return;
+
+    const st = String(ev.type || 'reservation').trim().toLowerCase();
+    if (st === 'fermeture') return;
+
+    const poolCalRaw = await fetchPlanningPoolCalendarId(supabaseUrl, supabaseAnonKey, jwt, user.id);
+    const poolCal = normalizeGoogleCalendarId(poolCalRaw);
+    if (!poolCal || resolveCalendarId(poolCal) === mainCal) return;
+
+    const title = String(ev.title || '').trim();
+    const start = ev.start;
+    const end = ev.end;
+    if (!title || !start || !end) return;
+
+    const baseFields: EventPayloadInput = {
+        title,
+        start,
+        end,
+        type: String(ev.type || 'reservation'),
+        owner: String(ev.owner || ''),
+        inscrits: ev.inscrits,
+        templateLineId: ev.templateLineId
+    };
+
+    const poolPayload = googleEventResource(
+        { ...baseFields, poolGoogleEventId: undefined },
+        { forPoolCalendarWrite: true }
+    );
+    const encPool = encodeURIComponent(poolCal);
+    let poolOutId = String(ev.poolGoogleEventId ?? '').trim();
+
+    if (poolOutId) {
+        const encEid = encodeURIComponent(poolOutId);
+        const patchP = await gcalFetch(
+            accessToken,
+            `/calendars/${encPool}/events/${encEid}`,
+            {
+                method: 'PATCH',
+                body: JSON.stringify(poolPayload)
+            }
+        );
+        if (!patchP.ok && patchP.status !== 404) {
+            console.error('[calendar-bridge] PATCH miroir pool:', patchP.status, await patchP.text());
+            return;
+        }
+        if (patchP.status === 404) poolOutId = '';
+    }
+
+    if (!poolOutId) {
+        const insP = await gcalFetch(accessToken, `/calendars/${encPool}/events`, {
+            method: 'POST',
+            body: JSON.stringify(poolPayload)
+        });
+        const created = (await insP.json()) as GCalEvent & { error?: { message?: string } };
+        if (!insP.ok || !created.id) {
+            const msg = created.error?.message || `HTTP ${insP.status}`;
+            const hint404 =
+                insP.status === 404
+                    ? ' — Partagez ce calendrier secondaire avec le compte Google utilisé par calendar-bridge (même procédure que pour l’agenda principal : « Modifier les événements »). Si l’ID en base était une URL embed complète, utilisez uniquement xxx@group.calendar.google.com (normalisation côté serveur activée).'
+                    : '';
+            console.error('[calendar-bridge] POST miroir pool:', msg + hint404);
+            return;
+        }
+        poolOutId = created.id || '';
+    }
+
+    if (!poolOutId) return;
+
+    const linkPayload = googleEventResource({
+        ...baseFields,
+        poolGoogleEventId: poolOutId
+    });
+    const encMain = encodeURIComponent(mainCal);
+    const linkPatch = await gcalFetch(
+        accessToken,
+        `/calendars/${encMain}/events/${encodeURIComponent(mainCalendarEventId)}`,
+        {
+            method: 'PATCH',
+            body: JSON.stringify(linkPayload)
+        }
+    );
+    if (!linkPatch.ok) {
+        console.error('[calendar-bridge] PATCH lien principal→pool:', linkPatch.status, await linkPatch.text());
+    }
 }
 
 Deno.serve(async (req) => {
@@ -328,6 +494,9 @@ Deno.serve(async (req) => {
         if (authErr || !user) {
             return jsonResponse({ error: authErr || 'Unauthorized' }, 401);
         }
+
+        const resolvedEmail = (user.email?.trim() || emailFromSupabaseJwt(jwt)).trim();
+        const calendarUser = { id: user.id, email: resolvedEmail || user.email?.trim() || '' };
 
         let body: BridgeBody;
         try {
@@ -430,9 +599,12 @@ Deno.serve(async (req) => {
                         type: String(ev.type || 'reservation'),
                         owner: String(ev.owner || ''),
                         inscrits: ev.inscrits,
-                        templateLineId: ev.templateLineId
+                        templateLineId: ev.templateLineId,
+                        poolGoogleEventId: ev.poolGoogleEventId
                     });
                     const gid = ev.googleEventId?.trim();
+
+                    let mainOutId = '';
 
                     if (gid) {
                         const encEid = encodeURIComponent(gid);
@@ -445,23 +617,37 @@ Deno.serve(async (req) => {
                             }
                         );
                         if (patch.ok) {
-                            return { googleEventId: gid, start, end };
-                        }
-                        if (patch.status !== 404) {
+                            mainOutId = gid;
+                        } else if (patch.status !== 404) {
                             const t = await patch.text();
                             throw new Error(t.slice(0, 200) || `PATCH ${patch.status}`);
                         }
                     }
 
-                    const ins = await gcalFetch(accessToken, `/calendars/${calIdUpsert}/events`, {
-                        method: 'POST',
-                        body: JSON.stringify(payload)
-                    });
-                    const created = (await ins.json()) as GCalEvent & { error?: { message?: string } };
-                    if (!ins.ok || !created.id) {
-                        throw new Error(created.error?.message || `POST événement HTTP ${ins.status}`);
+                    if (!mainOutId) {
+                        const ins = await gcalFetch(accessToken, `/calendars/${calIdUpsert}/events`, {
+                            method: 'POST',
+                            body: JSON.stringify(payload)
+                        });
+                        const created = (await ins.json()) as GCalEvent & { error?: { message?: string } };
+                        if (!ins.ok || !created.id) {
+                            throw new Error(created.error?.message || `POST événement HTTP ${ins.status}`);
+                        }
+                        mainOutId = created.id || '';
                     }
-                    return { googleEventId: created.id, start, end };
+
+                    await mirrorOwnerPersonalCalendarIfNeeded(
+                        accessToken,
+                        calendarUser,
+                        jwt,
+                        supabaseUrl,
+                        supabaseAnonKey,
+                        ev,
+                        body,
+                        mainOutId
+                    );
+
+                    return { googleEventId: mainOutId, start, end };
                 })
             );
 

@@ -5,6 +5,7 @@ import { isAdmin } from './auth-logic.js';
 import { isBackendAuthConfigured } from './supabase-client.js';
 import { planningAdminInvoke } from './admin-api.js';
 import { showToast } from '../utils/toast.js';
+import { normalizeGoogleCalendarId } from '../utils/google-calendar-id.js';
 
 function escapeTd(s) {
     const d = document.createElement('div');
@@ -83,7 +84,9 @@ export function initAdminCalendarPoolUi(currentUser) {
     });
 
     document.getElementById('calendar-pool-add-btn')?.addEventListener('click', async () => {
-        const google_calendar_id = document.getElementById('calendar-pool-google-id')?.value?.trim() || '';
+        const google_calendar_id = normalizeGoogleCalendarId(
+            document.getElementById('calendar-pool-google-id')?.value ?? ''
+        );
         const label = document.getElementById('calendar-pool-label')?.value?.trim() || '';
         const sortRaw = document.getElementById('calendar-pool-sort')?.value;
         const sort_order = sortRaw !== undefined && sortRaw !== '' ? Number(sortRaw) : 0;

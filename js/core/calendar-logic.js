@@ -6,7 +6,7 @@
 import { showToast } from '../utils/toast.js';
 import { getAccessToken, isBackendAuthConfigured, isPrivilegedUser } from './auth-logic.js';
 import { invokeCalendarBridge } from './calendar-bridge.js';
-import { getPlanningConfig } from './supabase-client.js';
+import { getPlanningConfig, getSupabaseClient } from './supabase-client.js';
 import { invokeSlotNotify } from './slot-notify-api.js';
 import { getDefaultReservationTitle, getProfile } from '../utils/user-profile.js';
 import { isPlanningRole } from './planning-roles.js';
@@ -18,6 +18,25 @@ import {
 } from './reservation-motifs.js';
 
 let saveReservationInFlight = false;
+
+/** @param {string | undefined} userId */
+async function fetchPoolCalendarIdForUser(userId) {
+    const uid = String(userId ?? '').trim();
+    if (!uid) return '';
+    const sb = getSupabaseClient();
+    if (!sb) return '';
+    const { data, error } = await sb.rpc('planning_pool_calendar_id', { p_user_id: uid });
+    if (error) {
+        console.warn('[Planning] planning_pool_calendar_id :', error.message);
+        return '';
+    }
+    return String(data ?? '').trim();
+}
+
+function calendarBridgeWanted() {
+    const { calendarBridgeUrl } = getPlanningConfig();
+    return Boolean(calendarBridgeUrl) && isBackendAuthConfigured();
+}
 
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -281,13 +300,15 @@ export async function syncReservationEventToGoogle(calendarEvent) {
     const type = calendarEvent.extendedProps?.type || 'reservation';
     const gid = bridgeGoogleIdFromFcEvent(calendarEvent);
     const title = String(calendarEvent.title || '').trim() || 'Créneau';
+    const poolLink = String(calendarEvent.extendedProps?.poolGoogleEventId ?? '').trim();
     const payload = {
         ...(gid ? { googleEventId: gid } : {}),
         title,
         start: start.toISOString(),
         end: end.toISOString(),
         type,
-        owner
+        owner,
+        ...(poolLink ? { poolGoogleEventId: poolLink } : {})
     };
     const r = await invokeCalendarBridge(token, { action: 'upsert', events: [payload] });
     if (!r.ok && !r.skipped) {
@@ -295,9 +316,9 @@ export async function syncReservationEventToGoogle(calendarEvent) {
         return { ok: false };
     }
     if (r.ok && r.data?.results?.[0]?.googleEventId && !gid) {
-        const ng = r.data.results[0].googleEventId;
-        calendarEvent.setProp('id', String(ng));
-        calendarEvent.setExtendedProp('googleEventId', String(ng));
+        const ng = String(r.data.results[0].googleEventId).trim();
+        calendarEvent.setProp('id', ng);
+        calendarEvent.setExtendedProp('googleEventId', ng);
     }
     return { ok: true, skipped: Boolean(r.skipped) };
 }
@@ -1319,11 +1340,6 @@ export function openModal(start, end, event, currentUser, calendarForClip = null
     });
 }
 
-function calendarBridgeWanted() {
-    const { calendarBridgeUrl } = getPlanningConfig();
-    return Boolean(calendarBridgeUrl) && isBackendAuthConfigured();
-}
-
 /** @param {{ start: Date | string, end: Date | string }[]} ranges */
 function unionListRangesBounds(ranges) {
     if (!Array.isArray(ranges) || ranges.length === 0) return null;
@@ -1644,13 +1660,15 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         );
         if (!ok) return;
     }
+    const poolLinkExisting = String(currentEventRef?.extendedProps?.poolGoogleEventId ?? '').trim();
     const payloadSingle = {
         ...(gid ? { googleEventId: gid } : {}),
         title,
         start: startStr,
         end: endStr,
         type: slotType,
-        owner: ownerForBridge || currentUser.email
+        owner: ownerForBridge || currentUser.email,
+        ...(poolLinkExisting ? { poolGoogleEventId: poolLinkExisting } : {})
     };
 
     const syncSingle = await trySyncGoogleCalendar([payloadSingle]);
@@ -1745,9 +1763,24 @@ export async function deleteReservation(calendar, currentEventRef, currentUser) 
     const endDel = currentEventRef.end;
 
     const gid = bridgeGoogleIdFromFcEvent(currentEventRef);
+    const poolGid = String(currentEventRef.extendedProps?.poolGoogleEventId ?? '').trim();
     if (isBackendAuthConfigured() && gid) {
         const token = await getAccessToken();
         if (token) {
+            if (poolGid) {
+                const poolCal = await fetchPoolCalendarIdForUser(currentUser.id);
+                if (poolCal) {
+                    const rPool = await invokeCalendarBridge(token, {
+                        action: 'delete',
+                        googleEventId: poolGid,
+                        calendarId: poolCal
+                    });
+                    if (!rPool.ok && !rPool.skipped) {
+                        showToast(`Suppression agenda perso : ${rPool.error || 'échec'}`, 'error');
+                        return;
+                    }
+                }
+            }
             const r = await invokeCalendarBridge(token, { action: 'delete', googleEventId: gid });
             if (!r.ok && !r.skipped) {
                 showToast(`Suppression agenda : ${r.error || 'échec'}`, 'error');
