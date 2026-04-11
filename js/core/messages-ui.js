@@ -210,7 +210,8 @@ export function initMessagesUi(_ignored) {
             /* Après tout await : re-vider le mount (évite barres empilées si close / ré-init pendant le fetch). */
             resetRulesQuill();
             rulesQuill = createPlanningQuill(rulesMount, {
-                placeholder: 'Saisissez les consignes…'
+                placeholder: 'Saisissez les consignes…',
+                adminFontStepper: getPlanningSessionUser()?.role === 'admin'
             });
             const raw = String(text ?? '');
             const initial = looksLikeHtml(raw)

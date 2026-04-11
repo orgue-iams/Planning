@@ -38,6 +38,8 @@ type BridgeBody = {
     action?: string;
     timeMin?: string;
     timeMax?: string;
+    /** Calendrier Google (ID brut ou e-mail). Défaut : GOOGLE_CALENDAR_ID. */
+    calendarId?: string;
     events?: Array<{
         title?: string;
         start?: string;
@@ -45,6 +47,10 @@ type BridgeBody = {
         type?: string;
         owner?: string;
         googleEventId?: string;
+        calendarId?: string;
+        /** E-mails élèves séparés par virgule (description + private). */
+        inscrits?: string;
+        templateLineId?: string;
     }>;
     googleEventId?: string;
 };
@@ -150,6 +156,23 @@ function calendarId(): string {
     return id;
 }
 
+function resolveCalendarId(override?: string): string {
+    const o = override?.trim();
+    if (o) {
+        let id = o;
+        try {
+            if (id.includes('%')) {
+                const once = decodeURIComponent(id);
+                if (once && !once.includes('%')) id = once;
+            }
+        } catch {
+            /* */
+        }
+        return id;
+    }
+    return calendarId();
+}
+
 function timeZone(): string {
     return (Deno.env.get('GOOGLE_CALENDAR_TIMEZONE') ?? 'Europe/Paris').trim() || 'Europe/Paris';
 }
@@ -179,26 +202,40 @@ function googleColorIdForPlanningType(type: string): string {
     return '7'; /* Peacock — bleu */
 }
 
-function parseDescription(desc: string | undefined): { type: string; owner: string } {
+function parseInscritsCsv(raw: string | undefined): string[] {
+    if (!raw?.trim()) return [];
+    return raw
+        .split(/[,;]/)
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean);
+}
+
+function parseDescription(desc: string | undefined): { type: string; owner: string; inscrits: string[] } {
     let type = 'reservation';
     let owner = '';
-    if (!desc) return { type, owner };
+    const inscrits: string[] = [];
+    if (!desc) return { type, owner, inscrits };
     const typeM = desc.match(/type=([^\s]+)/);
-    const ownerM = desc.match(/owner=(.+)$/);
+    const ownerM = desc.match(/owner=([^\s]+)/);
+    const inscM = desc.match(/inscrits=([^\n]+)/i);
     if (typeM) type = typeM[1] || type;
     if (ownerM) owner = String(ownerM[1] || '').trim();
-    return { type, owner };
+    if (inscM) {
+        for (const x of parseInscritsCsv(inscM[1])) inscrits.push(x);
+    }
+    return { type, owner, inscrits };
 }
 
 function fcEventFromGoogle(e: GCalEvent) {
     const priv = e.extendedProperties?.private;
     let type = priv?.planningType?.trim() || '';
     let owner = priv?.planningOwner?.trim() || '';
-    if (!type || !owner) {
-        const parsed = parseDescription(e.description);
-        if (!type) type = parsed.type;
-        if (!owner) owner = parsed.owner;
-    }
+    let inscrits = parseInscritsCsv(priv?.planningInscrits);
+    const templateLineId = String(priv?.planningTemplateLineId ?? '').trim();
+    const parsed = parseDescription(e.description);
+    if (!type) type = parsed.type;
+    if (!owner) owner = parsed.owner;
+    if (inscrits.length === 0) inscrits = parsed.inscrits;
     if (!type) type = 'reservation';
     const gid = e.id ?? '';
     const start = e.start?.dateTime ?? e.start?.date;
@@ -214,7 +251,9 @@ function fcEventFromGoogle(e: GCalEvent) {
             owner,
             ownerDisplayName: owner ? owner.split('@')[0] : '',
             ownerRole: '',
-            type
+            type,
+            inscrits,
+            ...(templateLineId ? { templateLineId } : {})
         }
     };
 }
@@ -225,21 +264,28 @@ function googleEventResource(ev: {
     end: string;
     type: string;
     owner: string;
+    inscrits?: string;
+    templateLineId?: string;
 }): Record<string, unknown> {
     const tz = timeZone();
     const colorId = googleColorIdForPlanningType(ev.type);
+    const insc = (ev.inscrits ?? '').trim();
+    const descParts = [`type=${ev.type || ''}`, `owner=${ev.owner || ''}`];
+    if (insc) descParts.push(`inscrits=${insc}`);
+    const priv: Record<string, string> = {
+        planningType: String(ev.type || 'reservation'),
+        planningOwner: String(ev.owner || '')
+    };
+    if (insc) priv.planningInscrits = insc.replace(/\s+/g, '');
+    const tid = (ev.templateLineId ?? '').trim();
+    if (tid) priv.planningTemplateLineId = tid;
     return {
         summary: ev.title,
-        description: `type=${ev.type || ''} owner=${ev.owner || ''}`,
+        description: descParts.join(' '),
         start: { dateTime: ev.start, timeZone: tz },
         end: { dateTime: ev.end, timeZone: tz },
         colorId,
-        extendedProperties: {
-            private: {
-                planningType: String(ev.type || 'reservation'),
-                planningOwner: String(ev.owner || '')
-            }
-        }
+        extendedProperties: { private: priv }
     };
 }
 
@@ -291,7 +337,6 @@ Deno.serve(async (req) => {
         }
 
         const accessToken = await getGoogleAccessToken();
-        const calId = encodeURIComponent(calendarId());
 
         const action = String(body.action || '');
 
@@ -301,6 +346,8 @@ Deno.serve(async (req) => {
             if (!timeMin || !timeMax) {
                 return jsonResponse({ ok: false, error: 'timeMin et timeMax requis (ISO 8601)' }, 400);
             }
+
+            const calId = encodeURIComponent(resolveCalendarId(body.calendarId));
 
             const params = new URLSearchParams({
                 timeMin,
@@ -346,8 +393,9 @@ Deno.serve(async (req) => {
             if (!eid) {
                 return jsonResponse({ ok: false, error: 'googleEventId requis' }, 400);
             }
+            const calIdDel = encodeURIComponent(resolveCalendarId(body.calendarId));
             const encEid = encodeURIComponent(eid);
-            const res = await gcalFetch(accessToken, `/calendars/${calId}/events/${encEid}`, {
+            const res = await gcalFetch(accessToken, `/calendars/${calIdDel}/events/${encEid}`, {
                 method: 'DELETE'
             });
             if (res.status === 204 || res.ok) {
@@ -372,21 +420,30 @@ Deno.serve(async (req) => {
                     if (!title || !start || !end) {
                         throw new Error('Champs title, start et end requis pour chaque événement');
                     }
+                    const calIdUpsert = encodeURIComponent(
+                        resolveCalendarId(ev.calendarId ?? body.calendarId)
+                    );
                     const payload = googleEventResource({
                         title,
                         start,
                         end,
                         type: String(ev.type || 'reservation'),
-                        owner: String(ev.owner || '')
+                        owner: String(ev.owner || ''),
+                        inscrits: ev.inscrits,
+                        templateLineId: ev.templateLineId
                     });
                     const gid = ev.googleEventId?.trim();
 
                     if (gid) {
                         const encEid = encodeURIComponent(gid);
-                        const patch = await gcalFetch(accessToken, `/calendars/${calId}/events/${encEid}`, {
-                            method: 'PATCH',
-                            body: JSON.stringify(payload)
-                        });
+                        const patch = await gcalFetch(
+                            accessToken,
+                            `/calendars/${calIdUpsert}/events/${encEid}`,
+                            {
+                                method: 'PATCH',
+                                body: JSON.stringify(payload)
+                            }
+                        );
                         if (patch.ok) {
                             return { googleEventId: gid, start, end };
                         }
@@ -396,7 +453,7 @@ Deno.serve(async (req) => {
                         }
                     }
 
-                    const ins = await gcalFetch(accessToken, `/calendars/${calId}/events`, {
+                    const ins = await gcalFetch(accessToken, `/calendars/${calIdUpsert}/events`, {
                         method: 'POST',
                         body: JSON.stringify(payload)
                     });

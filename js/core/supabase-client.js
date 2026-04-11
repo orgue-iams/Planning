@@ -3,13 +3,15 @@
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
 
-/** @returns {{ supabaseUrl: string, supabaseAnonKey: string, calendarBridgeUrl: string }} */
+/** @returns {{ supabaseUrl: string, supabaseAnonKey: string, calendarBridgeUrl: string, mainGoogleCalendarId: string, mainGoogleCalendarLabel: string }} */
 export function getPlanningConfig() {
     const c = typeof window !== 'undefined' ? window.__PLANNING_CONFIG__ : null;
     return {
         supabaseUrl: String(c?.supabaseUrl ?? '').trim(),
         supabaseAnonKey: String(c?.supabaseAnonKey ?? '').trim(),
-        calendarBridgeUrl: String(c?.calendarBridgeUrl ?? '').trim()
+        calendarBridgeUrl: String(c?.calendarBridgeUrl ?? '').trim(),
+        mainGoogleCalendarId: String(c?.mainGoogleCalendarId ?? '').trim(),
+        mainGoogleCalendarLabel: String(c?.mainGoogleCalendarLabel ?? '').trim()
     };
 }
 
@@ -56,13 +58,38 @@ export function purgeSupabaseKeysFromStorage(storage) {
 
 let _client = null;
 
-export function resetSupabaseClient() {
-    _client = null;
-}
-
-function getAuthStorageAdapter() {
+/**
+ * Stockage auth lu/écrit selon « Se souvenir » **au moment de l’appel** (pas figé à la 1ʳᵉ création).
+ * Ainsi un seul `createClient` suffit : plus de 2ᵉ GoTrueClient après `tryRestoreSession` + `login`.
+ */
+function planningAuthStorage() {
     if (typeof window === 'undefined') return undefined;
-    return getRememberMePreference() ? window.localStorage : window.sessionStorage;
+    return {
+        getItem: (key) => {
+            try {
+                const s = getRememberMePreference() ? window.localStorage : window.sessionStorage;
+                return s.getItem(key);
+            } catch {
+                return null;
+            }
+        },
+        setItem: (key, value) => {
+            try {
+                const s = getRememberMePreference() ? window.localStorage : window.sessionStorage;
+                s.setItem(key, value);
+            } catch {
+                /* quota */
+            }
+        },
+        removeItem: (key) => {
+            try {
+                window.localStorage.removeItem(key);
+                window.sessionStorage.removeItem(key);
+            } catch {
+                /* */
+            }
+        }
+    };
 }
 
 /** @returns {import('https://esm.sh/@supabase/supabase-js@2.49.8').SupabaseClient | null} */
@@ -70,7 +97,7 @@ export function getSupabaseClient() {
     if (!isBackendAuthConfigured()) return null;
     if (_client) return _client;
     const { supabaseUrl, supabaseAnonKey } = getPlanningConfig();
-    const storage = getAuthStorageAdapter();
+    const storage = planningAuthStorage();
     _client = createClient(supabaseUrl, supabaseAnonKey, {
         auth: {
             persistSession: true,
@@ -82,19 +109,8 @@ export function getSupabaseClient() {
     return _client;
 }
 
-/** Client anon sans session persistante (ex. bandeau login avant connexion). */
-let _anonClient = null;
-
-export function getAnonymousSupabase() {
-    if (!isBackendAuthConfigured()) return null;
-    if (_anonClient) return _anonClient;
-    const { supabaseUrl, supabaseAnonKey } = getPlanningConfig();
-    _anonClient = createClient(supabaseUrl, supabaseAnonKey, {
-        auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-            detectSessionInUrl: false
-        }
-    });
-    return _anonClient;
-}
+/**
+ * Ne pas appeler createClient() une seconde fois (ex. « client anonyme ») : GoTrueClient
+ * affiche un avertissement et peut se comporter de façon imprévisible avec la même clé de stockage.
+ * Les requêtes RLS « anon » (bandeau login, organ_rules) passent par getSupabaseClient().
+ */

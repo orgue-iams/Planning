@@ -43,10 +43,10 @@ const ASSETS = [
   './js/utils/messaging.js',
   './js/core/messages-ui.js',
   './js/utils/user-profile.js',
-  './js/core/profile-labels-ui.js',
   './js/core/login-banner.js',
   './js/core/admin-api.js',
   './js/core/admin-users-ui.js',
+  './js/core/admin-calendar-pool-ui.js',
   './js/core/session-user.js',
   './js/core/slot-notify-api.js',
   './js/core/reservation-motifs.js',
@@ -54,9 +54,20 @@ const ASSETS = [
   './js/utils/org-content.js',
   './js/utils/rich-text.js',
   './js/utils/planning-quill.js',
-  './components/modal-profile-labels.html',
   './components/modal-users-admin.html',
-  './components/modal-announcements.html'
+  './components/modal-calendar-pool.html',
+  './components/modal-announcements.html',
+  './components/modal-profile.html',
+  './components/modal-config.html',
+  './components/modal-semaines-types.html',
+  './js/core/profile-ui.js',
+  './js/core/config-ui.js',
+  './js/core/semaines-types-ui.js',
+  './js/core/organ-settings.js',
+  './js/core/template-apply-engine.js',
+  './js/core/week-cycle.js',
+  './js/core/planning-courses.js',
+  './js/utils/google-calendar-url.js'
 ];
 
 self.addEventListener('install', (event) => {

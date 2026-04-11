@@ -1,0 +1,107 @@
+<dialog id="modal_semaines_types" class="modal modal-semaines-types">
+    <div class="modal-box semaines-types-modal-box flex flex-col w-full max-w-none h-full max-h-none min-h-0 rounded-none p-0 border-0 shadow-none bg-slate-50">
+        <header class="shrink-0 px-4 sm:px-6 py-3 border-b border-slate-200 bg-white shadow-sm">
+            <div class="flex flex-wrap items-start justify-between gap-2 max-w-[1600px] mx-auto w-full">
+                <div>
+                    <h3 class="font-black text-sm sm:text-base uppercase text-slate-700 tracking-wide">Semaines types A / B</h3>
+                    <p class="text-[11px] sm:text-xs text-slate-500 mt-0.5 max-w-3xl">Repère d’affichage, gabarit hebdomadaire et application vers Google Agenda.</p>
+                </div>
+                <div class="flex flex-wrap gap-1.5 shrink-0">
+                    <button type="button" class="btn btn-ghost btn-sm font-normal text-[11px]" onclick="document.getElementById('modal_semaines_types').close()">Fermer</button>
+                    <button type="button" id="st-goto-cal" class="btn btn-outline btn-sm font-black text-[11px]">Aller au calendrier</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-4">
+            <div class="max-w-[1600px] mx-auto w-full space-y-4">
+
+        <section class="rounded-xl border border-slate-200 bg-slate-50/90 p-3 sm:p-4">
+            <p class="text-[10px] font-black uppercase text-slate-600 mb-1">Lundi de référence (semaine A)</p>
+            <p class="text-[9px] sm:text-[10px] text-slate-600 mb-2">Obligatoire avant d’<strong>appliquer</strong> le gabarit. Sert aussi au libellé dans la barre du calendrier.</p>
+            <div class="flex flex-wrap items-end gap-2" id="st-anchor-edit-wrap">
+                <input type="date" id="st-anchor-date" class="input input-sm h-9 font-mono text-sm max-w-[11rem] bg-white border border-slate-200 rounded-lg" aria-label="Lundi semaine A" />
+                <button type="button" id="st-anchor-save" class="btn btn-primary btn-sm font-black text-[11px]">Enregistrer le repère</button>
+                <button type="button" id="st-anchor-clear" class="btn btn-ghost btn-sm font-black text-[11px] border border-slate-200">Désactiver affichage</button>
+            </div>
+            <p id="st-anchor-readonly" class="hidden text-[10px] text-slate-600"></p>
+        </section>
+
+        <section id="st-gabarit-section">
+            <p class="text-[10px] font-black uppercase text-slate-600 mb-2">Gabarit</p>
+            <p id="st-gabarit-readonly-hint" class="hidden text-[9px] text-amber-800 bg-amber-50 border border-amber-100 rounded-lg p-2 mb-2">
+                Consultation seule : vous voyez les lignes de tous les professeurs. Seuls les profs modifient leurs créneaux.
+            </p>
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <div class="rounded-xl border border-slate-200 bg-white p-2 sm:p-3 min-w-0">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[11px] font-bold text-slate-700">Semaine type A</span>
+                        <button type="button" id="st-add-row-a" class="btn btn-ghost btn-xs font-black text-[10px] hidden">+ Ligne</button>
+                    </div>
+                    <div class="overflow-x-auto -mx-1">
+                        <table class="table table-sm w-full text-[11px] sm:text-xs min-w-[640px]">
+                            <thead>
+                                <tr class="text-slate-500">
+                                    <th>Jour</th>
+                                    <th>Début</th>
+                                    <th>Fin</th>
+                                    <th>Type</th>
+                                    <th>Titre</th>
+                                    <th>Élèves</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="st-tbody-a"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-white p-2 sm:p-3 min-w-0">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[11px] font-bold text-slate-700">Semaine type B</span>
+                        <button type="button" id="st-add-row-b" class="btn btn-ghost btn-xs font-black text-[10px] hidden">+ Ligne</button>
+                    </div>
+                    <div class="overflow-x-auto -mx-1">
+                        <table class="table table-sm w-full text-[11px] sm:text-xs min-w-[640px]">
+                            <thead>
+                                <tr class="text-slate-500">
+                                    <th>Jour</th>
+                                    <th>Début</th>
+                                    <th>Fin</th>
+                                    <th>Type</th>
+                                    <th>Titre</th>
+                                    <th>Élèves</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="st-tbody-b"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div id="st-gabarit-actions" class="mt-3 hidden">
+                <button type="button" id="st-save-gabarit" class="btn btn-primary btn-sm font-black text-[11px]">Enregistrer le gabarit</button>
+            </div>
+        </section>
+
+        <section id="st-apply-section" class="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
+            <p class="text-[10px] font-black uppercase text-slate-600 mb-2">Appliquer sur le planning</p>
+            <div class="flex flex-wrap gap-2 items-end mb-2">
+                <div>
+                    <label class="text-[9px] font-bold text-slate-500 block" for="st-apply-start">Date de prise en compte</label>
+                    <input type="date" id="st-apply-start" class="input input-sm h-9 font-mono text-sm bg-slate-50 border border-slate-200 rounded-lg" />
+                </div>
+                <div>
+                    <label class="text-[9px] font-bold text-slate-500 block" for="st-apply-end-ro">Fin (année scolaire)</label>
+                    <input type="date" id="st-apply-end-ro" readonly class="input input-sm h-9 font-mono text-sm bg-slate-100 border border-slate-200 rounded-lg opacity-80" />
+                </div>
+            </div>
+            <button type="button" id="st-btn-analyze" class="btn btn-outline btn-sm font-black text-[11px] mb-2">Analyser</button>
+            <div id="st-analyze-out" class="hidden text-[10px] sm:text-xs text-slate-700 whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-3 mb-2 max-w-4xl"></div>
+            <button type="button" id="st-btn-apply" class="btn btn-error btn-sm font-black text-[11px] hidden">Confirmer et appliquer</button>
+            <p class="text-[9px] text-slate-500 mt-1">TODO (hors V1) : e-mail récapitulatif par élève après changements.</p>
+        </section>
+
+            </div>
+        </div>
+    </div>
+</dialog>

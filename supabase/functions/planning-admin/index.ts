@@ -19,6 +19,40 @@ function normalizePlanningRole(r: string): (typeof PLANNING_ROLES)[number] {
     return isPlanningRole(x) ? (x as (typeof PLANNING_ROLES)[number]) : 'eleve';
 }
 
+function planningFullName(nom: string, prenom: string): string {
+    const n = nom.trim();
+    const p = prenom.trim();
+    if (n && p) return `${n} ${p}`;
+    return n || p || '';
+}
+
+/** Corps JSON : champs nom + prénom ; repli sur display_name seul (anciens clients). */
+function readNomPrenom(body: Record<string, unknown>): { nom: string; prenom: string } {
+    let nom = String(body.nom ?? '').trim();
+    let prenom = String(body.prenom ?? '').trim();
+    if (!nom && !prenom) {
+        const leg = String(body.display_name ?? '').trim();
+        if (leg) nom = leg;
+    }
+    return { nom, prenom };
+}
+
+function sortUsersForAdminList<
+    T extends { nom?: string | null; prenom?: string | null; email?: string | null }
+>(users: T[]): T[] {
+    return [...users].sort((a, b) => {
+        const an = String(a.nom ?? '').trim().toLowerCase();
+        const bn = String(b.nom ?? '').trim().toLowerCase();
+        if (an !== bn) return an.localeCompare(bn, 'fr');
+        const ap = String(a.prenom ?? '').trim().toLowerCase();
+        const bp = String(b.prenom ?? '').trim().toLowerCase();
+        if (ap !== bp) return ap.localeCompare(bp, 'fr');
+        return String(a.email ?? '')
+            .toLowerCase()
+            .localeCompare(String(b.email ?? '').toLowerCase(), 'fr');
+    });
+}
+
 /** Évite les URLs `in.(id)` trop longues (liste vide / erreur silencieuse côté client). */
 async function profileRowsForUserIds(
     admin: ReturnType<typeof createClient>,
@@ -28,10 +62,13 @@ async function profileRowsForUserIds(
         string,
         {
             id: string;
+            nom: string;
+            prenom: string;
             display_name: string | null;
             role: string;
             calendar_assignment_error: string | null;
             personal_google_calendar_id: string | null;
+            personal_calendar_label: string | null;
         }
     >
 > {
@@ -39,10 +76,13 @@ async function profileRowsForUserIds(
         string,
         {
             id: string;
+            nom: string;
+            prenom: string;
             display_name: string | null;
             role: string;
             calendar_assignment_error: string | null;
             personal_google_calendar_id: string | null;
+            personal_calendar_label: string | null;
         }
     >();
     const chunk = 40;
@@ -50,33 +90,43 @@ async function profileRowsForUserIds(
         const slice = ids.slice(i, i + chunk);
         const { data, error } = await admin
             .from('profiles')
-            .select('id,display_name,role,calendar_assignment_error')
+            .select('id,nom,prenom,display_name,role,calendar_assignment_error')
             .in('id', slice);
         if (error) throw error;
         const { data: poolRows, error: poolErr } = await admin
             .from('google_calendar_pool')
-            .select('assigned_user_id,google_calendar_id')
+            .select('assigned_user_id,google_calendar_id,label')
             .in('assigned_user_id', slice);
         if (poolErr) throw poolErr;
         const calByUser = new Map<string, string>();
+        const labelByUser = new Map<string, string | null>();
         for (const pr of poolRows ?? []) {
             const uid = (pr as { assigned_user_id: string | null }).assigned_user_id;
             const gid = (pr as { google_calendar_id: string }).google_calendar_id;
-            if (uid) calByUser.set(uid, gid);
+            const lab = (pr as { label: string | null }).label;
+            if (uid) {
+                calByUser.set(uid, gid);
+                labelByUser.set(uid, lab ?? null);
+            }
         }
         for (const p of data ?? []) {
             const row = p as {
                 id: string;
+                nom: string | null;
+                prenom: string | null;
                 display_name: string | null;
                 role: string;
                 calendar_assignment_error: string | null;
             };
             map.set(row.id, {
                 id: row.id,
+                nom: String(row.nom ?? '').trim(),
+                prenom: String(row.prenom ?? '').trim(),
                 display_name: row.display_name,
                 role: row.role,
                 calendar_assignment_error: row.calendar_assignment_error ?? null,
-                personal_google_calendar_id: calByUser.get(row.id) ?? null
+                personal_google_calendar_id: calByUser.get(row.id) ?? null,
+                personal_calendar_label: labelByUser.get(row.id) ?? null
             });
         }
     }
@@ -190,10 +240,13 @@ Deno.serve(async (req) => {
                 email?: string | null;
                 created_at?: string | null;
                 banned_until?: string | null;
+                nom?: string | null;
+                prenom?: string | null;
                 display_name?: string | null;
                 profile_role?: string | null;
                 calendar_assignment_error?: string | null;
                 personal_google_calendar_id?: string | null;
+                personal_calendar_label?: string | null;
             };
 
             const { data: rpcRaw, error: rpcErr } = await admin.rpc('planning_admin_list_auth_users');
@@ -204,10 +257,15 @@ Deno.serve(async (req) => {
                 const all: Array<{
                     id: string;
                     email: string;
+                    nom: string;
+                    prenom: string;
                     display_name: string | null;
                     role: string;
                     banned_until: string | null;
                     created_at: string | null;
+                    calendar_assignment_error: string | null;
+                    personal_google_calendar_id: string | null;
+                    personal_calendar_label: string | null;
                 }> = [];
 
                 while (true) {
@@ -229,19 +287,22 @@ Deno.serve(async (req) => {
                         all.push({
                             id: u.id,
                             email: u.email ?? '',
+                            nom: p?.nom ?? '',
+                            prenom: p?.prenom ?? '',
                             display_name: p?.display_name ?? null,
                             role: normalizePlanningRole(dbRole),
                             banned_until: ban ?? null,
                             created_at: u.created_at ?? null,
                             calendar_assignment_error: p?.calendar_assignment_error ?? null,
-                            personal_google_calendar_id: p?.personal_google_calendar_id ?? null
+                            personal_google_calendar_id: p?.personal_google_calendar_id ?? null,
+                            personal_calendar_label: p?.personal_calendar_label ?? null
                         });
                     }
                     if (users.length < perPage) break;
                     page++;
                 }
 
-                return new Response(JSON.stringify({ ok: true, users: all }), {
+                return new Response(JSON.stringify({ ok: true, users: sortUsersForAdminList(all) }), {
                     headers: { ...cors, 'Content-Type': 'application/json' }
                 });
             }
@@ -260,6 +321,8 @@ Deno.serve(async (req) => {
                 return {
                     id: String(row.id ?? ''),
                     email: String(row.email ?? ''),
+                    nom: row.nom != null ? String(row.nom) : '',
+                    prenom: row.prenom != null ? String(row.prenom) : '',
                     display_name: row.display_name != null ? String(row.display_name) : null,
                     role: normalizePlanningRole(dbRole),
                     banned_until: row.banned_until != null ? String(row.banned_until) : null,
@@ -267,11 +330,13 @@ Deno.serve(async (req) => {
                     calendar_assignment_error:
                         row.calendar_assignment_error != null ? String(row.calendar_assignment_error) : null,
                     personal_google_calendar_id:
-                        row.personal_google_calendar_id != null ? String(row.personal_google_calendar_id) : null
+                        row.personal_google_calendar_id != null ? String(row.personal_google_calendar_id) : null,
+                    personal_calendar_label:
+                        row.personal_calendar_label != null ? String(row.personal_calendar_label) : null
                 };
             });
 
-            return new Response(JSON.stringify({ ok: true, users: all }), {
+            return new Response(JSON.stringify({ ok: true, users: sortUsersForAdminList(all) }), {
                 headers: { ...cors, 'Content-Type': 'application/json' }
             });
         }
@@ -280,7 +345,8 @@ Deno.serve(async (req) => {
             const email = String(body.email ?? '')
                 .trim()
                 .toLowerCase();
-            const displayName = String(body.display_name ?? '').trim();
+            const { nom, prenom } = readNomPrenom(body);
+            const fullName = planningFullName(nom, prenom);
             const role = String(body.role ?? 'eleve').toLowerCase();
             const redirectTo = String(body.redirect_to ?? '').trim();
 
@@ -290,8 +356,8 @@ Deno.serve(async (req) => {
                     headers: { ...cors, 'Content-Type': 'application/json' }
                 });
             }
-            if (!displayName) {
-                return new Response(JSON.stringify({ error: 'Le nom affiché est obligatoire.' }), {
+            if (!fullName) {
+                return new Response(JSON.stringify({ error: 'Le nom et le prénom sont obligatoires.' }), {
                     status: 400,
                     headers: { ...cors, 'Content-Type': 'application/json' }
                 });
@@ -315,7 +381,9 @@ Deno.serve(async (req) => {
             const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
                 redirectTo,
                 data: {
-                    display_name: displayName,
+                    nom,
+                    prenom,
+                    display_name: fullName,
                     role: normalizePlanningRole(role)
                 }
             });
@@ -328,7 +396,8 @@ Deno.serve(async (req) => {
 
         if (action === 'create_user') {
             const email = String(body.email ?? '').trim().toLowerCase();
-            const displayName = String(body.display_name ?? '').trim();
+            const { nom, prenom } = readNomPrenom(body);
+            const fullName = planningFullName(nom, prenom);
             const role = String(body.role ?? 'eleve').toLowerCase();
             const password = String(body.password ?? '');
 
@@ -338,8 +407,8 @@ Deno.serve(async (req) => {
                     headers: { ...cors, 'Content-Type': 'application/json' }
                 });
             }
-            if (!displayName) {
-                return new Response(JSON.stringify({ error: 'Le nom affiché est obligatoire.' }), {
+            if (!fullName) {
+                return new Response(JSON.stringify({ error: 'Le nom et le prénom sont obligatoires.' }), {
                     status: 400,
                     headers: { ...cors, 'Content-Type': 'application/json' }
                 });
@@ -366,7 +435,9 @@ Deno.serve(async (req) => {
                 password,
                 email_confirm: true,
                 user_metadata: {
-                    display_name: displayName,
+                    nom,
+                    prenom,
+                    display_name: fullName,
                     role: nr
                 }
             });
@@ -374,15 +445,15 @@ Deno.serve(async (req) => {
 
             const createdId = data.user?.id;
             if (createdId) {
-                const dn = displayName.trim();
                 const { error: pErr } = await admin
                     .from('profiles')
                     .upsert(
                         {
                             id: createdId,
-                            display_name: dn,
+                            nom,
+                            prenom,
                             role: nr,
-                            reservation_types: { labels: [dn], favoriteLabel: dn },
+                            reservation_types: { labels: [fullName], favoriteLabel: fullName },
                             updated_at: new Date().toISOString()
                         },
                         { onConflict: 'id' }
@@ -426,6 +497,44 @@ Deno.serve(async (req) => {
             });
         }
 
+        if (action === 'update_user_email') {
+            const userId = String(body.user_id ?? '');
+            const email = String(body.email ?? '')
+                .trim()
+                .toLowerCase();
+            if (!userId) {
+                return new Response(JSON.stringify({ error: 'user_id requis' }), {
+                    status: 400,
+                    headers: { ...cors, 'Content-Type': 'application/json' }
+                });
+            }
+            if (!email.includes('@')) {
+                return new Response(JSON.stringify({ error: 'E-mail invalide' }), {
+                    status: 400,
+                    headers: { ...cors, 'Content-Type': 'application/json' }
+                });
+            }
+            if (userId === caller.id) {
+                return new Response(
+                    JSON.stringify({ error: 'Modifiez votre propre e-mail depuis votre profil / compte, pas depuis ce tableau.' }),
+                    {
+                        status: 400,
+                        headers: { ...cors, 'Content-Type': 'application/json' }
+                    }
+                );
+            }
+
+            const { error } = await admin.auth.admin.updateUserById(userId, {
+                email,
+                email_confirm: true
+            });
+            if (error) throw error;
+
+            return new Response(JSON.stringify({ ok: true }), {
+                headers: { ...cors, 'Content-Type': 'application/json' }
+            });
+        }
+
         if (action === 'suspend') {
             const userId = String(body.user_id ?? '');
             if (!userId) {
@@ -441,10 +550,8 @@ Deno.serve(async (req) => {
                 });
             }
 
-            const { error: relErr } = await admin.rpc('planning_release_personal_calendar', {
-                p_user_id: userId
-            });
-            if (relErr) throw relErr;
+            /* Ne pas appeler planning_release_personal_calendar : le lien calendrier perso doit rester
+             * (réactivation = même agenda ; évite qu’un autre compte récupère le créneau). */
 
             const { error } = await admin.auth.admin.updateUserById(userId, { ban_duration: '876600h' });
             if (error) throw error;

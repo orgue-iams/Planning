@@ -60,7 +60,10 @@ export function initAnnouncementsUi(currentUser) {
             return null;
         }
         annQuill = null;
-        annQuill = createPlanningQuill(mount, { placeholder: 'Votre message…' });
+        annQuill = createPlanningQuill(mount, {
+            placeholder: 'Votre message…',
+            adminFontStepper: currentUser?.role === 'admin'
+        });
         return annQuill;
     };
 

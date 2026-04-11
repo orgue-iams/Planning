@@ -88,3 +88,54 @@ export async function invokeCalendarBridge(accessToken, body, options) {
         return { ok: false, error: msg };
     }
 }
+
+/**
+ * @param {string | null} accessToken
+ * @param {{ timeMin: string, timeMax: string, calendarId?: string }} p
+ */
+export async function bridgeListEvents(accessToken, p, options = {}) {
+    return invokeCalendarBridge(
+        accessToken,
+        {
+            action: 'list',
+            timeMin: p.timeMin,
+            timeMax: p.timeMax,
+            ...(p.calendarId ? { calendarId: p.calendarId } : {})
+        },
+        options
+    );
+}
+
+/**
+ * @param {string | null} accessToken
+ * @param {string} googleEventId
+ * @param {string} [calendarId]
+ */
+export async function bridgeDeleteEvent(accessToken, googleEventId, calendarId, options) {
+    return invokeCalendarBridge(
+        accessToken,
+        {
+            action: 'delete',
+            googleEventId,
+            ...(calendarId ? { calendarId } : {})
+        },
+        options
+    );
+}
+
+/**
+ * @param {string | null} accessToken
+ * @param {Record<string, unknown>[]} events
+ * @param {string} [defaultCalendarId]
+ */
+export async function bridgeUpsertEvents(accessToken, events, defaultCalendarId, options = {}) {
+    return invokeCalendarBridge(
+        accessToken,
+        {
+            action: 'upsert',
+            events,
+            ...(defaultCalendarId ? { calendarId: defaultCalendarId } : {})
+        },
+        options
+    );
+}

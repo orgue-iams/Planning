@@ -9,7 +9,9 @@
 
             <div id="help-block-active" class="hidden space-y-3">
                 <p>Le planning affiche les réservations de l’orgue. La <strong>légende</strong> en bas indique le type de créneau (travail personnel, cours, fermeture, etc.). Sur <strong>téléphone ou tablette</strong>, un glissement horizontal sur la grille fait défiler la <strong>semaine précédente ou suivante</strong> (les flèches en haut restent disponibles partout).</p>
-                <p>Le bouton <strong>Consignes</strong> (centre de la barre) ouvre les consignes (horaires ICT, travail personnel, etc.). Dans le menu (icône personne), vous pouvez gérer <strong>vos préférences de réservation</strong>, votre mot de passe et vous déconnecter.</p>
+                <p>Le bouton <strong>Consignes</strong> (centre de la barre) ouvre les consignes (horaires ICT, travail personnel, etc.). Dans le menu (icône personne) : pour le <strong>personnel</strong>, <strong>Semaines A / B</strong> (ancrage du libellé dans la barre du calendrier) ; <strong>Profil</strong> (agendas, cours inscrits ; titres suggérés pour la modale de réservation) ; changement de mot de passe ; cette <strong>aide</strong> ; déconnexion.</p>
+                <p>En vue <strong>semaine</strong> ou <strong>jour</strong>, un <strong>clic</strong> sur une plage libre ou un <strong>glisser</strong> pour choisir des heures enregistre tout de suite une réservation (durée 1 h, ou 30 min si une occupation commence avant la fin de l’heure), avec votre <strong>nom</strong> comme titre — sans ouvrir la fenêtre de saisie. Cliquez sur un créneau existant pour le modifier ou le supprimer.</p>
+                <p id="help-block-week-cycle" class="hidden text-slate-600">À la rentrée, le menu <strong>Semaines A / B</strong> guide le personnel : d’abord le <strong>lundi de référence semaine A</strong> (repère commun dans la barre du calendrier), puis la définition des <strong>semaines types</strong> en créant les créneaux sur le planning (récurrence si besoin). Les <strong>inscriptions</strong> élèves restent une étape ultérieure dans Google Agenda (<code class="text-[10px] bg-slate-100 px-1 rounded">inscrits=…</code>).</p>
                 <p>Vous pouvez créer ou modifier <strong>vos propres</strong> réservations sur les créneaux à venir, dans le respect des consignes et des disponibilités.</p>
                 <p id="help-block-eleve-notify" class="hidden text-slate-600">Si un professeur ou un administrateur modifie l’un de vos créneaux, vous pouvez recevoir un <strong>e-mail d’information</strong>, lorsque la messagerie est activée sur le serveur.</p>
             </div>
@@ -22,8 +24,9 @@
             <div id="help-block-menu-privileged" class="hidden space-y-2 border-t border-slate-100 pt-3">
                 <p class="font-medium text-slate-800">Menu utilisateur</p>
                 <ul class="list-disc pl-4 space-y-1">
+                    <li id="help-li-week-cycle" class="hidden"><strong>Semaines A / B</strong> : à la rentrée, ancrage A/B puis repère pour construire les semaines types sur le calendrier.</li>
                     <li id="help-li-announcements" class="hidden"><strong>Annonces</strong> : messages ponctuels pour les personnes connectées.</li>
-                    <li id="help-li-admin-users" class="hidden"><strong>Gestion des comptes</strong> (administrateurs) : création et rôles des utilisateurs.</li>
+                    <li id="help-li-admin-users" class="hidden"><strong>Gestion des comptes</strong> (administrateurs) : création, rôles, statut (actif / suspendu) et mots de passe.</li>
                 </ul>
             </div>
 

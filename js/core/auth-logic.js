@@ -7,7 +7,6 @@ import {
     isBackendAuthConfigured,
     getRememberMePreference,
     setRememberMePreference,
-    resetSupabaseClient,
     purgeSupabaseKeysFromStorage
 } from './supabase-client.js';
 import { showToast } from '../utils/toast.js';
@@ -154,12 +153,16 @@ export async function login(email, pass, rememberMe = true) {
 
     if (isBackendAuthConfigured()) {
         setRememberMePreference(remember);
-        resetSupabaseClient();
         purgeSupabaseKeysFromStorage(remember ? sessionStorage : localStorage);
         const supabase = getSupabaseClient();
         if (!supabase) {
             showToast('Configuration Supabase invalide.', 'error');
             return { success: false };
+        }
+        try {
+            await supabase.auth.signOut({ scope: 'local' });
+        } catch {
+            /* session absente ou stockage restreint */
         }
         const { data, error } = await supabase.auth.signInWithPassword({
             email: id,
@@ -394,7 +397,6 @@ export async function logout() {
     clearDemoSession();
     if (isBackendAuthConfigured()) {
         await getSupabaseClient()?.auth.signOut();
-        resetSupabaseClient();
     }
     logoutImpl();
 }

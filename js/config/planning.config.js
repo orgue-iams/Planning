@@ -16,5 +16,14 @@ window.__PLANNING_CONFIG__ = window.__PLANNING_CONFIG__ || {
      * Elle vérifie le JWT puis appelle l’API Google Calendar (secrets GOOGLE_* côté Supabase).
      * Laisser vide + pas de clé Supabase = mode démo local inchangé.
      */
-    calendarBridgeUrl: 'https://dqgzvddphbjibkszcdun.supabase.co/functions/v1/calendar-bridge'
+    calendarBridgeUrl: 'https://dqgzvddphbjibkszcdun.supabase.co/functions/v1/calendar-bridge',
+
+    /**
+     * ID du calendrier Google « général » (même valeur que GOOGLE_CALENDAR_ID côté calendar-bridge).
+     * Sert aux liens d’abonnement / copie dans la modale Profil. Laisser vide = liens masqués.
+     */
+    mainGoogleCalendarId: 'orgue.iams@google.com',
+
+    /** Nom affiché au-dessus du lien dans la modale Profil (sinon libellé par défaut côté app). */
+    mainGoogleCalendarLabel: 'Planning général orgue'
 };

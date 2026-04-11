@@ -2,6 +2,8 @@
  * Barre d’outils type Google Agenda : Auj., ‹ ›, titre de période, menu vues.
  */
 
+import { getWeekCycleAnchorMonday, weekCycleLabelForDate } from './week-cycle.js';
+
 const MONTH_LONG = [
     'janvier',
     'février',
@@ -52,16 +54,13 @@ export function formatCalendarToolbarTitle(calendar) {
     const start = view.currentStart;
     const end = lastVisibleInstant(view);
 
+    let base;
     if (type === 'dayGridMonth') {
-        return `${ucFirst(MONTH_LONG[start.getMonth()])} ${start.getFullYear()}`;
-    }
-
-    if (type === 'multiMonthYear' || type.includes('multiMonth')) {
-        return String(start.getFullYear());
-    }
-
-    if (type === 'timeGridDay') {
-        return ucFirst(
+        base = `${ucFirst(MONTH_LONG[start.getMonth()])} ${start.getFullYear()}`;
+    } else if (type === 'multiMonthYear' || type.includes('multiMonth')) {
+        base = String(start.getFullYear());
+    } else if (type === 'timeGridDay') {
+        base = ucFirst(
             start.toLocaleDateString('fr-FR', {
                 weekday: 'long',
                 day: 'numeric',
@@ -69,33 +68,28 @@ export function formatCalendarToolbarTitle(calendar) {
                 year: 'numeric'
             })
         );
-    }
-
-    if (type === 'timeGridWeek') {
+    } else if (type === 'timeGridWeek') {
         if (start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth()) {
-            return `${ucFirst(MONTH_LONG[start.getMonth()])} ${start.getFullYear()}`;
+            base = `${ucFirst(MONTH_LONG[start.getMonth()])} ${start.getFullYear()}`;
+        } else if (start.getFullYear() === end.getFullYear()) {
+            base = `${ucFirst(MONTH_SHORT[start.getMonth()])} – ${ucFirst(MONTH_SHORT[end.getMonth()])} ${start.getFullYear()}`;
+        } else {
+            base = `${ucFirst(MONTH_SHORT[start.getMonth()])} ${start.getFullYear()} – ${ucFirst(MONTH_SHORT[end.getMonth()])} ${end.getFullYear()}`;
         }
-        if (start.getFullYear() === end.getFullYear()) {
-            return `${ucFirst(MONTH_SHORT[start.getMonth()])} – ${ucFirst(MONTH_SHORT[end.getMonth()])} ${start.getFullYear()}`;
-        }
-        return `${ucFirst(MONTH_SHORT[start.getMonth()])} ${start.getFullYear()} – ${ucFirst(MONTH_SHORT[end.getMonth()])} ${end.getFullYear()}`;
-    }
-
-    if (type === 'listMyPlanning') {
-        return `Mon planning · 30 jours`;
-    }
-
-    if (type.startsWith('list')) {
+    } else if (type.startsWith('list')) {
         if (start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth()) {
-            return `${start.getDate()} – ${end.getDate()} ${MONTH_LONG[start.getMonth()]} ${start.getFullYear()}`;
+            base = `${start.getDate()} – ${end.getDate()} ${MONTH_LONG[start.getMonth()]} ${start.getFullYear()}`;
+        } else if (start.getFullYear() === end.getFullYear()) {
+            base = `${start.getDate()} ${MONTH_SHORT[start.getMonth()]} – ${end.getDate()} ${MONTH_SHORT[end.getMonth()]} ${start.getFullYear()}`;
+        } else {
+            base = `${start.getDate()} ${MONTH_SHORT[start.getMonth()]} ${start.getFullYear()} – ${end.getDate()} ${MONTH_SHORT[end.getMonth()]} ${end.getFullYear()}`;
         }
-        if (start.getFullYear() === end.getFullYear()) {
-            return `${start.getDate()} ${MONTH_SHORT[start.getMonth()]} – ${end.getDate()} ${MONTH_SHORT[end.getMonth()]} ${start.getFullYear()}`;
-        }
-        return `${start.getDate()} ${MONTH_SHORT[start.getMonth()]} ${start.getFullYear()} – ${end.getDate()} ${MONTH_SHORT[end.getMonth()]} ${end.getFullYear()}`;
+    } else {
+        base = view.title || '';
     }
 
-    return view.title || '';
+    const wc = weekCycleLabelForDate(getWeekCycleAnchorMonday(), start);
+    return wc ? `${base} · ${wc}` : base;
 }
 
 const VIEW_ITEMS = [
@@ -103,8 +97,7 @@ const VIEW_ITEMS = [
     { id: 'dayGridMonth', label: 'Mois' },
     { id: 'timeGridDay', label: 'Jour' },
     { id: 'multiMonthYear', label: 'Année' },
-    { id: 'listWeek', label: 'Planning' },
-    { id: 'listMyPlanning', label: 'Mon planning' }
+    { id: 'listWeek', label: 'Planning' }
 ];
 
 /** @param {import('@fullcalendar/core').CalendarApi} calendar */
@@ -180,9 +173,6 @@ export function initCalendarToolbar(calendar) {
         b.setAttribute('data-view', id);
         b.addEventListener('click', (ev) => {
             ev.stopPropagation();
-            if (id === 'listMyPlanning') {
-                calendar.today();
-            }
             calendar.changeView(id);
             closeMenu();
             refreshTitle();

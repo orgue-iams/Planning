@@ -1,41 +1,43 @@
-<header class="app-navbar navbar bg-white border-b px-2 sm:px-3 min-h-12 h-12 max-sm:min-h-0 max-sm:h-auto fixed top-0 z-50 w-full grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-center shadow-sm gap-1 max-sm:gap-0.5 max-sm:shadow-none max-sm:rounded-b-none max-sm:border-b-0 max-sm:pb-1 max-sm:pt-[max(0px,env(safe-area-inset-top,0px))]">
-    <div class="flex items-center gap-1.5 sm:gap-2 min-w-0 max-sm:min-h-0">
-        <span class="text-lg sm:text-lg shrink-0 max-sm:text-base max-sm:leading-none" aria-hidden="true">🎹</span>
-        <div class="flex flex-col min-w-0 max-sm:flex-row max-sm:items-baseline max-sm:gap-1 max-sm:min-w-0">
-            <span class="font-black text-[11px] uppercase leading-none text-slate-800 truncate max-sm:text-[10px]">Orgue</span>
-            <span class="text-[10px] uppercase text-slate-500 font-bold tracking-wider truncate max-sm:text-[8px] max-sm:tracking-wide max-sm:opacity-90 max-sm:min-w-0 shrink">Gérard Bancells</span>
+<header class="app-navbar navbar bg-white border-b fixed top-0 z-50 w-full flex flex-col shadow-sm max-sm:shadow-none max-sm:rounded-b-none max-sm:border-b-0">
+    <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-center gap-1 min-h-12 h-12 px-2 sm:px-3 w-full max-sm:min-h-0 max-sm:h-auto max-sm:pb-1 max-sm:pt-[max(0px,env(safe-area-inset-top,0px))] max-sm:gap-0.5">
+        <div class="flex items-center gap-1.5 sm:gap-2 min-w-0 max-sm:min-h-0">
+            <span class="text-lg sm:text-lg shrink-0 max-sm:text-base max-sm:leading-none" aria-hidden="true">🎹</span>
+            <div class="flex flex-col min-w-0 max-sm:flex-row max-sm:items-baseline max-sm:gap-1 max-sm:min-w-0">
+                <span class="font-black text-[11px] uppercase leading-none text-slate-800 truncate max-sm:text-[10px]">Orgue</span>
+                <span class="text-[10px] uppercase text-slate-500 font-bold tracking-wider truncate max-sm:text-[8px] max-sm:tracking-wide max-sm:opacity-90 max-sm:min-w-0 shrink">Gérard Bancells</span>
+            </div>
         </div>
-    </div>
 
-    <div class="flex justify-center min-w-0 px-0.5 max-sm:px-0">
-        <button type="button" id="btn-rules" class="btn btn-ghost btn-xs font-sans font-semibold normal-case text-[11px] sm:text-[13px] leading-tight text-slate-700 border border-slate-200 bg-white shadow-sm hover:bg-slate-50 hover:border-slate-300 px-2 sm:px-2.5 h-8 sm:h-9 max-sm:h-7 max-sm:min-h-7 max-sm:px-1.5 max-sm:text-[10px] max-sm:leading-tight max-w-[min(52vw,11rem)] sm:max-w-[min(72vw,18rem)] max-sm:max-w-[min(46vw,9.5rem)] truncate shrink-0" title="Consignes">Consignes</button>
-    </div>
+        <div class="flex justify-center min-w-0 px-0.5 max-sm:px-0">
+            <button type="button" id="btn-rules" class="btn btn-ghost btn-xs font-sans font-semibold normal-case text-[11px] sm:text-[13px] leading-tight text-slate-700 border border-slate-200 bg-white shadow-sm hover:bg-slate-50 hover:border-slate-300 px-2 sm:px-2.5 h-8 sm:h-9 max-sm:h-7 max-sm:min-h-7 max-sm:px-1.5 max-sm:text-[10px] max-sm:leading-tight max-w-[min(52vw,11rem)] sm:max-w-[min(72vw,18rem)] max-sm:max-w-[min(46vw,9.5rem)] truncate shrink-0" title="Consignes">Consignes</button>
+        </div>
 
         <div class="flex items-center justify-end gap-1 sm:gap-2 min-w-0 max-sm:gap-0.5">
             <div id="user-identity" class="flex flex-col items-end min-w-0 mr-0.5 sm:mr-1 leading-tight max-sm:mr-0">
-            <span id="user-display-name" class="text-[10px] sm:text-[11px] font-black text-slate-800 truncate max-w-[6.5rem] sm:max-w-[12rem] max-sm:max-w-[4.25rem] max-sm:text-[8px] max-sm:leading-tight">Invité</span>
-            <span id="user-display-role" class="text-[9px] font-bold text-slate-500 uppercase tracking-wide truncate max-w-[6.5rem] sm:max-w-[12rem] hidden max-sm:hidden"></span>
-        </div>
-        <div id="user-menu-wrap" class="dropdown dropdown-end hidden shrink-0">
-            <div tabindex="0" role="button" id="btn-user-menu" class="btn btn-ghost btn-square btn-xs sm:btn-sm border border-transparent hover:border-slate-200 max-sm:!h-7 max-sm:!w-7 max-sm:!min-h-0" aria-label="Menu utilisateur" aria-haspopup="menu">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-5 sm:w-5 max-sm:h-4 max-sm:w-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
+                <span id="user-display-name" class="text-[10px] sm:text-[11px] font-black text-slate-800 truncate max-w-[6.5rem] sm:max-w-[12rem] max-sm:max-w-[4.25rem] max-sm:text-[8px] max-sm:leading-tight">Invité</span>
+                <span id="user-display-role" class="text-[9px] font-bold text-slate-500 uppercase tracking-wide truncate max-w-[6.5rem] sm:max-w-[12rem] hidden max-sm:hidden"></span>
             </div>
-            <ul tabindex="0" class="dropdown-content menu z-[100] mt-1 w-56 rounded-box border border-slate-200 bg-base-100 p-2 shadow-lg">
-                <li class="hidden" id="menu-item-users-admin-wrap"><a href="#" id="menu-item-users-admin" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Gestion des comptes</a></li>
-                <li class="hidden" id="menu-item-announcements-wrap"><a href="#" id="menu-item-announcements" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Annonces</a></li>
-                <li><a href="#" id="menu-item-reservation-types" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Mes réservations type</a></li>
-                <li><a href="#" id="menu-item-change-password" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Changer mon mot de passe</a></li>
-                <li><a href="#" id="menu-item-logout" class="font-bold text-[11px] text-error leading-snug normal-case" role="menuitem">Déconnexion</a></li>
-            </ul>
+            <div id="user-menu-wrap" class="dropdown dropdown-end hidden shrink-0">
+                <div tabindex="0" role="button" id="btn-user-menu" class="btn btn-ghost btn-square btn-xs sm:btn-sm border border-transparent hover:border-slate-200 max-sm:!h-7 max-sm:!w-7 max-sm:!min-h-0" aria-label="Menu utilisateur" aria-haspopup="menu">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-5 sm:w-5 max-sm:h-4 max-sm:w-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                </div>
+                <ul tabindex="0" class="dropdown-content menu z-[100] mt-1 w-56 rounded-box border border-slate-200 bg-base-100 p-2 shadow-lg">
+                    <li class="hidden" id="menu-item-users-admin-wrap"><a href="#" id="menu-item-users-admin" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Gestion des comptes</a></li>
+                    <li class="hidden" id="menu-item-calendar-pool-wrap"><a href="#" id="menu-item-calendar-pool" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Calendriers secondaires</a></li>
+                    <li class="hidden" id="menu-item-announcements-wrap"><a href="#" id="menu-item-announcements" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Annonces</a></li>
+                    <li class="hidden" id="menu-item-config-wrap"><a href="#" id="menu-item-config" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Configuration</a></li>
+                    <li class="hidden" id="menu-item-week-cycle-wrap"><a href="#" id="menu-item-week-cycle" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Semaines types A / B</a></li>
+                    <li><a href="#" id="menu-item-profile" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Profil</a></li>
+                    <li><a href="#" id="menu-item-change-password" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Changer mon mot de passe</a></li>
+                    <li><a href="#" id="menu-item-help" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Aide</a></li>
+                    <li><a href="#" id="menu-item-logout" class="font-bold text-[11px] text-error leading-snug normal-case" role="menuitem">Déconnexion</a></li>
+                </ul>
+            </div>
         </div>
-        <div id="header-help-wrap" class="hidden shrink-0">
-            <button type="button" id="btn-help" class="btn btn-ghost btn-square btn-xs sm:btn-sm border border-transparent hover:border-slate-200 max-sm:!h-7 max-sm:!w-7 max-sm:!min-h-0" aria-label="Aide" title="Aide">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 max-sm:h-4 max-sm:w-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-            </button>
-        </div>
+    </div>
+    <div id="header-week-strip-wrap" class="hidden w-full px-2 sm:px-3 pb-1.5 pt-0 border-t border-slate-100 bg-white">
+        <div id="header-week-courses" role="status" class="text-[10px] sm:text-[11px] leading-snug text-slate-700 rounded-lg border border-slate-200 bg-slate-100/95 px-2.5 py-1.5 shadow-sm truncate" title=""></div>
     </div>
 </header>

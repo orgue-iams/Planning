@@ -8,8 +8,9 @@ export function showToast(message, variant = 'success') {
         root.id = 'toast-root';
         document.body.appendChild(root);
     }
-    /* Bas-droite : ne pas recouvrir la barre fixe / menu utilisateur (haut-droite). */
-    root.className = 'toast toast-bottom toast-end z-[100] gap-2 p-0 bottom-4 end-4';
+    /* Au-dessus des <dialog> modaux (top layer) et des modales DaisyUI — z-index très élevé. */
+    root.className =
+        'toast toast-bottom toast-end fixed gap-2 p-0 bottom-4 end-4 z-[999999] pointer-events-none [&>.alert]:pointer-events-auto';
 
     const alertClass =
         variant === 'error' ? 'alert-error' : variant === 'info' ? 'alert-info' : 'alert-success';

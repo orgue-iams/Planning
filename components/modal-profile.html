@@ -1,0 +1,91 @@
+<dialog id="modal_profile" class="modal">
+    <div class="modal-box p-5 w-[96%] max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 shadow-2xl">
+        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest">Profil</h3>
+
+        <p class="text-[10px] text-slate-600 mb-3 leading-snug">
+            Informations de compte (lecture seule). Les liens d’agenda ci-dessous servent uniquement à
+            <strong>consulter</strong> le planning dans Google Agenda (abonnement ICS / « Autres agendas ») — pas à modifier les réservations sur ce site.
+        </p>
+
+        <dl class="text-[11px] space-y-2 mb-4 border border-slate-100 rounded-xl p-3 bg-slate-50/80">
+            <div class="flex flex-col gap-0.5">
+                <dt class="text-[9px] font-black uppercase text-slate-400 tracking-wide">Nom</dt>
+                <dd id="profile-display-name" class="text-slate-800 font-medium">—</dd>
+            </div>
+            <div class="flex flex-col gap-0.5">
+                <dt class="text-[9px] font-black uppercase text-slate-400 tracking-wide">E-mail</dt>
+                <dd id="profile-email" class="text-slate-800 font-mono text-[10px] break-all">—</dd>
+            </div>
+            <div class="flex flex-col gap-0.5">
+                <dt class="text-[9px] font-black uppercase text-slate-400 tracking-wide">Profil</dt>
+                <dd id="profile-role-label" class="text-slate-800">—</dd>
+            </div>
+        </dl>
+
+        <div class="rounded-xl border border-slate-200 bg-white p-3 mb-4">
+            <p class="text-[10px] font-bold text-slate-700 mb-1">Agendas Google (consultation)</p>
+            <p class="text-[9px] text-slate-500 leading-snug mb-3">
+                <strong>Planning général</strong> : tous les créneaux de l’orgue. <strong>Votre calendrier personnel</strong> : vos réservations « travail ».
+                Dans Google Agenda : <em>Paramètres</em> → <em>Ajouter un agenda</em> → <em>À partir de l’URL</em>, ou utilisez le lien « intégrer » pour un aperçu.
+            </p>
+
+            <div id="profile-row-main-cal" class="hidden mb-3">
+                <p id="profile-main-cal-name" class="text-[10px] font-semibold text-slate-800 mb-1 leading-snug"></p>
+                <div class="flex gap-1 items-stretch">
+                    <input type="text" id="profile-url-main" readonly class="input input-xs input-bordered flex-1 min-w-0 text-[10px] font-mono h-8" />
+                    <button type="button" id="profile-copy-main" class="btn btn-ghost btn-xs btn-square h-8 w-8 min-h-0 shrink-0 border border-slate-200" title="Copier dans le presse-papiers" aria-label="Copier le lien du planning général">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9 9 0 019 9zM18.75 10.5h-6.75a1.125 1.125 0 00-1.125 1.125v6.75" /></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div id="profile-row-personal-cal" class="hidden">
+                <p id="profile-personal-cal-name" class="text-[10px] font-semibold text-slate-800 mb-1 leading-snug"></p>
+                <div class="flex gap-1 items-stretch">
+                    <input type="text" id="profile-url-personal" readonly class="input input-xs input-bordered flex-1 min-w-0 text-[10px] font-mono h-8" />
+                    <button type="button" id="profile-copy-personal" class="btn btn-ghost btn-xs btn-square h-8 w-8 min-h-0 shrink-0 border border-slate-200" title="Copier dans le presse-papiers" aria-label="Copier le lien de votre calendrier personnel">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9 9 0 019 9zM18.75 10.5h-6.75a1.125 1.125 0 00-1.125 1.125v6.75" /></svg>
+                    </button>
+                </div>
+            </div>
+            <p id="profile-personal-cal-none" class="hidden text-[9px] text-slate-500 italic mt-2">Profil consultation : aucun calendrier personnel IAMS n’est attribué.</p>
+        </div>
+
+        <div id="profile-reservation-titles-wrap" class="hidden rounded-xl border border-slate-200 bg-white p-3 mb-4">
+            <p class="text-[10px] font-bold text-slate-700 mb-1">Titres pour la fenêtre de réservation</p>
+            <p class="text-[9px] text-slate-500 leading-snug mb-2">
+                Une ligne par intitulé souvent utilisé (répétition, cours particulier, etc.). Le titre coché est proposé par défaut dans la <strong>modale</strong> de réservation. Les créations <strong>rapides</strong> sur la grille utilisent votre <strong>nom</strong>.
+            </p>
+            <div class="form-control mb-2">
+                <label class="label py-0" for="profile-title-lines"
+                    ><span class="label-text font-bold text-[10px] uppercase text-slate-500">Titres (une par ligne)</span></label
+                >
+                <textarea
+                    id="profile-title-lines"
+                    rows="6"
+                    maxlength="2000"
+                    class="textarea textarea-bordered w-full text-sm bg-slate-50 leading-snug min-h-[6.5rem]"
+                    placeholder="Ex.&#10;Répétition Bach&#10;Cours avec M. Dupont"
+                ></textarea>
+            </div>
+            <div id="profile-preferred-wrap" class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 min-h-[2.75rem] mb-2"></div>
+            <button type="button" id="profile-labels-btn-save" class="btn btn-primary btn-sm font-black text-[11px] w-full sm:w-auto">
+                Enregistrer les titres
+            </button>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-3 mb-3">
+            <p class="text-[10px] font-bold text-slate-700 mb-1">Cours auxquels je suis inscrit</p>
+            <p id="profile-cours-hint" class="text-[9px] text-slate-500 leading-snug mb-2 hidden">
+                Les inscriptions aux cours peuvent être indiquées dans Google Agenda sur l’événement : ligne
+                <code class="text-[8px] bg-white px-0.5 rounded">inscrits=eleve@…,eleve2@…</code> dans la description (ou propriété privée équivalente côté serveur).
+            </p>
+            <ul id="profile-cours-list" class="text-[10px] text-slate-800 space-y-1.5 list-none pl-0"></ul>
+            <p id="profile-cours-empty" class="text-[10px] text-slate-500 hidden">Aucun cours à afficher pour votre compte sur la période chargée.</p>
+        </div>
+
+        <div class="modal-action mt-0 pt-2 border-t border-slate-100">
+            <button type="button" class="btn btn-ghost btn-sm font-normal text-[11px]" onclick="document.getElementById('modal_profile').close()">Fermer</button>
+        </div>
+    </div>
+</dialog>

@@ -2,10 +2,12 @@
  * Éditeur WYSIWYG partagé (modales Règles + Annonces).
  * Requiert `window.Quill` chargé via CDN (voir index.html).
  *
- * Tailles : format Quill `size` (px) + boutons T petit / moyen / grand (pas de liste déroulante).
+ * Tailles : format Quill `size` (px) — 3 boutons T (prof) ou T− / T+ pas à pas (admin).
  */
 
 const PLANNING_QUILL_SIZE_VER = 'style-px-v2';
+
+const PLANNING_FONT_SIZES = /** @type {const} */ (['12px', '16px', '20px']);
 
 /** @param {any} quill */
 function applyPlanningFontSize(quill, px) {
@@ -19,31 +21,141 @@ function applyPlanningFontSize(quill, px) {
 }
 
 /** @param {any} quill */
-function injectPlanningFontSizeButtons(quill) {
+function currentPlanningFontSizeIndex(quill) {
+    const range = quill.getSelection(true);
+    if (!range) return 1;
+    const fmt = range.length > 0 ? quill.getFormat(range.index, 1) : quill.getFormat(range.index);
+    const s = fmt?.size;
+    const i = PLANNING_FONT_SIZES.indexOf(s);
+    return i >= 0 ? i : 1;
+}
+
+/** Icône sobre : T + trait (diminuer). */
+function planningFsSvgDecrease() {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('width', '18');
+    svg.setAttribute('height', '18');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '1.65');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true');
+    for (const d of ['M12 5v8', 'M8 5h8', 'M7 18h10']) {
+        const p = document.createElementNS(ns, 'path');
+        p.setAttribute('d', d);
+        svg.appendChild(p);
+    }
+    return svg;
+}
+
+/** Icône sobre : T + croix (augmenter). */
+function planningFsSvgIncrease() {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('width', '18');
+    svg.setAttribute('height', '18');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '1.65');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true');
+    for (const d of ['M12 4v7', 'M8 4h8', 'M12 15v6', 'M9 18h6']) {
+        const p = document.createElementNS(ns, 'path');
+        p.setAttribute('d', d);
+        svg.appendChild(p);
+    }
+    return svg;
+}
+
+/**
+ * @param {any} quill
+ * @param {{ adminFontStepper?: boolean } | undefined} opts
+ */
+function injectPlanningFontSizeButtons(quill, opts = {}) {
     const tb = quill?.getModule?.('toolbar');
     const container = tb?.container;
     if (!(container instanceof HTMLElement)) return;
     const wrap = document.createElement('span');
     wrap.className = 'ql-formats planning-quill-fs-group';
     wrap.setAttribute('aria-label', 'Taille du texte');
-    const sizes = [
-        { px: '12px', cls: 'planning-fs-sm', title: 'Petit' },
-        { px: '16px', cls: 'planning-fs-md', title: 'Moyen' },
-        { px: '20px', cls: 'planning-fs-lg', title: 'Grand' }
-    ];
-    for (const { px, cls, title } of sizes) {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = `planning-fs-btn ${cls}`;
-        b.textContent = 'T';
-        b.title = title;
-        b.setAttribute('aria-label', `${title} (${px})`);
-        b.addEventListener('click', (ev) => {
+
+    if (opts.adminFontStepper) {
+        const bMinus = document.createElement('button');
+        bMinus.type = 'button';
+        bMinus.className = 'planning-fs-btn planning-fs-step planning-fs-step--minus';
+        bMinus.title = 'Réduire la taille (T−)';
+        bMinus.setAttribute('aria-label', 'Réduire la taille du texte');
+        bMinus.appendChild(planningFsSvgDecrease());
+        const labMinus = document.createElement('span');
+        labMinus.className = 'planning-fs-step-text';
+        labMinus.setAttribute('aria-hidden', 'true');
+        labMinus.textContent = 'T−';
+        bMinus.appendChild(labMinus);
+
+        const bPlus = document.createElement('button');
+        bPlus.type = 'button';
+        bPlus.className = 'planning-fs-btn planning-fs-step planning-fs-step--plus';
+        bPlus.title = 'Augmenter la taille (T+)';
+        bPlus.setAttribute('aria-label', 'Augmenter la taille du texte');
+        bPlus.appendChild(planningFsSvgIncrease());
+        const labPlus = document.createElement('span');
+        labPlus.className = 'planning-fs-step-text';
+        labPlus.setAttribute('aria-hidden', 'true');
+        labPlus.textContent = 'T+';
+        bPlus.appendChild(labPlus);
+
+        const syncDisabled = () => {
+            const i = currentPlanningFontSizeIndex(quill);
+            bMinus.disabled = i <= 0;
+            bPlus.disabled = i >= PLANNING_FONT_SIZES.length - 1;
+        };
+
+        bMinus.addEventListener('click', (ev) => {
             ev.preventDefault();
-            applyPlanningFontSize(quill, px);
+            const i = currentPlanningFontSizeIndex(quill);
+            if (i <= 0) return;
+            applyPlanningFontSize(quill, PLANNING_FONT_SIZES[i - 1]);
+            syncDisabled();
         });
-        wrap.appendChild(b);
+        bPlus.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            const i = currentPlanningFontSizeIndex(quill);
+            if (i >= PLANNING_FONT_SIZES.length - 1) return;
+            applyPlanningFontSize(quill, PLANNING_FONT_SIZES[i + 1]);
+            syncDisabled();
+        });
+
+        quill.on('selection-change', syncDisabled);
+        syncDisabled();
+
+        wrap.appendChild(bMinus);
+        wrap.appendChild(bPlus);
+    } else {
+        const sizes = [
+            { px: '12px', cls: 'planning-fs-sm', title: 'Petit' },
+            { px: '16px', cls: 'planning-fs-md', title: 'Moyen' },
+            { px: '20px', cls: 'planning-fs-lg', title: 'Grand' }
+        ];
+        for (const { px, cls, title } of sizes) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = `planning-fs-btn ${cls}`;
+            b.textContent = 'T';
+            b.title = title;
+            b.setAttribute('aria-label', `${title} (${px})`);
+            b.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                applyPlanningFontSize(quill, px);
+            });
+            wrap.appendChild(b);
+        }
     }
+
     container.appendChild(wrap);
 }
 
@@ -92,7 +204,7 @@ export function createPlanningQuill(mountEl, opts = {}) {
             toolbar: [['bold', 'italic', 'underline'], [{ list: 'bullet' }]]
         }
     });
-    injectPlanningFontSizeButtons(q);
+    injectPlanningFontSizeButtons(q, opts);
     return q;
 }
 

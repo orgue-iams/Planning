@@ -1,11 +1,11 @@
 /**
  * Règles orgue + messages planifiés (Supabase) — repli localStorage si pas de backend.
  */
-import { getSupabaseClient, getAnonymousSupabase, isBackendAuthConfigured } from '../core/supabase-client.js';
+import { getSupabaseClient, isBackendAuthConfigured } from '../core/supabase-client.js';
 
 export async function fetchOrganRulesRemote() {
     if (!isBackendAuthConfigured()) return null;
-    const sb = getSupabaseClient() || getAnonymousSupabase();
+    const sb = getSupabaseClient();
     if (!sb) return null;
     const { data, error } = await sb.from('organ_rules').select('content').eq('id', 1).maybeSingle();
     if (error) {
@@ -30,7 +30,7 @@ export async function saveOrganRulesRemote(text) {
 /** Bandeau sur la modale login (période active). */
 export async function fetchActiveLoginMessage() {
     if (!isBackendAuthConfigured()) return null;
-    const sb = getAnonymousSupabase();
+    const sb = getSupabaseClient();
     if (!sb) return null;
     const now = new Date().toISOString();
     const { data, error } = await sb

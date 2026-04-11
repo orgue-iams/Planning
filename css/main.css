@@ -61,3 +61,13 @@ html, body {
         box-shadow: 0 1px 0 rgb(226 232 240);
     }
 }
+
+/* Bandeau « cours de la semaine » sous la navbar : décale le contenu pour ne pas le masquer */
+#app-shell.planning-shell--weekstrip {
+    padding-top: calc(3.5rem + 2.65rem);
+}
+@media (max-width: 639px) {
+    #app-shell.planning-shell--weekstrip {
+        padding-top: calc(2.5rem + env(safe-area-inset-top, 0px) + 2.65rem);
+    }
+}

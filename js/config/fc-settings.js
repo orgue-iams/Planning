@@ -8,8 +8,9 @@ import { demoEvents } from '../data/mock-events.js';
 import { getAccessToken } from '../core/auth-logic.js';
 import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from '../core/supabase-client.js';
 import { invokeCalendarBridge } from '../core/calendar-bridge.js';
-import { fcDragResizePropsForEventStart } from '../core/calendar-logic.js';
+import { fcDragResizePropsForEvent } from '../core/calendar-logic.js';
 import { scheduleTimeGridColumnSync } from '../utils/timegrid-column-sync.js';
+import { getChapelSlotBounds } from '../core/organ-settings.js';
 
 function escapeHtmlText(s) {
     return String(s)
@@ -52,6 +53,7 @@ export function bindResponsiveCalendarToolbar(calendar) {
 export const getCalendarConfig = (handlers, currentUser) => {
     const privileged =
         currentUser && (currentUser.role === 'admin' || currentUser.role === 'prof');
+    const { slotMinTime, slotMaxTime } = getChapelSlotBounds();
 
     return {
         initialView: 'timeGridWeek',
@@ -69,17 +71,10 @@ export const getCalendarConfig = (handlers, currentUser) => {
             listWeek: {
                 listDayFormat: { weekday: 'long' },
                 listDaySideFormat: { month: 'long', day: 'numeric', year: 'numeric' }
-            },
-            /** Fenêtre glissante de 30 jours ; filtre « mes créneaux » appliqué dans `events`. */
-            listMyPlanning: {
-                type: 'list',
-                duration: { days: 30 },
-                listDayFormat: { weekday: 'long' },
-                listDaySideFormat: { month: 'long', day: 'numeric', year: 'numeric' }
             }
         },
-        slotMinTime: '08:00:00',
-        slotMaxTime: '22:00:00',
+        slotMinTime,
+        slotMaxTime,
         /* Grille visuelle : une ligne par heure. Interaction (sélection, glisser) : pas 30 min. */
         slotDuration: '01:00:00',
         snapDuration: '00:30:00',
@@ -117,9 +112,8 @@ export const getCalendarConfig = (handlers, currentUser) => {
         eventOverlap: false,
         selectOverlap: false,
 
-        /* editable au niveau calendrier : nécessaire pour que la sélection plage (clic-glisser sur la grille)
-         * reste fiable avec l’interaction plugin ; le drag des créneaux reste désactivé par défaut via
-         * eventStartEditable / eventDurationEditable false, puis opt-in par événement (fcDragResizePropsForEventStart). */
+        /* editable au niveau calendrier : nécessaire pour la sélection plage ; drag/resize par événement
+         * via fcDragResizePropsForEvent (droits comme la modale). */
         editable: true,
         eventStartEditable: false,
         eventDurationEditable: false,
@@ -142,7 +136,6 @@ export const getCalendarConfig = (handlers, currentUser) => {
                 try {
                     const start = fetchInfo.start;
                     const end = fetchInfo.end;
-                    const spanDays = Math.round((end.getTime() - start.getTime()) / 86400000);
                     const loadSignal =
                         fetchInfo && typeof fetchInfo === 'object' && 'signal' in fetchInfo
                             ? /** @type {AbortSignal | undefined} */ (fetchInfo.signal)
@@ -233,15 +226,6 @@ export const getCalendarConfig = (handlers, currentUser) => {
                         });
                     }
 
-                    if (spanDays >= 29 && spanDays <= 31 && currentUser?.email) {
-                        const me = String(currentUser.email).trim().toLowerCase();
-                        rows = rows.filter(
-                            (ev) => String(ev.extendedProps?.owner || '').trim().toLowerCase() === me
-                        );
-                    } else if (spanDays >= 29 && spanDays <= 31 && !currentUser?.email) {
-                        rows = [];
-                    }
-
                     /* Dédoublonnage défensif : évite les superpositions après navigation semaine suivante/précédente. */
                     const byKey = new Map();
                     for (const ev of rows) {
@@ -257,7 +241,7 @@ export const getCalendarConfig = (handlers, currentUser) => {
                     rows = [...byKey.values()];
                     rows = rows.map((ev) => ({
                         ...ev,
-                        ...fcDragResizePropsForEventStart(ev.start, currentUser)
+                        ...fcDragResizePropsForEvent(ev, currentUser)
                     }));
 
                     successCallback(rows);

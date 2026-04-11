@@ -7,7 +7,7 @@ alwaysApply: true
 
 Quand vous modifiez `supabase/functions/**`, `supabase/migrations/**` ou `supabase/config.toml` de façon à impacter l’hébergement :
 
-1. **Exécuter vous-même le déploiement** en fin de tâche (ne pas seulement dire à l’utilisateur de le faire).
+1. **Exécuter vous-même le déploiement** en fin de tâche (ne pas seulement dire à l’utilisateur de le faire). **Autonomie attendue** notamment pour **`supabase db push`** (migrations) et **`supabase functions deploy <nom>`** (ou le script ci-dessous) après changement d’une fonction — sans attendre que l’utilisateur le fasse.
 2. **Commande unique (recommandée)** : depuis la racine du dépôt `Planning`, après `Set-Location "c:\Developpement\Planning"` sous PowerShell :
    - `npm run deploy:supabase`
    - Cela enchaîne `supabase db push --yes` puis `supabase functions deploy --project-ref <ref> --yes` (ref lue dans `supabase/project-ref`, ou variable d’environnement `SUPABASE_PROJECT_REF` si définie).

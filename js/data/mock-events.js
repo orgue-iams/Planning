@@ -29,7 +29,13 @@ export const demoEvents = [
         title: 'Cours',
         start: '2026-04-07T15:00:00',
         end: '2026-04-07T17:00:00',
-        extendedProps: { owner: 'prof@iams.fr', ownerDisplayName: 'Prof IAMS', ownerRole: 'prof', type: 'cours' }
+        extendedProps: {
+            owner: 'prof@iams.fr',
+            ownerDisplayName: 'Prof IAMS',
+            ownerRole: 'prof',
+            type: 'cours',
+            inscrits: ['eleve1@iams.fr', 'eleve2@iams.fr']
+        }
     },
 
     // --- MERCREDI 8 AVRIL ---
@@ -59,6 +65,12 @@ export const demoEvents = [
         title: 'Cours',
         start: '2026-04-10T09:00:00',
         end: '2026-04-10T09:30:00',
-        extendedProps: { owner: 'prof@iams.fr', ownerDisplayName: 'Prof IAMS', ownerRole: 'prof', type: 'cours' }
+        extendedProps: {
+            owner: 'prof@iams.fr',
+            ownerDisplayName: 'Prof IAMS',
+            ownerRole: 'prof',
+            type: 'cours',
+            inscrits: ['eleve2@iams.fr']
+        }
     }
 ];

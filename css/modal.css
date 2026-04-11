@@ -121,7 +121,7 @@
     padding: 6px 8px;
 }
 
-/* Boutons T (petit / moyen / grand) — remplace la liste déroulante de taille Quill */
+/* Boutons taille : 3×T (prof) ou T− / T+ pas à pas (admin, SVG) */
 .planning-quill-mount .planning-quill-fs-group {
     display: inline-flex;
     gap: 3px;
@@ -157,6 +157,32 @@
 .planning-quill-mount .planning-fs-btn:focus-visible {
     outline: 2px solid #64748b;
     outline-offset: 1px;
+}
+
+.planning-quill-mount .planning-fs-btn:disabled {
+    opacity: 0.38;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.planning-quill-mount .planning-fs-step {
+    gap: 3px;
+    width: auto;
+    min-width: 2.5rem;
+    padding: 0 5px;
+}
+
+.planning-quill-mount .planning-fs-step svg {
+    display: block;
+    flex-shrink: 0;
+}
+
+.planning-quill-mount .planning-fs-step-text {
+    font-size: 0.5625rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: #334155;
 }
 
 .planning-quill-mount .planning-fs-sm {
@@ -296,4 +322,149 @@
 }
 .planning-quill-mount .ql-editor .ql-size-20px {
     font-size: 20px;
+}
+
+/* —— Gestion des comptes (#modal_users_admin) —— */
+
+/* Champ MDP création : toggle à gauche seul — masquer œil / contrôles natifs (Edge, Chrome, etc.) */
+#admin-create-password.admin-create-password-input::-ms-reveal,
+#admin-create-password.admin-create-password-input::-ms-clear {
+    display: none;
+    width: 0;
+    height: 0;
+}
+#admin-create-password.admin-create-password-input::-webkit-credentials-auto-fill-button,
+#admin-create-password.admin-create-password-input::-webkit-strong-password-auto-fill-button {
+    display: none !important;
+    visibility: hidden;
+    pointer-events: none;
+    width: 0;
+    height: 0;
+}
+/* Chrome / Chromium : œil « afficher le mot de passe » à droite du champ */
+#admin-create-password.admin-create-password-input::-webkit-textfield-decoration-container {
+    display: none;
+}
+
+/* Tableau gestion comptes : une seule famille, taille et graisse pour tout le contenu */
+#modal_users_admin table.admin-users-table {
+    font-family: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif !important;
+    font-size: 0.625rem !important;
+    font-weight: 500 !important;
+    line-height: 1.35 !important;
+}
+#modal_users_admin table.admin-users-table :is(th, td) {
+    font-family: inherit !important;
+    font-size: inherit !important;
+    font-weight: inherit !important;
+    line-height: inherit !important;
+    vertical-align: middle !important;
+}
+#modal_users_admin table.admin-users-table :is(th, td) :where(span, input, select, option, button) {
+    font-family: inherit !important;
+    font-size: inherit !important;
+    font-weight: inherit !important;
+    line-height: 1.25 !important;
+}
+#modal_users_admin table.admin-users-table .select {
+    min-height: 1.75rem;
+    height: 1.75rem;
+}
+#modal_users_admin table.admin-users-table .btn {
+    min-height: 1.65rem;
+    height: auto;
+    padding: 0.2rem 0.5rem;
+}
+#modal_users_admin table.admin-users-table .admin-btn-copy-cal-url svg {
+    width: 1em !important;
+    height: 1em !important;
+    min-width: 1em;
+    min-height: 1em;
+}
+
+/* Bulle éphémère « copié » (gestion comptes — URL calendrier) */
+.admin-copy-bubble {
+    position: fixed;
+    z-index: 999999;
+    padding: 0.35rem 0.55rem;
+    border-radius: 0.35rem;
+    background: rgb(15 23 42 / 0.92);
+    color: #f8fafc;
+    font-size: 0.625rem;
+    line-height: 1.25;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 4px 14px rgb(0 0 0 / 0.2);
+    transform: translate(-50%, -100%);
+    animation: admin-copy-bubble-in 0.15s ease-out;
+}
+@keyframes admin-copy-bubble-in {
+    from {
+        opacity: 0;
+        margin-top: 4px;
+    }
+    to {
+        opacity: 1;
+        margin-top: 0;
+    }
+}
+
+/* Fenêtre gestion comptes : non modale (show) — fond cliquable, pas de top layer bloquant */
+#modal_users_admin::backdrop {
+    display: none;
+}
+#modal_users_admin[open] {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    padding: 1rem;
+    overflow: auto;
+    background: rgb(15 23 42 / 0.45);
+    border: none;
+}
+#modal_users_admin[open] .modal-box {
+    position: relative;
+    z-index: 1;
+}
+
+/* Semaines types A / B : plein écran (largeur + hauteur viewport) */
+#modal_semaines_types::backdrop {
+    background: rgb(15 23 42 / 0.4);
+}
+#modal_semaines_types[open] {
+    position: fixed;
+    inset: 0;
+    z-index: 1150;
+    display: flex;
+    align-items: stretch;
+    justify-content: stretch;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    min-height: 100dvh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: transparent;
+    border: none;
+}
+#modal_semaines_types[open] .modal-box.semaines-types-modal-box {
+    position: relative;
+    z-index: 1;
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    min-height: 0;
 }

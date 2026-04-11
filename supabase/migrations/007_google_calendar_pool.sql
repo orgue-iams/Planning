@@ -154,7 +154,7 @@ comment on function public.planning_try_assign_personal_calendar(uuid) is
 revoke all on function public.planning_try_assign_personal_calendar(uuid) from public;
 grant execute on function public.planning_try_assign_personal_calendar(uuid) to service_role;
 
--- --- Libérer le calendrier d’un utilisateur (suspension, etc.) -------------------------
+-- --- Libérer le calendrier d’un utilisateur (ex. passage en profil consultation) -------
 create or replace function public.planning_release_personal_calendar(p_user_id uuid)
 returns void
 language plpgsql

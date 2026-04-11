@@ -1,0 +1,41 @@
+<dialog id="modal_calendar_pool" class="modal">
+    <div class="modal-box p-5 w-[96%] max-w-3xl max-h-[90dvh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col">
+        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest shrink-0">Calendriers secondaires (pool)</h3>
+        <p class="text-[10px] text-slate-500 mb-3 leading-snug">Créez d’abord chaque calendrier dans Google Agenda (compte orgue.iams), puis ajoutez-le <strong>un par un</strong> avec son ID. Les comptes élève / prof / admin reçoivent automatiquement le prochain créneau libre. Profil consultation : pas d’attribution. Si le pool est vide, le profil affiche <code class="text-[8px] bg-slate-100 px-0.5 rounded">POOL_SATURATED</code>.</p>
+
+        <div class="grid grid-cols-1 sm:grid-cols-[1fr_1fr_minmax(0,4rem)_auto] gap-2 items-end mb-3 shrink-0">
+            <label class="flex flex-col gap-0 min-w-0">
+                <span class="text-[9px] font-bold text-slate-600">ID calendrier Google <span class="font-normal text-slate-400">(oblig.)</span></span>
+                <input type="text" id="calendar-pool-google-id" placeholder="ex. xxxxx@group.calendar.google.com" class="input input-xs input-bordered w-full text-[10px] h-8 min-h-0 font-mono" autocomplete="off" />
+            </label>
+            <label class="flex flex-col gap-0 min-w-0">
+                <span class="text-[9px] font-bold text-slate-600">Libellé <span class="font-normal text-slate-400">(ex. Planning IAMS 27)</span></span>
+                <input type="text" id="calendar-pool-label" placeholder="Nom affiché dans l’admin" class="input input-xs input-bordered w-full text-[10px] h-8 min-h-0" autocomplete="off" />
+            </label>
+            <label class="flex flex-col gap-0 min-w-0">
+                <span class="text-[9px] font-bold text-slate-600">Tri</span>
+                <input type="number" id="calendar-pool-sort" value="0" class="input input-xs input-bordered w-full text-[10px] h-8 min-h-0" />
+            </label>
+            <button type="button" id="calendar-pool-add-btn" class="btn btn-primary btn-xs font-normal text-[10px] h-8 min-h-0">Ajouter</button>
+        </div>
+
+        <div class="flex-1 min-h-0 overflow-auto rounded-xl border border-slate-200 mb-3">
+            <table class="table table-xs table-pin-rows w-full">
+                <thead>
+                    <tr class="bg-slate-100">
+                        <th class="text-[10px]">Libellé</th>
+                        <th class="text-[10px]">ID Google</th>
+                        <th class="text-[10px] w-14">Tri</th>
+                        <th class="text-[10px] w-28">Statut</th>
+                    </tr>
+                </thead>
+                <tbody id="calendar-pool-tbody"></tbody>
+            </table>
+        </div>
+
+        <div class="modal-action shrink-0 mt-0 pt-2 border-t border-slate-100">
+            <button type="button" id="calendar-pool-refresh" class="btn btn-ghost btn-sm font-normal text-[11px]">Actualiser</button>
+            <button type="button" class="btn btn-ghost btn-sm font-normal text-[11px]" onclick="document.getElementById('modal_calendar_pool').close()">Fermer</button>
+        </div>
+    </div>
+</dialog>

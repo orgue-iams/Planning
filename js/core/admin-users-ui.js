@@ -6,6 +6,87 @@ import { isBackendAuthConfigured } from './supabase-client.js';
 import { planningAdminInvoke } from './admin-api.js';
 import { showToast } from '../utils/toast.js';
 import { PLANNING_ROLE_OPTIONS, normalizePlanningRole, isPlanningRole } from './planning-roles.js';
+import { getPlanningSessionUser } from './session-user.js';
+import { googleCalendarEmbedUrl } from '../utils/google-calendar-url.js';
+import { formatProfileFullName } from '../utils/profile-full-name.js';
+
+/** @type {string | null} */
+let adminPlanningViewerId = null;
+
+/** Évite double envoi (double clic ou écouteurs dupliqués) → deux toasts identiques. */
+let adminPasswordSaveInFlight = false;
+
+let adminCreateUserInFlight = false;
+let adminInviteInFlight = false;
+
+/** Clés `userId:kind` pour ignorer les doubles `change` / `focusout` / clic (HMR, tactiles, etc.). */
+const adminRowOpLocks = new Set();
+
+/** @returns {string | null} */
+function takeAdminRowLock(userId, kind) {
+    const key = `${String(userId)}:${kind}`;
+    if (adminRowOpLocks.has(key)) return null;
+    adminRowOpLocks.add(key);
+    return key;
+}
+
+/** @param {string | null} key */
+function releaseAdminRowLock(key) {
+    if (key) adminRowOpLocks.delete(key);
+}
+
+/**
+ * Confirmation in-app (évite window.confirm, supprimé / auto-validé par certains environnements de debug navigateur).
+ */
+function confirmAdminAsync(message) {
+    return new Promise((resolve) => {
+        const dlg = document.getElementById('modal_admin_confirm');
+        const msg = document.getElementById('admin-confirm-message');
+        const btnOk = document.getElementById('admin-confirm-ok');
+        const btnCancel = document.getElementById('admin-confirm-cancel');
+        if (!dlg || !msg || !btnOk || !btnCancel) {
+            resolve(false);
+            return;
+        }
+        msg.textContent = message;
+
+        const cleanupAnd = (v) => {
+            btnOk.removeEventListener('click', onOk);
+            btnCancel.removeEventListener('click', onCancel);
+            dlg.removeEventListener('cancel', onCancel);
+            dlg.removeEventListener('click', onBackdrop);
+            dlg.close();
+            resolve(v);
+        };
+        const onOk = () => cleanupAnd(true);
+        const onCancel = () => cleanupAnd(false);
+        const onBackdrop = (e) => {
+            if (e.target === dlg) onCancel();
+        };
+
+        btnOk.addEventListener('click', onOk);
+        btnCancel.addEventListener('click', onCancel);
+        dlg.addEventListener('cancel', onCancel);
+        dlg.addEventListener('click', onBackdrop);
+        dlg.showModal();
+    });
+}
+
+function showCopyBubbleNear(anchor, message) {
+    const el = document.createElement('div');
+    el.className = 'admin-copy-bubble';
+    el.textContent = message;
+    el.setAttribute('role', 'status');
+    document.body.appendChild(el);
+    const r = anchor.getBoundingClientRect();
+    el.style.left = `${r.left + r.width / 2}px`;
+    el.style.top = `${r.top - 6}px`;
+    window.setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transition = 'opacity 0.2s ease';
+        window.setTimeout(() => el.remove(), 220);
+    }, 2000);
+}
 
 function redirectBaseUrl() {
     try {
@@ -23,93 +104,82 @@ function roleSelectOptionsHtml(selectedRole) {
     ).join('');
 }
 
-function shortenCalendarId(id) {
-    const s = String(id || '').trim();
-    if (!s) return '—';
-    if (s.length <= 22) return s;
-    return `${s.slice(0, 20)}…`;
-}
+const ADMIN_CAL_URL_COPY_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="shrink-0 opacity-80 group-hover:opacity-100" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9 9 0 019 9zM18.75 10.5h-6.75a1.125 1.125 0 00-1.125 1.125v6.75" /></svg>';
 
-function renderPoolTable(rows) {
-    const tb = document.getElementById('admin-pool-tbody');
-    if (!tb) return;
-    tb.replaceChildren();
-    const list = Array.isArray(rows) ? rows : [];
-    if (list.length === 0) {
-        const tr = document.createElement('tr');
-        tr.innerHTML =
-            '<td colspan="4" class="text-[9px] text-slate-500 text-center py-2">Aucune entrée. Ajoutez un ID de calendrier Google ci-dessus.</td>';
-        tb.appendChild(tr);
-        return;
-    }
-    for (const r of list) {
-        const tr = document.createElement('tr');
-        const free = !r.assigned_user_id;
-        const st = free
-            ? '<span class="text-emerald-700 font-medium">Libre</span>'
-            : '<span class="text-amber-800 font-medium">Assigné</span>';
-        tr.innerHTML = `
-            <td class="text-[9px] max-w-[6rem] truncate" title="${escapeAttr(r.label || '')}">${escapeTd(r.label || '—')}</td>
-            <td class="text-[8px] font-mono break-all">${escapeTd(r.google_calendar_id)}</td>
-            <td class="text-[9px]">${escapeTd(String(r.sort_order ?? 0))}</td>
-            <td class="text-[9px]">${st}</td>`;
-        tb.appendChild(tr);
-    }
-}
-
-async function refreshCalendarPoolTable() {
-    try {
-        const res = await planningAdminInvoke('list_calendar_pool', {});
-        renderPoolTable(res.rows || []);
-    } catch (e) {
-        showToast(e instanceof Error ? e.message : String(e), 'error');
-    }
+function sortUsersByName(users) {
+    return [...users].sort((a, b) => {
+        const an = String(a.nom ?? '').trim().toLowerCase();
+        const bn = String(b.nom ?? '').trim().toLowerCase();
+        if (an !== bn) return an.localeCompare(bn, 'fr');
+        const ap = String(a.prenom ?? '').trim().toLowerCase();
+        const bp = String(b.prenom ?? '').trim().toLowerCase();
+        if (ap !== bp) return ap.localeCompare(bp, 'fr');
+        return String(a.email ?? '')
+            .toLowerCase()
+            .localeCompare(String(b.email ?? '').toLowerCase(), 'fr');
+    });
 }
 
 function renderUsersTable(users) {
     const tb = document.getElementById('admin-users-tbody');
     if (!tb) return;
     tb.replaceChildren();
-    const list = Array.isArray(users) ? users : [];
+    const list = sortUsersByName(Array.isArray(users) ? users : []);
     if (list.length === 0) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="6" class="text-[10px] text-slate-500 text-center py-4">Aucun compte renvoyé par le serveur. Actualisez ou vérifiez le déploiement de la fonction « planning-admin ».</td>`;
+        tr.innerHTML = `<td colspan="6" class="text-slate-500 text-center py-4">Aucun compte renvoyé par le serveur. Vérifiez le déploiement de la fonction « planning-admin » ou rechargez la page.</td>`;
         tb.appendChild(tr);
         return;
     }
     for (const u of list) {
         const tr = document.createElement('tr');
         const suspended = u.banned_until && new Date(u.banned_until) > new Date();
+        const label = String(u.personal_calendar_label ?? '').trim();
+        const hasCal = Boolean(String(u.personal_google_calendar_id ?? '').trim());
+        const calIdRaw = String(u.personal_google_calendar_id ?? '').trim();
+        const showCalCopy = u.role !== 'consultation' && calIdRaw;
+        const calLabelHtml = label
+            ? `<span class="text-slate-800 truncate min-w-0">${escapeTd(label)}</span>`
+            : hasCal
+              ? '<span class="text-slate-500">Sans libellé</span>'
+              : '<span class="text-slate-400">Non attribué</span>';
+        const copyBtn = showCalCopy
+            ? `<button type="button" class="btn btn-ghost btn-xs btn-square h-8 w-8 min-h-8 p-0 border-0 text-slate-600 hover:bg-slate-200/90 hover:text-slate-900 shrink-0 group admin-btn-copy-cal-url" data-calendar-id="${escapeAttr(calIdRaw)}" title="Copier URL" aria-label="Copier l’URL du calendrier">${ADMIN_CAL_URL_COPY_SVG}</button>`
+            : '';
         const calCell =
             u.role === 'consultation'
                 ? '<span class="text-slate-400">—</span>'
-                : u.personal_google_calendar_id
-                  ? `<span class="font-mono text-[8px] break-all" title="${escapeAttr(u.personal_google_calendar_id)}">${escapeTd(shortenCalendarId(u.personal_google_calendar_id))}</span>`
-                  : '<span class="text-slate-400 text-[9px]">Non attribué</span>';
-        const poolCell =
-            u.role === 'consultation'
-                ? '<span class="text-slate-400">—</span>'
-                : u.calendar_assignment_error
-                  ? `<span class="text-error font-semibold text-[8px]" title="${escapeAttr(u.calendar_assignment_error)}">${escapeTd(u.calendar_assignment_error)}</span>`
-                  : '<span class="text-emerald-700 text-[9px]">OK</span>';
+                : `<div class="flex items-center justify-center gap-1 min-w-0 max-w-full">${calLabelHtml}${copyBtn}</div>`;
+        const nameCell = escapeTd(
+            formatProfileFullName(u.nom, u.prenom) || String(u.display_name ?? '').trim() || '—'
+        );
+        const emailRaw = String(u.email ?? '').trim();
+        const emailAttr = escapeHtmlAttr(emailRaw);
+        const viewerId = String(adminPlanningViewerId ?? getPlanningSessionUser()?.id ?? '');
+        const emailReadonly = viewerId !== '' && String(u.id) === viewerId;
+        const emailInput = emailReadonly
+            ? `<span class="break-all text-slate-500" title="Votre propre e-mail ne peut pas être modifié ici.">${escapeTd(emailRaw)}</span>`
+            : `<input type="email" class="input input-xs input-bordered w-full min-w-0 admin-user-email" data-user-id="${escapeAttr(u.id)}" data-initial-email="${emailAttr}" value="${emailAttr}" autocomplete="off" />`;
         tr.innerHTML = `
-            <td class="text-[11px] font-normal break-all">${escapeTd(u.email)}</td>
-            <td>
-                <select class="select select-xs select-bordered text-[10px] admin-role-sel w-full max-w-[9.5rem]" data-user-id="${escapeAttr(u.id)}">
+            <td class="align-middle text-slate-900">${nameCell}</td>
+            <td class="break-all align-middle">${emailInput}</td>
+            <td class="align-middle">
+                <select class="select select-xs select-bordered admin-role-sel w-full max-w-[9.5rem]" data-user-id="${escapeAttr(u.id)}">
                     ${roleSelectOptionsHtml(u.role)}
                 </select>
             </td>
-            <td class="text-[10px]">${suspended ? '<span class="text-error font-medium">Suspendu</span>' : '<span class="text-emerald-700 font-medium">Actif</span>'}</td>
-            <td class="text-[10px] align-top">${calCell}</td>
-            <td class="text-[10px] align-top">${poolCell}</td>
-            <td>
-                <div class="flex flex-col sm:flex-row sm:flex-wrap gap-1 sm:gap-1.5">
-                    <button type="button" class="btn btn-xs btn-outline font-normal text-[9px] shrink-0 admin-btn-apply" data-user-id="${escapeAttr(u.id)}">Appliquer rôle</button>
-                    <button type="button" class="btn btn-xs btn-outline border-slate-300 text-slate-700 hover:border-slate-400 hover:bg-slate-100 font-normal text-[9px] shrink-0 admin-btn-pw" data-email="${escapeAttr(u.email)}" data-user-id="${escapeAttr(u.id)}">Mot de passe</button>
-                    ${suspended
-                        ? `<button type="button" class="btn btn-xs btn-success btn-outline font-normal text-[9px] shrink-0 admin-btn-unsuspend" data-user-id="${escapeAttr(u.id)}">Réactiver</button>`
-                        : `<button type="button" class="btn btn-xs btn-outline border-orange-500 text-orange-700 hover:bg-orange-50 hover:border-orange-600 font-normal text-[9px] shrink-0 admin-btn-suspend" data-user-id="${escapeAttr(u.id)}">Suspendre</button>`}
-                    <button type="button" class="btn btn-xs btn-error btn-outline font-normal text-[9px] shrink-0 admin-btn-delete" data-user-id="${escapeAttr(u.id)}">Supprimer</button>
+            <td class="align-middle">
+                <select class="select select-xs select-bordered admin-status-sel w-full max-w-[7.5rem] py-0" data-user-id="${escapeAttr(u.id)}" aria-label="Statut du compte">
+                    <option value="active" ${!suspended ? 'selected' : ''}>Actif</option>
+                    <option value="suspended" ${suspended ? 'selected' : ''}>Suspendu</option>
+                </select>
+            </td>
+            <td class="align-middle">${calCell}</td>
+            <td class="align-middle">
+                <div class="flex flex-col sm:flex-row sm:flex-wrap gap-1 sm:gap-1.5 justify-center">
+                    <button type="button" class="btn btn-xs btn-outline border-slate-300 text-slate-700 hover:border-slate-400 hover:bg-slate-100 shrink-0 admin-btn-pw" data-email="${escapeAttr(u.email)}" data-user-id="${escapeAttr(u.id)}">Mot de passe</button>
+                    <button type="button" class="btn btn-xs btn-error btn-outline shrink-0 admin-btn-delete" data-user-id="${escapeAttr(u.id)}">Supprimer</button>
                 </div>
             </td>`;
         tb.appendChild(tr);
@@ -124,6 +194,13 @@ function escapeTd(s) {
 
 function escapeAttr(s) {
     return String(s ?? '').replace(/"/g, '&quot;');
+}
+
+function escapeHtmlAttr(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;');
 }
 
 async function refreshUserList() {
@@ -152,11 +229,13 @@ function setAdminCreatePassVisible(visible) {
 
 function resetCreateInviteForm() {
     const emailEl = document.getElementById('admin-invite-email');
-    const nameEl = document.getElementById('admin-invite-name');
+    const nomEl = document.getElementById('admin-invite-nom');
+    const prenomEl = document.getElementById('admin-invite-prenom');
     const pwEl = document.getElementById('admin-create-password');
     const roleSel = document.getElementById('admin-invite-role');
     if (emailEl) emailEl.value = '';
-    if (nameEl) nameEl.value = '';
+    if (nomEl) nomEl.value = '';
+    if (prenomEl) prenomEl.value = '';
     if (pwEl) pwEl.value = '';
     setAdminCreatePassVisible(false);
     if (roleSel) roleSel.value = 'eleve';
@@ -193,6 +272,8 @@ let adminUsersHandlersBound = false;
 
 export function resetAdminUsersUiBindings() {
     adminUsersHandlersBound = false;
+    adminPlanningViewerId = null;
+    adminRowOpLocks.clear();
 }
 
 export function initAdminUsersUi(currentUser) {
@@ -200,8 +281,14 @@ export function initAdminUsersUi(currentUser) {
     document.getElementById('menu-item-users-admin-wrap')?.classList.toggle('hidden', !show);
     if (!show || adminUsersHandlersBound) return;
     adminUsersHandlersBound = true;
+    adminPlanningViewerId = currentUser?.id != null ? String(currentUser.id) : null;
 
     fillPasswordPolicyLists();
+
+    const usersAdminDlg = document.getElementById('modal_users_admin');
+    usersAdminDlg?.addEventListener('click', (e) => {
+        if (e.target === usersAdminDlg) usersAdminDlg.close();
+    });
 
     document.getElementById('admin-pw-show-plain')?.addEventListener('change', (e) => {
         const el = e.target;
@@ -224,160 +311,263 @@ export function initAdminUsersUi(currentUser) {
         }
         /* Après fermeture du menu DaisyUI, ouvrir au frame suivant évite un conflit tactiles / focus. */
         requestAnimationFrame(() => {
-            dlg.showModal();
+            dlg.show();
             void refreshUserList();
-            void refreshCalendarPoolTable();
         });
     });
 
-    document.getElementById('admin-users-refresh')?.addEventListener('click', () => void refreshUserList());
-
-    document.getElementById('admin-pool-refresh')?.addEventListener('click', () => void refreshCalendarPoolTable());
-
-    document.getElementById('admin-pool-add-btn')?.addEventListener('click', async () => {
-        const google_calendar_id = document.getElementById('admin-pool-google-id')?.value?.trim() || '';
-        const label = document.getElementById('admin-pool-label')?.value?.trim() || '';
-        const sortRaw = document.getElementById('admin-pool-sort')?.value;
-        const sort_order = sortRaw !== undefined && sortRaw !== '' ? Number(sortRaw) : 0;
-        if (!google_calendar_id) {
-            showToast('Indiquez l’ID du calendrier Google.', 'error');
-            return;
-        }
-        try {
-            await planningAdminInvoke('add_calendar_pool', {
-                google_calendar_id,
-                label: label || undefined,
-                sort_order: Number.isFinite(sort_order) ? sort_order : 0
-            });
-            showToast('Calendrier ajouté au pool.');
-            const gid = document.getElementById('admin-pool-google-id');
-            const lb = document.getElementById('admin-pool-label');
-            if (gid) gid.value = '';
-            if (lb) lb.value = '';
-            await refreshCalendarPoolTable();
-            await refreshUserList();
-        } catch (err) {
-            showToast(err instanceof Error ? err.message : String(err), 'error');
-        }
-    });
-
     document.getElementById('admin-create-btn')?.addEventListener('click', async () => {
-        const email = document.getElementById('admin-invite-email')?.value?.trim();
-        const display_name = document.getElementById('admin-invite-name')?.value?.trim() || '';
-        const password = document.getElementById('admin-create-password')?.value || '';
-        const role = document.getElementById('admin-invite-role')?.value || 'eleve';
-        if (!email) {
-            showToast('Indiquez un e-mail.', 'error');
-            return;
-        }
-        if (!display_name) {
-            showToast('Le nom affiché est obligatoire.', 'error');
-            return;
-        }
-        if (!isPlanningRole(role)) {
-            showToast('Rôle invalide.', 'error');
-            return;
-        }
-        if (password.length < PASSWORD_MIN_LENGTH) {
-            showToast(`Mot de passe : au moins ${PASSWORD_MIN_LENGTH} caractères.`, 'error');
-            return;
-        }
+        if (adminCreateUserInFlight) return;
+        adminCreateUserInFlight = true;
+        const btn = document.getElementById('admin-create-btn');
+        if (btn instanceof HTMLButtonElement) btn.disabled = true;
         try {
-            await planningAdminInvoke('create_user', {
-                email,
-                display_name,
-                role,
-                password
-            });
-            showToast('Compte créé.');
-            resetCreateInviteForm();
-            await refreshUserList();
-        } catch (err) {
-            showToast(err instanceof Error ? err.message : String(err), 'error');
+            const nomEl = document.getElementById('admin-invite-nom');
+            const prenomEl = document.getElementById('admin-invite-prenom');
+            const emailEl = document.getElementById('admin-invite-email');
+            if (nomEl && !nomEl.checkValidity()) {
+                nomEl.reportValidity();
+                return;
+            }
+            if (prenomEl && !prenomEl.checkValidity()) {
+                prenomEl.reportValidity();
+                return;
+            }
+            if (emailEl && !emailEl.checkValidity()) {
+                emailEl.reportValidity();
+                return;
+            }
+            const email = emailEl?.value?.trim();
+            const nom = nomEl?.value?.trim() || '';
+            const prenom = prenomEl?.value?.trim() || '';
+            const password = document.getElementById('admin-create-password')?.value || '';
+            const role = document.getElementById('admin-invite-role')?.value || 'eleve';
+            if (!email) {
+                showToast('Indiquez un e-mail.', 'error');
+                return;
+            }
+            if (!nom || !prenom) {
+                showToast('Le nom et le prénom sont obligatoires.', 'error');
+                return;
+            }
+            if (!isPlanningRole(role)) {
+                showToast('Rôle invalide.', 'error');
+                return;
+            }
+            if (password.length < PASSWORD_MIN_LENGTH) {
+                showToast(`Mot de passe : au moins ${PASSWORD_MIN_LENGTH} caractères.`, 'error');
+                return;
+            }
+            try {
+                await planningAdminInvoke('create_user', {
+                    email,
+                    nom,
+                    prenom,
+                    role,
+                    password
+                });
+                showToast('Compte créé.');
+                resetCreateInviteForm();
+                await refreshUserList();
+            } catch (err) {
+                showToast(err instanceof Error ? err.message : String(err), 'error');
+            }
+        } finally {
+            adminCreateUserInFlight = false;
+            if (btn instanceof HTMLButtonElement) btn.disabled = false;
         }
     });
 
     document.getElementById('admin-invite-btn')?.addEventListener('click', async () => {
-        const email = document.getElementById('admin-invite-email')?.value?.trim();
-        const display_name = document.getElementById('admin-invite-name')?.value?.trim() || '';
-        const role = document.getElementById('admin-invite-role')?.value || 'eleve';
-        if (!email) {
-            showToast('Indiquez un e-mail.', 'error');
-            return;
-        }
-        if (!display_name) {
-            showToast('Le nom affiché est obligatoire.', 'error');
-            return;
-        }
-        if (!isPlanningRole(role)) {
-            showToast('Rôle invalide.', 'error');
-            return;
-        }
+        if (adminInviteInFlight) return;
+        adminInviteInFlight = true;
+        const btn = document.getElementById('admin-invite-btn');
+        if (btn instanceof HTMLButtonElement) btn.disabled = true;
         try {
-            await planningAdminInvoke('invite', {
-                email,
-                display_name,
-                role,
-                redirect_to: redirectBaseUrl()
-            });
-            showToast('Invitation envoyée.');
-            resetCreateInviteForm();
-            await refreshUserList();
-        } catch (err) {
-            showToast(err instanceof Error ? err.message : String(err), 'error');
+            const nomEl = document.getElementById('admin-invite-nom');
+            const prenomEl = document.getElementById('admin-invite-prenom');
+            const emailEl = document.getElementById('admin-invite-email');
+            if (nomEl && !nomEl.checkValidity()) {
+                nomEl.reportValidity();
+                return;
+            }
+            if (prenomEl && !prenomEl.checkValidity()) {
+                prenomEl.reportValidity();
+                return;
+            }
+            if (emailEl && !emailEl.checkValidity()) {
+                emailEl.reportValidity();
+                return;
+            }
+            const email = emailEl?.value?.trim();
+            const nom = nomEl?.value?.trim() || '';
+            const prenom = prenomEl?.value?.trim() || '';
+            const role = document.getElementById('admin-invite-role')?.value || 'eleve';
+            if (!email) {
+                showToast('Indiquez un e-mail.', 'error');
+                return;
+            }
+            if (!nom || !prenom) {
+                showToast('Le nom et le prénom sont obligatoires.', 'error');
+                return;
+            }
+            if (!isPlanningRole(role)) {
+                showToast('Rôle invalide.', 'error');
+                return;
+            }
+            try {
+                await planningAdminInvoke('invite', {
+                    email,
+                    nom,
+                    prenom,
+                    role,
+                    redirect_to: redirectBaseUrl()
+                });
+                showToast('Invitation envoyée.');
+                resetCreateInviteForm();
+                await refreshUserList();
+            } catch (err) {
+                showToast(err instanceof Error ? err.message : String(err), 'error');
+            }
+        } finally {
+            adminInviteInFlight = false;
+            if (btn instanceof HTMLButtonElement) btn.disabled = false;
+        }
+    });
+
+    document.getElementById('admin-users-tbody')?.addEventListener('focusout', async (ev) => {
+        const t = ev.target;
+        if (!(t instanceof HTMLInputElement) || !t.classList.contains('admin-user-email')) return;
+        const uid = t.getAttribute('data-user-id');
+        const initial = String(t.getAttribute('data-initial-email') ?? '')
+            .trim()
+            .toLowerCase();
+        const next = t.value.trim().toLowerCase();
+        if (!uid || next === initial) return;
+        if (!next.includes('@')) {
+            showToast('E-mail invalide.', 'error');
+            t.value = String(t.getAttribute('data-initial-email') ?? '');
+            return;
+        }
+        const lockKey = takeAdminRowLock(uid, 'email');
+        if (!lockKey) return;
+        try {
+            try {
+                await planningAdminInvoke('update_user_email', { user_id: uid, email: next });
+                showToast('E-mail enregistré.');
+                await refreshUserList();
+            } catch (err) {
+                showToast(err instanceof Error ? err.message : String(err), 'error');
+                await refreshUserList();
+            }
+        } finally {
+            releaseAdminRowLock(lockKey);
+        }
+    });
+
+    document.getElementById('admin-users-tbody')?.addEventListener('change', async (ev) => {
+        const t = ev.target;
+        if (!(t instanceof HTMLSelectElement)) return;
+        const uid = t.getAttribute('data-user-id');
+        if (!uid) return;
+
+        if (t.classList.contains('admin-role-sel')) {
+            const role = t.value;
+            if (!role || !isPlanningRole(role)) return;
+            const lockKey = takeAdminRowLock(uid, 'role');
+            if (!lockKey) return;
+            try {
+                try {
+                    await planningAdminInvoke('update_role', { user_id: uid, role: normalizePlanningRole(role) });
+                    showToast('Rôle enregistré.');
+                    await refreshUserList();
+                } catch (err) {
+                    showToast(err instanceof Error ? err.message : String(err), 'error');
+                    await refreshUserList();
+                }
+            } finally {
+                releaseAdminRowLock(lockKey);
+            }
+            return;
+        }
+
+        if (t.classList.contains('admin-status-sel')) {
+            const v = t.value;
+            const lockKey = takeAdminRowLock(uid, 'status');
+            if (!lockKey) return;
+            try {
+                if (v === 'suspended') {
+                    if (!confirm('Suspendre ce compte ?')) {
+                        t.value = 'active';
+                        return;
+                    }
+                    try {
+                        await planningAdminInvoke('suspend', { user_id: uid });
+                        showToast('Statut enregistré : compte suspendu.');
+                        await refreshUserList();
+                    } catch (err) {
+                        showToast(err instanceof Error ? err.message : String(err), 'error');
+                        await refreshUserList();
+                    }
+                } else {
+                    try {
+                        const res = await planningAdminInvoke('unsuspend', { user_id: uid });
+                        if (res.calendar_warning) {
+                            showToast(res.calendar_warning, 'info');
+                        } else {
+                            showToast('Statut enregistré : compte actif.');
+                        }
+                        await refreshUserList();
+                    } catch (err) {
+                        showToast(err instanceof Error ? err.message : String(err), 'error');
+                        await refreshUserList();
+                    }
+                }
+            } finally {
+                releaseAdminRowLock(lockKey);
+            }
         }
     });
 
     document.getElementById('admin-users-tbody')?.addEventListener('click', async (ev) => {
         const t = ev.target;
         if (!(t instanceof HTMLElement)) return;
+
+        const copyBtn = t.closest('.admin-btn-copy-cal-url');
+        if (copyBtn instanceof HTMLButtonElement) {
+            const cid = copyBtn.getAttribute('data-calendar-id')?.trim();
+            const url = cid ? googleCalendarEmbedUrl(cid) : '';
+            if (!url) {
+                showToast('Aucune URL d’agenda à copier.', 'error');
+                return;
+            }
+            try {
+                await navigator.clipboard.writeText(url);
+                showCopyBubbleNear(copyBtn, 'URL du calendrier copiée');
+            } catch {
+                showToast('Copie impossible (navigateur ou permissions).', 'error');
+            }
+            return;
+        }
+
         const uid = t.getAttribute('data-user-id');
         if (!uid) return;
 
-        if (t.classList.contains('admin-btn-apply')) {
-            const row = t.closest('tr');
-            const sel = row?.querySelector('.admin-role-sel');
-            const role = sel?.value;
-            if (!role || !isPlanningRole(role)) return;
-            try {
-                await planningAdminInvoke('update_role', { user_id: uid, role: normalizePlanningRole(role) });
-                showToast('Rôle mis à jour.');
-                await refreshUserList();
-            } catch (err) {
-                showToast(err instanceof Error ? err.message : String(err), 'error');
-            }
-        }
-        if (t.classList.contains('admin-btn-suspend')) {
-            if (!confirm('Suspendre ce compte ?')) return;
-            try {
-                await planningAdminInvoke('suspend', { user_id: uid });
-                showToast('Compte suspendu.');
-                await refreshUserList();
-            } catch (err) {
-                showToast(err instanceof Error ? err.message : String(err), 'error');
-            }
-        }
-        if (t.classList.contains('admin-btn-unsuspend')) {
-            try {
-                const res = await planningAdminInvoke('unsuspend', { user_id: uid });
-                if (res.calendar_warning) {
-                    showToast(res.calendar_warning, 'info');
-                } else {
-                    showToast('Compte réactivé.');
-                }
-                await refreshUserList();
-            } catch (err) {
-                showToast(err instanceof Error ? err.message : String(err), 'error');
-            }
-        }
         if (t.classList.contains('admin-btn-delete')) {
-            if (!confirm('Supprimer définitivement ce compte ?')) return;
+            const ok = await confirmAdminAsync('Supprimer définitivement ce compte ?');
+            if (!ok) return;
+            const lockKey = takeAdminRowLock(uid, 'delete');
+            if (!lockKey) return;
             try {
-                await planningAdminInvoke('delete_user', { user_id: uid });
-                showToast('Compte supprimé.');
-                await refreshUserList();
-            } catch (err) {
-                showToast(err instanceof Error ? err.message : String(err), 'error');
+                try {
+                    await planningAdminInvoke('delete_user', { user_id: uid });
+                    showToast('Compte supprimé.');
+                    await refreshUserList();
+                } catch (err) {
+                    showToast(err instanceof Error ? err.message : String(err), 'error');
+                }
+            } finally {
+                releaseAdminRowLock(lockKey);
             }
         }
         if (t.classList.contains('admin-btn-pw')) {
@@ -394,23 +584,33 @@ export function initAdminUsersUi(currentUser) {
     });
 
     document.getElementById('admin-pw-save')?.addEventListener('click', async () => {
-        const user_id = document.getElementById('admin-pw-user-id')?.value;
-        const a = document.getElementById('admin-pw-new')?.value || '';
-        const b = document.getElementById('admin-pw-new2')?.value || '';
-        if (a !== b) {
-            showToast('Les deux mots de passe diffèrent.', 'error');
-            return;
-        }
-        if (a.length < PASSWORD_MIN_LENGTH) {
-            showToast(`Au moins ${PASSWORD_MIN_LENGTH} caractères.`, 'error');
-            return;
-        }
+        if (adminPasswordSaveInFlight) return;
+        adminPasswordSaveInFlight = true;
+        const saveBtn = document.getElementById('admin-pw-save');
+        if (saveBtn instanceof HTMLButtonElement) saveBtn.disabled = true;
+
         try {
-            await planningAdminInvoke('set_password', { user_id, password: a });
-            showToast('Mot de passe défini.');
-            document.getElementById('modal_admin_password')?.close();
-        } catch (err) {
-            showToast(err instanceof Error ? err.message : String(err), 'error');
+            const user_id = document.getElementById('admin-pw-user-id')?.value;
+            const a = document.getElementById('admin-pw-new')?.value || '';
+            const b = document.getElementById('admin-pw-new2')?.value || '';
+            if (a !== b) {
+                showToast('Les deux mots de passe diffèrent.', 'error');
+                return;
+            }
+            if (a.length < PASSWORD_MIN_LENGTH) {
+                showToast(`Au moins ${PASSWORD_MIN_LENGTH} caractères.`, 'error');
+                return;
+            }
+            try {
+                await planningAdminInvoke('set_password', { user_id, password: a });
+                showToast('Mot de passe défini.');
+                document.getElementById('modal_admin_password')?.close();
+            } catch (err) {
+                showToast(err instanceof Error ? err.message : String(err), 'error');
+            }
+        } finally {
+            adminPasswordSaveInFlight = false;
+            if (saveBtn instanceof HTMLButtonElement) saveBtn.disabled = false;
         }
     });
 }

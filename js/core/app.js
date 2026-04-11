@@ -9,6 +9,8 @@ import {
     openModal,
     saveReservation,
     deleteReservation,
+    quickCreateFromSelection,
+    quickCreateFromDateClick,
     setRecurringOptionsVisible,
     handleEventResize,
     canCurrentUserEditEvent,
@@ -47,12 +49,17 @@ import {
 } from './auth-logic.js';
 import { initMessagesUi, resetMessagesUiBindings, tryShowBroadcastPopup } from './messages-ui.js';
 import { destroyPlanningQuillMount } from '../utils/planning-quill.js';
-import { initProfileLabelsUi, resetProfileLabelsUiBindings } from './profile-labels-ui.js';
 import { applyLoginBanner } from './login-banner.js';
 import { initAdminUsersUi, resetAdminUsersUiBindings } from './admin-users-ui.js';
+import { initAdminCalendarPoolUi, resetAdminCalendarPoolBindings } from './admin-calendar-pool-ui.js';
 import { initAnnouncementsUi, resetAnnouncementsUiBindings } from './announcements-ui.js';
 import { showToast } from '../utils/toast.js';
-import { setPlanningSessionUser } from './session-user.js';
+import { setPlanningSessionUser, getPlanningSessionUser } from './session-user.js';
+import { initProfileUi, resetProfileUiBindings, refreshHeaderWeekStrip } from './profile-ui.js';
+import { initSemainesTypesUi, resetSemainesTypesUiBindings } from './semaines-types-ui.js';
+import { initConfigUi, resetConfigUiBindings } from './config-ui.js';
+import { fetchWeekCycleAnchor } from './week-cycle.js';
+import { fetchOrganSchoolSettings, invalidateOrganSchoolSettingsCache } from './organ-settings.js';
 import { CACHE_NAME } from '../config/cache-name.js';
 import { normalizePlanningRole } from './planning-roles.js';
 
@@ -75,7 +82,11 @@ function performLogout() {
     resetMessagesUiBindings();
     resetAnnouncementsUiBindings();
     resetAdminUsersUiBindings();
-    resetProfileLabelsUiBindings();
+    resetAdminCalendarPoolBindings();
+    resetProfileUiBindings();
+    resetSemainesTypesUiBindings();
+    resetConfigUiBindings();
+    invalidateOrganSchoolSettingsCache();
     currentEvent = null;
     if (calendar) {
         unbindTimeGridColumnSync?.();
@@ -89,13 +100,17 @@ function performLogout() {
         'modal_forgot',
         'modal_password',
         'modal_reservation',
-        'modal_profile_labels',
         'modal_rules',
         'modal_broadcast',
         'modal_users_admin',
+        'modal_calendar_pool',
         'modal_admin_password',
+        'modal_admin_confirm',
         'modal_announcements',
-        'modal_help'
+        'modal_help',
+        'modal_profile',
+        'modal_semaines_types',
+        'modal_config'
     ].forEach((id) => document.getElementById(id)?.close());
     const loginDlg = document.getElementById('modal_login');
     void applyLoginBanner();
@@ -116,7 +131,9 @@ function syncHelpModalContent(user) {
 
     document.getElementById('help-block-staff')?.classList.toggle('hidden', !isStaff);
     document.getElementById('help-block-menu-privileged')?.classList.toggle('hidden', !isStaff);
+    document.getElementById('help-block-week-cycle')?.classList.toggle('hidden', !isStaff);
 
+    document.getElementById('help-li-week-cycle')?.classList.toggle('hidden', !isStaff);
     document.getElementById('help-li-announcements')?.classList.toggle('hidden', !isStaff);
     document.getElementById('help-li-admin-users')?.classList.toggle('hidden', !isAdmin);
 
@@ -127,7 +144,8 @@ function refreshHeaderUser(user) {
     const nameEl = document.getElementById('user-display-name');
     const roleEl = document.getElementById('user-display-role');
     const menuWrap = document.getElementById('user-menu-wrap');
-    const helpWrap = document.getElementById('header-help-wrap');
+    const shell = document.getElementById('app-shell');
+    const stripWrap = document.getElementById('header-week-strip-wrap');
     if (!user?.email) {
         if (nameEl) nameEl.textContent = 'Invité';
         if (roleEl) {
@@ -135,7 +153,8 @@ function refreshHeaderUser(user) {
             roleEl.classList.add('hidden');
         }
         menuWrap?.classList.add('hidden');
-        helpWrap?.classList.add('hidden');
+        stripWrap?.classList.add('hidden');
+        shell?.classList.remove('planning-shell--weekstrip');
         return;
     }
     if (nameEl) nameEl.textContent = user.name;
@@ -144,7 +163,8 @@ function refreshHeaderUser(user) {
         roleEl.classList.remove('hidden');
     }
     menuWrap?.classList.remove('hidden');
-    helpWrap?.classList.remove('hidden');
+    shell?.classList.add('planning-shell--weekstrip');
+    void refreshHeaderWeekStrip(user);
 }
 
 function initCalendarAndRevealUi() {
@@ -158,8 +178,7 @@ function initCalendarAndRevealUi() {
         /**
          * Souris : clic + glisser sur la grille pour choisir [début, fin).
          * Doigt : appui long (~250 ms) puis glisser (même plage).
-         * Ouvre la modale de réservation avec ces horaires (pas d’enregistrement immédiat).
-         * Le clic simple sans glisser reste géré par onDateClick (durée proposée ~1 h / libre).
+         * Enregistrement rapide sur la plage choisie (sans modale en vue semaine/jour).
          */
         onSelect: (info) => {
             suppressDateClickUntil = Date.now() + 900;
@@ -169,24 +188,26 @@ function initCalendarAndRevealUi() {
                 calendar.unselect();
                 return;
             }
-            openModal(info.start, info.end, null, currentUser);
-            calendar.unselect();
+            void quickCreateFromSelection(calendar, info, currentUser).catch((err) =>
+                console.error(err)
+            );
         },
-        /** Clic simple (sans sélection par glisser) : modale avec créneau par défaut. */
+        /** Clic simple : création rapide 1 h / 30 min (sans modale), sauf vue liste → modale. */
         onDateClick: (info) => {
             queueMicrotask(() => {
                 if (Date.now() < suppressDateClickUntil) return;
                 currentEvent = null;
-                let start = info.date;
-                const isMonthLike =
-                    info.view.type === 'dayGridMonth' || info.view.type.startsWith('multiMonth');
-                if (isMonthLike) {
-                    start = new Date(info.date);
-                    if (info.allDay !== false) {
-                        start.setHours(8, 0, 0, 0);
-                    }
+                if (!currentUser?.email) {
+                    showToast('Connectez-vous pour réserver.', 'error');
+                    return;
                 }
-                openModal(start, null, null, currentUser, calendar);
+                void quickCreateFromDateClick(
+                    calendar,
+                    info.date,
+                    currentUser,
+                    info.view.type,
+                    info.allDay
+                ).catch((err) => console.error(err));
             });
         },
         onEventClick: (info) => {
@@ -268,7 +289,12 @@ function initCalendarAndRevealUi() {
     // FullCalendar mesure le conteneur au render : il doit être visible (plus auth-pending).
     document.body.classList.remove('auth-pending');
 
-    const mount = () => {
+    const mount = async () => {
+        if (isBackendAuthConfigured()) {
+            await fetchOrganSchoolSettings();
+            populateTimeSelects('event-start', 'event-end');
+            populateTimeSelects('event-recur-start', 'event-recur-end');
+        }
         calendar = new FullCalendar.Calendar(calendarEl, getCalendarConfig(handlers, currentUser));
         calendar.render();
         const toolbarCtl = initCalendarToolbar(calendar);
@@ -277,6 +303,15 @@ function initCalendarAndRevealUi() {
             toolbarCtl?.syncViewTriggerLabel();
         };
         handlers.onDatesSet();
+        void fetchWeekCycleAnchor().then(() => toolbarCtl?.refreshTitle());
+        document.addEventListener('planning-week-cycle-updated', () => toolbarCtl?.refreshTitle());
+        document.addEventListener('planning-template-applied', () => {
+            try {
+                calendar?.refetchEvents();
+            } catch {
+                /* */
+            }
+        });
         bindResponsiveCalendarToolbar(calendar);
 
         initSwipe(calendarEl, calendar);
@@ -301,8 +336,11 @@ function initCalendarAndRevealUi() {
         unbindTimeGridColumnSync = bindTimeGridColumnSync(calendarEl);
 
         initMessagesUi(currentUser);
-        initProfileLabelsUi(currentUser);
+        initProfileUi(currentUser);
+        initSemainesTypesUi(currentUser);
+        initConfigUi(currentUser);
         initAdminUsersUi(currentUser);
+        initAdminCalendarPoolUi(currentUser);
         initAnnouncementsUi(currentUser);
         window.setTimeout(
             () => void tryShowBroadcastPopup(currentUser).catch((e) => console.warn(e)),
@@ -310,7 +348,7 @@ function initCalendarAndRevealUi() {
         );
     };
 
-    requestAnimationFrame(mount);
+    requestAnimationFrame(() => void mount());
 }
 
 /** Fermer une modale en cliquant sur le fond (hors .modal-box). L’événement a pour cible l’élément <dialog>. */
@@ -333,8 +371,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadUIComponents();
 
     const dlgHelp = document.getElementById('modal_help');
-    document.getElementById('btn-help')?.addEventListener('click', () => {
-        syncHelpModalContent(currentUser);
+    document.getElementById('menu-item-help')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('btn-user-menu')?.blur();
+        syncHelpModalContent(getPlanningSessionUser());
         dlgHelp?.showModal();
     });
     document.getElementById('help-btn-close')?.addEventListener('click', () => dlgHelp?.close());
@@ -594,4 +634,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         dlg?.showModal();
         requestAnimationFrame(() => document.getElementById('login-email')?.focus());
     }
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible') return;
+        const u = getPlanningSessionUser();
+        if (u?.email) void refreshHeaderWeekStrip(u);
+    });
 });

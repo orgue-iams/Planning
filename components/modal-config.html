@@ -1,0 +1,45 @@
+<dialog id="modal_config" class="modal">
+    <div class="modal-box p-5 w-[96%] max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 shadow-2xl">
+        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest">Configuration</h3>
+        <p class="text-[10px] text-slate-600 mb-3 leading-snug">
+            <span id="config-hint-admin" class="hidden">Dates d’année scolaire et plage horaire de la chapelle (grille du planning).</span>
+            <span id="config-hint-readonly" class="hidden">Lecture seule : seul un <strong>administrateur</strong> peut modifier ces valeurs.</span>
+        </p>
+
+        <div class="rounded-xl border border-slate-200 bg-slate-50/90 p-3 mb-3 space-y-2">
+            <p class="text-[10px] font-bold text-slate-700">Année scolaire</p>
+            <div class="flex flex-wrap gap-2 items-end">
+                <div>
+                    <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="config-school-start">Début</label>
+                    <input type="date" id="config-school-start" class="input input-sm h-9 text-sm font-mono bg-white border border-slate-200 rounded-lg" />
+                </div>
+                <div>
+                    <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="config-school-end">Fin</label>
+                    <input type="date" id="config-school-end" class="input input-sm h-9 text-sm font-mono bg-white border border-slate-200 rounded-lg" />
+                </div>
+            </div>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 bg-slate-50/90 p-3 mb-4 space-y-2">
+            <p class="text-[10px] font-bold text-slate-700">Plage horaire chapelle (grille)</p>
+            <div class="flex flex-wrap gap-2 items-end">
+                <div>
+                    <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="config-chapel-min">Première heure</label>
+                    <input type="time" id="config-chapel-min" step="1800" class="input input-sm h-9 text-sm font-mono bg-white border border-slate-200 rounded-lg" />
+                </div>
+                <div>
+                    <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="config-chapel-max">Dernière heure affichée</label>
+                    <input type="time" id="config-chapel-max" step="1800" class="input input-sm h-9 text-sm font-mono bg-white border border-slate-200 rounded-lg" />
+                </div>
+            </div>
+        </div>
+
+        <div id="config-admin-actions" class="hidden mb-3">
+            <button type="button" id="config-save-btn" class="btn btn-primary btn-sm font-black text-[11px]">Enregistrer</button>
+        </div>
+
+        <div class="modal-action mt-0 pt-2 border-t border-slate-100">
+            <button type="button" class="btn btn-ghost btn-sm font-normal text-[11px]" onclick="document.getElementById('modal_config').close()">Fermer</button>
+        </div>
+    </div>
+</dialog>
