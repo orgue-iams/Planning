@@ -38,22 +38,26 @@ Démarrage option 2 — Supabase + Google Agenda
      js/config/planning.config.js (supabaseUrl, supabaseAnonKey, calendarBridgeUrl).
 
 2ter) Créer plusieurs calendriers secondaires (pool, ex. 60)
-   - L’assistant ne peut pas se connecter à votre Google : utilisez le script Apps Script du dépôt
-     `scripts/google-create-planning-calendars.gs` (voir l’en-tête du fichier : script.google.com,
-     exécuter connecté en orgue.iams@…). Il crée les agendas et une feuille avec les IDs à saisir
-     dans « Gestion des comptes » → pool, ou via INSERT SQL sur `google_calendar_pool`.
-   - Google limite souvent la création à ~25–30 calendriers d’affilée : le script utilise par défaut
-     une plage (ex. 1–26) ; reprendre plus tard avec START_NUM / END_NUM (ex. 27–60) après une pause.
-   - Pour insérer les 26 calendriers dans le pool Supabase : exécuter
-     `supabase/manual/seed-planning-iams-pool-26.sql` (IDs réels Planning IAMS 01–26 ; sur un autre
-     compte Google, régénérer le fichier via Apps Script puis remplacer les valeurs).
+   - L’agent ne peut pas créer des agendas sur votre compte Google : utilisez le script Apps Script
+     `scripts/google-create-planning-calendars.gs` (script.google.com, connecté en orgue.iams@… ou compte
+     propriétaire des calendriers).
+   - Activer le service avancé « Google Calendar API » dans l’éditeur Apps Script (icône puzzle) pour le
+     partage public en lecture (ACL) sur tous les « Planning IAMS NN ».
+   - Lot supplémentaire 28–47 (20 calendriers) + partage public sur tous les IAMS + SQL pour Supabase :
+     exécuter une fois la fonction `runOnce_CreatePlanning28to47_PublicAndPoolSql()`. Le journal et un
+     fichier `.sql` sur Drive contiennent l’INSERT pour `google_calendar_pool` ; l’agent peut ensuite
+     l’appliquer avec `npx supabase db query --linked -f …` si le fichier est dans le dépôt.
+   - Si les calendriers 28–47 existent déjà mais sans visibilité publique : `runOnce_OnlyMakeAllPlanningIamsPublicReader()`.
+   - Google limite souvent ~25–30 créations d’affilée : en cas d’erreur, relancer le même jour plus tard
+     ou diviser la plage (modifier START_NUM / END_NUM dans le script pour d’autres lots).
+   - Pour les 26 premiers dans Supabase : `supabase/manual/seed-planning-iams-pool-26.sql` (ou export Apps Script).
    - Miroir agenda perso (Edge calendar-bridge) : chaque calendrier du pool doit être partagé avec le
      même compte Google que pour GOOGLE_CALENDAR_ID (e-mail du compte de service ou compte OAuth),
      droit « Modifier les événements ». Sinon l’API renvoie souvent « Not Found » sur le calendrier secondaire.
      En base, stocker l’ID `xxx@group.calendar.google.com` (pas l’URL embed entière) — l’admin et le bridge
      normalisent désormais les URLs `?src=…`.
-   - Contrôle des lignes du pool (format ID, doublons de tri) : exécuter une fois
-     `supabase/manual/verify-google-calendar-pool.sql` dans le SQL Editor.
+   - Contrôle du pool : `npx supabase db query --linked -f supabase/manual/verify-google-calendar-pool.sql -o table --agent=no`
+     (ou SQL Editor si la CLI n’est pas liée).
 
 3) Edge Functions
    - Installer la CLI : https://supabase.com/docs/guides/cli

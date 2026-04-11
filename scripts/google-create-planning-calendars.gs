@@ -2,28 +2,31 @@
  * Création en masse de calendriers secondaires pour le pool Planning IAMS.
  *
  * Limite pratique Google : la création peut s’arrêter / être bloquée après ~25–30 calendriers
- * en une seule exécution. Utilisez plusieurs passes en changeant START_NUM / END_NUM (ex. 1–26,
- * puis plus tard 27–60). Attendre quelques heures entre les passes si besoin.
+ * en une seule exécution. Utilisez plusieurs passes en changeant START_NUM / END_NUM.
+ *
+ * --- Partage public (lecture) ---
+ * Pour « Rendre accessible au public » (voir tous les détails des événements, lien d’intégration),
+ * ce script utilise l’API Calendar avancée (ACL). Dans script.google.com : Services (puzzle) →
+ * « Google Calendar API » → Activer. Sans cela, les fonctions insertPublicReaderAcl_ échouent.
  *
  * Utilisation :
- * 1. https://script.google.com (compte Google propriétaire des calendriers).
- * 2. Nouveau projet → coller ce fichier → enregistrer.
- * 3. Ajuster START_NUM, END_NUM (et optionnellement SLEEP_MS_BETWEEN) puis Exécuter
- *    createPlanningSecondaryCalendars → autoriser l’accès Agenda.
- * 4. Journaux + feuille créée : colonne google_calendar_id → pool admin Planning ou SQL.
+ * 1. https://script.google.com (compte Google propriétaire des calendriers, ex. orgue.iams@…).
+ * 2. Nouveau projet → coller ce fichier → activer le service avancé Google Calendar API.
+ * 3. Exécuter UNE fois : runOnce_CreatePlanning28to47_PublicAndPoolSql()
+ *    (crée Planning IAMS 28–47 s’ils n’existent pas, rend TOUS les « Planning IAMS NN » publics
+ *    en lecture, journalise le SQL + fichier Drive pour Supabase).
+ * 4. Copier le SQL depuis les journaux ou le fichier Drive → coller dans le dépôt ou exécuter via
+ *    `npx supabase db query --linked -f …` sur la machine de dev.
  *
  * Vérification : listPlanningCalendarsPrefix() journalise les agendas dont le nom commence par NAME_PREFIX.
  *
- * Export pour la base Supabase :
- * Exécuter exportPlanningCalendarsToSheetAndCsv() → une feuille Google + un fichier CSV sur Drive
- * (colonnes label, google_calendar_id), calendriers dont vous êtes propriétaire et nom « Planning IAMS NN ».
- * Transmettre le CSV ou copier la feuille pour générer le script SQL seed du dépôt.
+ * Export global : exportPlanningCalendarsToSheetAndCsv() → feuille + CSV (tous les IAMS possédés).
  */
 
-/** Premier numéro de la plage (inclus), ex. 1 puis 27 après un premier lot. */
+/** Premier numéro de la plage (inclus). */
 var START_NUM = 1;
 
-/** Dernier numéro de la plage (inclus). Premier lot ~26 ; plus tard 60 pour aller jusqu’à « Planning IAMS 60 ». */
+/** Dernier numéro de la plage (inclus). */
 var END_NUM = 26;
 
 var NAME_PREFIX = 'Planning IAMS ';
@@ -31,20 +34,98 @@ var NAME_PREFIX = 'Planning IAMS ';
 /** Pause entre deux créations (ms) pour limiter le throttling ; 0 pour désactiver. */
 var SLEEP_MS_BETWEEN = 500;
 
+/**
+ * Après chaque création dans createPlanningSecondaryCalendars(), tenter ACL public (lecteur).
+ * Nécessite le service avancé Google Calendar API.
+ */
+var CREATE_PUBLIC_ACL_AFTER_EACH = true;
+
+/**
+ * Nom du calendrier pour le numéro n (ex. 3 → Planning IAMS 03).
+ */
+function planningCalendarNameForNumber_(n) {
+  var suffix = n < 100 ? ('00' + n).slice(-2) : String(n);
+  return NAME_PREFIX + suffix;
+}
+
+/**
+ * Retourne le calendrier déjà existant et possédé avec ce nom exact, sinon null.
+ */
+function findOwnedPlanningCalendarByNumber_(n) {
+  var expectedName = planningCalendarNameForNumber_(n);
+  var cals = CalendarApp.getAllCalendars();
+  for (var i = 0; i < cals.length; i++) {
+    var c = cals[i];
+    if (!c.isOwnedByMe()) {
+      continue;
+    }
+    if (String(c.getName()).replace(/\s+$/, '') === expectedName) {
+      return c;
+    }
+  }
+  return null;
+}
+
+/**
+ * ACL « public » en lecture (équivalent réglage Agenda : disponible pour le public).
+ * @see https://developers.google.com/calendar/api/v3/reference/acl/insert
+ */
+function insertPublicReaderAcl_(calendarId, labelForLog) {
+  try {
+    Calendar.Acl.insert(
+      {
+        role: 'reader',
+        scope: { type: 'default' }
+      },
+      calendarId
+    );
+    Logger.log('[ACL public] OK : ' + labelForLog);
+  } catch (e) {
+    Logger.log('[ACL public] ' + labelForLog + ' : ' + e);
+  }
+}
+
+/**
+ * Tous les calendriers possédés dont le nom est « Planning IAMS » + chiffres → partage public lecteur.
+ * À lancer après création d’un lot ou pour corriger les anciens (01–27, etc.).
+ */
+function makeAllPlanningIamsCalendarsPublicReader() {
+  var cals = CalendarApp.getAllCalendars();
+  for (var i = 0; i < cals.length; i++) {
+    var c = cals[i];
+    if (!c.isOwnedByMe()) {
+      continue;
+    }
+    var name = String(c.getName()).replace(/\s+$/, '');
+    var n = planningIamsNameSuffixNumber_(name);
+    if (isNaN(n)) {
+      continue;
+    }
+    insertPublicReaderAcl_(c.getId(), name);
+  }
+}
+
 function createPlanningSecondaryCalendars() {
   if (END_NUM < START_NUM) {
     throw new Error('END_NUM doit être >= START_NUM');
   }
   var rows = [];
   for (var i = START_NUM; i <= END_NUM; i++) {
-    var suffix = i < 100 ? ('00' + i).slice(-2) : String(i);
-    var name = NAME_PREFIX + suffix;
-    var cal = CalendarApp.createCalendar(name, {
-      timeZone: 'Europe/Paris'
-    });
+    var name = planningCalendarNameForNumber_(i);
+    var cal = findOwnedPlanningCalendarByNumber_(i);
+    if (cal) {
+      Logger.log('Existe déjà (skip création) : ' + name + '\t' + cal.getId());
+    } else {
+      cal = CalendarApp.createCalendar(name, {
+        timeZone: 'Europe/Paris'
+      });
+      Logger.log('Créé : ' + name + '\t' + cal.getId());
+    }
     var id = cal.getId();
     rows.push([name, id]);
-    Logger.log(name + '\t' + id);
+    if (CREATE_PUBLIC_ACL_AFTER_EACH) {
+      insertPublicReaderAcl_(id, name);
+    }
     if (SLEEP_MS_BETWEEN > 0 && i < END_NUM) {
       Utilities.sleep(SLEEP_MS_BETWEEN);
     }
@@ -95,6 +176,138 @@ function escapeCsvField_(s) {
     return '"' + t.replace(/"/g, '""') + '"';
   }
   return t;
+}
+
+function escapeSqlString_(s) {
+  return String(s).replace(/'/g, "''");
+}
+
+/**
+ * Génère le SQL d’insertion pool pour une plage de numéros IAMS (calendriers déjà créés).
+ * Copier depuis l’onglet Exécution → Journal.
+ */
+function logSqlInsertsPlanningIamsRange(startN, endN) {
+  var cals = CalendarApp.getAllCalendars();
+  var pairs = [];
+  for (var i = 0; i < cals.length; i++) {
+    var c = cals[i];
+    if (!c.isOwnedByMe()) {
+      continue;
+    }
+    var name = String(c.getName()).replace(/\s+$/, '');
+    var n = planningIamsNameSuffixNumber_(name);
+    if (!isNaN(n) && n >= startN && n <= endN) {
+      pairs.push({ n: n, name: name, id: c.getId() });
+    }
+  }
+  pairs.sort(function (a, b) {
+    return a.n - b.n;
+  });
+  if (pairs.length === 0) {
+    Logger.log('Aucun calendrier IAMS dans la plage ' + startN + '–' + endN);
+    return;
+  }
+  var lines = [];
+  for (var j = 0; j < pairs.length; j++) {
+    var p = pairs[j];
+    lines.push(
+      "    ('" +
+        escapeSqlString_(p.id) +
+        "', '" +
+        escapeSqlString_(p.name) +
+        "', " +
+        p.n +
+        ')'
+    );
+  }
+  var sql =
+    'insert into public.google_calendar_pool (google_calendar_id, label, sort_order)\nvalues\n' +
+    lines.join(',\n') +
+    '\non conflict (google_calendar_id) do nothing;\n\nselect public.planning_backfill_unassigned_calendars();\n';
+  Logger.log(sql);
+}
+
+/**
+ * Même SQL que logSqlInsertsPlanningIamsRange, enregistré sur Drive (plus pratique à récupérer).
+ */
+function savePoolSqlInsertsToDrive(startN, endN) {
+  var cals = CalendarApp.getAllCalendars();
+  var pairs = [];
+  for (var i = 0; i < cals.length; i++) {
+    var c = cals[i];
+    if (!c.isOwnedByMe()) {
+      continue;
+    }
+    var name = String(c.getName()).replace(/\s+$/, '');
+    var n = planningIamsNameSuffixNumber_(name);
+    if (!isNaN(n) && n >= startN && n <= endN) {
+      pairs.push({ n: n, name: name, id: c.getId() });
+    }
+  }
+  pairs.sort(function (a, b) {
+    return a.n - b.n;
+  });
+  if (pairs.length === 0) {
+    Logger.log('savePoolSqlInsertsToDrive : aucune ligne pour ' + startN + '–' + endN);
+    return;
+  }
+  var lines = [];
+  for (var j = 0; j < pairs.length; j++) {
+    var p = pairs[j];
+    lines.push(
+      "    ('" +
+        escapeSqlString_(p.id) +
+        "', '" +
+        escapeSqlString_(p.name) +
+        "', " +
+        p.n +
+        ')'
+    );
+  }
+  var sql =
+    'insert into public.google_calendar_pool (google_calendar_id, label, sort_order)\nvalues\n' +
+    lines.join(',\n') +
+    '\non conflict (google_calendar_id) do nothing;\n\nselect public.planning_backfill_unassigned_calendars();\n';
+  var fileName =
+    'planning-pool-insert-' +
+    startN +
+    '-' +
+    endN +
+    '-' +
+    new Date().toISOString().slice(0, 10) +
+    '.sql';
+  var file = DriveApp.createFile(fileName, sql, MimeType.PLAIN_TEXT);
+  Logger.log('Fichier SQL Drive : ' + file.getUrl());
+}
+
+/**
+ * À exécuter une fois sur le compte Google propriétaire :
+ * 1) Crée Planning IAMS 28 … 47 s’ils n’existent pas encore.
+ * 2) Rend publics en lecture TOUS les calendriers « Planning IAMS NN » possédés (y compris 01–27).
+ * 3) Journalise le SQL pool pour 28–47 + fichier .sql sur Drive.
+ */
+function runOnce_CreatePlanning28to47_PublicAndPoolSql() {
+  var prevStart = START_NUM;
+  var prevEnd = END_NUM;
+  START_NUM = 28;
+  END_NUM = 47;
+  try {
+    createPlanningSecondaryCalendars();
+    makeAllPlanningIamsCalendarsPublicReader();
+    logSqlInsertsPlanningIamsRange(28, 47);
+    savePoolSqlInsertsToDrive(28, 47);
+  } finally {
+    START_NUM = prevStart;
+    END_NUM = prevEnd;
+  }
+}
+
+/**
+ * Uniquement rendre publics tous les calendriers Planning IAMS (sans création).
+ * Utile si la création 28–47 est déjà faite mais pas l’ACL.
+ */
+function runOnce_OnlyMakeAllPlanningIamsPublicReader() {
+  makeAllPlanningIamsCalendarsPublicReader();
 }
 
 /**
