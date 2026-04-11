@@ -35,6 +35,12 @@ Démarrage option 2 — Supabase + Google Agenda
      des migrations, redeploy functions, recopier les secrets (GOOGLE_*, BREVO, etc.), puis mettre à jour
      js/config/planning.config.js (supabaseUrl, supabaseAnonKey, calendarBridgeUrl).
 
+2ter) Créer plusieurs calendriers secondaires (pool, ex. 60)
+   - L’assistant ne peut pas se connecter à votre Google : utilisez le script Apps Script du dépôt
+     `scripts/google-create-planning-calendars.gs` (voir l’en-tête du fichier : script.google.com,
+     exécuter connecté en orgue.iams@…). Il crée les agendas et une feuille avec les IDs à saisir
+     dans « Gestion des comptes » → pool, ou via INSERT SQL sur `google_calendar_pool`.
+
 3) Edge Functions
    - Installer la CLI : https://supabase.com/docs/guides/cli
    - supabase login && supabase link --project-ref <VOTRE_REF>
