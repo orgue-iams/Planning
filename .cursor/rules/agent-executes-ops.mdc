@@ -1,0 +1,14 @@
+---
+description: L’agent exécute les opérations (git, Supabase, vérifs) au lieu de les déléguer à l’utilisateur
+alwaysApply: true
+---
+
+# Opérations : toujours par l’agent
+
+Ne **pas** terminer une réponse par une section du type **« À faire de ton côté »** qui liste des commandes (`git`, `supabase`, `npm`, etc.), des déploiements Edge Functions, ou des vérifications en base / dans des fichiers **sans les avoir exécutées**.
+
+- **Exécuter** les commandes pertinentes dans le terminal (depuis le bon répertoire du repo).
+- **Lire** ou **modifier** les fichiers nécessaires pour confirmer l’état (migrations, config, workflows).
+- Si un outil échoue (auth Supabase absente, réseau, droits), **le signaler clairement** après avoir **tenté**, plutôt que de supposer que l’utilisateur le fera.
+
+Cela complète la règle utilisateur : ne pas se contenter d’indiquer quoi lancer — **le faire** quand l’environnement le permet.
