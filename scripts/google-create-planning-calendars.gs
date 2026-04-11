@@ -13,6 +13,11 @@
  * 4. Journaux + feuille créée : colonne google_calendar_id → pool admin Planning ou SQL.
  *
  * Vérification : listPlanningCalendarsPrefix() journalise les agendas dont le nom commence par NAME_PREFIX.
+ *
+ * Export pour la base Supabase :
+ * Exécuter exportPlanningCalendarsToSheetAndCsv() → une feuille Google + un fichier CSV sur Drive
+ * (colonnes label, google_calendar_id), calendriers dont vous êtes propriétaire et nom « Planning IAMS NN ».
+ * Transmettre le CSV ou copier la feuille pour générer le script SQL seed du dépôt.
  */
 
 /** Premier numéro de la plage (inclus), ex. 1 puis 27 après un premier lot. */
@@ -71,4 +76,76 @@ function listPlanningCalendarsPrefix() {
       Logger.log(c.getName() + '\t' + c.getId());
     }
   }
+}
+
+/**
+ * Extrait le numéro final du nom « Planning IAMS 26 » → 26 ; sinon NaN.
+ */
+function planningIamsNameSuffixNumber_(name) {
+  var re = new RegExp(
+    '^' + NAME_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\d+)\\s*$'
+  );
+  var m = String(name).match(re);
+  return m ? parseInt(m[1], 10) : NaN;
+}
+
+function escapeCsvField_(s) {
+  var t = String(s);
+  if (/[",\n\r]/.test(t)) {
+    return '"' + t.replace(/"/g, '""') + '"';
+  }
+  return t;
+}
+
+/**
+ * Produit :
+ * 1) Une feuille de calcul avec en-têtes label | google_calendar_id (tri par numéro IAMS).
+ * 2) Un fichier CSV sur Mon Drive avec le même contenu (pratique à télécharger / envoyer).
+ * Inclut uniquement les calendriers dont le compte courant est propriétaire et dont le nom
+ * correspond à « Planning IAMS » + un ou plusieurs chiffres (espaces en fin ignorés).
+ */
+function exportPlanningCalendarsToSheetAndCsv() {
+  var cals = CalendarApp.getAllCalendars();
+  var pairs = [];
+  for (var i = 0; i < cals.length; i++) {
+    var c = cals[i];
+    if (!c.isOwnedByMe()) {
+      continue;
+    }
+    var name = String(c.getName()).replace(/\s+$/, '');
+    var n = planningIamsNameSuffixNumber_(name);
+    if (!isNaN(n)) {
+      pairs.push({ n: n, name: name, id: c.getId() });
+    }
+  }
+  pairs.sort(function (a, b) {
+    return a.n - b.n;
+  });
+
+  var rows = [['label', 'google_calendar_id']];
+  for (var j = 0; j < pairs.length; j++) {
+    rows.push([pairs[j].name, pairs[j].id]);
+  }
+
+  var stamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  var title = 'Planning IAMS — export calendriers ' + stamp;
+
+  var ss = SpreadsheetApp.create(title);
+  var sh = ss.getActiveSheet();
+  sh.getRange(1, 1, rows.length, 2).setValues(rows);
+  sh.autoResizeColumns(1, 2);
+  Logger.log('Feuille : ' + ss.getUrl());
+
+  var lines = [];
+  for (var k = 0; k < rows.length; k++) {
+    lines.push(
+      escapeCsvField_(rows[k][0]) + ',' + escapeCsvField_(rows[k][1])
+    );
+  }
+  var csv = lines.join('\r\n');
+  var fileName = 'planning-iams-calendars-export-' + new Date().toISOString().slice(0, 10) + '.csv';
+  var file = DriveApp.createFile(fileName, csv, MimeType.CSV);
+  Logger.log('CSV Drive : ' + file.getUrl());
+
+  return { sheetUrl: ss.getUrl(), csvUrl: file.getUrl(), count: pairs.length };
 }
