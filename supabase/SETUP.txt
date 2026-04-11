@@ -42,9 +42,9 @@ Démarrage option 2 — Supabase + Google Agenda
      dans « Gestion des comptes » → pool, ou via INSERT SQL sur `google_calendar_pool`.
    - Google limite souvent la création à ~25–30 calendriers d’affilée : le script utilise par défaut
      une plage (ex. 1–26) ; reprendre plus tard avec START_NUM / END_NUM (ex. 27–60) après une pause.
-   - Pour insérer les 26 calendriers dans le pool Supabase : éditer puis exécuter
-     `supabase/manual/seed-planning-iams-pool-26.sql` (remplacer les `PLACEHOLDER_ID_XX` par les vrais
-     `google_calendar_id` de la feuille Sheets ; ne pas lancer le script sans remplacement).
+   - Pour insérer les 26 calendriers dans le pool Supabase : exécuter
+     `supabase/manual/seed-planning-iams-pool-26.sql` (IDs réels Planning IAMS 01–26 ; sur un autre
+     compte Google, régénérer le fichier via Apps Script puis remplacer les valeurs).
 
 3) Edge Functions
    - Installer la CLI : https://supabase.com/docs/guides/cli
