@@ -1,7 +1,41 @@
 <dialog id="modal_users_admin" class="modal">
     <div class="modal-box p-5 w-[96%] max-w-5xl max-h-[90dvh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col">
         <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest shrink-0">Gestion des comptes</h3>
-        <p class="text-[10px] text-slate-500 mb-3 leading-snug">Création directe de compte (avec mot de passe) ou invitation par e-mail, puis gestion des rôles, suspension, suppression et réinitialisation du mot de passe.</p>
+        <p class="text-[10px] text-slate-500 mb-3 leading-snug">Création directe de compte (avec mot de passe) ou invitation par e-mail, puis gestion des rôles, suspension, suppression et réinitialisation du mot de passe. Pool des calendriers Google secondaires (affectation auto à l’activation, hors profil consultation).</p>
+
+        <div class="rounded-xl border border-indigo-100 bg-indigo-50/50 p-2 sm:p-2.5 mb-3 shrink-0">
+            <p class="text-[9px] font-black uppercase text-indigo-800/80 mb-1.5 tracking-wide">Pool calendriers Google (secondaires)</p>
+            <p class="text-[9px] text-slate-600 mb-2 leading-snug">Créez d’abord le calendrier dans Google (compte orgue.iams), puis enregistrez son <strong>ID</strong> ici. Les comptes élève / prof / admin reçoivent automatiquement le prochain créneau libre. Si le pool est vide, le profil est marqué <code class="text-[8px] bg-white/80 px-0.5 rounded">POOL_SATURATED</code>.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-[1fr_1fr_minmax(0,4rem)_auto] gap-2 items-end mb-2">
+                <label class="flex flex-col gap-0 min-w-0">
+                    <span class="text-[9px] font-bold text-slate-600">ID calendrier Google <span class="font-normal text-slate-400">(oblig.)</span></span>
+                    <input type="text" id="admin-pool-google-id" placeholder="ex. xxxxx@group.calendar.google.com" class="input input-xs input-bordered w-full text-[10px] h-8 min-h-0 font-mono" autocomplete="off" />
+                </label>
+                <label class="flex flex-col gap-0 min-w-0">
+                    <span class="text-[9px] font-bold text-slate-600">Libellé <span class="font-normal text-slate-400">(optionnel)</span></span>
+                    <input type="text" id="admin-pool-label" placeholder="ex. planning12@iams.fr" class="input input-xs input-bordered w-full text-[10px] h-8 min-h-0" autocomplete="off" />
+                </label>
+                <label class="flex flex-col gap-0 min-w-0">
+                    <span class="text-[9px] font-bold text-slate-600">Tri</span>
+                    <input type="number" id="admin-pool-sort" value="0" class="input input-xs input-bordered w-full text-[10px] h-8 min-h-0" />
+                </label>
+                <button type="button" id="admin-pool-add-btn" class="btn btn-primary btn-xs font-normal text-[10px] h-8 min-h-0">Ajouter au pool</button>
+            </div>
+            <div class="max-h-32 overflow-auto rounded-lg border border-indigo-100/80 bg-white/90">
+                <table class="table table-xs w-full">
+                    <thead>
+                        <tr class="bg-indigo-50/80">
+                            <th class="text-[9px]">Libellé</th>
+                            <th class="text-[9px]">ID Google</th>
+                            <th class="text-[9px] w-16">Tri</th>
+                            <th class="text-[9px] w-24">Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-pool-tbody"></tbody>
+                </table>
+            </div>
+            <button type="button" id="admin-pool-refresh" class="btn btn-ghost btn-xs font-normal text-[9px] mt-1.5 h-7 min-h-0">Actualiser le pool</button>
+        </div>
 
         <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-2 sm:p-2.5 mb-3 shrink-0">
             <p class="text-[9px] font-black uppercase text-slate-500 mb-1.5 tracking-wide">Créer / inviter</p>
@@ -59,6 +93,8 @@
                         <th class="text-[10px] min-w-[10rem]">Email</th>
                         <th class="text-[10px] w-28">Rôle</th>
                         <th class="text-[10px] w-24">Statut</th>
+                        <th class="text-[10px] min-w-[7rem] max-w-[9rem]">Cal. perso</th>
+                        <th class="text-[10px] w-24">Pool</th>
                         <th class="text-[10px] min-w-[11rem]">Actions</th>
                     </tr>
                 </thead>

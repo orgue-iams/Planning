@@ -23,15 +23,61 @@ function normalizePlanningRole(r: string): (typeof PLANNING_ROLES)[number] {
 async function profileRowsForUserIds(
     admin: ReturnType<typeof createClient>,
     ids: string[]
-): Promise<Map<string, { id: string; display_name: string | null; role: string }>> {
-    const map = new Map<string, { id: string; display_name: string | null; role: string }>();
+): Promise<
+    Map<
+        string,
+        {
+            id: string;
+            display_name: string | null;
+            role: string;
+            calendar_assignment_error: string | null;
+            personal_google_calendar_id: string | null;
+        }
+    >
+> {
+    const map = new Map<
+        string,
+        {
+            id: string;
+            display_name: string | null;
+            role: string;
+            calendar_assignment_error: string | null;
+            personal_google_calendar_id: string | null;
+        }
+    >();
     const chunk = 40;
     for (let i = 0; i < ids.length; i += chunk) {
         const slice = ids.slice(i, i + chunk);
-        const { data, error } = await admin.from('profiles').select('id,display_name,role').in('id', slice);
+        const { data, error } = await admin
+            .from('profiles')
+            .select('id,display_name,role,calendar_assignment_error')
+            .in('id', slice);
         if (error) throw error;
+        const { data: poolRows, error: poolErr } = await admin
+            .from('google_calendar_pool')
+            .select('assigned_user_id,google_calendar_id')
+            .in('assigned_user_id', slice);
+        if (poolErr) throw poolErr;
+        const calByUser = new Map<string, string>();
+        for (const pr of poolRows ?? []) {
+            const uid = (pr as { assigned_user_id: string | null }).assigned_user_id;
+            const gid = (pr as { google_calendar_id: string }).google_calendar_id;
+            if (uid) calByUser.set(uid, gid);
+        }
         for (const p of data ?? []) {
-            map.set(p.id, p);
+            const row = p as {
+                id: string;
+                display_name: string | null;
+                role: string;
+                calendar_assignment_error: string | null;
+            };
+            map.set(row.id, {
+                id: row.id,
+                display_name: row.display_name,
+                role: row.role,
+                calendar_assignment_error: row.calendar_assignment_error ?? null,
+                personal_google_calendar_id: calByUser.get(row.id) ?? null
+            });
         }
     }
     return map;
@@ -146,6 +192,8 @@ Deno.serve(async (req) => {
                 banned_until?: string | null;
                 display_name?: string | null;
                 profile_role?: string | null;
+                calendar_assignment_error?: string | null;
+                personal_google_calendar_id?: string | null;
             };
 
             const { data: rpcRaw, error: rpcErr } = await admin.rpc('planning_admin_list_auth_users');
@@ -184,7 +232,9 @@ Deno.serve(async (req) => {
                             display_name: p?.display_name ?? null,
                             role: normalizePlanningRole(dbRole),
                             banned_until: ban ?? null,
-                            created_at: u.created_at ?? null
+                            created_at: u.created_at ?? null,
+                            calendar_assignment_error: p?.calendar_assignment_error ?? null,
+                            personal_google_calendar_id: p?.personal_google_calendar_id ?? null
                         });
                     }
                     if (users.length < perPage) break;
@@ -213,7 +263,11 @@ Deno.serve(async (req) => {
                     display_name: row.display_name != null ? String(row.display_name) : null,
                     role: normalizePlanningRole(dbRole),
                     banned_until: row.banned_until != null ? String(row.banned_until) : null,
-                    created_at: row.created_at != null ? String(row.created_at) : null
+                    created_at: row.created_at != null ? String(row.created_at) : null,
+                    calendar_assignment_error:
+                        row.calendar_assignment_error != null ? String(row.calendar_assignment_error) : null,
+                    personal_google_calendar_id:
+                        row.personal_google_calendar_id != null ? String(row.personal_google_calendar_id) : null
                 };
             });
 
@@ -387,6 +441,11 @@ Deno.serve(async (req) => {
                 });
             }
 
+            const { error: relErr } = await admin.rpc('planning_release_personal_calendar', {
+                p_user_id: userId
+            });
+            if (relErr) throw relErr;
+
             const { error } = await admin.auth.admin.updateUserById(userId, { ban_duration: '876600h' });
             if (error) throw error;
 
@@ -406,7 +465,61 @@ Deno.serve(async (req) => {
             const { error } = await admin.auth.admin.updateUserById(userId, { ban_duration: 'none' });
             if (error) throw error;
 
-            return new Response(JSON.stringify({ ok: true }), {
+            const { data: assignCode, error: assignErr } = await admin.rpc('planning_try_assign_personal_calendar', {
+                p_user_id: userId
+            });
+            if (assignErr) throw assignErr;
+
+            const warn =
+                assignCode === 'POOL_SATURATED'
+                    ? 'Compte réactivé mais aucun calendrier secondaire libre (POOL_SATURATED). Ajoutez une entrée au pool.'
+                    : assignCode && assignCode !== ''
+                      ? `Compte réactivé ; attention calendrier : ${assignCode}`
+                      : null;
+
+            return new Response(JSON.stringify({ ok: true, calendar_warning: warn }), {
+                headers: { ...cors, 'Content-Type': 'application/json' }
+            });
+        }
+
+        if (action === 'list_calendar_pool') {
+            const { data, error } = await admin
+                .from('google_calendar_pool')
+                .select('id,google_calendar_id,label,disabled,sort_order,assigned_user_id,assigned_at,created_at')
+                .order('sort_order', { ascending: true })
+                .order('created_at', { ascending: true });
+            if (error) throw error;
+            return new Response(JSON.stringify({ ok: true, rows: data ?? [] }), {
+                headers: { ...cors, 'Content-Type': 'application/json' }
+            });
+        }
+
+        if (action === 'add_calendar_pool') {
+            const google_calendar_id = String(body.google_calendar_id ?? '').trim();
+            const label = String(body.label ?? '').trim() || null;
+            const sort_order = Number.isFinite(Number(body.sort_order)) ? Math.trunc(Number(body.sort_order)) : 0;
+            if (!google_calendar_id) {
+                return new Response(JSON.stringify({ error: 'google_calendar_id requis' }), {
+                    status: 400,
+                    headers: { ...cors, 'Content-Type': 'application/json' }
+                });
+            }
+            const { data, error } = await admin
+                .from('google_calendar_pool')
+                .insert({
+                    google_calendar_id,
+                    label,
+                    sort_order,
+                    disabled: false
+                })
+                .select('id,google_calendar_id,label,disabled,sort_order,assigned_user_id,assigned_at,created_at')
+                .maybeSingle();
+            if (error) throw error;
+
+            const { error: backfillErr } = await admin.rpc('planning_backfill_unassigned_calendars');
+            if (backfillErr) throw backfillErr;
+
+            return new Response(JSON.stringify({ ok: true, row: data ?? null }), {
                 headers: { ...cors, 'Content-Type': 'application/json' }
             });
         }

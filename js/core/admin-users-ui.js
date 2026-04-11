@@ -23,6 +23,49 @@ function roleSelectOptionsHtml(selectedRole) {
     ).join('');
 }
 
+function shortenCalendarId(id) {
+    const s = String(id || '').trim();
+    if (!s) return '—';
+    if (s.length <= 22) return s;
+    return `${s.slice(0, 20)}…`;
+}
+
+function renderPoolTable(rows) {
+    const tb = document.getElementById('admin-pool-tbody');
+    if (!tb) return;
+    tb.replaceChildren();
+    const list = Array.isArray(rows) ? rows : [];
+    if (list.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+            '<td colspan="4" class="text-[9px] text-slate-500 text-center py-2">Aucune entrée. Ajoutez un ID de calendrier Google ci-dessus.</td>';
+        tb.appendChild(tr);
+        return;
+    }
+    for (const r of list) {
+        const tr = document.createElement('tr');
+        const free = !r.assigned_user_id;
+        const st = free
+            ? '<span class="text-emerald-700 font-medium">Libre</span>'
+            : '<span class="text-amber-800 font-medium">Assigné</span>';
+        tr.innerHTML = `
+            <td class="text-[9px] max-w-[6rem] truncate" title="${escapeAttr(r.label || '')}">${escapeTd(r.label || '—')}</td>
+            <td class="text-[8px] font-mono break-all">${escapeTd(r.google_calendar_id)}</td>
+            <td class="text-[9px]">${escapeTd(String(r.sort_order ?? 0))}</td>
+            <td class="text-[9px]">${st}</td>`;
+        tb.appendChild(tr);
+    }
+}
+
+async function refreshCalendarPoolTable() {
+    try {
+        const res = await planningAdminInvoke('list_calendar_pool', {});
+        renderPoolTable(res.rows || []);
+    } catch (e) {
+        showToast(e instanceof Error ? e.message : String(e), 'error');
+    }
+}
+
 function renderUsersTable(users) {
     const tb = document.getElementById('admin-users-tbody');
     if (!tb) return;
@@ -30,13 +73,25 @@ function renderUsersTable(users) {
     const list = Array.isArray(users) ? users : [];
     if (list.length === 0) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="4" class="text-[10px] text-slate-500 text-center py-4">Aucun compte renvoyé par le serveur. Actualisez ou vérifiez le déploiement de la fonction « planning-admin ».</td>`;
+        tr.innerHTML = `<td colspan="6" class="text-[10px] text-slate-500 text-center py-4">Aucun compte renvoyé par le serveur. Actualisez ou vérifiez le déploiement de la fonction « planning-admin ».</td>`;
         tb.appendChild(tr);
         return;
     }
     for (const u of list) {
         const tr = document.createElement('tr');
         const suspended = u.banned_until && new Date(u.banned_until) > new Date();
+        const calCell =
+            u.role === 'consultation'
+                ? '<span class="text-slate-400">—</span>'
+                : u.personal_google_calendar_id
+                  ? `<span class="font-mono text-[8px] break-all" title="${escapeAttr(u.personal_google_calendar_id)}">${escapeTd(shortenCalendarId(u.personal_google_calendar_id))}</span>`
+                  : '<span class="text-slate-400 text-[9px]">Non attribué</span>';
+        const poolCell =
+            u.role === 'consultation'
+                ? '<span class="text-slate-400">—</span>'
+                : u.calendar_assignment_error
+                  ? `<span class="text-error font-semibold text-[8px]" title="${escapeAttr(u.calendar_assignment_error)}">${escapeTd(u.calendar_assignment_error)}</span>`
+                  : '<span class="text-emerald-700 text-[9px]">OK</span>';
         tr.innerHTML = `
             <td class="text-[11px] font-normal break-all">${escapeTd(u.email)}</td>
             <td>
@@ -45,6 +100,8 @@ function renderUsersTable(users) {
                 </select>
             </td>
             <td class="text-[10px]">${suspended ? '<span class="text-error font-medium">Suspendu</span>' : '<span class="text-emerald-700 font-medium">Actif</span>'}</td>
+            <td class="text-[10px] align-top">${calCell}</td>
+            <td class="text-[10px] align-top">${poolCell}</td>
             <td>
                 <div class="flex flex-col sm:flex-row sm:flex-wrap gap-1 sm:gap-1.5">
                     <button type="button" class="btn btn-xs btn-outline font-normal text-[9px] shrink-0 admin-btn-apply" data-user-id="${escapeAttr(u.id)}">Appliquer rôle</button>
@@ -169,10 +226,40 @@ export function initAdminUsersUi(currentUser) {
         requestAnimationFrame(() => {
             dlg.showModal();
             void refreshUserList();
+            void refreshCalendarPoolTable();
         });
     });
 
     document.getElementById('admin-users-refresh')?.addEventListener('click', () => void refreshUserList());
+
+    document.getElementById('admin-pool-refresh')?.addEventListener('click', () => void refreshCalendarPoolTable());
+
+    document.getElementById('admin-pool-add-btn')?.addEventListener('click', async () => {
+        const google_calendar_id = document.getElementById('admin-pool-google-id')?.value?.trim() || '';
+        const label = document.getElementById('admin-pool-label')?.value?.trim() || '';
+        const sortRaw = document.getElementById('admin-pool-sort')?.value;
+        const sort_order = sortRaw !== undefined && sortRaw !== '' ? Number(sortRaw) : 0;
+        if (!google_calendar_id) {
+            showToast('Indiquez l’ID du calendrier Google.', 'error');
+            return;
+        }
+        try {
+            await planningAdminInvoke('add_calendar_pool', {
+                google_calendar_id,
+                label: label || undefined,
+                sort_order: Number.isFinite(sort_order) ? sort_order : 0
+            });
+            showToast('Calendrier ajouté au pool.');
+            const gid = document.getElementById('admin-pool-google-id');
+            const lb = document.getElementById('admin-pool-label');
+            if (gid) gid.value = '';
+            if (lb) lb.value = '';
+            await refreshCalendarPoolTable();
+            await refreshUserList();
+        } catch (err) {
+            showToast(err instanceof Error ? err.message : String(err), 'error');
+        }
+    });
 
     document.getElementById('admin-create-btn')?.addEventListener('click', async () => {
         const email = document.getElementById('admin-invite-email')?.value?.trim();
@@ -272,8 +359,12 @@ export function initAdminUsersUi(currentUser) {
         }
         if (t.classList.contains('admin-btn-unsuspend')) {
             try {
-                await planningAdminInvoke('unsuspend', { user_id: uid });
-                showToast('Compte réactivé.');
+                const res = await planningAdminInvoke('unsuspend', { user_id: uid });
+                if (res.calendar_warning) {
+                    showToast(res.calendar_warning, 'info');
+                } else {
+                    showToast('Compte réactivé.');
+                }
                 await refreshUserList();
             } catch (err) {
                 showToast(err instanceof Error ? err.message : String(err), 'error');
