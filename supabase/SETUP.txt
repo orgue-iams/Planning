@@ -52,6 +52,8 @@ Démarrage option 2 — Supabase + Google Agenda
      droit « Modifier les événements ». Sinon l’API renvoie souvent « Not Found » sur le calendrier secondaire.
      En base, stocker l’ID `xxx@group.calendar.google.com` (pas l’URL embed entière) — l’admin et le bridge
      normalisent désormais les URLs `?src=…`.
+   - Contrôle des lignes du pool (format ID, doublons de tri) : exécuter une fois
+     `supabase/manual/verify-google-calendar-pool.sql` dans le SQL Editor.
 
 3) Edge Functions
    - Installer la CLI : https://supabase.com/docs/guides/cli
