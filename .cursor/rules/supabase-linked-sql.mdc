@@ -1,0 +1,19 @@
+---
+description: Environnement Supabase lié — exécuter le SQL distant via la CLI plutôt que renvoyer l’utilisateur au dashboard
+alwaysApply: true
+---
+
+# Supabase : SQL sur la base distante (projet lié)
+
+L’environnement de développement est **configuré** pour la CLI Supabase avec **`supabase link`** et **`supabase login`** valides sur le dépôt **Planning** (`c:\Developpement\Planning`, ref dans `supabase/project-ref`).
+
+Quand une tâche implique d’**exécuter du SQL** sur la base **hébergée** (seed manuel, requête de vérif, correctif ponctuel) :
+
+1. **Préférer exécuter vous-même** la commande depuis la racine du dépôt Planning (PowerShell : `Set-Location "c:\Developpement\Planning"` puis) :
+   - Fichier : `supabase db query -f "chemin/vers/fichier.sql" --linked`
+   - Requête inline : `supabase db query --linked "select …"`
+2. Ne pas répondre uniquement « collez dans le SQL Editor » si l’exécution CLI est possible.
+3. La première connexion peut afficher **Initialising login role…** et prendre ~1 min ; ce n’est pas un échec en soi.
+4. **`supabase/manual/*.sql`** n’est pas appliqué par `db push` : ces scripts se lancent avec **`db query -f … --linked`** (ou équivalent) quand c’est demandé.
+
+Si la CLI échoue (non lié, session expirée), indiquer l’erreur et la marche de secours (Dashboard SQL).
