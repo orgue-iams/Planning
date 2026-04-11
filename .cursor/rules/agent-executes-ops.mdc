@@ -11,6 +11,15 @@ Ne **pas** terminer une réponse par une section du type **« À faire de ton c�
 - **Lire** ou **modifier** les fichiers nécessaires pour confirmer l’état (migrations, config, workflows).
 - Si un outil échoue (auth Supabase absente, réseau, droits), **le signaler clairement** après avoir **tenté**, plutôt que de supposer que l’utilisateur le fera.
 
+## SQL sur la base Supabase (projet lié)
+
+- Pour **contrôles, diagnostics** ou fichiers sous `supabase/manual/*.sql` : **exécuter soi-même** avec la CLI depuis la racine du repo Planning, par exemple  
+  `npx supabase db query --linked -f supabase/manual/…sql -o table --agent=no`  
+  ou une requête inline : `npx supabase db query --linked "select …" -o table --agent=no`.
+- **Ne pas** se limiter à « coller ce script dans le SQL Editor » si l’environnement local est **lié** (`supabase link`) et la CLI authentifiée (`supabase login`) : l’agent doit lancer la commande et **rapporter le résultat** (tableaux, erreurs).
+- Un fichier `.sql` avec **plusieurs** instructions peut n’afficher qu’**un** jeu de résultats selon la CLI : enchaîner plusieurs `db query` ou des requêtes séparées si besoin de tout voir.
+- Si `--linked` échoue (projet non lié, session expirée), le signaler **après** la tentative ; à défaut, proposer le SQL Editor en dernier recours.
+
 Cela complète la règle utilisateur : ne pas se contenter d’indiquer quoi lancer — **le faire** quand l’environnement le permet.
 
 ## Front statique (GitHub Pages)

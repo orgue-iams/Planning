@@ -1,5 +1,8 @@
--- Vérification du pool `google_calendar_pool` (SQL Editor Supabase).
--- À exécuter après toute saisie manuelle ou import des calendriers secondaires.
+-- Vérification du pool `google_calendar_pool`.
+-- Depuis le repo (projet lié + `supabase login`) : exécuter avec la CLI, ex.
+--   npx supabase db query --linked -f supabase/manual/verify-google-calendar-pool.sql -o table --agent=no
+-- (Plusieurs SELECT : la CLI peut n’en afficher qu’un ; utiliser aussi des requêtes ciblées une par une.)
+-- Alternative : SQL Editor dans le dashboard Supabase.
 
 -- 1) Nombre total d’entrées (actives / désactivées)
 select
