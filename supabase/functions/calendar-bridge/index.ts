@@ -372,9 +372,15 @@ async function mirrorOwnerPersonalCalendarIfNeeded(
     body: BridgeBody,
     mainCalendarEventId: string
 ): Promise<void> {
-    if (!supabaseUrl || !supabaseAnonKey || !user.id) return;
+    if (!supabaseUrl || !supabaseAnonKey || !user.id) {
+        console.warn('[calendar-bridge] mirror skip: supabase url/anon key ou user.id manquant');
+        return;
+    }
     const me = String(user.email || '').trim().toLowerCase();
-    if (!me) return;
+    if (!me) {
+        console.warn('[calendar-bridge] mirror skip: e-mail JWT absent (impossible de résoudre le pool)');
+        return;
+    }
 
     const mainCal = calendarId();
     const targetCal = resolveCalendarId(ev.calendarId ?? body.calendarId);
@@ -382,14 +388,26 @@ async function mirrorOwnerPersonalCalendarIfNeeded(
 
     const ownerRaw = String(ev.owner || '').trim().toLowerCase();
     /* owner vide = créneau imputé au compte connecté (évite un miroir bloqué si le client n’envoie pas owner). */
-    if (ownerRaw && ownerRaw !== me) return;
+    if (ownerRaw && ownerRaw !== me) {
+        console.warn(
+            '[calendar-bridge] mirror skip: owner du créneau ≠ compte connecté (miroir pool uniquement si l’élève crée pour lui-même).',
+            { ownerPayload: ownerRaw, jwtEmail: me }
+        );
+        return;
+    }
 
     const st = String(ev.type || 'reservation').trim().toLowerCase();
     if (st === 'fermeture') return;
 
     const poolCalRaw = await fetchPlanningPoolCalendarId(supabaseUrl, supabaseAnonKey, jwt, user.id);
     const poolCal = normalizeGoogleCalendarId(poolCalRaw);
-    if (!poolCal || resolveCalendarId(poolCal) === mainCal) return;
+    if (!poolCal || resolveCalendarId(poolCal) === mainCal) {
+        console.warn('[calendar-bridge] mirror skip: pas de calendrier pool pour ce user ou id = principal', {
+            poolRawLen: poolCalRaw.length,
+            poolCal: poolCal ? poolCal.slice(0, 48) + '…' : ''
+        });
+        return;
+    }
 
     const title = String(ev.title || '').trim();
     const start = ev.start;
