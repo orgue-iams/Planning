@@ -358,9 +358,37 @@ async function fetchPlanningPoolCalendarId(
     }
 }
 
+async function fetchPlanningPoolCalendarIdForOwnerEmail(
+    projectUrl: string,
+    anonKey: string,
+    jwt: string,
+    ownerEmail: string
+): Promise<string> {
+    const base = projectUrl.replace(/\/$/, '');
+    const res = await fetch(`${base}/rest/v1/rpc/planning_pool_calendar_id_for_owner_email`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            apikey: anonKey,
+            Authorization: `Bearer ${jwt}`
+        },
+        body: JSON.stringify({ p_owner_email: ownerEmail.trim() })
+    });
+    if (!res.ok) return '';
+    const t = await res.text();
+    if (!t || t === 'null') return '';
+    try {
+        const j = JSON.parse(t) as unknown;
+        if (typeof j === 'string') return j.trim();
+        return '';
+    } catch {
+        return String(t).replace(/^"|"$/g, '').trim();
+    }
+}
+
 /**
- * Après écriture sur le calendrier principal : copie sur l’agenda Google « pool » du même utilisateur
- * (JWT = propriétaire du créneau). Évite de dépendre du client (id session, double requête).
+ * Après écriture sur le calendrier principal : copie sur l’agenda Google « pool » du **propriétaire**
+ * du créneau (`ev.owner`). Même compte que le JWT → RPC par user id ; prof/admin pour un élève → RPC par e-mail.
  */
 async function mirrorOwnerPersonalCalendarIfNeeded(
     accessToken: string,
@@ -386,24 +414,28 @@ async function mirrorOwnerPersonalCalendarIfNeeded(
     const targetCal = resolveCalendarId(ev.calendarId ?? body.calendarId);
     if (targetCal !== mainCal) return;
 
-    const ownerRaw = String(ev.owner || '').trim().toLowerCase();
-    /* owner vide = créneau imputé au compte connecté (évite un miroir bloqué si le client n’envoie pas owner). */
-    if (ownerRaw && ownerRaw !== me) {
-        console.warn(
-            '[calendar-bridge] mirror skip: owner du créneau ≠ compte connecté (miroir pool uniquement si l’élève crée pour lui-même).',
-            { ownerPayload: ownerRaw, jwtEmail: me }
-        );
-        return;
-    }
-
+    const ownerTrim = String(ev.owner || '').trim();
+    const ownerNorm = ownerTrim.toLowerCase();
     const st = String(ev.type || 'reservation').trim().toLowerCase();
     if (st === 'fermeture') return;
 
-    const poolCalRaw = await fetchPlanningPoolCalendarId(supabaseUrl, supabaseAnonKey, jwt, user.id);
+    let poolCalRaw = '';
+    if (!ownerNorm || ownerNorm === me) {
+        poolCalRaw = await fetchPlanningPoolCalendarId(supabaseUrl, supabaseAnonKey, jwt, user.id);
+    } else {
+        poolCalRaw = await fetchPlanningPoolCalendarIdForOwnerEmail(
+            supabaseUrl,
+            supabaseAnonKey,
+            jwt,
+            ownerTrim
+        );
+    }
+
     const poolCal = normalizeGoogleCalendarId(poolCalRaw);
     if (!poolCal || resolveCalendarId(poolCal) === mainCal) {
-        console.warn('[calendar-bridge] mirror skip: pas de calendrier pool pour ce user ou id = principal', {
-            poolRawLen: poolCalRaw.length,
+        console.warn('[calendar-bridge] mirror skip: pas de calendrier pool pour le propriétaire ou id = principal', {
+            ownerForPool: ownerNorm || me,
+            poolRawLen: String(poolCalRaw).length,
             poolCal: poolCal ? poolCal.slice(0, 48) + '…' : ''
         });
         return;

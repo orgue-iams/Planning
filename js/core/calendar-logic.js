@@ -73,6 +73,94 @@ function ownerIdentityLabel(owner) {
     return `Réservé par ${name}`;
 }
 
+/**
+ * Remplit le sélecteur « Créneau pour » (prof/admin, nouvelle réservation).
+ * @param {import('@fullcalendar/core').EventApi | null} event
+ */
+async function prepareReservationOwnerSelect(currentUser, event, canEditEvent) {
+    const wrap = document.getElementById('wrap-reservation-owner-target');
+    const sel = document.getElementById('reservation-slot-owner-email');
+    const editorOwnerEl = document.getElementById('event-editor-owner');
+    const r = normalizeRole(currentUser?.role);
+
+    if (!wrap || !sel) return;
+
+    if (r === 'eleve' || r === 'consultation') {
+        wrap.classList.add('hidden');
+        editorOwnerEl?.classList.remove('hidden');
+        return;
+    }
+
+    if (event) {
+        wrap.classList.add('hidden');
+        editorOwnerEl?.classList.remove('hidden');
+        return;
+    }
+
+    wrap.classList.remove('hidden');
+    if (editorOwnerEl) editorOwnerEl.classList.add('hidden');
+
+    sel.disabled = true;
+    sel.innerHTML = '';
+    const me = String(currentUser?.email || '').trim();
+    const meLower = me.toLowerCase();
+    sel.add(new Option(`Moi · ${me}`, me, true, true));
+
+    const sb = getSupabaseClient();
+    if (!sb || !isBackendAuthConfigured()) {
+        sel.disabled = !canEditEvent;
+        return;
+    }
+
+    try {
+        const { data, error } = await sb.rpc('planning_list_reservation_owner_candidates');
+        if (error) {
+            console.warn('[Planning] planning_list_reservation_owner_candidates', error.message);
+        } else {
+            const rows = Array.isArray(data) ? data : [];
+            for (const row of rows) {
+                const em = String(row.email || '').trim();
+                if (!em || em.toLowerCase() === meLower) continue;
+                const dn = String(row.display_name || '').trim() || em;
+                sel.add(new Option(`${dn} · ${em}`, em));
+            }
+        }
+    } catch (e) {
+        console.warn(e);
+    }
+    sel.disabled = !canEditEvent;
+}
+
+function getReservationSlotOwnerEmail(currentUser, currentEventRef) {
+    const r = normalizeRole(currentUser?.role);
+    if (r === 'eleve' || r === 'consultation') {
+        return String(currentUser?.email || '').trim();
+    }
+    const wrap = document.getElementById('wrap-reservation-owner-target');
+    const sel = document.getElementById('reservation-slot-owner-email');
+    if (currentEventRef || !wrap || wrap.classList.contains('hidden')) {
+        return String(currentEventRef?.extendedProps?.owner || currentUser?.email || '').trim();
+    }
+    if (sel && sel.value) return String(sel.value).trim();
+    return String(currentUser?.email || '').trim();
+}
+
+function getReservationSlotOwnerDisplayNameForSave(slotOwnerEmail) {
+    const em = String(slotOwnerEmail || '').trim();
+    const sel = document.getElementById('reservation-slot-owner-email');
+    if (sel) {
+        for (let i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === em) {
+                const t = String(sel.options[i].textContent || '');
+                const ix = t.indexOf(' · ');
+                if (ix > 0) return t.slice(0, ix).trim();
+                return em.includes('@') ? em.split('@')[0] : em;
+            }
+        }
+    }
+    return em.includes('@') ? em.split('@')[0] : em;
+}
+
 /** Début du créneau strictement avant aujourd’hui (minuit local). */
 export function isReservationStartBeforeTodayLocal(eventLike) {
     const raw = eventLike?.start;
@@ -904,14 +992,22 @@ function applyReservationEditorShellForRole(currentUser, event) {
     const owner = ownerInfoFromEvent(event, currentUser);
 
     if (r === 'eleve') {
-        if (editorOwnerEl) editorOwnerEl.textContent = reservationDisplayTitleForCurrentUser(currentUser);
+        if (editorOwnerEl) {
+            editorOwnerEl.textContent = reservationDisplayTitleForCurrentUser(currentUser);
+            editorOwnerEl.classList.remove('hidden');
+        }
         wrapTitle?.classList.add('hidden');
         hintFerm?.classList.add('hidden');
         const nOpt = sel?.options?.length ?? 0;
         if (nOpt <= 1) wrapMotif?.classList.add('hidden');
         else wrapMotif?.classList.remove('hidden');
     } else {
-        if (editorOwnerEl) editorOwnerEl.textContent = ownerIdentityLabel(owner);
+        if (!event && editorOwnerEl) {
+            editorOwnerEl.classList.add('hidden');
+        } else if (editorOwnerEl) {
+            editorOwnerEl.textContent = ownerIdentityLabel(owner);
+            editorOwnerEl.classList.remove('hidden');
+        }
         wrapTitle?.classList.remove('hidden');
         wrapMotif?.classList.remove('hidden');
         if (r === 'admin') {
@@ -1064,7 +1160,7 @@ export async function quickCreateFromSelection(calendar, selectInfo, currentUser
         selectInfo.view.type.startsWith('list') ||
         selectInfo.allDay
     ) {
-        openModal(selectInfo.start, selectInfo.end, null, currentUser);
+        await openModal(selectInfo.start, selectInfo.end, null, currentUser);
         calendar.unselect();
         return;
     }
@@ -1119,7 +1215,7 @@ export async function quickCreateFromDateClick(calendar, clickDate, currentUser,
     }
 
     if (viewType.startsWith('list')) {
-        openModal(new Date(clickDate), null, null, currentUser);
+        await openModal(new Date(clickDate), null, null, currentUser);
         return;
     }
 
@@ -1158,7 +1254,7 @@ export async function quickCreateFromDateClick(calendar, clickDate, currentUser,
  * @param {import('@fullcalendar/core').Calendar | null} [calendarForClip] — si défini (ex. clic sur la grille),
  * propose une fin cohérente avec les occupations (max 1 h si tout est libre).
  */
-export function openModal(start, end, event, currentUser, calendarForClip = null) {
+export async function openModal(start, end, event, currentUser, calendarForClip = null) {
     const modal = document.getElementById('modal_reservation');
     if (!modal) return;
     if (!event && normalizeRole(currentUser?.role) === 'consultation') {
@@ -1200,8 +1296,6 @@ export function openModal(start, end, event, currentUser, calendarForClip = null
         wrapRead.classList.add('hidden');
         wrapEdit.classList.remove('hidden');
     }
-    const editorOwnerEl = document.getElementById('event-editor-owner');
-    if (editorOwnerEl) editorOwnerEl.textContent = ownerText;
     modalActions?.classList.remove('justify-end');
     modalActions?.classList.add('justify-between');
 
@@ -1315,7 +1409,8 @@ export function openModal(start, end, event, currentUser, calendarForClip = null
         'event-recur-start',
         'event-recur-end',
         'recur-mode-all',
-        'recur-mode-days'
+        'recur-mode-days',
+        'reservation-slot-owner-email'
     ];
     fields.forEach((id) => {
         const el = document.getElementById(id);
@@ -1328,6 +1423,8 @@ export function openModal(start, end, event, currentUser, calendarForClip = null
 
     document.getElementById('btn-save').classList.toggle('hidden', !canEditEvent);
     document.getElementById('btn-delete').classList.toggle('hidden', !canEditEvent || !event);
+
+    await prepareReservationOwnerSelect(currentUser, event || null, canEditEvent);
 
     modal.showModal();
     requestAnimationFrame(() => {
@@ -1498,6 +1595,9 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     try {
     const motif = getReservationMotifFromForm(currentUser, currentEventRef);
     const title = getReservationTextTitleFromForm(currentUser, motif);
+    const slotOwnerEmail = getReservationSlotOwnerEmail(currentUser, currentEventRef);
+    const slotOwnerDisplay = getReservationSlotOwnerDisplayNameForSave(slotOwnerEmail);
+    const slotOwnerRoleNorm = normalizeRole(roleFromOwnerEmail(slotOwnerEmail)) || 'eleve';
     const slotType = motifToSlotType(motif);
     const recurOn =
         isPrivilegedUser(currentUser) &&
@@ -1565,7 +1665,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
             start: `${d}T${tRecStart}:00`,
             end: `${d}T${tRecEnd}:00`,
             type: slotType,
-            owner: currentUser.email
+            owner: slotOwnerEmail || currentUser.email
         }));
         const syncMulti = await trySyncGoogleCalendar(bridgeEvents);
         if (calendarBridgeWanted() && !syncMulti.ok && !syncMulti.skipped) {
@@ -1588,9 +1688,9 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
             tRecStart,
             tRecEnd,
             slotType,
-            currentUser.email,
-            currentUser.name || currentUser.email.split('@')[0],
-            currentUser.role,
+            slotOwnerEmail || currentUser.email,
+            slotOwnerDisplay,
+            slotOwnerRoleNorm,
             currentUser
         );
         applyBridgeUpsertResults(addedList, syncMulti?.data?.results);
@@ -1648,9 +1748,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         };
     }
 
-    const ownerForBridge = String(
-        currentEventRef?.extendedProps?.owner || currentUser.email || ''
-    ).trim();
+    const ownerForBridge = slotOwnerEmail || String(currentUser.email || '').trim();
     const gid = currentEventRef ? bridgeGoogleIdFromFcEvent(currentEventRef) : '';
     if (calendarBridgeWanted()) {
         const ok = await ensureGoogleAgendaSlotsFreeOrAbort(
@@ -1678,9 +1776,9 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     }
 
     const xpSingle = {
-        owner: currentUser.email,
-        ownerDisplayName: currentUser.name || currentUser.email.split('@')[0],
-        ownerRole: normalizeRole(currentUser.role) || 'eleve',
+        owner: ownerForBridge,
+        ownerDisplayName: slotOwnerDisplay,
+        ownerRole: slotOwnerRoleNorm,
         type: slotType
     };
     const eventData = {

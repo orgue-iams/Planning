@@ -212,7 +212,9 @@ function initCalendarAndRevealUi() {
         },
         onEventClick: (info) => {
             currentEvent = info.event;
-            openModal(info.event.start, info.event.end, info.event, currentUser);
+            void openModal(info.event.start, info.event.end, info.event, currentUser).catch((err) =>
+                console.error(err)
+            );
         },
         onEventDragStart: (info) => onCalendarEventDragStart(info),
         onEventDragStop: (info) => onCalendarEventDragStop(info),
