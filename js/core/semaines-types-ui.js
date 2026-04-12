@@ -549,6 +549,263 @@ function addEmptyRow(tbody, elevesHtml, user, elevesById, ownerLabels) {
     );
 }
 
+async function runSemainesTypesSaveGabarit() {
+    const u = getPlanningSessionUser();
+    const sb = getSupabaseClient();
+    if (!u?.id || !sb || isAdmin(u)) return;
+    const ta = document.getElementById('st-tbody-a');
+    const tb = document.getElementById('st-tbody-b');
+    const ra = parseRowsFromTbody(ta, 'A', u.id);
+    const rb = parseRowsFromTbody(tb, 'B', u.id);
+    const all = [...ra, ...rb];
+    const err = validateNoOverlap(all);
+    if (err) {
+        showToast(err, 'error');
+        return;
+    }
+    const { data: existing } = await sb.from('organ_week_template_line').select('id').eq('owner_user_id', u.id);
+    const existingIds = new Set((existing || []).map((x) => x.id));
+    const currentIds = new Set(
+        all.map((x) => x.domId).filter((id) => id && !String(id).startsWith('new-'))
+    );
+    for (const id of existingIds) {
+        if (!currentIds.has(id)) {
+            await sb.from('organ_week_template_line').delete().eq('id', id);
+        }
+    }
+    for (const r of all) {
+        const payload = {
+            week_type: r.week_type,
+            owner_user_id: u.id,
+            slot_type: r.slot_type,
+            day_of_week: r.day_of_week,
+            start_time: r.start_time,
+            end_time: r.end_time,
+            title: r.title,
+            updated_at: new Date().toISOString()
+        };
+        let lineId = r.domId;
+        if (!lineId || String(lineId).startsWith('new-')) {
+            const { data: ins, error } = await sb
+                .from('organ_week_template_line')
+                .insert(payload)
+                .select('id')
+                .single();
+            if (error) {
+                showToast(error.message, 'error');
+                return;
+            }
+            lineId = ins.id;
+        } else {
+            const { error } = await sb.from('organ_week_template_line').update(payload).eq('id', lineId);
+            if (error) {
+                showToast(error.message, 'error');
+                return;
+            }
+        }
+        await sb.from('organ_week_template_line_student').delete().eq('line_id', lineId);
+        if (r.slot_type === 'cours' && r.studentIds.length) {
+            const rowsIns = r.studentIds.map((sid) => ({ line_id: lineId, student_user_id: sid }));
+            const { error: e2 } = await sb.from('organ_week_template_line_student').insert(rowsIns);
+            if (e2) {
+                showToast(e2.message, 'error');
+                return;
+            }
+        }
+    }
+    showToast('Gabarit enregistré : semaines types A et B sauvegardées.', 'success', 5200);
+}
+
+async function runSemainesTypesAnalyze() {
+    const u = getPlanningSessionUser();
+    const sb = getSupabaseClient();
+    if (!u?.id || !sb || isAdmin(u)) return;
+
+    const analyzeBtn = document.getElementById('st-btn-analyze');
+    const analyzeLabelRest =
+        analyzeBtn?.getAttribute('data-label-rest') || '1. Préparer l’application';
+    if (analyzeBtn && !analyzeBtn.getAttribute('data-label-rest')) {
+        analyzeBtn.setAttribute('data-label-rest', analyzeLabelRest);
+    }
+
+    if (analyzeBtn) {
+        analyzeBtn.disabled = true;
+        analyzeBtn.textContent = 'Préparation en cours…';
+    }
+    try {
+        stAnalyzeSetLoadingMessage();
+        setStApplyButtonReady(false);
+
+        const mainId = mainCalId();
+        if (!mainId) {
+            showToast('mainGoogleCalendarId manquant dans la config.', 'error');
+            resetStAnalyzeOutput();
+            return;
+        }
+        const applyStart = document.getElementById('st-apply-start')?.value?.trim();
+        const applyEnd = document.getElementById('st-apply-end')?.value?.trim();
+        if (!applyStart || !applyEnd) {
+            showToast('Indiquez une date de début et une date de fin.', 'error');
+            resetStAnalyzeOutput();
+            return;
+        }
+        if (applyEnd < applyStart) {
+            showToast('La date de fin doit être la même ou après le début.', 'error');
+            resetStAnalyzeOutput();
+            return;
+        }
+        const firstWeekRaw = document.querySelector('input[name="st-apply-first-week"]:checked')?.value;
+        const firstWeekLetter = firstWeekRaw === 'B' ? 'B' : 'A';
+
+        const { lines, byLineStudents } = await loadLinesForModal(u, false);
+        const { data: evs } = await sb.rpc('planning_list_eleves_actifs');
+        const byId = new Map((evs || []).map((e) => [e.user_id, e.email]));
+        const linePayload = [];
+        for (const ln of lines) {
+            const emails = [];
+            const ids = byLineStudents.get(ln.id) || [];
+            for (const sid of ids) {
+                const em = byId.get(sid);
+                if (em) emails.push(em);
+            }
+            linePayload.push({
+                ...ln,
+                students: emails
+            });
+        }
+        const emptyCours = linePayload.filter((l) => l.slot_type === 'cours').length === 0;
+        if (emptyCours && linePayload.filter((l) => l.slot_type === 'reservation').length === 0) {
+            if (
+                !confirm(
+                    'Votre gabarit ne contient aucune ligne. Tous vos cours seront retirés des agendas sur la période. Continuer la préparation ?'
+                )
+            ) {
+                resetStAnalyzeOutput();
+                return;
+            }
+        }
+        const analysis = await analyzeTemplateApply({
+            profUserId: u.id,
+            profEmail: u.email,
+            applyStartYmd: applyStart,
+            applyEndYmd: applyEnd,
+            firstWeekLetter,
+            lines: linePayload,
+            mainCalendarId: mainId
+        });
+        if (!analysis.ok) {
+            showToast(analysis.error || 'Préparation impossible.', 'error');
+            resetStAnalyzeOutput();
+            return;
+        }
+        lastAnalysis = analysis;
+        const s = analysis.summary;
+        let summaryText;
+        try {
+            summaryText = formatPrepareSummaryText(s, applyStart, firstWeekLetter, applyEnd);
+        } catch (e) {
+            console.error('[semaines-types] formatPrepareSummaryText', e);
+            showToast('Erreur d’affichage du résumé (voir la console).', 'error');
+            resetStAnalyzeOutput();
+            return;
+        }
+        stAnalyzeShowResult(summaryText);
+        setStApplyButtonReady(true);
+        showToast(
+            'Préparation terminée : résumé dans l’encadré ci-dessous, bouton 2 activé à droite du bouton 1.',
+            'info',
+            4800
+        );
+        document.getElementById('st-analyze-out-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } finally {
+        if (analyzeBtn) {
+            analyzeBtn.disabled = false;
+            analyzeBtn.textContent = analyzeBtn.getAttribute('data-label-rest') || analyzeLabelRest;
+        }
+    }
+}
+
+async function runSemainesTypesApply() {
+    const u = getPlanningSessionUser();
+    if (!u?.email || !lastAnalysis?.ok) return;
+    if (
+        !confirm(
+            'Appliquer maintenant sur Google Agenda ? Les suppressions listées seront exécutées puis les créations.'
+        )
+    ) {
+        return;
+    }
+    const mainId = mainCalId();
+    const r = await executeTemplateApply(lastAnalysis, { profEmail: u.email, mainCalendarId: mainId });
+    if (!r.ok) {
+        showToast(r.error || 'Échec application.', 'error');
+        return;
+    }
+    showToast('Application sur Google Agenda terminée.', 'success', 5200);
+    setStApplyButtonReady(false);
+    lastAnalysis = null;
+    document.dispatchEvent(new CustomEvent('planning-template-applied'));
+}
+
+async function runSemainesTypesAddRow(week) {
+    const u = getPlanningSessionUser();
+    if (!u?.id) return;
+    const eleves = await loadEleves();
+    const elevesById = new Map(eleves.map((e) => [e.user_id, e]));
+    const ownerLabels = await loadOwnerLabels([u.id]);
+    const tbody =
+        week === 'B' ? document.getElementById('st-tbody-b') : document.getElementById('st-tbody-a');
+    addEmptyRow(tbody, makeStudentOptionsHtml(eleves), u, elevesById, ownerLabels);
+}
+
+function runSemainesTypesGotoCal() {
+    document.getElementById('modal_semaines_types')?.close();
+    document.getElementById('calendar')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+/**
+ * Clics dans la modale : délégation sur document (fiable même si le fragment HTML a été injecté
+ * après un premier bind, ou si les boutons ont été recréés).
+ */
+function onSemainesTypesDocumentClick(e) {
+    const t = e.target;
+    if (!(t instanceof Element)) return;
+    const dlg = document.getElementById('modal_semaines_types');
+    if (!dlg?.open || !dlg.contains(t)) return;
+
+    if (t.closest('#st-btn-analyze')) {
+        e.preventDefault();
+        void runSemainesTypesAnalyze();
+        return;
+    }
+    const applyEl = t.closest('#st-btn-apply');
+    if (applyEl instanceof HTMLButtonElement) {
+        e.preventDefault();
+        if (applyEl.disabled) return;
+        void runSemainesTypesApply();
+        return;
+    }
+    if (t.closest('#st-save-gabarit')) {
+        e.preventDefault();
+        void runSemainesTypesSaveGabarit();
+        return;
+    }
+    if (t.closest('#st-add-row-a')) {
+        e.preventDefault();
+        void runSemainesTypesAddRow('A');
+        return;
+    }
+    if (t.closest('#st-add-row-b')) {
+        e.preventDefault();
+        void runSemainesTypesAddRow('B');
+        return;
+    }
+    if (t.closest('#st-goto-cal')) {
+        e.preventDefault();
+        runSemainesTypesGotoCal();
+    }
+}
+
 export function initSemainesTypesUi(currentUser) {
     const show = isBackendAuthConfigured() && isPrivilegedUser(currentUser);
     document.getElementById('menu-item-week-cycle-wrap')?.classList.toggle('hidden', !show);
@@ -572,263 +829,5 @@ export function initSemainesTypesUi(currentUser) {
         { signal }
     );
 
-    document.getElementById('st-add-row-a')?.addEventListener(
-        'click',
-        async () => {
-            const u = getPlanningSessionUser();
-            if (!u?.id) return;
-            const eleves = await loadEleves();
-            const elevesById = new Map(eleves.map((e) => [e.user_id, e]));
-            const ownerLabels = await loadOwnerLabels([u.id]);
-            addEmptyRow(
-                document.getElementById('st-tbody-a'),
-                makeStudentOptionsHtml(eleves),
-                u,
-                elevesById,
-                ownerLabels
-            );
-        },
-        { signal }
-    );
-    document.getElementById('st-add-row-b')?.addEventListener(
-        'click',
-        async () => {
-            const u = getPlanningSessionUser();
-            if (!u?.id) return;
-            const eleves = await loadEleves();
-            const elevesById = new Map(eleves.map((e) => [e.user_id, e]));
-            const ownerLabels = await loadOwnerLabels([u.id]);
-            addEmptyRow(
-                document.getElementById('st-tbody-b'),
-                makeStudentOptionsHtml(eleves),
-                u,
-                elevesById,
-                ownerLabels
-            );
-        },
-        { signal }
-    );
-
-    document.getElementById('st-save-gabarit')?.addEventListener(
-        'click',
-        async () => {
-            const u = getPlanningSessionUser();
-            const sb = getSupabaseClient();
-            if (!u?.id || !sb || isAdmin(u)) return;
-            const ta = document.getElementById('st-tbody-a');
-            const tb = document.getElementById('st-tbody-b');
-            const ra = parseRowsFromTbody(ta, 'A', u.id);
-            const rb = parseRowsFromTbody(tb, 'B', u.id);
-            const all = [...ra, ...rb];
-            const err = validateNoOverlap(all);
-            if (err) {
-                showToast(err, 'error');
-                return;
-            }
-            const { data: existing } = await sb
-                .from('organ_week_template_line')
-                .select('id')
-                .eq('owner_user_id', u.id);
-            const existingIds = new Set((existing || []).map((x) => x.id));
-            const currentIds = new Set(
-                all.map((x) => x.domId).filter((id) => id && !String(id).startsWith('new-'))
-            );
-            for (const id of existingIds) {
-                if (!currentIds.has(id)) {
-                    await sb.from('organ_week_template_line').delete().eq('id', id);
-                }
-            }
-            for (const r of all) {
-                const payload = {
-                    week_type: r.week_type,
-                    owner_user_id: u.id,
-                    slot_type: r.slot_type,
-                    day_of_week: r.day_of_week,
-                    start_time: r.start_time,
-                    end_time: r.end_time,
-                    title: r.title,
-                    updated_at: new Date().toISOString()
-                };
-                let lineId = r.domId;
-                if (!lineId || String(lineId).startsWith('new-')) {
-                    const { data: ins, error } = await sb
-                        .from('organ_week_template_line')
-                        .insert(payload)
-                        .select('id')
-                        .single();
-                    if (error) {
-                        showToast(error.message, 'error');
-                        return;
-                    }
-                    lineId = ins.id;
-                } else {
-                    const { error } = await sb.from('organ_week_template_line').update(payload).eq('id', lineId);
-                    if (error) {
-                        showToast(error.message, 'error');
-                        return;
-                    }
-                }
-                await sb.from('organ_week_template_line_student').delete().eq('line_id', lineId);
-                if (r.slot_type === 'cours' && r.studentIds.length) {
-                    const rowsIns = r.studentIds.map((sid) => ({ line_id: lineId, student_user_id: sid }));
-                    const { error: e2 } = await sb.from('organ_week_template_line_student').insert(rowsIns);
-                    if (e2) {
-                        showToast(e2.message, 'error');
-                        return;
-                    }
-                }
-            }
-            showToast('Gabarit enregistré : semaines types A et B sauvegardées.', 'success', 5200);
-        },
-        { signal }
-    );
-
-    document.getElementById('st-btn-analyze')?.addEventListener(
-        'click',
-        async () => {
-            const u = getPlanningSessionUser();
-            const sb = getSupabaseClient();
-            if (!u?.id || !sb || isAdmin(u)) return;
-
-            const analyzeBtn = document.getElementById('st-btn-analyze');
-            const analyzeLabelRest =
-                analyzeBtn?.getAttribute('data-label-rest') || '1. Préparer l’application';
-            if (analyzeBtn && !analyzeBtn.getAttribute('data-label-rest')) {
-                analyzeBtn.setAttribute('data-label-rest', analyzeLabelRest);
-            }
-
-            if (analyzeBtn) {
-                analyzeBtn.disabled = true;
-                analyzeBtn.textContent = 'Préparation en cours…';
-            }
-            try {
-                stAnalyzeSetLoadingMessage();
-                setStApplyButtonReady(false);
-
-                const mainId = mainCalId();
-                if (!mainId) {
-                    showToast('mainGoogleCalendarId manquant dans la config.', 'error');
-                    resetStAnalyzeOutput();
-                    return;
-                }
-                const applyStart = document.getElementById('st-apply-start')?.value?.trim();
-                const applyEnd = document.getElementById('st-apply-end')?.value?.trim();
-                if (!applyStart || !applyEnd) {
-                    showToast('Indiquez une date de début et une date de fin.', 'error');
-                    resetStAnalyzeOutput();
-                    return;
-                }
-                if (applyEnd < applyStart) {
-                    showToast('La date de fin doit être la même ou après le début.', 'error');
-                    resetStAnalyzeOutput();
-                    return;
-                }
-                const firstWeekRaw = document.querySelector('input[name="st-apply-first-week"]:checked')?.value;
-                const firstWeekLetter = firstWeekRaw === 'B' ? 'B' : 'A';
-
-                const { lines, byLineStudents } = await loadLinesForModal(u, false);
-                const { data: evs } = await sb.rpc('planning_list_eleves_actifs');
-                const byId = new Map((evs || []).map((e) => [e.user_id, e.email]));
-                const linePayload = [];
-                for (const ln of lines) {
-                    const emails = [];
-                    const ids = byLineStudents.get(ln.id) || [];
-                    for (const sid of ids) {
-                        const em = byId.get(sid);
-                        if (em) emails.push(em);
-                    }
-                    linePayload.push({
-                        ...ln,
-                        students: emails
-                    });
-                }
-                const emptyCours = linePayload.filter((l) => l.slot_type === 'cours').length === 0;
-                if (emptyCours && linePayload.filter((l) => l.slot_type === 'reservation').length === 0) {
-                    if (
-                        !confirm(
-                            'Votre gabarit ne contient aucune ligne. Tous vos cours seront retirés des agendas sur la période. Continuer la préparation ?'
-                        )
-                    ) {
-                        resetStAnalyzeOutput();
-                        return;
-                    }
-                }
-                const analysis = await analyzeTemplateApply({
-                    profUserId: u.id,
-                    profEmail: u.email,
-                    applyStartYmd: applyStart,
-                    applyEndYmd: applyEnd,
-                    firstWeekLetter,
-                    lines: linePayload,
-                    mainCalendarId: mainId
-                });
-                if (!analysis.ok) {
-                    showToast(analysis.error || 'Préparation impossible.', 'error');
-                    resetStAnalyzeOutput();
-                    return;
-                }
-                lastAnalysis = analysis;
-                const s = analysis.summary;
-                let summaryText;
-                try {
-                    summaryText = formatPrepareSummaryText(s, applyStart, firstWeekLetter, applyEnd);
-                } catch (e) {
-                    console.error('[semaines-types] formatPrepareSummaryText', e);
-                    showToast('Erreur d’affichage du résumé (voir la console).', 'error');
-                    resetStAnalyzeOutput();
-                    return;
-                }
-                stAnalyzeShowResult(summaryText);
-                setStApplyButtonReady(true);
-                showToast(
-                    'Préparation terminée : résumé dans l’encadré ci-dessous, bouton 2 activé à droite du bouton 1.',
-                    'info',
-                    4800
-                );
-                document.getElementById('st-analyze-out-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            } finally {
-                if (analyzeBtn) {
-                    analyzeBtn.disabled = false;
-                    analyzeBtn.textContent =
-                        analyzeBtn.getAttribute('data-label-rest') || analyzeLabelRest;
-                }
-            }
-        },
-        { signal }
-    );
-
-    document.getElementById('st-btn-apply')?.addEventListener(
-        'click',
-        async () => {
-            const u = getPlanningSessionUser();
-            if (!u?.email || !lastAnalysis?.ok) return;
-            if (
-                !confirm(
-                    'Appliquer maintenant sur Google Agenda ? Les suppressions listées seront exécutées puis les créations.'
-                )
-            ) {
-                return;
-            }
-            const mainId = mainCalId();
-            const r = await executeTemplateApply(lastAnalysis, { profEmail: u.email, mainCalendarId: mainId });
-            if (!r.ok) {
-                showToast(r.error || 'Échec application.', 'error');
-                return;
-            }
-            showToast('Application sur Google Agenda terminée.', 'success');
-            setStApplyButtonReady(false);
-            lastAnalysis = null;
-            document.dispatchEvent(new CustomEvent('planning-template-applied'));
-        },
-        { signal }
-    );
-
-    document.getElementById('st-goto-cal')?.addEventListener(
-        'click',
-        () => {
-            document.getElementById('modal_semaines_types')?.close();
-            document.getElementById('calendar')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-        },
-        { signal }
-    );
+    document.addEventListener('click', onSemainesTypesDocumentClick, { signal });
 }
