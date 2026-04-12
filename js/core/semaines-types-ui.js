@@ -26,7 +26,18 @@ const DOW_OPTS = [
 const USERS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>`;
 
 const ST_ANALYZE_PLACEHOLDER_TEXT =
-    'Cliquez sur « 1. Préparer l’application » : un résumé (suppressions, créations, conflits) s’affichera ici. Ensuite utilisez « 2. Appliquer sur Google Agenda » pour écrire dans les agendas.';
+    'Cliquez sur « 1. Préparer l’application » : le résumé s’affiche ici. Le bouton « 2. Appliquer sur Google Agenda » est juste en dessous (il s’active après une préparation réussie).';
+
+function setStApplyButtonReady(ready) {
+    const btn = document.getElementById('st-btn-apply');
+    if (!btn) return;
+    btn.disabled = !ready;
+    if (ready) {
+        btn.removeAttribute('title');
+    } else {
+        btn.setAttribute('title', 'Terminez d’abord l’étape 1 (Préparer l’application).');
+    }
+}
 
 function resetStAnalyzeOutput() {
     const ph = document.getElementById('st-analyze-placeholder');
@@ -39,6 +50,7 @@ function resetStAnalyzeOutput() {
         out.textContent = '';
         out.classList.add('hidden');
     }
+    setStApplyButtonReady(false);
 }
 
 /** @type {AbortController | null} */
@@ -440,7 +452,6 @@ async function openSemainesTypesModal(user) {
     if (applyEnd) applyEnd.value = defaultApplyEndYmd();
 
     resetStAnalyzeOutput();
-    document.getElementById('st-btn-apply')?.classList.add('hidden');
     lastAnalysis = null;
     dlg.showModal();
 }
@@ -621,6 +632,7 @@ export function initSemainesTypesUi(currentUser) {
                 out.classList.add('hidden');
                 out.textContent = '';
             }
+            setStApplyButtonReady(false);
 
             const mainId = mainCalId();
             if (!mainId) {
@@ -699,12 +711,12 @@ export function initSemainesTypesUi(currentUser) {
                     `Créations — travail perso : ${s.createTravailCount}`,
                     `Créneaux cours non posés (conflit autre prof) : ${s.skippedOtherProfCount}`,
                     '',
-                    'Vérifiez puis cliquez « 2. Appliquer sur Google Agenda » (3 tentatives en cas d’erreur réseau).'
+                    'Vérifiez le résumé ci-dessus puis cliquez le bouton rouge « 2. Appliquer sur Google Agenda » (3 tentatives en cas d’erreur réseau).'
                 ].join('\n');
             }
-            document.getElementById('st-btn-apply')?.classList.remove('hidden');
-            showToast('Préparation terminée : résumé affiché ci-dessous.', 'info');
-            wrap?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            setStApplyButtonReady(true);
+            showToast('Préparation terminée : résumé affiché ci-dessus, bouton 2 activé.', 'info');
+            document.getElementById('st-btn-apply-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         },
         { signal }
     );
@@ -728,7 +740,8 @@ export function initSemainesTypesUi(currentUser) {
                 return;
             }
             showToast('Application sur Google Agenda terminée.', 'success');
-            document.getElementById('st-btn-apply')?.classList.add('hidden');
+            setStApplyButtonReady(false);
+            lastAnalysis = null;
             document.dispatchEvent(new CustomEvent('planning-template-applied'));
         },
         { signal }

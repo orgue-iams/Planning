@@ -101,11 +101,22 @@
                 <p class="text-[9px] text-slate-500 leading-snug">La semaine est celle du <strong>lundi–dimanche</strong> contenant la date de début ; le <strong>lundi suivant</strong> bascule sur l’autre type (A ↔ B), et ainsi de suite jusqu’à la fin.</p>
                 <div class="flex flex-wrap gap-2 items-center">
                     <button type="button" id="st-btn-analyze" class="btn btn-outline btn-sm font-black text-[11px]">1. Préparer l’application</button>
-                    <button type="button" id="st-btn-apply" class="btn btn-error btn-sm font-black text-[11px] hidden">2. Appliquer sur Google Agenda</button>
                 </div>
                 <div id="st-analyze-out-wrap" class="rounded-lg border border-slate-200 bg-slate-50 p-3 max-w-4xl min-h-[3.5rem]">
-                    <p id="st-analyze-placeholder" class="text-[9px] text-slate-500 m-0 leading-relaxed">Cliquez sur <strong>1. Préparer l’application</strong> : un résumé (suppressions, créations, conflits) s’affichera ici. Ensuite utilisez <strong>2. Appliquer sur Google Agenda</strong> pour écrire dans les agendas.</p>
+                    <p id="st-analyze-placeholder" class="text-[9px] text-slate-500 m-0 leading-relaxed">Cliquez sur <strong>1. Préparer l’application</strong> : le résumé s’affiche ici. Le bouton <strong>2. Appliquer sur Google Agenda</strong> se trouve juste en dessous (il s’active après une préparation réussie).</p>
                     <pre id="st-analyze-out" class="hidden text-[10px] sm:text-xs text-slate-800 whitespace-pre-wrap font-sans m-0 mt-2 leading-relaxed"></pre>
+                </div>
+                <div id="st-btn-apply-wrap" class="mt-2 flex flex-col gap-1">
+                    <button
+                        type="button"
+                        id="st-btn-apply"
+                        disabled
+                        class="btn btn-error btn-sm font-black text-[11px] w-full sm:w-auto self-start"
+                        title="Terminez d’abord l’étape 1 (Préparer l’application)."
+                    >
+                        2. Appliquer sur Google Agenda
+                    </button>
+                    <p class="text-[9px] text-slate-500 m-0">Inactif tant que la préparation n’a pas réussi ; lisez le résumé ci-dessus puis cliquez ici pour écrire dans Google.</p>
                 </div>
             </div>
             <p class="text-[9px] text-slate-500 mt-2">TODO (hors V1) : e-mail récapitulatif par élève après changements.</p>
