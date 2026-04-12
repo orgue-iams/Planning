@@ -101,6 +101,20 @@ export function humanizeGoogleCalendarListError(raw) {
     return m;
 }
 
+/** Message utilisateur quand l’écriture Google échoue (quota / rafales). */
+export function humanizeGoogleCalendarApplyError(raw) {
+    const m = String(raw || '').trim();
+    if (!m) return 'Écriture Google Calendar impossible.';
+    if (/rate limit|quota|usageLimits|userRateLimitExceeded|rateLimitExceeded/i.test(m)) {
+        return [
+            'Google Calendar a temporairement limité les écritures (trop de requêtes en peu de temps).',
+            '',
+            'Attendez une minute puis réessayez « Appliquer ». Ne cliquez pas deux fois pendant l’envoi : l’application peut prendre du temps sur une longue période.'
+        ].join('\n');
+    }
+    return m;
+}
+
 /**
  * @param {object} p
  * @param {string} p.profUserId
@@ -378,8 +392,10 @@ export async function executeTemplateApply(analysis, ctx) {
             return { ok: true };
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
-            if (attempt >= APPLY_RETRIES) return { ok: false, error: msg };
+            if (attempt >= APPLY_RETRIES) {
+                return { ok: false, error: humanizeGoogleCalendarApplyError(msg) };
+            }
         }
     }
-    return { ok: false, error: 'Échec après plusieurs tentatives.' };
+    return { ok: false, error: humanizeGoogleCalendarApplyError('Échec après plusieurs tentatives.') };
 }

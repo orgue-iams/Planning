@@ -757,16 +757,42 @@ async function runSemainesTypesApply() {
     ) {
         return;
     }
-    const mainId = mainCalId();
-    const r = await executeTemplateApply(lastAnalysis, { profEmail: u.email, mainCalendarId: mainId });
-    if (!r.ok) {
-        showToast(r.error || 'Échec application.', 'error');
-        return;
+    const applyBtn = document.getElementById('st-btn-apply');
+    const applyLabelRest =
+        applyBtn?.getAttribute('data-label-rest') || '2. Appliquer sur Google Agenda';
+    if (applyBtn && !applyBtn.getAttribute('data-label-rest')) {
+        applyBtn.setAttribute('data-label-rest', applyLabelRest);
     }
-    showToast('Application sur Google Agenda terminée.', 'success', 5200);
-    setStApplyButtonReady(false);
-    lastAnalysis = null;
-    document.dispatchEvent(new CustomEvent('planning-template-applied'));
+    if (applyBtn) {
+        applyBtn.disabled = true;
+        applyBtn.textContent = 'Application en cours…';
+    }
+    const mainId = mainCalId();
+    try {
+        const r = await executeTemplateApply(lastAnalysis, { profEmail: u.email, mainCalendarId: mainId });
+        if (!r?.ok) {
+            const detail = r?.error || 'Échec application.';
+            stAnalyzeShowError('Application Google interrompue', detail);
+            showToast(detail.split('\n').find((l) => l.trim()) || 'Échec application.', 'error', 9000);
+            return;
+        }
+        showToast('Application sur Google Agenda terminée.', 'success', 5200);
+        setStApplyButtonReady(false);
+        lastAnalysis = null;
+        document.dispatchEvent(new CustomEvent('planning-template-applied'));
+    } finally {
+        if (applyBtn) {
+            applyBtn.textContent = applyBtn.getAttribute('data-label-rest') || applyLabelRest;
+            /* Succès : lastAnalysis effacé → garder désactivé. Échec : réactiver pour réessayer. */
+            if (lastAnalysis?.ok) {
+                applyBtn.removeAttribute('disabled');
+                applyBtn.disabled = false;
+            } else {
+                applyBtn.setAttribute('disabled', 'disabled');
+                applyBtn.disabled = true;
+            }
+        }
+    }
 }
 
 async function runSemainesTypesAddRow(week) {

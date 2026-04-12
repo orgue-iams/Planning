@@ -522,6 +522,118 @@ async function mirrorOwnerPersonalCalendarIfNeeded(
     }
 }
 
+function sleepMs(ms: number): Promise<void> {
+    return new Promise((r) => setTimeout(r, ms));
+}
+
+function isGoogleCalendarRateLimited(status: number, bodyText: string): boolean {
+    if (status === 429) return true;
+    if (status !== 403) return false;
+    try {
+        const j = JSON.parse(bodyText) as {
+            error?: { errors?: Array<{ reason?: string }>; message?: string };
+        };
+        const reasons = j.error?.errors?.map((e) => e.reason) ?? [];
+        if (reasons.some((x) => x === 'rateLimitExceeded' || x === 'userRateLimitExceeded')) return true;
+        const m = String(j.error?.message || '');
+        return /rate limit|quota/i.test(m);
+    } catch {
+        return /rate limit|quota|usageLimits/i.test(bodyText);
+    }
+}
+
+/**
+ * Un seul événement : évite Promise.all (centaines d’appels Google en parallèle → Rate Limit Exceeded).
+ */
+async function upsertSingleCalendarEvent(
+    accessToken: string,
+    calendarUser: { id: string; email?: string },
+    jwt: string,
+    supabaseUrl: string,
+    supabaseAnonKey: string,
+    ev: NonNullable<BridgeBody['events']>[0],
+    body: BridgeBody
+): Promise<{ googleEventId: string; start: string; end: string }> {
+    const title = String(ev.title || '').trim();
+    const start = ev.start;
+    const end = ev.end;
+    if (!title || !start || !end) {
+        throw new Error('Champs title, start et end requis pour chaque événement');
+    }
+    const calIdUpsert = encodeURIComponent(resolveCalendarId(ev.calendarId ?? body.calendarId));
+    const payload = googleEventResource({
+        title,
+        start,
+        end,
+        type: String(ev.type || 'reservation'),
+        owner: String(ev.owner || ''),
+        inscrits: ev.inscrits,
+        templateLineId: ev.templateLineId,
+        poolGoogleEventId: ev.poolGoogleEventId
+    });
+    const gid = ev.googleEventId?.trim();
+
+    let mainOutId = '';
+
+    if (gid) {
+        const encEid = encodeURIComponent(gid);
+        for (let attempt = 0; attempt < 5; attempt++) {
+            if (attempt > 0) await sleepMs(Math.min(2500, 350 * 2 ** (attempt - 1)));
+            const patch = await gcalFetch(accessToken, `/calendars/${calIdUpsert}/events/${encEid}`, {
+                method: 'PATCH',
+                body: JSON.stringify(payload)
+            });
+            const pt = await patch.text();
+            if (patch.ok) {
+                mainOutId = gid;
+                break;
+            }
+            if (patch.status === 404) break;
+            if (isGoogleCalendarRateLimited(patch.status, pt) && attempt < 4) continue;
+            throw new Error(pt.slice(0, 200) || `PATCH ${patch.status}`);
+        }
+    }
+
+    if (!mainOutId) {
+        let lastErr = '';
+        for (let attempt = 0; attempt < 6; attempt++) {
+            if (attempt > 0) await sleepMs(Math.min(3000, 400 * 2 ** (attempt - 1)));
+            const ins = await gcalFetch(accessToken, `/calendars/${calIdUpsert}/events`, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            const raw = await ins.text();
+            let created: GCalEvent & { error?: { message?: string } };
+            try {
+                created = JSON.parse(raw) as GCalEvent & { error?: { message?: string } };
+            } catch {
+                throw new Error(raw.slice(0, 200) || `POST HTTP ${ins.status}`);
+            }
+            if (ins.ok && created.id) {
+                mainOutId = created.id || '';
+                break;
+            }
+            lastErr = created.error?.message || `POST événement HTTP ${ins.status}`;
+            if (isGoogleCalendarRateLimited(ins.status, raw) && attempt < 5) continue;
+            throw new Error(lastErr);
+        }
+        if (!mainOutId) throw new Error(lastErr || 'Création événement impossible');
+    }
+
+    await mirrorOwnerPersonalCalendarIfNeeded(
+        accessToken,
+        calendarUser,
+        jwt,
+        supabaseUrl,
+        supabaseAnonKey,
+        ev,
+        body,
+        mainOutId
+    );
+
+    return { googleEventId: mainOutId, start, end };
+}
+
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
@@ -635,76 +747,22 @@ Deno.serve(async (req) => {
         }
 
         if (action === 'upsert' && body.events && body.events.length > 0) {
-            const results = await Promise.all(
-                body.events.map(async (ev) => {
-                    const title = String(ev.title || '').trim();
-                    const start = ev.start;
-                    const end = ev.end;
-                    if (!title || !start || !end) {
-                        throw new Error('Champs title, start et end requis pour chaque événement');
-                    }
-                    const calIdUpsert = encodeURIComponent(
-                        resolveCalendarId(ev.calendarId ?? body.calendarId)
-                    );
-                    const payload = googleEventResource({
-                        title,
-                        start,
-                        end,
-                        type: String(ev.type || 'reservation'),
-                        owner: String(ev.owner || ''),
-                        inscrits: ev.inscrits,
-                        templateLineId: ev.templateLineId,
-                        poolGoogleEventId: ev.poolGoogleEventId
-                    });
-                    const gid = ev.googleEventId?.trim();
-
-                    let mainOutId = '';
-
-                    if (gid) {
-                        const encEid = encodeURIComponent(gid);
-                        const patch = await gcalFetch(
-                            accessToken,
-                            `/calendars/${calIdUpsert}/events/${encEid}`,
-                            {
-                                method: 'PATCH',
-                                body: JSON.stringify(payload)
-                            }
-                        );
-                        if (patch.ok) {
-                            mainOutId = gid;
-                        } else if (patch.status !== 404) {
-                            const t = await patch.text();
-                            throw new Error(t.slice(0, 200) || `PATCH ${patch.status}`);
-                        }
-                    }
-
-                    if (!mainOutId) {
-                        const ins = await gcalFetch(accessToken, `/calendars/${calIdUpsert}/events`, {
-                            method: 'POST',
-                            body: JSON.stringify(payload)
-                        });
-                        const created = (await ins.json()) as GCalEvent & { error?: { message?: string } };
-                        if (!ins.ok || !created.id) {
-                            throw new Error(created.error?.message || `POST événement HTTP ${ins.status}`);
-                        }
-                        mainOutId = created.id || '';
-                    }
-
-                    await mirrorOwnerPersonalCalendarIfNeeded(
-                        accessToken,
-                        calendarUser,
-                        jwt,
-                        supabaseUrl,
-                        supabaseAnonKey,
-                        ev,
-                        body,
-                        mainOutId
-                    );
-
-                    return { googleEventId: mainOutId, start, end };
-                })
-            );
-
+            const results: Array<{ googleEventId: string; start: string; end: string }> = [];
+            /** Écart entre événements pour limiter les rafales (quota Google Calendar). */
+            const gapMs = 55;
+            for (let i = 0; i < body.events.length; i++) {
+                if (i > 0) await sleepMs(gapMs);
+                const row = await upsertSingleCalendarEvent(
+                    accessToken,
+                    calendarUser,
+                    jwt,
+                    supabaseUrl,
+                    supabaseAnonKey,
+                    body.events[i],
+                    body
+                );
+                results.push(row);
+            }
             return jsonResponse({ ok: true, results });
         }
 
