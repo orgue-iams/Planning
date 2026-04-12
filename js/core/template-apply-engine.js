@@ -80,6 +80,27 @@ function normEmail(s) {
         .toLowerCase();
 }
 
+/** Message lisible quand la liste d’événements Google échoue (souvent 404 / droits SA). */
+export function humanizeGoogleCalendarListError(raw) {
+    const m = String(raw || '').trim();
+    if (!m) return 'Impossible de lire le planning général sur Google Calendar.';
+    if (/not found/i.test(m)) {
+        return [
+            'Google Calendar indique « Not Found » pour ce calendrier.',
+            '',
+            'Contrôlez :',
+            '• planning.config.js → mainGoogleCalendarId = l’ID du calendrier « général » (souvent son adresse e-mail, ex. orgue.iams@google.com).',
+            '• Supabase → secrets de calendar-bridge : GOOGLE_CALENDAR_ID doit être la même valeur.',
+            '• Le calendrier est partagé avec l’e-mail du compte de service (client_email du JSON GOOGLE_SERVICE_ACCOUNT_JSON), droits de modification.',
+            '• Évitez un ID déjà encodé en %40 dans les secrets (risque de double encodage).'
+        ].join('\n');
+    }
+    if (/401|403|unauthorized|forbidden/i.test(m)) {
+        return `${m}\n\nVérifiez les secrets Google côté Edge Function (compte de service ou refresh token) et les droits sur le calendrier.`;
+    }
+    return m;
+}
+
 /**
  * @param {object} p
  * @param {string} p.profUserId
@@ -141,7 +162,12 @@ export async function analyzeTemplateApply(p) {
         calendarId: p.mainCalendarId
     });
     if (listMain.skipped) return { ok: false, error: 'Pont Google (calendar-bridge) non configuré.' };
-    if (!listMain.ok) return { ok: false, error: listMain.error || 'Liste agenda général impossible.' };
+    if (!listMain.ok) {
+        return {
+            ok: false,
+            error: humanizeGoogleCalendarListError(listMain.error || 'Liste agenda général impossible.')
+        };
+    }
     const mainEvents = listMain.data?.events || [];
 
     let skippedOtherProf = 0;

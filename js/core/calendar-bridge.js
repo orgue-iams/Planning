@@ -12,6 +12,13 @@ export async function invokeCalendarBridge(accessToken, body, options) {
     if (!calendarBridgeUrl) {
         return { ok: true, skipped: true };
     }
+    if (!String(supabaseAnonKey || '').trim()) {
+        return {
+            ok: false,
+            error:
+                'supabaseAnonKey manquante dans planning.config.js : obligatoire pour appeler calendar-bridge (en-tête apikey Supabase).'
+        };
+    }
 
     const parseResponse = async (res) => {
         const text = await res.text();

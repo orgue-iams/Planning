@@ -34,6 +34,7 @@ function stAnalyzeSetLoadingMessage() {
     if (out) {
         out.textContent = '';
         out.style.display = 'none';
+        out.classList.remove('text-red-700', 'font-bold');
     }
     if (ph) {
         ph.textContent = 'Préparation en cours…';
@@ -46,7 +47,20 @@ function stAnalyzeShowResult(text) {
     const out = document.getElementById('st-analyze-out');
     if (ph) ph.style.display = 'none';
     if (out) {
+        out.classList.remove('text-red-700', 'font-bold');
         out.textContent = text;
+        out.style.display = 'block';
+    }
+}
+
+/** Affiche l’échec dans l’encadré (visible même si le toast est raté). */
+function stAnalyzeShowError(title, detail) {
+    const ph = document.getElementById('st-analyze-placeholder');
+    const out = document.getElementById('st-analyze-out');
+    if (ph) ph.style.display = 'none';
+    if (out) {
+        out.classList.add('text-red-700', 'font-bold');
+        out.textContent = [title, '', detail].filter(Boolean).join('\n');
         out.style.display = 'block';
     }
 }
@@ -114,6 +128,7 @@ function resetStAnalyzeOutput() {
     if (out) {
         out.textContent = '';
         out.style.display = 'none';
+        out.classList.remove('text-red-700', 'font-bold');
     }
     if (ph) {
         ph.innerHTML = ST_ANALYZE_PLACEHOLDER_HTML;
@@ -638,20 +653,21 @@ async function runSemainesTypesAnalyze() {
 
         const mainId = mainCalId();
         if (!mainId) {
+            const msg = 'Renseignez mainGoogleCalendarId dans planning.config.js (même calendrier que GOOGLE_CALENDAR_ID côté Edge Function).';
+            stAnalyzeShowError('Configuration incomplète', msg);
             showToast('mainGoogleCalendarId manquant dans la config.', 'error');
-            resetStAnalyzeOutput();
             return;
         }
         const applyStart = document.getElementById('st-apply-start')?.value?.trim();
         const applyEnd = document.getElementById('st-apply-end')?.value?.trim();
         if (!applyStart || !applyEnd) {
+            stAnalyzeShowError('Dates manquantes', 'Indiquez une date de début et une date de fin.');
             showToast('Indiquez une date de début et une date de fin.', 'error');
-            resetStAnalyzeOutput();
             return;
         }
         if (applyEnd < applyStart) {
+            stAnalyzeShowError('Dates invalides', 'La date de fin doit être la même ou après le début.');
             showToast('La date de fin doit être la même ou après le début.', 'error');
-            resetStAnalyzeOutput();
             return;
         }
         const firstWeekRaw = document.querySelector('input[name="st-apply-first-week"]:checked')?.value;
@@ -694,8 +710,9 @@ async function runSemainesTypesAnalyze() {
             mainCalendarId: mainId
         });
         if (!analysis.ok) {
-            showToast(analysis.error || 'Préparation impossible.', 'error');
-            resetStAnalyzeOutput();
+            const err = analysis.error || 'Préparation impossible.';
+            stAnalyzeShowError('La préparation a échoué', err);
+            showToast(err.split('\n')[0] || 'Préparation impossible.', 'error', 8000);
             return;
         }
         lastAnalysis = analysis;
@@ -705,8 +722,8 @@ async function runSemainesTypesAnalyze() {
             summaryText = formatPrepareSummaryText(s, applyStart, firstWeekLetter, applyEnd);
         } catch (e) {
             console.error('[semaines-types] formatPrepareSummaryText', e);
+            stAnalyzeShowError('Erreur interne', String(e?.message || e));
             showToast('Erreur d’affichage du résumé (voir la console).', 'error');
-            resetStAnalyzeOutput();
             return;
         }
         stAnalyzeShowResult(summaryText);
@@ -717,6 +734,11 @@ async function runSemainesTypesAnalyze() {
             4800
         );
         document.getElementById('st-analyze-out-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (e) {
+        console.error('[semaines-types] runSemainesTypesAnalyze', e);
+        const msg = String(e?.message || e);
+        stAnalyzeShowError('Erreur inattendue', msg);
+        showToast(msg.split('\n')[0] || 'Erreur lors de la préparation.', 'error', 8000);
     } finally {
         if (analyzeBtn) {
             analyzeBtn.disabled = false;
