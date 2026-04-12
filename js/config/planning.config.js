@@ -22,8 +22,8 @@ window.__PLANNING_CONFIG__ = window.__PLANNING_CONFIG__ || {
      * ID du calendrier Google « général » (même valeur que GOOGLE_CALENDAR_ID côté calendar-bridge).
      * Sert aux liens d’abonnement / copie dans la modale Profil. Laisser vide = liens masqués.
      */
-    mainGoogleCalendarId: 'orgue.iams@google.com',
+    mainGoogleCalendarId: 'orgue.iams@gmail.com',
 
     /** Nom affiché au-dessus du lien dans la modale Profil (sinon libellé par défaut côté app). */
-    mainGoogleCalendarLabel: 'Planning général orgue'
+    mainGoogleCalendarLabel: 'Planning général'
 };
