@@ -1,7 +1,8 @@
 /**
  * Retours utilisateur non bloquants (DaisyUI toast)
+ * @param {number} [durationMs] temps d’affichage avant fondu (défaut 3200 ms)
  */
-export function showToast(message, variant = 'success') {
+export function showToast(message, variant = 'success', durationMs = 3200) {
     let root = document.getElementById('toast-root');
     if (!root) {
         root = document.createElement('div');
@@ -21,7 +22,7 @@ export function showToast(message, variant = 'success') {
     el.textContent = message;
     root.appendChild(el);
 
-    const fadeMs = 3200;
+    const fadeMs = typeof durationMs === 'number' && durationMs > 0 ? durationMs : 3200;
     window.setTimeout(() => {
         el.style.opacity = '0';
         el.style.transition = 'opacity 0.25s ease';

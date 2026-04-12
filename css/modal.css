@@ -468,3 +468,13 @@
     max-height: none;
     min-height: 0;
 }
+
+/* Semaines types : bouton Appliquer clairement actif après préparation */
+#modal_semaines_types #st-btn-apply:not(:disabled) {
+    opacity: 1;
+    cursor: pointer;
+}
+#modal_semaines_types #st-btn-apply:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}

@@ -30,13 +30,53 @@ const ST_ANALYZE_PLACEHOLDER_TEXT =
 
 function setStApplyButtonReady(ready) {
     const btn = document.getElementById('st-btn-apply');
+    const hint = document.getElementById('st-btn-apply-hint');
     if (!btn) return;
-    btn.disabled = !ready;
     if (ready) {
+        btn.removeAttribute('disabled');
         btn.removeAttribute('title');
+        if (hint) {
+            hint.textContent =
+                'Le bouton est actif : vous pouvez écrire dans Google Agenda (lisez le résumé ci-dessus avant de confirmer).';
+        }
     } else {
+        btn.setAttribute('disabled', 'disabled');
         btn.setAttribute('title', 'Terminez d’abord l’étape 1 (Préparer l’application).');
+        if (hint) {
+            hint.textContent =
+                'Inactif tant que la préparation n’a pas réussi ; lisez le résumé ci-dessus puis cliquez ici pour écrire dans Google.';
+        }
     }
+}
+
+/** @param {object} s summary from analyzeTemplateApply */
+function formatPrepareSummaryText(s, applyStart, firstWeekLetter, applyEnd) {
+    const skipped = Number(s?.skippedOtherProfCount ?? 0);
+    const conflictBlock =
+        skipped === 0
+            ? [
+                  '——— Conflits / blocages ———',
+                  'Aucun conflit détecté : pas de cours laissé de côté pour chevauchement avec un autre professeur sur le planning général.',
+                  ''
+              ]
+            : [
+                  '——— Conflits / blocages ———',
+                  `${skipped} créneau(x) cours non posé(s) sur le planning général (chevauchement avec un autre professeur).`,
+                  ''
+              ];
+    return [
+        `Alternance : semaine du ${applyStart} = type ${firstWeekLetter}, puis chaque lundi bascule A ↔ B jusqu’au ${applyEnd}.`,
+        '',
+        '——— Bilan des opérations prévues ———',
+        `Suppressions — planning général : ${s.deleteMainCount}`,
+        `Suppressions — agendas perso élèves : ${s.deleteStudentPersoCount}`,
+        `Suppressions — agenda perso prof : ${s.deleteProfPersoCount}`,
+        `Créations — cours (général + élève chacun) : ${s.createMainCoursCount} × 2 max`,
+        `Créations — travail perso : ${s.createTravailCount}`,
+        '',
+        ...conflictBlock,
+        'Vérifiez le résumé puis cliquez « 2. Appliquer sur Google Agenda » pour écrire dans Google (3 tentatives en cas d’erreur réseau).'
+    ].join('\n');
 }
 
 function resetStAnalyzeOutput() {
@@ -609,7 +649,7 @@ export function initSemainesTypesUi(currentUser) {
                     }
                 }
             }
-            showToast('Semaines types enregistrées avec succès.', 'success');
+            showToast('Gabarit enregistré : semaines types A et B sauvegardées.', 'success', 5200);
         },
         { signal }
     );
@@ -621,102 +661,113 @@ export function initSemainesTypesUi(currentUser) {
             const sb = getSupabaseClient();
             if (!u?.id || !sb || isAdmin(u)) return;
 
+            const analyzeBtn = document.getElementById('st-btn-analyze');
+            const analyzeLabelRest =
+                analyzeBtn?.getAttribute('data-label-rest') || '1. Préparer l’application';
+            if (analyzeBtn && !analyzeBtn.getAttribute('data-label-rest')) {
+                analyzeBtn.setAttribute('data-label-rest', analyzeLabelRest);
+            }
+
             const ph = document.getElementById('st-analyze-placeholder');
             const out = document.getElementById('st-analyze-out');
-            const wrap = document.getElementById('st-analyze-out-wrap');
-            if (ph) {
-                ph.textContent = 'Préparation en cours…';
-                ph.classList.remove('hidden');
+            if (analyzeBtn) {
+                analyzeBtn.disabled = true;
+                analyzeBtn.textContent = 'Préparation en cours…';
             }
-            if (out) {
-                out.classList.add('hidden');
-                out.textContent = '';
-            }
-            setStApplyButtonReady(false);
-
-            const mainId = mainCalId();
-            if (!mainId) {
-                showToast('mainGoogleCalendarId manquant dans la config.', 'error');
-                resetStAnalyzeOutput();
-                return;
-            }
-            const applyStart = document.getElementById('st-apply-start')?.value?.trim();
-            const applyEnd = document.getElementById('st-apply-end')?.value?.trim();
-            if (!applyStart || !applyEnd) {
-                showToast('Indiquez une date de début et une date de fin.', 'error');
-                resetStAnalyzeOutput();
-                return;
-            }
-            if (applyEnd < applyStart) {
-                showToast('La date de fin doit être la même ou après le début.', 'error');
-                resetStAnalyzeOutput();
-                return;
-            }
-            const firstWeekRaw = document.querySelector('input[name="st-apply-first-week"]:checked')?.value;
-            const firstWeekLetter = firstWeekRaw === 'B' ? 'B' : 'A';
-
-            const { lines, byLineStudents } = await loadLinesForModal(u, false);
-            const { data: evs } = await sb.rpc('planning_list_eleves_actifs');
-            const byId = new Map((evs || []).map((e) => [e.user_id, e.email]));
-            const linePayload = [];
-            for (const ln of lines) {
-                const emails = [];
-                const ids = byLineStudents.get(ln.id) || [];
-                for (const sid of ids) {
-                    const em = byId.get(sid);
-                    if (em) emails.push(em);
+            try {
+                if (ph) {
+                    ph.textContent = 'Préparation en cours…';
+                    ph.classList.remove('hidden');
                 }
-                linePayload.push({
-                    ...ln,
-                    students: emails
-                });
-            }
-            const emptyCours = linePayload.filter((l) => l.slot_type === 'cours').length === 0;
-            if (emptyCours && linePayload.filter((l) => l.slot_type === 'reservation').length === 0) {
-                if (
-                    !confirm(
-                        'Votre gabarit ne contient aucune ligne. Tous vos cours seront retirés des agendas sur la période. Continuer la préparation ?'
-                    )
-                ) {
+                if (out) {
+                    out.classList.add('hidden');
+                    out.textContent = '';
+                }
+                setStApplyButtonReady(false);
+
+                const mainId = mainCalId();
+                if (!mainId) {
+                    showToast('mainGoogleCalendarId manquant dans la config.', 'error');
                     resetStAnalyzeOutput();
                     return;
                 }
+                const applyStart = document.getElementById('st-apply-start')?.value?.trim();
+                const applyEnd = document.getElementById('st-apply-end')?.value?.trim();
+                if (!applyStart || !applyEnd) {
+                    showToast('Indiquez une date de début et une date de fin.', 'error');
+                    resetStAnalyzeOutput();
+                    return;
+                }
+                if (applyEnd < applyStart) {
+                    showToast('La date de fin doit être la même ou après le début.', 'error');
+                    resetStAnalyzeOutput();
+                    return;
+                }
+                const firstWeekRaw = document.querySelector('input[name="st-apply-first-week"]:checked')?.value;
+                const firstWeekLetter = firstWeekRaw === 'B' ? 'B' : 'A';
+
+                const { lines, byLineStudents } = await loadLinesForModal(u, false);
+                const { data: evs } = await sb.rpc('planning_list_eleves_actifs');
+                const byId = new Map((evs || []).map((e) => [e.user_id, e.email]));
+                const linePayload = [];
+                for (const ln of lines) {
+                    const emails = [];
+                    const ids = byLineStudents.get(ln.id) || [];
+                    for (const sid of ids) {
+                        const em = byId.get(sid);
+                        if (em) emails.push(em);
+                    }
+                    linePayload.push({
+                        ...ln,
+                        students: emails
+                    });
+                }
+                const emptyCours = linePayload.filter((l) => l.slot_type === 'cours').length === 0;
+                if (emptyCours && linePayload.filter((l) => l.slot_type === 'reservation').length === 0) {
+                    if (
+                        !confirm(
+                            'Votre gabarit ne contient aucune ligne. Tous vos cours seront retirés des agendas sur la période. Continuer la préparation ?'
+                        )
+                    ) {
+                        resetStAnalyzeOutput();
+                        return;
+                    }
+                }
+                const analysis = await analyzeTemplateApply({
+                    profUserId: u.id,
+                    profEmail: u.email,
+                    applyStartYmd: applyStart,
+                    applyEndYmd: applyEnd,
+                    firstWeekLetter,
+                    lines: linePayload,
+                    mainCalendarId: mainId
+                });
+                if (!analysis.ok) {
+                    showToast(analysis.error || 'Préparation impossible.', 'error');
+                    resetStAnalyzeOutput();
+                    return;
+                }
+                lastAnalysis = analysis;
+                const s = analysis.summary;
+                if (ph) ph.classList.add('hidden');
+                if (out) {
+                    out.classList.remove('hidden');
+                    out.textContent = formatPrepareSummaryText(s, applyStart, firstWeekLetter, applyEnd);
+                }
+                setStApplyButtonReady(true);
+                showToast(
+                    'Préparation terminée : le bouton « 2. Appliquer sur Google Agenda » est maintenant actif.',
+                    'info',
+                    4800
+                );
+                document.getElementById('st-btn-apply-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } finally {
+                if (analyzeBtn) {
+                    analyzeBtn.disabled = false;
+                    analyzeBtn.textContent =
+                        analyzeBtn.getAttribute('data-label-rest') || analyzeLabelRest;
+                }
             }
-            const analysis = await analyzeTemplateApply({
-                profUserId: u.id,
-                profEmail: u.email,
-                applyStartYmd: applyStart,
-                applyEndYmd: applyEnd,
-                firstWeekLetter,
-                lines: linePayload,
-                mainCalendarId: mainId
-            });
-            if (!analysis.ok) {
-                showToast(analysis.error || 'Préparation impossible.', 'error');
-                resetStAnalyzeOutput();
-                return;
-            }
-            lastAnalysis = analysis;
-            const s = analysis.summary;
-            if (ph) ph.classList.add('hidden');
-            if (out) {
-                out.classList.remove('hidden');
-                out.textContent = [
-                    `Alternance : semaine du ${applyStart} = type ${firstWeekLetter}, puis chaque lundi bascule A ↔ B jusqu’au ${applyEnd}.`,
-                    '',
-                    `Suppressions — planning général : ${s.deleteMainCount}`,
-                    `Suppressions — agendas perso élèves : ${s.deleteStudentPersoCount}`,
-                    `Suppressions — agenda perso prof : ${s.deleteProfPersoCount}`,
-                    `Créations — cours (général + élève chacun) : ${s.createMainCoursCount} × 2 max`,
-                    `Créations — travail perso : ${s.createTravailCount}`,
-                    `Créneaux cours non posés (conflit autre prof) : ${s.skippedOtherProfCount}`,
-                    '',
-                    'Vérifiez le résumé ci-dessus puis cliquez le bouton rouge « 2. Appliquer sur Google Agenda » (3 tentatives en cas d’erreur réseau).'
-                ].join('\n');
-            }
-            setStApplyButtonReady(true);
-            showToast('Préparation terminée : résumé affiché ci-dessus, bouton 2 activé.', 'info');
-            document.getElementById('st-btn-apply-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         },
         { signal }
     );
