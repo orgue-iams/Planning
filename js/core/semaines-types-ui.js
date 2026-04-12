@@ -25,8 +25,31 @@ const DOW_OPTS = [
 
 const USERS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>`;
 
-const ST_ANALYZE_PLACEHOLDER_TEXT =
-    'Cliquez sur « 1. Préparer l’application » : le résumé s’affiche ici. Le bouton « 2. Appliquer sur Google Agenda » est juste en dessous (il s’active après une préparation réussie).';
+const ST_ANALYZE_PLACEHOLDER_HTML =
+    'Cliquez sur <strong>1. Préparer l’application</strong> : le résumé (bilan, conflits) s’affiche dans cet encadré. Ensuite activez <strong>2. Appliquer sur Google Agenda</strong> (à droite du bouton 1).';
+
+function stAnalyzeSetLoadingMessage() {
+    const ph = document.getElementById('st-analyze-placeholder');
+    const out = document.getElementById('st-analyze-out');
+    if (out) {
+        out.textContent = '';
+        out.style.display = 'none';
+    }
+    if (ph) {
+        ph.textContent = 'Préparation en cours…';
+        ph.style.display = 'block';
+    }
+}
+
+function stAnalyzeShowResult(text) {
+    const ph = document.getElementById('st-analyze-placeholder');
+    const out = document.getElementById('st-analyze-out');
+    if (ph) ph.style.display = 'none';
+    if (out) {
+        out.textContent = text;
+        out.style.display = 'block';
+    }
+}
 
 function setStApplyButtonReady(ready) {
     const btn = document.getElementById('st-btn-apply');
@@ -34,17 +57,23 @@ function setStApplyButtonReady(ready) {
     if (!btn) return;
     if (ready) {
         btn.removeAttribute('disabled');
+        btn.disabled = false;
+        requestAnimationFrame(() => {
+            btn.removeAttribute('disabled');
+            btn.disabled = false;
+        });
         btn.removeAttribute('title');
         if (hint) {
-            hint.textContent =
-                'Le bouton est actif : vous pouvez écrire dans Google Agenda (lisez le résumé ci-dessus avant de confirmer).';
+            hint.innerHTML =
+                'Le bouton <strong>2</strong> est actif : vous pouvez écrire dans Google Agenda (vérifiez le résumé dans l’encadré ci-dessous avant de confirmer).';
         }
     } else {
         btn.setAttribute('disabled', 'disabled');
+        btn.disabled = true;
         btn.setAttribute('title', 'Terminez d’abord l’étape 1 (Préparer l’application).');
         if (hint) {
-            hint.textContent =
-                'Inactif tant que la préparation n’a pas réussi ; lisez le résumé ci-dessus puis cliquez ici pour écrire dans Google.';
+            hint.innerHTML =
+                'Le bouton <strong>2</strong> reste inactif tant que la préparation n’a pas réussi ; le résumé s’affiche dans l’encadré ci-dessous.';
         }
     }
 }
@@ -75,20 +104,20 @@ function formatPrepareSummaryText(s, applyStart, firstWeekLetter, applyEnd) {
         `Créations — travail perso : ${s.createTravailCount}`,
         '',
         ...conflictBlock,
-        'Vérifiez le résumé puis cliquez « 2. Appliquer sur Google Agenda » pour écrire dans Google (3 tentatives en cas d’erreur réseau).'
+        'Vérifiez le résumé ci-dessus puis cliquez « 2. Appliquer sur Google Agenda » (à droite du bouton 1) pour écrire dans Google (3 tentatives en cas d’erreur réseau).'
     ].join('\n');
 }
 
 function resetStAnalyzeOutput() {
     const ph = document.getElementById('st-analyze-placeholder');
     const out = document.getElementById('st-analyze-out');
-    if (ph) {
-        ph.textContent = ST_ANALYZE_PLACEHOLDER_TEXT;
-        ph.classList.remove('hidden');
-    }
     if (out) {
         out.textContent = '';
-        out.classList.add('hidden');
+        out.style.display = 'none';
+    }
+    if (ph) {
+        ph.innerHTML = ST_ANALYZE_PLACEHOLDER_HTML;
+        ph.style.display = 'block';
     }
     setStApplyButtonReady(false);
 }
@@ -668,21 +697,12 @@ export function initSemainesTypesUi(currentUser) {
                 analyzeBtn.setAttribute('data-label-rest', analyzeLabelRest);
             }
 
-            const ph = document.getElementById('st-analyze-placeholder');
-            const out = document.getElementById('st-analyze-out');
             if (analyzeBtn) {
                 analyzeBtn.disabled = true;
                 analyzeBtn.textContent = 'Préparation en cours…';
             }
             try {
-                if (ph) {
-                    ph.textContent = 'Préparation en cours…';
-                    ph.classList.remove('hidden');
-                }
-                if (out) {
-                    out.classList.add('hidden');
-                    out.textContent = '';
-                }
+                stAnalyzeSetLoadingMessage();
                 setStApplyButtonReady(false);
 
                 const mainId = mainCalId();
@@ -749,18 +769,23 @@ export function initSemainesTypesUi(currentUser) {
                 }
                 lastAnalysis = analysis;
                 const s = analysis.summary;
-                if (ph) ph.classList.add('hidden');
-                if (out) {
-                    out.classList.remove('hidden');
-                    out.textContent = formatPrepareSummaryText(s, applyStart, firstWeekLetter, applyEnd);
+                let summaryText;
+                try {
+                    summaryText = formatPrepareSummaryText(s, applyStart, firstWeekLetter, applyEnd);
+                } catch (e) {
+                    console.error('[semaines-types] formatPrepareSummaryText', e);
+                    showToast('Erreur d’affichage du résumé (voir la console).', 'error');
+                    resetStAnalyzeOutput();
+                    return;
                 }
+                stAnalyzeShowResult(summaryText);
                 setStApplyButtonReady(true);
                 showToast(
-                    'Préparation terminée : le bouton « 2. Appliquer sur Google Agenda » est maintenant actif.',
+                    'Préparation terminée : résumé dans l’encadré ci-dessous, bouton 2 activé à droite du bouton 1.',
                     'info',
                     4800
                 );
-                document.getElementById('st-btn-apply-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                document.getElementById('st-analyze-out-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             } finally {
                 if (analyzeBtn) {
                     analyzeBtn.disabled = false;
