@@ -5,7 +5,7 @@
 import { getAccessToken } from './auth-logic.js';
 import { getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
 import { bridgeListEvents, bridgeDeleteEvent, bridgeUpsertEvents } from './calendar-bridge.js';
-import { weekCycleLabelForDate } from './week-cycle.js';
+import { mondayOfLocalWeek } from './week-cycle.js';
 
 const APPLY_RETRIES = 3;
 
@@ -26,15 +26,27 @@ export function jsGetDayMatchesTemplateDow(d, templateDow) {
 }
 
 /**
- * @param {string} anchorIso
+ * Alternance lundi → lundi : la semaine calendaire qui contient `periodStartYmd`
+ * (repérée par son lundi local) porte `letterForWeekContainingStart`, puis A/B alterne.
+ *
  * @param {Date} d
+ * @param {string} periodStartYmd YYYY-MM-DD (n’importe quel jour de la semaine de référence)
+ * @param {'A'|'B'} letterForWeekContainingStart
  * @returns {'A'|'B'|null}
  */
-export function weekTypeLetterForDate(anchorIso, d) {
-    const lab = weekCycleLabelForDate(anchorIso, d);
-    if (lab === 'Semaine A') return 'A';
-    if (lab === 'Semaine B') return 'B';
-    return null;
+export function weekTypeLetterForAlternance(d, periodStartYmd, letterForWeekContainingStart) {
+    const ymd = String(periodStartYmd || '').slice(0, 10);
+    const start = new Date(`${ymd}T12:00:00`);
+    if (Number.isNaN(start.getTime()) || !d || Number.isNaN(d.getTime())) return null;
+    if (letterForWeekContainingStart !== 'A' && letterForWeekContainingStart !== 'B') return null;
+    const refMon = mondayOfLocalWeek(start);
+    const dMon = mondayOfLocalWeek(d);
+    const diff = Math.round((dMon.getTime() - refMon.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    if (!Number.isFinite(diff)) return null;
+    const flip = diff % 2 !== 0;
+    let letter = letterForWeekContainingStart;
+    if (flip) letter = letter === 'A' ? 'B' : 'A';
+    return letter;
 }
 
 function combineDateAndTimeLocal(d, timeStr) {
@@ -72,9 +84,9 @@ function normEmail(s) {
  * @param {object} p
  * @param {string} p.profUserId
  * @param {string} p.profEmail
- * @param {string} p.applyStartYmd
- * @param {string} p.schoolEndYmd
- * @param {string} p.anchorMondayIso
+ * @param {string} p.applyStartYmd — début de période (inclus)
+ * @param {string} p.applyEndYmd — fin de période (inclus)
+ * @param {'A'|'B'} p.firstWeekLetter — type de la semaine calendaire qui contient applyStartYmd
  * @param {object[]} p.lines — { id, week_type, day_of_week, start_time, end_time, slot_type, title, students: string[] emails }
  * @param {string} p.mainCalendarId
  */
@@ -84,7 +96,7 @@ export async function analyzeTemplateApply(p) {
 
     const profEmail = normEmail(p.profEmail);
     const startD = new Date(`${p.applyStartYmd}T12:00:00`);
-    const endD = new Date(`${p.schoolEndYmd}T12:00:00`);
+    const endD = new Date(`${p.applyEndYmd}T12:00:00`);
     const timeMax = new Date(endD);
     timeMax.setHours(23, 59, 59, 999);
 
@@ -93,7 +105,7 @@ export async function analyzeTemplateApply(p) {
 
     const days = eachCalendarDay(startD, endD);
     for (const d of days) {
-        const letter = weekTypeLetterForDate(p.anchorMondayIso, d);
+        const letter = weekTypeLetterForAlternance(d, p.applyStartYmd, p.firstWeekLetter);
         if (!letter) continue;
         for (const line of p.lines) {
             if (line.week_type !== letter) continue;

@@ -3,7 +3,6 @@
  */
 import { isAdmin, isPrivilegedUser } from './auth-logic.js';
 import { getPlanningSessionUser } from './session-user.js';
-import { fetchWeekCycleAnchor, getWeekCycleAnchorMonday } from './week-cycle.js';
 import { getSupabaseClient, isBackendAuthConfigured, getPlanningConfig } from './supabase-client.js';
 import { showToast } from '../utils/toast.js';
 import { populateTimeSelectElement } from '../utils/time-helpers.js';
@@ -25,6 +24,22 @@ const DOW_OPTS = [
 ];
 
 const USERS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>`;
+
+const ST_ANALYZE_PLACEHOLDER_TEXT =
+    'Cliquez sur « 1. Préparer l’application » : un résumé (suppressions, créations, conflits) s’affichera ici. Ensuite utilisez « 2. Appliquer sur Google Agenda » pour écrire dans les agendas.';
+
+function resetStAnalyzeOutput() {
+    const ph = document.getElementById('st-analyze-placeholder');
+    const out = document.getElementById('st-analyze-out');
+    if (ph) {
+        ph.textContent = ST_ANALYZE_PLACEHOLDER_TEXT;
+        ph.classList.remove('hidden');
+    }
+    if (out) {
+        out.textContent = '';
+        out.classList.add('hidden');
+    }
+}
 
 /** @type {AbortController | null} */
 let stAbort = null;
@@ -380,13 +395,13 @@ async function openSemainesTypesModal(user) {
     const isAdm = isAdmin(user);
     invalidateOrganSchoolSettingsCache();
     await fetchOrganSchoolSettings();
-    await fetchWeekCycleAnchor();
 
     document.getElementById('st-gabarit-readonly-hint')?.classList.toggle('hidden', !isAdm);
     document.getElementById('st-add-row-a')?.classList.toggle('hidden', isAdm);
     document.getElementById('st-add-row-b')?.classList.toggle('hidden', isAdm);
     document.getElementById('st-gabarit-actions')?.classList.toggle('hidden', isAdm);
-    document.getElementById('st-apply-section')?.classList.toggle('hidden', isAdm);
+    document.getElementById('st-apply-admin-hint')?.classList.toggle('hidden', !isAdm);
+    document.getElementById('st-apply-controls')?.classList.toggle('hidden', isAdm);
 
     const eleves = await loadEleves();
     const elevesById = new Map(eleves.map((e) => [e.user_id, e]));
@@ -424,7 +439,7 @@ async function openSemainesTypesModal(user) {
     const applyEnd = document.getElementById('st-apply-end');
     if (applyEnd) applyEnd.value = defaultApplyEndYmd();
 
-    document.getElementById('st-analyze-out')?.classList.add('hidden');
+    resetStAnalyzeOutput();
     document.getElementById('st-btn-apply')?.classList.add('hidden');
     lastAnalysis = null;
     dlg.showModal();
@@ -583,7 +598,7 @@ export function initSemainesTypesUi(currentUser) {
                     }
                 }
             }
-            showToast('Gabarit enregistré.');
+            showToast('Semaines types enregistrées avec succès.', 'success');
         },
         { signal }
     );
@@ -594,31 +609,40 @@ export function initSemainesTypesUi(currentUser) {
             const u = getPlanningSessionUser();
             const sb = getSupabaseClient();
             if (!u?.id || !sb || isAdmin(u)) return;
-            await fetchOrganSchoolSettings();
-            await fetchWeekCycleAnchor();
-            const anchor = getWeekCycleAnchorMonday();
-            if (!anchor) {
-                showToast(
-                    'Renseignez le début d’année scolaire dans Configuration (repère A/B), ou un lundi semaine A en base.',
-                    'error'
-                );
-                return;
+
+            const ph = document.getElementById('st-analyze-placeholder');
+            const out = document.getElementById('st-analyze-out');
+            const wrap = document.getElementById('st-analyze-out-wrap');
+            if (ph) {
+                ph.textContent = 'Préparation en cours…';
+                ph.classList.remove('hidden');
             }
+            if (out) {
+                out.classList.add('hidden');
+                out.textContent = '';
+            }
+
             const mainId = mainCalId();
             if (!mainId) {
                 showToast('mainGoogleCalendarId manquant dans la config.', 'error');
+                resetStAnalyzeOutput();
                 return;
             }
             const applyStart = document.getElementById('st-apply-start')?.value?.trim();
             const applyEnd = document.getElementById('st-apply-end')?.value?.trim();
             if (!applyStart || !applyEnd) {
-                showToast('Indiquez une date de début et une fin d’application.', 'error');
+                showToast('Indiquez une date de début et une date de fin.', 'error');
+                resetStAnalyzeOutput();
                 return;
             }
             if (applyEnd < applyStart) {
-                showToast('La fin d’application doit être le même jour ou après le début.', 'error');
+                showToast('La date de fin doit être la même ou après le début.', 'error');
+                resetStAnalyzeOutput();
                 return;
             }
+            const firstWeekRaw = document.querySelector('input[name="st-apply-first-week"]:checked')?.value;
+            const firstWeekLetter = firstWeekRaw === 'B' ? 'B' : 'A';
+
             const { lines, byLineStudents } = await loadLinesForModal(u, false);
             const { data: evs } = await sb.rpc('planning_list_eleves_actifs');
             const byId = new Map((evs || []).map((e) => [e.user_id, e.email]));
@@ -636,13 +660,13 @@ export function initSemainesTypesUi(currentUser) {
                 });
             }
             const emptyCours = linePayload.filter((l) => l.slot_type === 'cours').length === 0;
-            const out = document.getElementById('st-analyze-out');
             if (emptyCours && linePayload.filter((l) => l.slot_type === 'reservation').length === 0) {
                 if (
                     !confirm(
-                        'Votre gabarit ne contient aucune ligne. Tous vos cours seront retirés des agendas sur la période. Continuer l’analyse ?'
+                        'Votre gabarit ne contient aucune ligne. Tous vos cours seront retirés des agendas sur la période. Continuer la préparation ?'
                     )
                 ) {
+                    resetStAnalyzeOutput();
                     return;
                 }
             }
@@ -650,20 +674,24 @@ export function initSemainesTypesUi(currentUser) {
                 profUserId: u.id,
                 profEmail: u.email,
                 applyStartYmd: applyStart,
-                schoolEndYmd: applyEnd,
-                anchorMondayIso: anchor,
+                applyEndYmd: applyEnd,
+                firstWeekLetter,
                 lines: linePayload,
                 mainCalendarId: mainId
             });
             if (!analysis.ok) {
-                showToast(analysis.error || 'Analyse impossible.', 'error');
+                showToast(analysis.error || 'Préparation impossible.', 'error');
+                resetStAnalyzeOutput();
                 return;
             }
             lastAnalysis = analysis;
             const s = analysis.summary;
+            if (ph) ph.classList.add('hidden');
             if (out) {
                 out.classList.remove('hidden');
                 out.textContent = [
+                    `Alternance : semaine du ${applyStart} = type ${firstWeekLetter}, puis chaque lundi bascule A ↔ B jusqu’au ${applyEnd}.`,
+                    '',
                     `Suppressions — planning général : ${s.deleteMainCount}`,
                     `Suppressions — agendas perso élèves : ${s.deleteStudentPersoCount}`,
                     `Suppressions — agenda perso prof : ${s.deleteProfPersoCount}`,
@@ -671,10 +699,12 @@ export function initSemainesTypesUi(currentUser) {
                     `Créations — travail perso : ${s.createTravailCount}`,
                     `Créneaux cours non posés (conflit autre prof) : ${s.skippedOtherProfCount}`,
                     '',
-                    'Vérifiez puis cliquez « Confirmer et appliquer » (3 tentatives en cas d’erreur réseau).'
+                    'Vérifiez puis cliquez « 2. Appliquer sur Google Agenda » (3 tentatives en cas d’erreur réseau).'
                 ].join('\n');
             }
             document.getElementById('st-btn-apply')?.classList.remove('hidden');
+            showToast('Préparation terminée : résumé affiché ci-dessous.', 'info');
+            wrap?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         },
         { signal }
     );
@@ -697,7 +727,7 @@ export function initSemainesTypesUi(currentUser) {
                 showToast(r.error || 'Échec application.', 'error');
                 return;
             }
-            showToast('Gabarit appliqué.');
+            showToast('Application sur Google Agenda terminée.', 'success');
             document.getElementById('st-btn-apply')?.classList.add('hidden');
             document.dispatchEvent(new CustomEvent('planning-template-applied'));
         },
