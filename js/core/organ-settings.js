@@ -27,7 +27,8 @@ export async function fetchOrganSchoolSettings() {
             school_year_start: null,
             school_year_end: null,
             chapel_slot_min: '08:00:00',
-            chapel_slot_max: '22:00:00'
+            chapel_slot_max: '22:00:00',
+            planning_error_notify_email: ''
         };
         return cache;
     }
@@ -51,11 +52,18 @@ export function getOrganSchoolSettingsCached() {
 }
 
 /**
- * @param {{ school_year_start: string | null, school_year_end: string | null, chapel_slot_min: string, chapel_slot_max: string }} row
+ * @param {{
+ *   school_year_start: string | null,
+ *   school_year_end: string | null,
+ *   chapel_slot_min: string,
+ *   chapel_slot_max: string,
+ *   planning_error_notify_email?: string | null
+ * }} row
  */
 export async function saveOrganSchoolSettingsAdmin(row) {
     const sb = getSupabaseClient();
     if (!sb) return { ok: false, error: 'Session indisponible.' };
+    const notify = row.planning_error_notify_email != null ? String(row.planning_error_notify_email).trim() : null;
     const { error } = await sb
         .from('organ_school_settings')
         .update({
@@ -63,6 +71,7 @@ export async function saveOrganSchoolSettingsAdmin(row) {
             school_year_end: row.school_year_end || null,
             chapel_slot_min: row.chapel_slot_min,
             chapel_slot_max: row.chapel_slot_max,
+            planning_error_notify_email: notify || null,
             updated_at: new Date().toISOString()
         })
         .eq('id', 1);

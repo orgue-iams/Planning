@@ -20,6 +20,14 @@ export function motifToSlotType(motif) {
     return 'reservation';
 }
 
+/** Colonne `planning_event.slot_type` (contrainte CHECK), pas le type bridge / FC. */
+export function motifToPlanningDbSlotType(motif) {
+    const m = String(motif || '').trim();
+    if (m === 'Fermeture') return 'fermeture';
+    if (m === 'Cours') return 'cours';
+    return 'travail perso';
+}
+
 /** @param {string} value */
 export function normalizeMotif(value) {
     const s = String(value || '').trim();

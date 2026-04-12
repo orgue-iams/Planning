@@ -1,6 +1,6 @@
 /**
  * Gestion des comptes (secrétaire = role admin dans profiles).
- * Secrets auto : SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+ * Secrets auto : SUPABASE_URL, SUPABASE_ANON_KEY ; service role : SERVICE_ROLE_KEY (Edge) ou SUPABASE_SERVICE_ROLE_KEY (local)
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
 import { fetchAuthUser } from '../_shared/auth_gotrue.ts';
@@ -195,7 +195,8 @@ Deno.serve(async (req) => {
 
     const url = Deno.env.get('SUPABASE_URL') ?? '';
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const serviceKey =
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY') ?? '';
     if (!url || !anonKey || !serviceKey) {
         return new Response(
             JSON.stringify({

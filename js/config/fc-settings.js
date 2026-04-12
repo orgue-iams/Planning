@@ -8,7 +8,18 @@ import { demoEvents } from '../data/mock-events.js';
 import { getAccessToken } from '../core/auth-logic.js';
 import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from '../core/supabase-client.js';
 import { invokeCalendarBridge } from '../core/calendar-bridge.js';
+import {
+    calendarListCacheKey,
+    cloneCachedCalendarRows,
+    getCalendarListCache,
+    setCalendarListCache
+} from '../core/calendar-events-list-cache.js';
 import { fcDragResizePropsForEvent } from '../core/calendar-logic.js';
+import { mapBridgeListEvents } from '../core/planning-courses.js';
+import {
+    fetchPlanningEventsForFullCalendar,
+    planningGridUsesSupabaseDb
+} from '../core/planning-events-db.js';
 import { scheduleTimeGridColumnSync } from '../utils/timegrid-column-sync.js';
 import { getChapelSlotBounds } from '../core/organ-settings.js';
 
@@ -131,6 +142,8 @@ export const getCalendarConfig = (handlers, currentUser) => {
             scheduleTimeGridColumnSync(document.getElementById('calendar'));
         },
 
+        /* Source des créneaux : RPC Postgres si planningGridReadsFromSupabase, sinon bridge Google ; démo sinon.
+         * Cache mémoire 90 s + clé par scope (db:userId ou bridge). */
         events: (fetchInfo, successCallback, failureCallback) => {
             void (async () => {
                 try {
@@ -142,81 +155,98 @@ export const getCalendarConfig = (handlers, currentUser) => {
                             : undefined;
 
                     const { calendarBridgeUrl } = getPlanningConfig();
+                    const useDbGrid = planningGridUsesSupabaseDb();
                     const useBridge =
-                        Boolean(calendarBridgeUrl) && isBackendAuthConfigured();
+                        Boolean(calendarBridgeUrl) && isBackendAuthConfigured() && !useDbGrid;
 
                     let rows = [];
 
-                    if (useBridge) {
+                    if (useDbGrid) {
                         if (loadSignal?.aborted) return;
-                        let token = await getAccessToken();
-                        if (!token) {
-                            const supabase = getSupabaseClient();
-                            if (supabase) {
-                                await supabase.auth.refreshSession();
-                                token = await getAccessToken();
+                        const cacheKey = calendarListCacheKey(
+                            start.toISOString(),
+                            end.toISOString(),
+                            `db:${currentUser?.id || ''}`
+                        );
+                        const cached = getCalendarListCache(cacheKey);
+                        if (cached) {
+                            rows = cloneCachedCalendarRows(cached);
+                        } else {
+                            try {
+                                rows = await fetchPlanningEventsForFullCalendar(start, end, currentUser);
+                                setCalendarListCache(cacheKey, cloneCachedCalendarRows(rows));
+                            } catch (err) {
+                                const msg = err instanceof Error ? err.message : String(err);
+                                showToast(`Planning (base) : ${msg}`, 'error');
+                                failureCallback(err instanceof Error ? err : new Error(msg));
+                                return;
                             }
                         }
+                    } else if (useBridge) {
                         if (loadSignal?.aborted) return;
-                        if (token) {
-                            const listPayload = {
-                                action: 'list',
-                                timeMin: start.toISOString(),
-                                timeMax: end.toISOString()
-                            };
-                            const bridgeOpts = loadSignal ? { signal: loadSignal } : undefined;
-                            let bridge = await invokeCalendarBridge(token, listPayload, bridgeOpts);
-                            if (loadSignal?.aborted || bridge.aborted) {
-                                return;
-                            }
-                            const authFail = (r) => {
-                                const s = String(r || '');
-                                return /401|403|unauthorized|invalid\s*jwt|jwt\s*expired|session/i.test(s);
-                            };
-                            if (!bridge.ok && authFail(bridge.error)) {
+                        const cacheKey = calendarListCacheKey(
+                            start.toISOString(),
+                            end.toISOString(),
+                            'bridge'
+                        );
+                        const cached = getCalendarListCache(cacheKey);
+                        if (cached) {
+                            rows = cloneCachedCalendarRows(cached);
+                        } else {
+                            let token = await getAccessToken();
+                            if (!token) {
                                 const supabase = getSupabaseClient();
-                                if (supabase && !loadSignal?.aborted) {
+                                if (supabase) {
                                     await supabase.auth.refreshSession();
-                                    const t2 = await getAccessToken();
-                                    if (t2) {
-                                        bridge = await invokeCalendarBridge(t2, listPayload, bridgeOpts);
+                                    token = await getAccessToken();
+                                }
+                            }
+                            if (loadSignal?.aborted) return;
+                            if (token) {
+                                const listPayload = {
+                                    action: 'list',
+                                    timeMin: start.toISOString(),
+                                    timeMax: end.toISOString()
+                                };
+                                const bridgeOpts = loadSignal ? { signal: loadSignal } : undefined;
+                                let bridge = await invokeCalendarBridge(token, listPayload, bridgeOpts);
+                                if (loadSignal?.aborted || bridge.aborted) {
+                                    return;
+                                }
+                                const authFail = (r) => {
+                                    const s = String(r || '');
+                                    return /401|403|unauthorized|invalid\s*jwt|jwt\s*expired|session/i.test(s);
+                                };
+                                if (!bridge.ok && authFail(bridge.error)) {
+                                    const supabase = getSupabaseClient();
+                                    if (supabase && !loadSignal?.aborted) {
+                                        await supabase.auth.refreshSession();
+                                        const t2 = await getAccessToken();
+                                        if (t2) {
+                                            bridge = await invokeCalendarBridge(t2, listPayload, bridgeOpts);
+                                        }
                                     }
                                 }
-                            }
-                            if (loadSignal?.aborted || bridge.aborted) {
-                                return;
-                            }
-                            if (!bridge.ok) {
-                                const raw = String(bridge.error || 'Erreur de synchronisation agenda').trim();
-                                const msg =
-                                    /^not\s*found$/i.test(raw) || raw === '404'
-                                        ? 'Calendrier introuvable (vérifiez GOOGLE_CALENDAR_ID ou le déploiement de calendar-bridge).'
-                                        : raw;
-                                showToast(`Agenda Google : ${msg}`, 'error');
-                                failureCallback(new Error(msg));
-                                return;
-                            }
-                            const data = /** @type {{ events?: unknown[] }} */ (bridge.data || {});
-                            const raw = Array.isArray(data.events) ? data.events : [];
-                            rows = raw.map((ev) => {
-                                const o = /** @type {Record<string, unknown>} */ (ev);
-                                const ext = o.extendedProps;
-                                const xp =
-                                    ext && typeof ext === 'object' && !Array.isArray(ext)
-                                        ? { .../** @type {Record<string, unknown>} */ (ext) }
-                                        : {};
-                                const gid =
-                                    (typeof o.id === 'string' && o.id) ||
-                                    (typeof xp.googleEventId === 'string' && xp.googleEventId) ||
-                                    '';
-                                if (gid) {
-                                    xp.googleEventId = gid;
-                                    o.id = gid;
+                                if (loadSignal?.aborted || bridge.aborted) {
+                                    return;
                                 }
-                                return { ...o, extendedProps: xp };
-                            });
-                        } else {
-                            rows = [];
+                                if (!bridge.ok) {
+                                    const rawErr = String(bridge.error || 'Erreur de synchronisation agenda').trim();
+                                    const msg =
+                                        /^not\s*found$/i.test(rawErr) || rawErr === '404'
+                                            ? 'Calendrier introuvable (vérifiez GOOGLE_CALENDAR_ID ou le déploiement de calendar-bridge).'
+                                            : rawErr;
+                                    showToast(`Agenda Google : ${msg}`, 'error');
+                                    failureCallback(new Error(msg));
+                                    return;
+                                }
+                                const data = /** @type {{ events?: unknown[] }} */ (bridge.data || {});
+                                const rawEv = Array.isArray(data.events) ? data.events : [];
+                                rows = mapBridgeListEvents(rawEv);
+                                setCalendarListCache(cacheKey, cloneCachedCalendarRows(rows));
+                            } else {
+                                rows = [];
+                            }
                         }
                     } else {
                         rows = demoEvents.map((e) => ({ ...e }));

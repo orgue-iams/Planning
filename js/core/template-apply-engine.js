@@ -5,9 +5,55 @@
 import { getAccessToken } from './auth-logic.js';
 import { getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
 import { bridgeListEvents, bridgeDeleteEvent, bridgeUpsertEvents } from './calendar-bridge.js';
-import { mondayOfLocalWeek } from './week-cycle.js';
+import {
+    mondayOfLocalWeek,
+    weekTypeLetterForAlternance,
+    toLocalDateFromIsoDate,
+    formatLocalYmd
+} from './week-cycle.js';
 
 const APPLY_RETRIES = 3;
+/** Lots côté client : moins d’allers-retours HTTP vers la fonction Edge (chaque lot enchaîne les événements côté serveur). */
+const UPSERT_BATCH = 24;
+/** Suppressions Google indépendantes en parallèle (plafonné — évite les rafales tout en accélérant). */
+const DELETE_CONCURRENCY = 8;
+
+/**
+ * Bilan lisible quand l’application s’arrête en cours (Google n’offre pas de transaction globale).
+ * @param {{ grandDone: number; grandTotal: number; deletesDone: number; upsertsDone: number; totalDel: number; upsertTotal: number }} partial
+ */
+export function formatTemplateApplyPartialSummary(partial) {
+    if (!partial) return '';
+    const { grandDone, grandTotal, deletesDone, upsertsDone, totalDel, upsertTotal } = partial;
+    return [
+        '——— État partiel (Google Calendar n’a pas de « tout ou rien » sur plusieurs agendas) ———',
+        `Étapes terminées avant l’erreur : ${grandDone} / ${grandTotal}.`,
+        `Suppressions effectuées : ${deletesDone} (prévues au total : ${totalDel}).`,
+        `Écritures envoyées (créations / mises à jour d’événements) : ${upsertsDone} (prévues : ${upsertTotal}).`,
+        '',
+        'Il n’y a pas de retour arrière automatique fiable. Vérifiez les agendas, puis lancez « 1. Préparer l’application » pour recalculer ce qu’il reste à faire avant un nouvel « 2. Appliquer ».'
+    ].join('\n');
+}
+
+/**
+ * @template T
+ * @param {T[]} items
+ * @param {number} concurrency
+ * @param {(item: T) => Promise<void>} fn
+ */
+async function runPoolConcurrency(items, concurrency, fn) {
+    if (!items.length) return;
+    const n = Math.min(Math.max(1, concurrency), items.length);
+    let next = 0;
+    async function worker() {
+        while (true) {
+            const i = next++;
+            if (i >= items.length) break;
+            await fn(items[i]);
+        }
+    }
+    await Promise.all(Array.from({ length: n }, () => worker()));
+}
 
 /** @param {Date} today */
 export function nextMondayStrictlyAfter(today = new Date()) {
@@ -25,29 +71,7 @@ export function jsGetDayMatchesTemplateDow(d, templateDow) {
     return d.getDay() === want;
 }
 
-/**
- * Alternance lundi → lundi : la semaine calendaire qui contient `periodStartYmd`
- * (repérée par son lundi local) porte `letterForWeekContainingStart`, puis A/B alterne.
- *
- * @param {Date} d
- * @param {string} periodStartYmd YYYY-MM-DD (n’importe quel jour de la semaine de référence)
- * @param {'A'|'B'} letterForWeekContainingStart
- * @returns {'A'|'B'|null}
- */
-export function weekTypeLetterForAlternance(d, periodStartYmd, letterForWeekContainingStart) {
-    const ymd = String(periodStartYmd || '').slice(0, 10);
-    const start = new Date(`${ymd}T12:00:00`);
-    if (Number.isNaN(start.getTime()) || !d || Number.isNaN(d.getTime())) return null;
-    if (letterForWeekContainingStart !== 'A' && letterForWeekContainingStart !== 'B') return null;
-    const refMon = mondayOfLocalWeek(start);
-    const dMon = mondayOfLocalWeek(d);
-    const diff = Math.round((dMon.getTime() - refMon.getTime()) / (7 * 24 * 60 * 60 * 1000));
-    if (!Number.isFinite(diff)) return null;
-    const flip = diff % 2 !== 0;
-    let letter = letterForWeekContainingStart;
-    if (flip) letter = letter === 'A' ? 'B' : 'A';
-    return letter;
-}
+export { weekTypeLetterForAlternance };
 
 function combineDateAndTimeLocal(d, timeStr) {
     const parts = String(timeStr || '00:00:00').split(':');
@@ -72,6 +96,76 @@ function eachCalendarDay(start, end) {
 
 function rangesOverlap(aStart, aEnd, bStart, bEnd) {
     return aStart.getTime() < bEnd.getTime() && bStart.getTime() < aEnd.getTime();
+}
+
+/**
+ * Événement « fermeture » qui recouvre toute la semaine locale lundi 00:00 → lundi suivant exclus.
+ * (Typiquement vacances posées sur le planning général.)
+ */
+function eventSpansEntireLocalWeek(weekMonday, evStart, evEnd) {
+    const ws = new Date(weekMonday);
+    ws.setHours(0, 0, 0, 0);
+    const we = new Date(ws);
+    we.setDate(we.getDate() + 7);
+    return evStart.getTime() <= ws.getTime() + 120_000 && evEnd.getTime() >= we.getTime() - 120_000;
+}
+
+/**
+ * @param {object[]} mainEvents — liste bridge (extendedProps.type, start, end)
+ * @param {Date} rangeStart
+ * @param {Date} rangeEnd
+ * @returns {Set<string>} lundis YYYY-MM-DD (locaux) = semaine entière sautée pour le gabarit
+ */
+function collectFullClosureMondayIsoSet(mainEvents, rangeStart, rangeEnd) {
+    const ferm = [];
+    for (const ev of mainEvents || []) {
+        const typ = String(ev.extendedProps?.type || '').toLowerCase();
+        if (typ !== 'fermeture') continue;
+        const es = new Date(ev.start);
+        const ee = new Date(ev.end);
+        if (Number.isNaN(es.getTime()) || Number.isNaN(ee.getTime())) continue;
+        ferm.push({ es, ee });
+    }
+    const set = new Set();
+    const rs = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), rangeStart.getDate());
+    rs.setHours(0, 0, 0, 0);
+    const re = new Date(rangeEnd.getFullYear(), rangeEnd.getMonth(), rangeEnd.getDate());
+    re.setHours(0, 0, 0, 0);
+    let curMon = mondayOfLocalWeek(rs);
+    const endMon = mondayOfLocalWeek(re);
+    while (curMon.getTime() <= endMon.getTime()) {
+        const w0 = new Date(curMon);
+        w0.setHours(0, 0, 0, 0);
+        if (ferm.some((f) => eventSpansEntireLocalWeek(w0, f.es, f.ee))) {
+            set.add(formatLocalYmd(curMon));
+        }
+        curMon.setDate(curMon.getDate() + 7);
+    }
+    return set;
+}
+
+/**
+ * Lettre A/B pour un jour, en sautant les semaines entièrement en fermeture (sans avancer l’alternance).
+ */
+export function templateWeekLetterForDate(d, applyStartYmd, firstWeekLetter, closureMondaySet) {
+    const mon = mondayOfLocalWeek(d);
+    const monIso = formatLocalYmd(mon);
+    if (closureMondaySet?.has(monIso)) return null;
+    const refMon = mondayOfLocalWeek(toLocalDateFromIsoDate(String(applyStartYmd).slice(0, 10)));
+    const targetT = mon.getTime();
+    if (targetT < refMon.getTime()) {
+        return weekTypeLetterForAlternance(d, applyStartYmd, firstWeekLetter);
+    }
+    let parity = 0;
+    const walker = new Date(refMon);
+    while (walker.getTime() < targetT) {
+        const wIso = formatLocalYmd(walker);
+        if (!closureMondaySet?.has(wIso)) parity += 1;
+        walker.setDate(walker.getDate() + 7);
+    }
+    let letter = firstWeekLetter;
+    if (parity % 2 !== 0) letter = letter === 'A' ? 'B' : 'A';
+    return letter;
 }
 
 function normEmail(s) {
@@ -135,12 +229,35 @@ export async function analyzeTemplateApply(p) {
     const timeMax = new Date(endD);
     timeMax.setHours(23, 59, 59, 999);
 
+    const timeMinIso = new Date(`${p.applyStartYmd}T00:00:00`).toISOString();
+    const timeMaxIso = timeMax.toISOString();
+
+    const listMain = await bridgeListEvents(token, {
+        timeMin: timeMinIso,
+        timeMax: timeMaxIso,
+        calendarId: p.mainCalendarId
+    });
+    if (listMain.skipped) return { ok: false, error: 'Pont Google (calendar-bridge) non configuré.' };
+    if (!listMain.ok) {
+        return {
+            ok: false,
+            error: humanizeGoogleCalendarListError(listMain.error || 'Liste agenda général impossible.')
+        };
+    }
+    const mainEvents = listMain.data?.events || [];
+
+    const closureMondaySet = collectFullClosureMondayIsoSet(mainEvents, startD, endD);
+
     /** @type {{ start: Date, end: Date, line: object, studentEmail: string }[]} */
     const slotsWithStudent = [];
-
     const days = eachCalendarDay(startD, endD);
     for (const d of days) {
-        const letter = weekTypeLetterForAlternance(d, p.applyStartYmd, p.firstWeekLetter);
+        const letter = templateWeekLetterForDate(
+            d,
+            p.applyStartYmd,
+            p.firstWeekLetter,
+            closureMondaySet
+        );
         if (!letter) continue;
         for (const line of p.lines) {
             if (line.week_type !== letter) continue;
@@ -166,23 +283,6 @@ export async function analyzeTemplateApply(p) {
 
     const travailSlots = slotsWithStudent.filter((s) => s.studentEmail === '__travail__');
     const coursSlots = slotsWithStudent.filter((s) => s.studentEmail !== '__travail__');
-
-    const timeMinIso = new Date(`${p.applyStartYmd}T00:00:00`).toISOString();
-    const timeMaxIso = timeMax.toISOString();
-
-    const listMain = await bridgeListEvents(token, {
-        timeMin: timeMinIso,
-        timeMax: timeMaxIso,
-        calendarId: p.mainCalendarId
-    });
-    if (listMain.skipped) return { ok: false, error: 'Pont Google (calendar-bridge) non configuré.' };
-    if (!listMain.ok) {
-        return {
-            ok: false,
-            error: humanizeGoogleCalendarListError(listMain.error || 'Liste agenda général impossible.')
-        };
-    }
-    const mainEvents = listMain.data?.events || [];
 
     let skippedOtherProf = 0;
     const mainCreates = [];
@@ -296,6 +396,7 @@ export async function analyzeTemplateApply(p) {
         createStudentCoursCount: mainCreates.length,
         createTravailCount: travailSlots.length,
         skippedOtherProfCount: skippedOtherProf,
+        closureFullWeekCount: closureMondaySet.size,
         hasCoursLines: coursSlots.length > 0,
         hasTravailLines: travailSlots.length > 0
     };
@@ -317,83 +418,144 @@ export async function analyzeTemplateApply(p) {
 
 /**
  * @param {Awaited<ReturnType<typeof analyzeTemplateApply>>} analysis
- * @param {{ profEmail: string, mainCalendarId: string }} ctx
+ * @param {{
+ *   profEmail: string,
+ *   mainCalendarId: string,
+ *   onProgress?: (ev: { phase: string; done: number; total: number; detail?: string }) => void
+ * }} ctx
  */
 export async function executeTemplateApply(analysis, ctx) {
     if (!analysis?.ok) return { ok: false, error: 'Analyse invalide.' };
-    const token = await getAccessToken();
-    if (!token) return { ok: false, error: 'Session expirée.' };
     const profEmail = normEmail(ctx.profEmail);
+    const onProgress = typeof ctx.onProgress === 'function' ? ctx.onProgress : null;
+    const report = (phase, done, total, detail) => {
+        onProgress?.({ phase, done, total, detail: detail || '' });
+    };
     const map = analysis.studentCalByEmail instanceof Map ? analysis.studentCalByEmail : new Map();
 
+    const delMain = analysis.toDeleteMain;
+    const delStud = analysis.toDeleteStudentPersonal;
+    const delProf = analysis.toDeleteProfPerso;
+    const totalDel = delMain.length + delStud.length + delProf.length;
+
+    const upserts = [];
+    for (const slot of analysis.plannedMainCours) {
+        upserts.push({
+            title: String(slot.line.title || 'Cours').trim() || 'Cours',
+            start: slot.start.toISOString(),
+            end: slot.end.toISOString(),
+            type: 'cours',
+            owner: profEmail,
+            calendarId: ctx.mainCalendarId,
+            inscrits: slot.studentEmail,
+            templateLineId: slot.line.id
+        });
+        const calId = map.get(slot.studentEmail);
+        if (calId) {
+            upserts.push({
+                title: String(slot.line.title || 'Cours').trim() || 'Cours',
+                start: slot.start.toISOString(),
+                end: slot.end.toISOString(),
+                type: 'cours',
+                owner: profEmail,
+                calendarId: calId,
+                inscrits: slot.studentEmail,
+                templateLineId: slot.line.id
+            });
+        }
+    }
+    for (const tr of analysis.plannedTravailPerso) {
+        if (!analysis.profPoolId) continue;
+        upserts.push({
+            title: String(tr.line.title || 'Travail').trim() || 'Travail personnel',
+            start: tr.start.toISOString(),
+            end: tr.end.toISOString(),
+            type: 'reservation',
+            owner: profEmail,
+            calendarId: analysis.profPoolId,
+            templateLineId: tr.line.id
+        });
+    }
+
+    const upsertTotal = upserts.length;
+    const grandTotal = totalDel + upsertTotal;
+    const gt = grandTotal > 0 ? grandTotal : 1;
+
     for (let attempt = 1; attempt <= APPLY_RETRIES; attempt++) {
+        let grandDone = 0;
+        let deletesDone = 0;
+        let upsertsDone = 0;
         try {
-            for (const d of analysis.toDeleteMain) {
+            const token = await getAccessToken();
+            if (!token) throw new Error('Session expirée.');
+
+            report('apply', 0, gt, 'Connexion à Google…');
+
+            const bumpDel = (detail) => {
+                grandDone += 1;
+                deletesDone += 1;
+                report('apply', grandDone, gt, detail);
+            };
+            const bumpUp = (detail) => {
+                grandDone += 1;
+                upsertsDone += 1;
+                report('apply', grandDone, gt, detail);
+            };
+
+            await runPoolConcurrency(delMain, DELETE_CONCURRENCY, async (d) => {
                 const r = await bridgeDeleteEvent(token, d.googleEventId, d.calendarId);
                 if (r.skipped) throw new Error('Pont agenda non configuré.');
                 if (!r.ok) throw new Error(r.error || 'Suppression général');
-            }
-            for (const d of analysis.toDeleteStudentPersonal) {
+                bumpDel('Suppression — planning général');
+            });
+            await runPoolConcurrency(delStud, DELETE_CONCURRENCY, async (d) => {
                 const r = await bridgeDeleteEvent(token, d.googleEventId, d.calendarId);
                 if (r.skipped) throw new Error('Pont agenda non configuré.');
                 if (!r.ok) throw new Error(r.error || 'Suppression perso élève');
-            }
-            for (const d of analysis.toDeleteProfPerso) {
+                bumpDel('Suppression — agendas élèves');
+            });
+            await runPoolConcurrency(delProf, DELETE_CONCURRENCY, async (d) => {
                 const r = await bridgeDeleteEvent(token, d.googleEventId, d.calendarId);
                 if (r.skipped) throw new Error('Pont agenda non configuré.');
                 if (!r.ok) throw new Error(r.error || 'Suppression perso prof');
-            }
+                bumpDel('Suppression — agenda perso prof');
+            });
 
-            const upserts = [];
-            for (const slot of analysis.plannedMainCours) {
-                upserts.push({
-                    title: String(slot.line.title || 'Cours').trim() || 'Cours',
-                    start: slot.start.toISOString(),
-                    end: slot.end.toISOString(),
-                    type: 'cours',
-                    owner: profEmail,
-                    calendarId: ctx.mainCalendarId,
-                    inscrits: slot.studentEmail,
-                    templateLineId: slot.line.id
-                });
-                const calId = map.get(slot.studentEmail);
-                if (calId) {
-                    upserts.push({
-                        title: String(slot.line.title || 'Cours').trim() || 'Cours',
-                        start: slot.start.toISOString(),
-                        end: slot.end.toISOString(),
-                        type: 'cours',
-                        owner: profEmail,
-                        calendarId: calId,
-                        inscrits: slot.studentEmail,
-                        templateLineId: slot.line.id
-                    });
+            if (upsertTotal > 0) {
+                for (let i = 0; i < upserts.length; i += UPSERT_BATCH) {
+                    const slice = upserts.slice(i, i + UPSERT_BATCH);
+                    const r = await bridgeUpsertEvents(token, slice, undefined);
+                    if (r.skipped) throw new Error('Pont agenda non configuré.');
+                    if (!r.ok) throw new Error(r.error || 'Création agenda');
+                    for (let k = 0; k < slice.length; k++) bumpUp('Écriture sur Google Calendar');
                 }
-            }
-            for (const tr of analysis.plannedTravailPerso) {
-                if (!analysis.profPoolId) continue;
-                upserts.push({
-                    title: String(tr.line.title || 'Travail').trim() || 'Travail personnel',
-                    start: tr.start.toISOString(),
-                    end: tr.end.toISOString(),
-                    type: 'reservation',
-                    owner: profEmail,
-                    calendarId: analysis.profPoolId,
-                    templateLineId: tr.line.id
-                });
+            } else if (grandTotal === 0) {
+                report('apply', 1, 1, 'Rien à modifier (0 suppression, 0 création).');
             }
 
-            if (upserts.length > 0) {
-                const r = await bridgeUpsertEvents(token, upserts, undefined);
-                if (r.skipped) throw new Error('Pont agenda non configuré.');
-                if (!r.ok) throw new Error(r.error || 'Création agenda');
-            }
-
-            return { ok: true };
+            return {
+                ok: true,
+                stats: { deleteTotal: totalDel, upsertTotal: upsertTotal }
+            };
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
+            const human = humanizeGoogleCalendarApplyError(msg);
+            const partial =
+                grandDone > 0
+                    ? {
+                          grandDone,
+                          grandTotal: gt,
+                          deletesDone,
+                          upsertsDone,
+                          totalDel,
+                          upsertTotal
+                      }
+                    : undefined;
+            if (partial) {
+                return { ok: false, error: human, partial };
+            }
             if (attempt >= APPLY_RETRIES) {
-                return { ok: false, error: humanizeGoogleCalendarApplyError(msg) };
+                return { ok: false, error: human };
             }
         }
     }

@@ -1,0 +1,76 @@
+# Reprise de session — Planning canonique (Postgres) + miroir Google
+
+**À lire en premier** par un agent Cursor (ou un humain) qui reprend le projet **sans refaire toute la spec** avec le porteur.
+
+## Objectif d’architecture (cible)
+
+| Élément | Décision |
+|---------|----------|
+| **Source de vérité** | PostgreSQL : table `planning_event` (+ `planning_event_enrollment` pour les inscriptions cours). |
+| **Google Calendar** | **Miroir** pour les utilisateurs (lecture abonnement / confort) ; écriture par l’app via `calendar-bridge`, pas de logique métier dans Google. |
+| **Grille FullCalendar** | Avec `planningGridReadsFromSupabase: true` : lecture via RPC `planning_events_in_range` (pas de `list` bridge pour l’affichage normal). |
+| **Sync** | Après écriture DB → push Google (général + pool concerné) ; table `planning_event_google_mirror` pour tracer ids / statut ; `sync_generation` sur `planning_event` pour invalidation future des retries. |
+| **Erreurs infra** | Table `planning_infra_error_log` + e-mail digest nocturne (paramètre `planning_error_notify_email` dans `organ_school_settings`) — **pas encore implémenté** côté job / envoi. |
+
+## Où on en est (livré dans le dépôt)
+
+### Base de données (migrations)
+
+- **`015_planning_events_canonical.sql`** : `planning_event`, `planning_event_enrollment`, `planning_event_google_mirror`, `planning_infra_error_log`, RLS de base, RPC `planning_events_in_range` (évoluée en 016), `planning_error_notify_email`.
+- **`016_planning_event_rls_prof_and_mirror.sql`** : RLS prof/admin (créneaux pour autrui, édition élève/prof), RPC `planning_user_id_for_email`, index unique miroir `(event_id, target)`, politique SELECT miroir pour owner/prof/admin, trigger `sync_generation`, **remplacement** de `planning_events_in_range` via `DROP FUNCTION` + `CREATE` (colonnes `main_google_event_id`, `pool_google_event_id`).
+
+À appliquer sur l’environnement cible : `supabase db push` (déjà validé une fois le `DROP FUNCTION` ajouté pour le changement de signature).
+
+### Front (JS)
+
+- **`js/config/planning.config.js`** : `planningGridReadsFromSupabase: true` (grille = DB).
+- **`js/core/planning-events-db.js`** : RPC, mapping FC, `upsertPlanningEventRow`, `deletePlanningEventRow`, `fetchPlanningMirrorTargetsForDelete`, `planningUserIdForEmail`, import dynamique de `calendar-logic` pour éviter cycle.
+- **`js/core/calendar-logic.js`** : sauvegarde modale + récurrence + création rapide en mode DB ; suppression DB + delete Google via miroirs ; `syncReservationEventToGoogle` avec `planningEventId` ; pas de conflit « liste Google » si grille DB (`googleAgendaConflictCheckWanted`).
+- **`js/core/reservation-motifs.js`** : `motifToPlanningDbSlotType` (Travail → `travail perso`).
+- **`js/config/fc-settings.js`** / **`planning-courses.js`** / **`calendar-events-list-cache.js`** : cache avec scope `db:userId` vs `bridge`.
+- **`organ-settings.js`**, **`modal-config.html`**, **`config-ui.js`** : chargement / enregistrement `planning_error_notify_email` (admin).
+
+### Edge — `calendar-bridge`
+
+- Payload événement : `planningEventId` (UUID `planning_event`).
+- Après upsert Google : persistance `planning_event_google_mirror` si **`SUPABASE_SERVICE_ROLE_KEY`** (auto) ou **`SERVICE_ROLE_KEY`** (secret Edge manuel — le dashboard **interdit** le préfixe `SUPABASE_` pour les secrets saisis à la main).
+- Retour `poolGoogleEventId` optionnel dans `results[]`.
+
+### Documentation opérationnelle
+
+- **`supabase/SETUP.txt`** : secrets dont `SERVICE_ROLE_KEY`, déploiement.
+
+## Ce qu’il reste à faire (backlog agent)
+
+Numérotation indicative ; détail technique dans le code / migrations existantes.
+
+1. **Retry / abandon sync** (spec initiale : ≤ 8 retries sur 10 min, abandon, `sync_generation` pour ignorer les retries obsolètes) — **non implémenté** (pas de file d’attente ni Edge dédiée).
+2. **Job nocturne** : réaligner tous les calendriers (général + pool) sur la DB — **non implémenté** (pg_cron, Edge schedulée, ou GitHub Action + script service role).
+3. **Digest nocturne erreurs infra** : lire `planning_infra_error_log` où `digest_sent_at IS NULL`, envoyer un mail à `planning_error_notify_email`, marquer `digest_sent_at` — **non implémenté** (aucune écriture systématique dans `planning_infra_error_log` depuis l’app ou le bridge pour l’instant).
+4. **Écriture dans `planning_infra_error_log`** : en cas d’échec bridge / DB critique (401 service account, etc.) — partiellement spécifié ; à brancher côté bridge ou front sans spammer l’utilisateur.
+5. **`planning_event_enrollment`** : enrichir `planning_events_in_range` (ou RPC dédiée) + `mapPlanningDbRowToFcEvent` pour remplir `extendedProps.inscrits` (profil élève / cours) — **non fait** (`inscrits: []` pour l’instant).
+6. **Semaines types / gabarit** : flux « Appliquer gabarit » doit **écrire dans `planning_event`** (ou RPC bulk) au lieu de ou en plus du bridge Google seul — **à vérifier / brancher** selon `template-apply-engine.js` et scripts existants.
+7. **Cohérence hors modale** : tout créneau créé uniquement côté Google (ancien flux) ne doit plus exister si la grille est 100 % DB ; migrations données éventuelles hors périmètre « fresh start ».
+8. **Tests / CI** : pas de tests auto sur le nouveau flux DB + bridge.
+
+## Checklist rapide « environnement prêt »
+
+- [ ] Migrations **015** et **016** appliquées (`supabase db push`).
+- [ ] `calendar-bridge` **redéployé** après les changements TypeScript.
+- [ ] Secret Edge **`SERVICE_ROLE_KEY`** = JWT **service_role** (Settings → API), si l’auto-injection `SUPABASE_SERVICE_ROLE_KEY` ne suffit pas.
+- [ ] Front : `planningGridReadsFromSupabase: true` et `CACHE_NAME` incrémenté si besoin après changements JS (`js/config/cache-name.js`).
+
+## Fichiers clés (navigation)
+
+| Sujet | Fichiers |
+|-------|----------|
+| Flag grille DB | `js/config/planning.config.js` |
+| Lecture / upsert / delete DB | `js/core/planning-events-db.js` |
+| Sauvegarde, suppression, sync drag | `js/core/calendar-logic.js` |
+| Bridge Google + miroir SQL | `supabase/functions/calendar-bridge/index.ts` |
+| Schéma canonique | `supabase/migrations/015_planning_events_canonical.sql`, `016_planning_event_rls_prof_and_mirror.sql` |
+| Secrets / déploiement | `supabase/SETUP.txt`, `npm run deploy:supabase` |
+
+## Mise à jour de ce document
+
+Après chaque session qui avance l’archi canonique : ajuster les sections **Livré** et **Reste à faire** pour que le prochain agent parte du bon état.

@@ -23,7 +23,8 @@ import {
     ensureGoogleAgendaSlotsFreeOrAbort,
     captureResizeStart,
     maybeNotifySlotOwnerAfterThirdPartyEdit,
-    ownerInfoFromEvent
+    ownerInfoFromEvent,
+    refetchCalendarEventsFromGoogle
 } from './calendar-logic.js';
 import {
     login,
@@ -58,7 +59,7 @@ import { setPlanningSessionUser, getPlanningSessionUser } from './session-user.j
 import { initProfileUi, resetProfileUiBindings, refreshHeaderWeekStrip } from './profile-ui.js';
 import { initSemainesTypesUi, resetSemainesTypesUiBindings } from './semaines-types-ui.js';
 import { initConfigUi, resetConfigUiBindings } from './config-ui.js';
-import { fetchWeekCycleAnchor } from './week-cycle.js';
+import { fetchWeekCycleAnchor, clearProfWeekCycleCache } from './week-cycle.js';
 import { fetchOrganSchoolSettings, invalidateOrganSchoolSettingsCache } from './organ-settings.js';
 import { CACHE_NAME } from '../config/cache-name.js';
 import { normalizePlanningRole } from './planning-roles.js';
@@ -77,6 +78,7 @@ let unbindTimeGridColumnSync = null;
 
 function performLogout() {
     currentUser = null;
+    clearProfWeekCycleCache();
     setPlanningSessionUser(null);
     destroyPlanningQuillMount(document.getElementById('rules-quill-mount'));
     resetMessagesUiBindings();
@@ -305,14 +307,12 @@ function initCalendarAndRevealUi() {
             toolbarCtl?.syncViewTriggerLabel();
         };
         handlers.onDatesSet();
-        void fetchWeekCycleAnchor().then(() => toolbarCtl?.refreshTitle());
+        void fetchWeekCycleAnchor(currentUser).then(() => toolbarCtl?.refreshTitle());
         document.addEventListener('planning-week-cycle-updated', () => toolbarCtl?.refreshTitle());
         document.addEventListener('planning-template-applied', () => {
-            try {
-                calendar?.refetchEvents();
-            } catch {
+            void refetchCalendarEventsFromGoogle(calendar).catch(() => {
                 /* */
-            }
+            });
         });
         bindResponsiveCalendarToolbar(calendar);
 

@@ -35,6 +35,8 @@ async function fillConfigModal() {
     if (e) e.value = data?.school_year_end?.slice(0, 10) || '';
     if (mn) mn.value = timeDbToInput(data?.chapel_slot_min);
     if (mx) mx.value = timeDbToInput(data?.chapel_slot_max);
+    const em = document.getElementById('config-planning-error-notify-email');
+    if (em) em.value = String(data?.planning_error_notify_email ?? '').trim();
 }
 
 export function initConfigUi(currentUser) {
@@ -47,10 +49,12 @@ export function initConfigUi(currentUser) {
     document.getElementById('config-hint-admin')?.classList.toggle('hidden', !admin);
     document.getElementById('config-hint-readonly')?.classList.toggle('hidden', admin);
     document.getElementById('config-admin-actions')?.classList.toggle('hidden', !admin);
+    document.getElementById('config-planning-notify-wrap')?.classList.toggle('hidden', !admin);
 
     for (const id of ['config-school-start', 'config-school-end', 'config-chapel-min', 'config-chapel-max']) {
         document.getElementById(id)?.toggleAttribute('readonly', !admin);
     }
+    document.getElementById('config-planning-error-notify-email')?.toggleAttribute('readonly', !admin);
 
     document.getElementById('menu-item-config')?.addEventListener('click', (ev) => {
         ev.preventDefault();
@@ -64,7 +68,8 @@ export function initConfigUi(currentUser) {
             school_year_start: document.getElementById('config-school-start')?.value || null,
             school_year_end: document.getElementById('config-school-end')?.value || null,
             chapel_slot_min: inputTimeToDb(document.getElementById('config-chapel-min')?.value),
-            chapel_slot_max: inputTimeToDb(document.getElementById('config-chapel-max')?.value)
+            chapel_slot_max: inputTimeToDb(document.getElementById('config-chapel-max')?.value),
+            planning_error_notify_email: document.getElementById('config-planning-error-notify-email')?.value ?? ''
         });
         if (!r.ok) {
             showToast(r.error || 'Erreur.', 'error');

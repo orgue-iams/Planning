@@ -1,41 +1,41 @@
 # Roadmap — fait et à faire
 
-> Document d’orientation : à ajuster au fil des sprints. Les dates ne sont pas imposées.
+> Les évolutions **« source de vérité Postgres + miroir Google »** sont suivies en détail dans **[HANDOFF.md](./HANDOFF.md)** (livré / backlog / checklist). Ce fichier garde une vue plus large sur le produit.
 
 ## Déjà en place (résumé)
 
 - Auth **Supabase** + mode **démo** sans backend.
-- Calendrier **FullCalendar** branché sur **Google** via **`calendar-bridge`** (compte de service ou OAuth).
-- **Rôles** admin / prof / élève / consultation avec règles d’édition dans `calendar-logic.js`.
-- **Motifs** : Travail perso. / Cours / Fermeture (Fermeture réservée admin en UI) ; sync étendue (inscrits, calendrier ciblé, etc.).
-- **Profils** : `nom` + `prenom` en base, `display_name` dérivé ; liste admin triée et formulaire création / invitation.
-- **Pool** de calendriers Google secondaires + attribution / libellés.
-- **Paramètres org** : année scolaire, plage horaire chapelle (`organ_school_settings`).
-- **Semaines types A/B** : ancrage, gabarit, analyse / application (moteur client + bridge).
-- **PWA** : service worker, cache versionné.
-- **Notifications** optionnelles : **`planning-slot-notify`** (Brevo) si tiers modifie un créneau.
-- **Contenu** : consignes / annonces / diffusion (Quill + tables dédiées selon migrations).
+- Calendrier **FullCalendar** ; sync **Google** via **`calendar-bridge`** (compte de service ou OAuth).
+- **Grille en mode canonique DB** (quand `planningGridReadsFromSupabase: true`) : RPC `planning_events_in_range`, écriture `planning_event`, suppression + sync Google via `planning_event_google_mirror` ; secrets Edge **`SERVICE_ROLE_KEY`** ou auto `SUPABASE_SERVICE_ROLE_KEY` pour persistance miroir côté bridge — voir **HANDOFF.md**.
+- **Rôles** admin / prof / élève / consultation avec règles d’édition dans `calendar-logic.js` ; RLS SQL alignée (prof sur créneaux élèves/prof, etc.).
+- **Motifs** : Travail perso. / Cours / Fermeture ; mapping DB `motifToPlanningDbSlotType` (`travail perso`, `cours`, `fermeture`).
+- **Profils** : `nom` + `prenom`, liste admin, création / invitation.
+- **Pool** calendriers Google secondaires + attribution / libellés.
+- **Paramètres org** : année scolaire, plage chapelle, **`planning_error_notify_email`** (UI admin) pour futur digest infra.
+- **Semaines types A/B** : gabarit, analyse / application (moteur client + bridge — **vérifier** écriture pure DB si objectif 100 % Postgres).
+- **PWA** : service worker, `js/config/cache-name.js` versionné.
+- **Notifications** : **`planning-slot-notify`** (Brevo) si tiers modifie un créneau.
+- **Contenu** : consignes / annonces / messages (Quill + tables dédiées).
 
 ## En cours / dette technique connue
 
-- **`planning.config.js`** : contient souvent l’**anon key** Supabase — acceptable pour une anon key mais à **ne pas dupliquer** dans la doc ; pour dépôts publics, préférer variables d’environnement / build injecté.
-- **Cohérence migrations** : les environnements doivent appliquer **toutes** les migrations jusqu’à `011` (et suivantes) avant de déployer un front qui sélectionne `nom`/`prenom`.
-- **Edge Functions** : version déployée doit correspondre au contrat attendu par le front (champs `nom`/`prenom`, tri liste admin, etc.).
+- **`planning.config.js`** : anon key souvent en clair — acceptable pour anon ; dépôt public → préférer injection CI / env.
+- **Retry sync, job nocturne, digest `planning_infra_error_log`** : spécifiés dans HANDOFF, **non implémentés**.
+- **Inscrits cours** en grille DB : champs `inscrits` FC encore vides côté RPC mapping — à brancher sur `planning_event_enrollment`.
+- **Edge Functions** : version déployée = contrat attendu par le front (déployer après chaque changement de bridge).
 
-## Pistes « à faire » (backlog suggéré)
+## Pistes « à faire » (hors track HANDOFF)
 
-Prioriser selon besoins pédagogiques / secrétariat.
+1. Édition inline `nom`/`prenom` dans le tableau admin.
+2. Tests auto : `reservation-motifs`, `formatProfileFullName`, plus tard E2E Playwright.
+3. Observabilité : logs structurés Edge, corrélation `user_id` / action.
+4. Accessibilité : modales (focus, `aria-*`, contrastes).
+5. i18n : aujourd’hui FR ; extraire chaînes si besoin.
+6. Doc API interne : tableau des `action` `calendar-bridge` / `planning-admin`.
+7. Export ICS / snapshot gabarits.
+8. Messages conflits Google plus explicites (mode bridge historique).
 
-1. **Édition inline** des `nom`/`prenom` dans le tableau admin (au lieu de seulement à la création).
-2. **Tests automatisés** : au minimum tests unitaires sur `reservation-motifs`, `formatProfileFullName`, normalisation rôles ; plus tard E2E sur flux login + création créneau (Playwright).
-3. **Observabilité** : logs structurés côté Edge, corrélation `user_id` / `action` pour diagnostiquer erreurs Google API.
-4. **Accessibilité** : audit ciblé des modales (focus trap, `aria-*`, contrastes).
-5. **Internationalisation** : aujourd’hui FR assumé ; extraire chaînes si besoin EN/DE.
-6. **Documentation API interne** : OpenAPI ou tableau des `action` acceptées par `calendar-bridge` et `planning-admin` (au-delà des commentaires dans le code).
-7. **Sauvegarde / export** : export ICS ou snapshot pédagogique des gabarits (hors Google).
-8. **Gestion des conflits Google** : messages utilisateur plus explicites lorsque `409` / ressources occupées.
+## Comment mettre à jour
 
-## Comment mettre à jour ce fichier
-
-Après une fonctionnalité livrée : ajouter une ligne courte dans **Déjà en place** ou déplacer depuis **à faire**.  
-Après un incident : ajouter sous **dette** si la cause est structurelle.
+- Fonctionnalité **planning canonique / miroir / sync** : **HANDOFF.md** en priorité.
+- Reste du produit : une ligne ici ou déplacement entre sections.

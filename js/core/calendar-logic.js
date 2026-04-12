@@ -6,6 +6,7 @@
 import { showToast } from '../utils/toast.js';
 import { getAccessToken, isBackendAuthConfigured, isPrivilegedUser } from './auth-logic.js';
 import { invokeCalendarBridge } from './calendar-bridge.js';
+import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
 import { getPlanningConfig, getSupabaseClient } from './supabase-client.js';
 import { invokeSlotNotify } from './slot-notify-api.js';
 import { getDefaultReservationTitle, getProfile } from '../utils/user-profile.js';
@@ -14,10 +15,27 @@ import {
     RESERVATION_MOTIFS,
     normalizeMotif,
     motifToSlotType,
-    motifDisplayLabel
+    motifDisplayLabel,
+    motifToPlanningDbSlotType
 } from './reservation-motifs.js';
+import {
+    planningGridUsesSupabaseDb,
+    planningDbSlotTypeToBridgeType,
+    upsertPlanningEventRow,
+    deletePlanningEventRow,
+    fetchPlanningMirrorTargetsForDelete,
+    planningUserIdForEmail
+} from './planning-events-db.js';
 
 let saveReservationInFlight = false;
+
+/** Rechargement grille depuis Google : invalide le cache mémoire des `list` pour éviter des données périmées. */
+export async function refetchCalendarEventsFromGoogle(calendar) {
+    invalidateCalendarListCache();
+    if (calendar && typeof calendar.refetchEvents === 'function') {
+        await calendar.refetchEvents();
+    }
+}
 
 /** @param {string | undefined} userId */
 async function fetchPoolCalendarIdForUser(userId) {
@@ -36,6 +54,11 @@ async function fetchPoolCalendarIdForUser(userId) {
 function calendarBridgeWanted() {
     const { calendarBridgeUrl } = getPlanningConfig();
     return Boolean(calendarBridgeUrl) && isBackendAuthConfigured();
+}
+
+/** Contrôle de conflit via liste Google : pertinent seulement si la grille ne lit pas la base. */
+function googleAgendaConflictCheckWanted() {
+    return calendarBridgeWanted() && !planningGridUsesSupabaseDb();
 }
 
 function escapeHtml(text) {
@@ -367,6 +390,9 @@ export function onCalendarEventDragStop(info) {
 
 export function bridgeGoogleIdFromFcEvent(event) {
     if (!event) return '';
+    if (String(event.extendedProps?.planningRowSource || '') === 'supabase') {
+        return String(event.extendedProps?.googleEventId || '').trim();
+    }
     const raw = event.id ?? event.extendedProps?.googleEventId;
     return raw != null && String(raw).trim() ? String(raw).trim() : '';
 }
@@ -379,6 +405,11 @@ export async function syncReservationEventToGoogle(calendarEvent) {
     if (!calendarEvent || !isBackendAuthConfigured()) {
         return { ok: false, skipped: true };
     }
+    const fromDb = String(calendarEvent.extendedProps?.planningRowSource || '') === 'supabase';
+    const dbGrid = planningGridUsesSupabaseDb();
+    if (fromDb && !dbGrid) return { ok: true, skipped: true };
+    if (!fromDb && dbGrid) return { ok: true, skipped: true };
+
     const token = await getAccessToken();
     if (!token) return { ok: false };
     const start = calendarEvent.start;
@@ -389,7 +420,13 @@ export async function syncReservationEventToGoogle(calendarEvent) {
     const gid = bridgeGoogleIdFromFcEvent(calendarEvent);
     const title = String(calendarEvent.title || '').trim() || 'Créneau';
     const poolLink = String(calendarEvent.extendedProps?.poolGoogleEventId ?? '').trim();
+    const canonicalId = String(calendarEvent.extendedProps?.planningCanonicalId || '').trim();
+    if (fromDb && !canonicalId) {
+        showToast('Créneau sans identifiant base : synchronisation impossible.', 'error');
+        return { ok: false };
+    }
     const payload = {
+        ...(fromDb && canonicalId ? { planningEventId: canonicalId } : {}),
         ...(gid ? { googleEventId: gid } : {}),
         title,
         start: start.toISOString(),
@@ -405,8 +442,14 @@ export async function syncReservationEventToGoogle(calendarEvent) {
     }
     if (r.ok && r.data?.results?.[0]?.googleEventId && !gid) {
         const ng = String(r.data.results[0].googleEventId).trim();
-        calendarEvent.setProp('id', ng);
-        calendarEvent.setExtendedProp('googleEventId', ng);
+        if (fromDb) {
+            calendarEvent.setExtendedProp('googleEventId', ng);
+            const pg = String(r.data.results[0].poolGoogleEventId || '').trim();
+            if (pg) calendarEvent.setExtendedProp('poolGoogleEventId', pg);
+        } else {
+            calendarEvent.setProp('id', ng);
+            calendarEvent.setExtendedProp('googleEventId', ng);
+        }
     }
     return { ok: true, skipped: Boolean(r.skipped) };
 }
@@ -1066,7 +1109,7 @@ async function finalizeQuickReservationInBackground(
     ];
 
     try {
-        if (calendarBridgeWanted()) {
+        if (googleAgendaConflictCheckWanted()) {
             const v = await verifySlotsFreeOnGoogleCalendar([{ start: rangeStart, end: rangeEnd }], '');
             if (!v.ok) {
                 if (created) created.remove();
@@ -1079,6 +1122,49 @@ async function finalizeQuickReservationInBackground(
             }
         }
 
+        if (planningGridUsesSupabaseDb()) {
+            const ownerUid = await planningUserIdForEmail(currentUser.email);
+            if (!ownerUid) {
+                if (created) created.remove();
+                showToast('Compte indisponible pour enregistrer.', 'error');
+                return;
+            }
+            const dbSlotType = motifToPlanningDbSlotType(motif);
+            const bridgeType = planningDbSlotTypeToBridgeType(dbSlotType);
+            const ur = await upsertPlanningEventRow({
+                id: null,
+                startIso: rangeStart.toISOString(),
+                endIso: rangeEnd.toISOString(),
+                title,
+                dbSlotType,
+                ownerEmail: currentUser.email,
+                ownerUserId: ownerUid
+            });
+            if (!ur.ok || !ur.id) {
+                if (created) created.remove();
+                showToast(ur.error || 'Enregistrement impossible.', 'error');
+                return;
+            }
+            const syncDb = await trySyncGoogleCalendar([
+                {
+                    planningEventId: ur.id,
+                    title,
+                    start: rangeStart.toISOString(),
+                    end: rangeEnd.toISOString(),
+                    type: bridgeType,
+                    owner: currentUser.email
+                }
+            ]);
+            if (calendarBridgeWanted() && !syncDb.ok && !syncDb.skipped) {
+                if (created) created.remove();
+                showToast(`Synchronisation agenda : ${syncDb.error || 'échec'}`, 'error');
+                return;
+            }
+            if (created) created.remove();
+            await refetchCalendarEventsFromGoogle(calendar);
+            return;
+        }
+
         const sync = await trySyncGoogleCalendar(payload);
         if (calendarBridgeWanted() && !sync.ok && !sync.skipped) {
             if (created) created.remove();
@@ -1087,7 +1173,7 @@ async function finalizeQuickReservationInBackground(
         }
         if (calendarBridgeWanted() && sync.ok && !sync.skipped) {
             if (created) created.remove();
-            if (typeof calendar.refetchEvents === 'function') await calendar.refetchEvents();
+            await refetchCalendarEventsFromGoogle(calendar);
             return;
         }
         if (created && sync?.data?.results) {
@@ -1503,7 +1589,7 @@ function findOverlappingBridgeRow(rows, rangeStart, rangeEnd, excludeGoogleId) {
  * @returns {Promise<{ ok: true } | { ok: false, conflict: object } | { ok: false, error: string }>}
  */
 async function verifySlotsFreeOnGoogleCalendar(ranges, excludeGoogleId) {
-    if (!calendarBridgeWanted()) return { ok: true };
+    if (!googleAgendaConflictCheckWanted()) return { ok: true };
     const bounds = unionListRangesBounds(ranges);
     if (!bounds) return { ok: false, error: 'Plage horaire invalide.' };
     const token = await getAccessToken();
@@ -1546,9 +1632,7 @@ export async function ensureGoogleAgendaSlotsFreeOrAbort(calendar, ranges, exclu
     } else {
         showToast(v.error || 'Impossible de vérifier l’agenda Google.', 'error');
     }
-    if (calendar && typeof calendar.refetchEvents === 'function') {
-        await calendar.refetchEvents();
-    }
+    await refetchCalendarEventsFromGoogle(calendar);
     return false;
 }
 
@@ -1652,7 +1736,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
                 return;
             }
         }
-        if (calendarBridgeWanted()) {
+        if (googleAgendaConflictCheckWanted()) {
             const ranges = days.map((d) => ({
                 start: new Date(`${d}T${tRecStart}:00`),
                 end: new Date(`${d}T${tRecEnd}:00`)
@@ -1660,6 +1744,56 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
             const ok = await ensureGoogleAgendaSlotsFreeOrAbort(calendar, ranges, '');
             if (!ok) return;
         }
+
+        if (planningGridUsesSupabaseDb()) {
+            const ownerUid = await planningUserIdForEmail(slotOwnerEmail || currentUser.email);
+            if (!ownerUid) {
+                showToast('Impossible de résoudre le compte du propriétaire du créneau.', 'error');
+                return;
+            }
+            const dbSlotType = motifToPlanningDbSlotType(motif);
+            const bridgeType = planningDbSlotTypeToBridgeType(dbSlotType);
+            /** @type {Record<string, unknown>[]} */
+            const bridgeEventsDb = [];
+            for (const d of days) {
+                const startIso = new Date(`${d}T${tRecStart}:00`).toISOString();
+                const endIso = new Date(`${d}T${tRecEnd}:00`).toISOString();
+                const ur = await upsertPlanningEventRow({
+                    id: null,
+                    startIso,
+                    endIso,
+                    title,
+                    dbSlotType,
+                    ownerEmail: slotOwnerEmail || currentUser.email,
+                    ownerUserId: ownerUid
+                });
+                if (!ur.ok || !ur.id) {
+                    showToast(ur.error || 'Enregistrement base impossible.', 'error');
+                    return;
+                }
+                bridgeEventsDb.push({
+                    planningEventId: ur.id,
+                    title,
+                    start: startIso,
+                    end: endIso,
+                    type: bridgeType,
+                    owner: slotOwnerEmail || currentUser.email
+                });
+            }
+            const syncMultiDb = await trySyncGoogleCalendar(bridgeEventsDb);
+            if (calendarBridgeWanted() && !syncMultiDb.ok && !syncMultiDb.skipped) {
+                showToast(`Synchronisation agenda : ${syncMultiDb.error || 'échec'}`, 'error');
+                return;
+            }
+            document.getElementById('modal_reservation').close();
+            showToast(`${days.length} créneau${days.length > 1 ? 'x' : ''} enregistré${days.length > 1 ? 's' : ''}.`);
+            document.getElementById('event-recurring').checked = false;
+            resetRecurringFormDefaults();
+            setRecurringOptionsVisible(false);
+            await refetchCalendarEventsFromGoogle(calendar);
+            return;
+        }
+
         const bridgeEvents = days.map((d) => ({
             title,
             start: `${d}T${tRecStart}:00`,
@@ -1678,7 +1812,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
             document.getElementById('event-recurring').checked = false;
             resetRecurringFormDefaults();
             setRecurringOptionsVisible(false);
-            await calendar.refetchEvents();
+            await refetchCalendarEventsFromGoogle(calendar);
             return;
         }
         const addedList = addOneEventPerDay(
@@ -1750,7 +1884,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
 
     const ownerForBridge = slotOwnerEmail || String(currentUser.email || '').trim();
     const gid = currentEventRef ? bridgeGoogleIdFromFcEvent(currentEventRef) : '';
-    if (calendarBridgeWanted()) {
+    if (googleAgendaConflictCheckWanted()) {
         const ok = await ensureGoogleAgendaSlotsFreeOrAbort(
             calendar,
             [{ start: new Date(startStr), end: new Date(endStr) }],
@@ -1759,6 +1893,77 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         if (!ok) return;
     }
     const poolLinkExisting = String(currentEventRef?.extendedProps?.poolGoogleEventId ?? '').trim();
+
+    if (planningGridUsesSupabaseDb()) {
+        const ownerUid = await planningUserIdForEmail(slotOwnerEmail || currentUser.email);
+        if (!ownerUid) {
+            showToast('Impossible de résoudre le compte du propriétaire du créneau.', 'error');
+            return;
+        }
+        const dbSlotType = motifToPlanningDbSlotType(motif);
+        const bridgeType = planningDbSlotTypeToBridgeType(dbSlotType);
+        const startIso = new Date(startStr).toISOString();
+        const endIso = new Date(endStr).toISOString();
+        const canonicalExisting = currentEventRef
+            ? String(currentEventRef.extendedProps?.planningCanonicalId || '').trim()
+            : '';
+        const ur = await upsertPlanningEventRow({
+            id: canonicalExisting || null,
+            startIso,
+            endIso,
+            title,
+            dbSlotType,
+            ownerEmail: slotOwnerEmail || currentUser.email,
+            ownerUserId: ownerUid
+        });
+        if (!ur.ok || !ur.id) {
+            showToast(ur.error || 'Enregistrement base impossible.', 'error');
+            return;
+        }
+        const payloadDb = {
+            planningEventId: ur.id,
+            ...(gid ? { googleEventId: gid } : {}),
+            title,
+            start: startIso,
+            end: endIso,
+            type: bridgeType,
+            owner: ownerForBridge || currentUser.email,
+            ...(poolLinkExisting ? { poolGoogleEventId: poolLinkExisting } : {})
+        };
+        const syncSingleDb = await trySyncGoogleCalendar([payloadDb]);
+        if (calendarBridgeWanted() && !syncSingleDb.ok && !syncSingleDb.skipped) {
+            showToast(`Synchronisation agenda : ${syncSingleDb.error || 'échec'}`, 'error');
+            return;
+        }
+        document.getElementById('modal_reservation').close();
+        showToast(currentEventRef ? 'Réservation mise à jour.' : 'Réservation enregistrée.');
+        await refetchCalendarEventsFromGoogle(calendar);
+        if (currentEventRef && syncSingleDb.ok && prevSnapshot) {
+            const changed =
+                prevSnapshot.title !== title ||
+                prevSnapshot.startStr !== startIso ||
+                prevSnapshot.endStr !== endIso ||
+                prevSnapshot.type !== slotType;
+            const actor = String(currentUser.email).trim().toLowerCase();
+            const ownerLower = String(ownerForBridge || '').trim().toLowerCase();
+            if (changed && ownerLower && ownerLower !== actor) {
+                const oi = ownerInfoFromEvent(currentEventRef, currentUser);
+                await maybeNotifySlotOwnerAfterThirdPartyEdit({
+                    currentUser,
+                    action: 'modified',
+                    targetOwnerEmail: oi.ownerEmail,
+                    targetOwnerDisplayName: oi.ownerName,
+                    slotTitle: title,
+                    slotStart: startIso,
+                    slotEnd: endIso,
+                    previousStartIso: prevSnapshot.startStr,
+                    previousEndIso: prevSnapshot.endStr
+                });
+            }
+        }
+        return;
+    }
+
     const payloadSingle = {
         ...(gid ? { googleEventId: gid } : {}),
         title,
@@ -1799,7 +2004,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         currentEventRef.setExtendedProp('type', slotType);
     } else if (calendarBridgeWanted() && syncSingle.ok && !syncSingle.skipped) {
         /* En mode bridge, éviter l'optimisme local : recharger depuis Google pour ne pas dupliquer. */
-        await calendar.refetchEvents();
+        await refetchCalendarEventsFromGoogle(calendar);
     } else {
         addedSingle = calendar.addEvent(eventData);
     }
@@ -1859,6 +2064,56 @@ export async function deleteReservation(calendar, currentEventRef, currentUser) 
     const titleDel = String(currentEventRef.title || '').trim() || 'Créneau';
     const startDel = currentEventRef.start;
     const endDel = currentEventRef.end;
+
+    if (planningGridUsesSupabaseDb()) {
+        const canonicalId = String(currentEventRef.extendedProps?.planningCanonicalId || '').trim();
+        if (!canonicalId) {
+            showToast('Créneau sans identifiant base : suppression impossible.', 'error');
+            return;
+        }
+        const tokenDb = await getAccessToken();
+        const targets = await fetchPlanningMirrorTargetsForDelete(canonicalId);
+        if (tokenDb && targets.length > 0) {
+            for (const t of targets) {
+                const rDel = await invokeCalendarBridge(tokenDb, {
+                    action: 'delete',
+                    googleEventId: t.googleEventId,
+                    calendarId: t.calendarId
+                });
+                if (!rDel.ok && !rDel.skipped) {
+                    showToast(`Suppression agenda : ${rDel.error || 'échec'}`, 'error');
+                    return;
+                }
+            }
+        }
+        const delRow = await deletePlanningEventRow(canonicalId);
+        if (!delRow.ok) {
+            showToast(delRow.error || 'Suppression base impossible.', 'error');
+            return;
+        }
+        currentEventRef.remove();
+        invalidateCalendarListCache();
+        if (calendar && typeof calendar.refetchEvents === 'function') {
+            await calendar.refetchEvents();
+        }
+        document.getElementById('modal_reservation').close();
+        showToast('Créneau supprimé.');
+        const meDb = String(currentUser.email).trim().toLowerCase();
+        if (oi.ownerEmail && oi.ownerEmail !== meDb && startDel && endDel) {
+            await maybeNotifySlotOwnerAfterThirdPartyEdit({
+                currentUser,
+                action: 'deleted',
+                targetOwnerEmail: oi.ownerEmail,
+                targetOwnerDisplayName: oi.ownerName,
+                slotTitle: titleDel,
+                slotStart: startDel,
+                slotEnd: endDel,
+                previousStartIso: '',
+                previousEndIso: ''
+            });
+        }
+        return;
+    }
 
     const gid = bridgeGoogleIdFromFcEvent(currentEventRef);
     const poolGid = String(currentEventRef.extendedProps?.poolGoogleEventId ?? '').trim();

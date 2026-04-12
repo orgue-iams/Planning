@@ -1,12 +1,12 @@
 # Spécification fonctionnelle (aperçu)
 
-Application web **PWA** de planning autour de l’orgue : consultation et gestion de créneaux sur un **Google Calendar** partagé, avec **authentification** et **profils** côté **Supabase**.
+Application web **PWA** de planning autour de l’orgue : consultation et gestion de créneaux avec **authentification** et **profils** côté **Supabase**. Les créneaux peuvent être **canoniquement** stockés en **PostgreSQL** (`planning_event`) et **reflétés** sur **Google Calendar** pour abonnement / confort utilisateur — voir **[HANDOFF.md](./HANDOFF.md)** pour l’état d’implémentation et le reste à faire.
 
 ## Objectifs
 
 - Afficher une **grille calendrier** (semaine / mois / liste) alignée sur les horaires « chapelle » configurables.
 - **Créer, modifier, supprimer** des réservations selon le **rôle** et le **propriétaire** du créneau.
-- Synchroniser les opérations avec **Google Calendar** via une **Edge Function** (pas d’Apps Script obligatoire en prod).
+- Synchroniser les opérations avec **Google Calendar** via une **Edge Function** (`calendar-bridge`) lorsque la persistance métier est en base ou lors du mode historique « Google d’abord ».
 - Permettre à l’**admin** de gérer les **comptes**, le **pool de calendriers secondaires**, la **configuration org** (année scolaire, plages horaires) et les **gabarits de semaines** (A/B).
 - Offrir aux **élèves** une vision de leurs **cours** (bandeau / profil) et des **consignes** / annonces selon le contenu éditorial stocké en base.
 

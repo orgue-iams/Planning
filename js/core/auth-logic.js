@@ -123,6 +123,11 @@ export function isPrivilegedUser(user) {
     return !!(user && (user.role === 'admin' || user.role === 'prof'));
 }
 
+/** Compte enseignant (seuls les profs voient le libellé semaine A/B personnel sur le planning). */
+export function isProf(user) {
+    return !!(user && user.role === 'prof');
+}
+
 export function isAdmin(user) {
     return !!(user && user.role === 'admin');
 }

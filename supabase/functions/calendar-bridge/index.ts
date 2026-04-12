@@ -68,6 +68,8 @@ type BridgeBody = {
         templateLineId?: string;
         /** ID de l’événement miroir sur l’agenda perso (pool) — stocké en private sur l’événement principal. */
         poolGoogleEventId?: string;
+        /** Ligne `planning_event.id` : après upsert Google, enregistrement des miroirs (service_role). */
+        planningEventId?: string;
     }>;
     googleEventId?: string;
 };
@@ -399,25 +401,25 @@ async function mirrorOwnerPersonalCalendarIfNeeded(
     ev: NonNullable<BridgeBody['events']>[0],
     body: BridgeBody,
     mainCalendarEventId: string
-): Promise<void> {
+): Promise<{ poolGoogleEventId: string; poolCalendarId: string } | null> {
     if (!supabaseUrl || !supabaseAnonKey || !user.id) {
         console.warn('[calendar-bridge] mirror skip: supabase url/anon key ou user.id manquant');
-        return;
+        return null;
     }
     const me = String(user.email || '').trim().toLowerCase();
     if (!me) {
         console.warn('[calendar-bridge] mirror skip: e-mail JWT absent (impossible de résoudre le pool)');
-        return;
+        return null;
     }
 
     const mainCal = calendarId();
     const targetCal = resolveCalendarId(ev.calendarId ?? body.calendarId);
-    if (targetCal !== mainCal) return;
+    if (targetCal !== mainCal) return null;
 
     const ownerTrim = String(ev.owner || '').trim();
     const ownerNorm = ownerTrim.toLowerCase();
     const st = String(ev.type || 'reservation').trim().toLowerCase();
-    if (st === 'fermeture') return;
+    if (st === 'fermeture') return null;
 
     let poolCalRaw = '';
     if (!ownerNorm || ownerNorm === me) {
@@ -438,13 +440,13 @@ async function mirrorOwnerPersonalCalendarIfNeeded(
             poolRawLen: String(poolCalRaw).length,
             poolCal: poolCal ? poolCal.slice(0, 48) + '…' : ''
         });
-        return;
+        return null;
     }
 
     const title = String(ev.title || '').trim();
     const start = ev.start;
     const end = ev.end;
-    if (!title || !start || !end) return;
+    if (!title || !start || !end) return null;
 
     const baseFields: EventPayloadInput = {
         title,
@@ -475,7 +477,7 @@ async function mirrorOwnerPersonalCalendarIfNeeded(
         );
         if (!patchP.ok && patchP.status !== 404) {
             console.error('[calendar-bridge] PATCH miroir pool:', patchP.status, await patchP.text());
-            return;
+            return null;
         }
         if (patchP.status === 404) poolOutId = '';
     }
@@ -497,12 +499,12 @@ async function mirrorOwnerPersonalCalendarIfNeeded(
                     ? ' — Dans Google Agenda : ce calendrier secondaire → Partager avec l’e-mail du compte OAuth du bridge (ex. orgue.iams@gmail.com) avec « Modifier les événements », pas seulement lecture ou « public ».'
                     : '';
             console.error('[calendar-bridge] POST miroir pool:', msg + hint404 + hintWriter);
-            return;
+            return null;
         }
         poolOutId = created.id || '';
     }
 
-    if (!poolOutId) return;
+    if (!poolOutId) return null;
 
     const linkPayload = googleEventResource({
         ...baseFields,
@@ -519,6 +521,84 @@ async function mirrorOwnerPersonalCalendarIfNeeded(
     );
     if (!linkPatch.ok) {
         console.error('[calendar-bridge] PATCH lien principal→pool:', linkPatch.status, await linkPatch.text());
+    }
+
+    return { poolGoogleEventId: poolOutId, poolCalendarId: poolCal };
+}
+
+async function fetchPlanningEventSyncGeneration(
+    supabaseUrl: string,
+    serviceKey: string,
+    eventId: string
+): Promise<number | null> {
+    const base = supabaseUrl.replace(/\/$/, '');
+    const res = await fetch(
+        `${base}/rest/v1/planning_event?id=eq.${encodeURIComponent(eventId)}&select=sync_generation`,
+        {
+            headers: {
+                apikey: serviceKey,
+                Authorization: `Bearer ${serviceKey}`
+            }
+        }
+    );
+    if (!res.ok) return null;
+    const arr = (await res.json()) as Array<{ sync_generation?: number }>;
+    if (!Array.isArray(arr) || arr.length === 0) return null;
+    const g = arr[0]?.sync_generation;
+    return typeof g === 'number' ? g : null;
+}
+
+async function persistPlanningMirrorRows(
+    supabaseUrl: string,
+    serviceKey: string,
+    planningEventId: string,
+    mainCalendarId: string,
+    mainGoogleEventId: string,
+    pool: { googleEventId: string; calendarId: string } | null
+): Promise<void> {
+    const gen = await fetchPlanningEventSyncGeneration(supabaseUrl, serviceKey, planningEventId);
+    if (gen == null) {
+        console.warn('[calendar-bridge] persist mirror skip: planning_event introuvable ou sync_generation', planningEventId);
+        return;
+    }
+    const base = supabaseUrl.replace(/\/$/, '');
+    const now = new Date().toISOString();
+    const rows: Record<string, unknown>[] = [
+        {
+            event_id: planningEventId,
+            target: 'main',
+            google_calendar_id: mainCalendarId,
+            google_event_id: mainGoogleEventId,
+            sync_status: 'ok',
+            last_error: null,
+            sync_generation: gen,
+            updated_at: now
+        }
+    ];
+    if (pool?.googleEventId && pool?.calendarId) {
+        rows.push({
+            event_id: planningEventId,
+            target: 'pool_owner',
+            google_calendar_id: pool.calendarId,
+            google_event_id: pool.googleEventId,
+            sync_status: 'ok',
+            last_error: null,
+            sync_generation: gen,
+            updated_at: now
+        });
+    }
+    const res = await fetch(`${base}/rest/v1/planning_event_google_mirror?on_conflict=event_id,target`, {
+        method: 'POST',
+        headers: {
+            apikey: serviceKey,
+            Authorization: `Bearer ${serviceKey}`,
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify(rows)
+    });
+    if (!res.ok) {
+        console.error('[calendar-bridge] persist planning_event_google_mirror:', res.status, await res.text());
     }
 }
 
@@ -553,7 +633,7 @@ async function upsertSingleCalendarEvent(
     supabaseAnonKey: string,
     ev: NonNullable<BridgeBody['events']>[0],
     body: BridgeBody
-): Promise<{ googleEventId: string; start: string; end: string }> {
+): Promise<{ googleEventId: string; start: string; end: string; poolGoogleEventId?: string }> {
     const title = String(ev.title || '').trim();
     const start = ev.start;
     const end = ev.end;
@@ -620,7 +700,7 @@ async function upsertSingleCalendarEvent(
         if (!mainOutId) throw new Error(lastErr || 'Création événement impossible');
     }
 
-    await mirrorOwnerPersonalCalendarIfNeeded(
+    const poolPair = await mirrorOwnerPersonalCalendarIfNeeded(
         accessToken,
         calendarUser,
         jwt,
@@ -631,7 +711,35 @@ async function upsertSingleCalendarEvent(
         mainOutId
     );
 
-    return { googleEventId: mainOutId, start, end };
+    const mainCalResolved = resolveCalendarId(ev.calendarId ?? body.calendarId);
+    const planningId = String(ev.planningEventId ?? '').trim();
+    /* Secret manuel Edge : le dashboard refuse SUPABASE_* → SERVICE_ROLE_KEY (même JWT que la clé service_role). */
+    const serviceKey = (
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
+        Deno.env.get('SERVICE_ROLE_KEY') ??
+        ''
+    ).trim();
+    if (planningId && serviceKey) {
+        await persistPlanningMirrorRows(
+            supabaseUrl,
+            serviceKey,
+            planningId,
+            mainCalResolved,
+            mainOutId,
+            poolPair
+        );
+    } else if (planningId && !serviceKey) {
+        console.warn(
+            '[calendar-bridge] Clé service_role absente (SUPABASE_SERVICE_ROLE_KEY auto ou secret Edge SERVICE_ROLE_KEY) — planning_event_google_mirror ignoré'
+        );
+    }
+
+    return {
+        googleEventId: mainOutId,
+        start,
+        end,
+        ...(poolPair?.poolGoogleEventId ? { poolGoogleEventId: poolPair.poolGoogleEventId } : {})
+    };
 }
 
 Deno.serve(async (req) => {
@@ -747,7 +855,8 @@ Deno.serve(async (req) => {
         }
 
         if (action === 'upsert' && body.events && body.events.length > 0) {
-            const results: Array<{ googleEventId: string; start: string; end: string }> = [];
+            const results: Array<{ googleEventId: string; start: string; end: string; poolGoogleEventId?: string }> =
+                [];
             /** Écart entre événements pour limiter les rafales (quota Google Calendar). */
             const gapMs = 55;
             for (let i = 0; i < body.events.length; i++) {

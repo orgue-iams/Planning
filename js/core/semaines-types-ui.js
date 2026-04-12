@@ -11,7 +11,12 @@ import {
     getOrganSchoolSettingsCached,
     invalidateOrganSchoolSettingsCache
 } from './organ-settings.js';
-import { analyzeTemplateApply, executeTemplateApply } from './template-apply-engine.js';
+import {
+    analyzeTemplateApply,
+    executeTemplateApply,
+    formatTemplateApplyPartialSummary
+} from './template-apply-engine.js';
+import { saveProfWeekCycleFromApply } from './week-cycle.js';
 
 const DOW_OPTS = [
     { v: 1, t: 'Lun' },
@@ -24,6 +29,8 @@ const DOW_OPTS = [
 ];
 
 const USERS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>`;
+
+const ST_DRAG_GRIP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>`;
 
 const ST_ANALYZE_PLACEHOLDER_HTML =
     'Cliquez sur <strong>1. Préparer l’application</strong> : le résumé (bilan, conflits) s’affiche dans cet encadré. Ensuite activez <strong>2. Appliquer sur Google Agenda</strong> (à droite du bouton 1).';
@@ -76,6 +83,7 @@ function setStApplyButtonReady(ready) {
             btn.removeAttribute('disabled');
             btn.disabled = false;
         });
+        btn.classList.remove('btn-disabled', 'opacity-50', 'pointer-events-none');
         btn.removeAttribute('title');
         if (hint) {
             hint.innerHTML =
@@ -84,6 +92,7 @@ function setStApplyButtonReady(ready) {
     } else {
         btn.setAttribute('disabled', 'disabled');
         btn.disabled = true;
+        btn.classList.add('btn-disabled', 'opacity-50', 'pointer-events-none');
         btn.setAttribute('title', 'Terminez d’abord l’étape 1 (Préparer l’application).');
         if (hint) {
             hint.innerHTML =
@@ -92,9 +101,62 @@ function setStApplyButtonReady(ready) {
     }
 }
 
+function setStGotoCalBusy(busy) {
+    const btn = document.getElementById('st-goto-cal');
+    if (!btn) return;
+    if (busy) {
+        btn.setAttribute('disabled', 'disabled');
+        btn.disabled = true;
+        btn.classList.add('btn-disabled', 'opacity-50', 'pointer-events-none');
+    } else {
+        btn.removeAttribute('disabled');
+        btn.disabled = false;
+        btn.classList.remove('btn-disabled', 'opacity-50', 'pointer-events-none');
+    }
+}
+
+/** Grise et désactive les actions gabarit / préparation / application / fermer pendant une opération réseau. */
+function setStModalActionsBusy(busy) {
+    const save = document.getElementById('st-save-gabarit');
+    const analyze = document.getElementById('st-btn-analyze');
+    const apply = document.getElementById('st-btn-apply');
+    for (const btn of [save, analyze]) {
+        if (!btn) continue;
+        if (busy) {
+            btn.setAttribute('disabled', 'disabled');
+            btn.disabled = true;
+            btn.classList.add('btn-disabled', 'opacity-50', 'pointer-events-none');
+        } else {
+            btn.removeAttribute('disabled');
+            btn.disabled = false;
+            btn.classList.remove('btn-disabled', 'opacity-50', 'pointer-events-none');
+        }
+    }
+    setStGotoCalBusy(busy);
+    if (apply) {
+        if (busy) {
+            apply.setAttribute('disabled', 'disabled');
+            apply.disabled = true;
+            apply.classList.add('btn-disabled', 'opacity-50', 'pointer-events-none');
+        } else {
+            apply.classList.remove('btn-disabled', 'opacity-50', 'pointer-events-none');
+            setStApplyButtonReady(!!lastAnalysis?.ok);
+        }
+    }
+}
+
 /** @param {object} s summary from analyzeTemplateApply */
 function formatPrepareSummaryText(s, applyStart, firstWeekLetter, applyEnd) {
     const skipped = Number(s?.skippedOtherProfCount ?? 0);
+    const nClosure = Number(s?.closureFullWeekCount ?? 0);
+    const closureLine =
+        nClosure > 0
+            ? `Semaines entières en fermeture sur la période (général) : ${nClosure} — gabarit non posé, alternance A/B suspendue pour ces semaines.`
+            : '';
+    const alternanceLine =
+        nClosure > 0
+            ? `Votre alternance (repère personnel) : semaine du ${applyStart} = type ${firstWeekLetter}, puis chaque lundi bascule A ↔ B jusqu’au ${applyEnd}, en ignorant les semaines entièrement en fermeture (voir ci-dessous).`
+            : `Votre alternance (repère personnel) : semaine du ${applyStart} = type ${firstWeekLetter}, puis chaque lundi bascule A ↔ B jusqu’au ${applyEnd}.`;
     const conflictBlock =
         skipped === 0
             ? [
@@ -108,8 +170,9 @@ function formatPrepareSummaryText(s, applyStart, firstWeekLetter, applyEnd) {
                   ''
               ];
     return [
-        `Alternance : semaine du ${applyStart} = type ${firstWeekLetter}, puis chaque lundi bascule A ↔ B jusqu’au ${applyEnd}.`,
+        alternanceLine,
         '',
+        ...(closureLine ? [closureLine, ''] : []),
         '——— Bilan des opérations prévues ———',
         `Suppressions — planning général : ${s.deleteMainCount}`,
         `Suppressions — agendas perso élèves : ${s.deleteStudentPersoCount}`,
@@ -118,8 +181,33 @@ function formatPrepareSummaryText(s, applyStart, firstWeekLetter, applyEnd) {
         `Créations — travail perso : ${s.createTravailCount}`,
         '',
         ...conflictBlock,
-        'Vérifiez le résumé ci-dessus puis cliquez « 2. Appliquer sur Google Agenda » (à droite du bouton 1) pour écrire dans Google (3 tentatives en cas d’erreur réseau).'
+        'Vérifiez le résumé ci-dessus puis cliquez « 2. Appliquer sur Google Agenda » (à droite du bouton 1) pour écrire dans Google. En cas d’échec avant toute modification sur Google, une nouvelle tentative automatique peut avoir lieu ; après un début d’exécution, le message d’erreur indique ce qui a déjà été fait.'
     ].join('\n');
+}
+
+function resetStApplyProgressUi() {
+    const wrap = document.getElementById('st-apply-progress-wrap');
+    const bar = document.getElementById('st-apply-progress');
+    const txt = document.getElementById('st-apply-progress-text');
+    if (bar) bar.value = 0;
+    if (txt) {
+        txt.textContent = '';
+        txt.classList.remove('text-red-700', 'font-bold');
+    }
+    wrap?.classList.add('hidden');
+}
+
+/** @param {{ phase: string; done: number; total: number; detail?: string }} ev */
+function onStApplyProgress(ev) {
+    const wrap = document.getElementById('st-apply-progress-wrap');
+    const bar = document.getElementById('st-apply-progress');
+    const txt = document.getElementById('st-apply-progress-text');
+    if (!wrap || !bar || !txt) return;
+    wrap.classList.remove('hidden');
+    const total = ev.total > 0 ? ev.total : 1;
+    const pct = Math.min(100, Math.round((100 * ev.done) / total));
+    bar.value = pct;
+    txt.textContent = `Progression : ${ev.done} / ${ev.total} — ${ev.detail || ''}`.trim();
 }
 
 function resetStAnalyzeOutput() {
@@ -142,12 +230,15 @@ let stAbort = null;
 /** @type {object | null} */
 let lastAnalysis = null;
 let stUiBound = false;
+/** @type {HTMLTableRowElement | null} */
+let stDnDRow = null;
 
 export function resetSemainesTypesUiBindings() {
     stAbort?.abort();
     stAbort = null;
     lastAnalysis = null;
     stUiBound = false;
+    stDnDRow = null;
 }
 
 function mainCalId() {
@@ -346,7 +437,12 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
         </td>`;
     }
 
+    const dragCell = isReadonly
+        ? '<td class="w-7 p-0"></td>'
+        : `<td class="w-7 p-0 align-middle text-center select-none"><span class="st-drag-handle inline-flex cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 p-0.5 rounded hover:bg-slate-100" draggable="true" title="Glisser vers l’autre semaine type" aria-label="Glisser vers l’autre semaine type">${ST_DRAG_GRIP_SVG}</span></td>`;
+
     tr.innerHTML = `
+        ${dragCell}
         <td class="text-[10px] font-bold text-slate-700 align-top">${escapeAttr(ownerLabel)}</td>
         <td><select class="select select-xs st-dow max-w-[4.5rem] font-bold bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${dowSel}</select></td>
         <td><select class="select select-xs st-start max-w-[4.5rem] font-mono bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
@@ -578,57 +674,70 @@ async function runSemainesTypesSaveGabarit() {
         showToast(err, 'error');
         return;
     }
-    const { data: existing } = await sb.from('organ_week_template_line').select('id').eq('owner_user_id', u.id);
-    const existingIds = new Set((existing || []).map((x) => x.id));
-    const currentIds = new Set(
-        all.map((x) => x.domId).filter((id) => id && !String(id).startsWith('new-'))
-    );
-    for (const id of existingIds) {
-        if (!currentIds.has(id)) {
-            await sb.from('organ_week_template_line').delete().eq('id', id);
-        }
+    const saveBtn = document.getElementById('st-save-gabarit');
+    const saveLabelRest =
+        saveBtn?.getAttribute('data-label-rest') || 'Enregistrer le gabarit';
+    if (saveBtn && !saveBtn.getAttribute('data-label-rest')) {
+        saveBtn.setAttribute('data-label-rest', saveLabelRest);
     }
-    for (const r of all) {
-        const payload = {
-            week_type: r.week_type,
-            owner_user_id: u.id,
-            slot_type: r.slot_type,
-            day_of_week: r.day_of_week,
-            start_time: r.start_time,
-            end_time: r.end_time,
-            title: r.title,
-            updated_at: new Date().toISOString()
-        };
-        let lineId = r.domId;
-        if (!lineId || String(lineId).startsWith('new-')) {
-            const { data: ins, error } = await sb
-                .from('organ_week_template_line')
-                .insert(payload)
-                .select('id')
-                .single();
-            if (error) {
-                showToast(error.message, 'error');
-                return;
-            }
-            lineId = ins.id;
-        } else {
-            const { error } = await sb.from('organ_week_template_line').update(payload).eq('id', lineId);
-            if (error) {
-                showToast(error.message, 'error');
-                return;
+    setStModalActionsBusy(true);
+    if (saveBtn) saveBtn.textContent = 'Enregistrement…';
+    try {
+        const { data: existing } = await sb.from('organ_week_template_line').select('id').eq('owner_user_id', u.id);
+        const existingIds = new Set((existing || []).map((x) => x.id));
+        const currentIds = new Set(
+            all.map((x) => x.domId).filter((id) => id && !String(id).startsWith('new-'))
+        );
+        for (const id of existingIds) {
+            if (!currentIds.has(id)) {
+                await sb.from('organ_week_template_line').delete().eq('id', id);
             }
         }
-        await sb.from('organ_week_template_line_student').delete().eq('line_id', lineId);
-        if (r.slot_type === 'cours' && r.studentIds.length) {
-            const rowsIns = r.studentIds.map((sid) => ({ line_id: lineId, student_user_id: sid }));
-            const { error: e2 } = await sb.from('organ_week_template_line_student').insert(rowsIns);
-            if (e2) {
-                showToast(e2.message, 'error');
-                return;
+        for (const r of all) {
+            const payload = {
+                week_type: r.week_type,
+                owner_user_id: u.id,
+                slot_type: r.slot_type,
+                day_of_week: r.day_of_week,
+                start_time: r.start_time,
+                end_time: r.end_time,
+                title: r.title,
+                updated_at: new Date().toISOString()
+            };
+            let lineId = r.domId;
+            if (!lineId || String(lineId).startsWith('new-')) {
+                const { data: ins, error } = await sb
+                    .from('organ_week_template_line')
+                    .insert(payload)
+                    .select('id')
+                    .single();
+                if (error) {
+                    showToast(error.message, 'error');
+                    return;
+                }
+                lineId = ins.id;
+            } else {
+                const { error } = await sb.from('organ_week_template_line').update(payload).eq('id', lineId);
+                if (error) {
+                    showToast(error.message, 'error');
+                    return;
+                }
+            }
+            await sb.from('organ_week_template_line_student').delete().eq('line_id', lineId);
+            if (r.slot_type === 'cours' && r.studentIds.length) {
+                const rowsIns = r.studentIds.map((sid) => ({ line_id: lineId, student_user_id: sid }));
+                const { error: e2 } = await sb.from('organ_week_template_line_student').insert(rowsIns);
+                if (e2) {
+                    showToast(e2.message, 'error');
+                    return;
+                }
             }
         }
+        showToast('Gabarit enregistré : semaines types A et B sauvegardées.', 'success', 5200);
+    } finally {
+        if (saveBtn) saveBtn.textContent = saveBtn.getAttribute('data-label-rest') || saveLabelRest;
+        setStModalActionsBusy(false);
     }
-    showToast('Gabarit enregistré : semaines types A et B sauvegardées.', 'success', 5200);
 }
 
 async function runSemainesTypesAnalyze() {
@@ -643,33 +752,33 @@ async function runSemainesTypesAnalyze() {
         analyzeBtn.setAttribute('data-label-rest', analyzeLabelRest);
     }
 
-    if (analyzeBtn) {
-        analyzeBtn.disabled = true;
-        analyzeBtn.textContent = 'Préparation en cours…';
+    const mainId = mainCalId();
+    if (!mainId) {
+        const msg = 'Renseignez mainGoogleCalendarId dans planning.config.js (même calendrier que GOOGLE_CALENDAR_ID côté Edge Function).';
+        stAnalyzeShowError('Configuration incomplète', msg);
+        showToast('mainGoogleCalendarId manquant dans la config.', 'error');
+        return;
     }
+    const applyStart = document.getElementById('st-apply-start')?.value?.trim();
+    const applyEnd = document.getElementById('st-apply-end')?.value?.trim();
+    if (!applyStart || !applyEnd) {
+        stAnalyzeShowError('Dates manquantes', 'Indiquez une date de début et une date de fin.');
+        showToast('Indiquez une date de début et une date de fin.', 'error');
+        return;
+    }
+    if (applyEnd < applyStart) {
+        stAnalyzeShowError('Dates invalides', 'La date de fin doit être la même ou après le début.');
+        showToast('La date de fin doit être la même ou après le début.', 'error');
+        return;
+    }
+
+    setStModalActionsBusy(true);
+    if (analyzeBtn) analyzeBtn.textContent = 'Préparation en cours…';
     try {
         stAnalyzeSetLoadingMessage();
+        lastAnalysis = null;
         setStApplyButtonReady(false);
 
-        const mainId = mainCalId();
-        if (!mainId) {
-            const msg = 'Renseignez mainGoogleCalendarId dans planning.config.js (même calendrier que GOOGLE_CALENDAR_ID côté Edge Function).';
-            stAnalyzeShowError('Configuration incomplète', msg);
-            showToast('mainGoogleCalendarId manquant dans la config.', 'error');
-            return;
-        }
-        const applyStart = document.getElementById('st-apply-start')?.value?.trim();
-        const applyEnd = document.getElementById('st-apply-end')?.value?.trim();
-        if (!applyStart || !applyEnd) {
-            stAnalyzeShowError('Dates manquantes', 'Indiquez une date de début et une date de fin.');
-            showToast('Indiquez une date de début et une date de fin.', 'error');
-            return;
-        }
-        if (applyEnd < applyStart) {
-            stAnalyzeShowError('Dates invalides', 'La date de fin doit être la même ou après le début.');
-            showToast('La date de fin doit être la même ou après le début.', 'error');
-            return;
-        }
         const firstWeekRaw = document.querySelector('input[name="st-apply-first-week"]:checked')?.value;
         const firstWeekLetter = firstWeekRaw === 'B' ? 'B' : 'A';
 
@@ -741,9 +850,9 @@ async function runSemainesTypesAnalyze() {
         showToast(msg.split('\n')[0] || 'Erreur lors de la préparation.', 'error', 8000);
     } finally {
         if (analyzeBtn) {
-            analyzeBtn.disabled = false;
             analyzeBtn.textContent = analyzeBtn.getAttribute('data-label-rest') || analyzeLabelRest;
         }
+        setStModalActionsBusy(false);
     }
 }
 
@@ -757,41 +866,174 @@ async function runSemainesTypesApply() {
     ) {
         return;
     }
+    setStModalActionsBusy(true);
     const applyBtn = document.getElementById('st-btn-apply');
     const applyLabelRest =
         applyBtn?.getAttribute('data-label-rest') || '2. Appliquer sur Google Agenda';
     if (applyBtn && !applyBtn.getAttribute('data-label-rest')) {
         applyBtn.setAttribute('data-label-rest', applyLabelRest);
     }
-    if (applyBtn) {
-        applyBtn.disabled = true;
-        applyBtn.textContent = 'Application en cours…';
-    }
+    if (applyBtn) applyBtn.textContent = 'Application en cours…';
     const mainId = mainCalId();
+    const applyStartYmd = document.getElementById('st-apply-start')?.value?.trim() || '';
+    const firstWeekRaw = document.querySelector('input[name="st-apply-first-week"]:checked')?.value;
+    const letterForStartWeek = firstWeekRaw === 'B' ? 'B' : 'A';
+    const analysisSnapshot = lastAnalysis;
+    resetStApplyProgressUi();
+    const pBar = document.getElementById('st-apply-progress');
+    const pTxt = document.getElementById('st-apply-progress-text');
+    const pWrap = document.getElementById('st-apply-progress-wrap');
+    pWrap?.classList.remove('hidden');
+    if (pTxt) pTxt.textContent = 'Démarrage de l’application…';
     try {
-        const r = await executeTemplateApply(lastAnalysis, { profEmail: u.email, mainCalendarId: mainId });
-        if (!r?.ok) {
-            const detail = r?.error || 'Échec application.';
-            stAnalyzeShowError('Application Google interrompue', detail);
-            showToast(detail.split('\n').find((l) => l.trim()) || 'Échec application.', 'error', 9000);
+        if (pTxt) pTxt.textContent = 'Enregistrement du repère semaine A/B en base…';
+        const sav = await saveProfWeekCycleFromApply(u.id, applyStartYmd, letterForStartWeek);
+        if (!sav.ok && !sav.skipped) {
+            const w = sav.error || 'Enregistrement du repère semaine A/B impossible.';
+            if (pBar) pBar.value = 100;
+            if (pTxt) {
+                pTxt.textContent = w;
+                pTxt.classList.add('text-red-700', 'font-bold');
+            }
+            stAnalyzeShowError('Base de données', w);
+            showToast(w, 'error', 8000);
             return;
         }
-        showToast('Application sur Google Agenda terminée.', 'success', 5200);
+        if (sav.ok) {
+            document.dispatchEvent(new CustomEvent('planning-week-cycle-updated'));
+        }
+
+        const r = await executeTemplateApply(lastAnalysis, {
+            profEmail: u.email,
+            mainCalendarId: mainId,
+            onProgress: onStApplyProgress
+        });
+        if (!r?.ok) {
+            const detail = r?.error || 'Échec application.';
+            const partialBlock = r?.partial ? formatTemplateApplyPartialSummary(r.partial) : '';
+            const dbNote = sav.ok
+                ? 'Le repère semaine A/B a été enregistré en base avant l’écriture Google. Les agendas peuvent être incomplets ; après correction, lancez « 1. Préparer » puis « 2. Appliquer » à nouveau.'
+                : '';
+            const fullDetail = [detail, partialBlock, dbNote].filter(Boolean).join('\n\n');
+            const oneLine = detail.split('\n').find((l) => l.trim()) || 'Échec application.';
+            if (pBar) {
+                if (r?.partial && r.partial.grandTotal > 0) {
+                    pBar.value = Math.min(
+                        100,
+                        Math.round((100 * r.partial.grandDone) / r.partial.grandTotal)
+                    );
+                } else {
+                    pBar.value = 100;
+                }
+            }
+            if (pTxt) {
+                pTxt.textContent = r?.partial
+                    ? `Interrompu après ${r.partial.grandDone} / ${r.partial.grandTotal} — ${oneLine}`
+                    : `Interrompu : ${oneLine}`;
+                pTxt.classList.add('text-red-700', 'font-bold');
+            }
+            stAnalyzeShowError('Application Google interrompue', fullDetail);
+            showToast(oneLine, 'error', 9000);
+            return;
+        }
+        if (pTxt) pTxt.classList.remove('text-red-700', 'font-bold');
+        if (pBar) pBar.value = 100;
+        if (pTxt) pTxt.textContent = 'Terminé avec succès — résumé dans l’encadré ci-dessous.';
+
+        const st = r.stats || { deleteTotal: 0, upsertTotal: 0 };
+        const sum = analysisSnapshot?.summary;
+        const savWarn =
+            sav.skipped
+                ? '\n\nNote : repère semaine A/B non enregistré (auth backend non configurée). Libellé A/B dans la barre du planning : inchangé côté base.'
+                : '';
+        const repereBilanLine = sav.ok ? 'Repère A/B : enregistré en base avant l’écriture Google.' : null;
+        const bilan =
+            sum != null
+                ? [
+                      ...(repereBilanLine ? [repereBilanLine] : []),
+                      `Suppressions prévues (analyse) — général / élèves / prof : ${sum.deleteMainCount} / ${sum.deleteStudentPersoCount} / ${sum.deleteProfPersoCount}`,
+                      `Écritures exécutées cette fois : ${st.upsertTotal} événement(s) Google ; suppressions exécutées : ${st.deleteTotal}.`
+                  ].join('\n')
+                : sav.ok
+                  ? `Repère A/B enregistré en base. Suppressions exécutées : ${st.deleteTotal}. Écritures Google : ${st.upsertTotal}.`
+                  : `Suppressions exécutées : ${st.deleteTotal}. Écritures Google : ${st.upsertTotal}.`;
+
+        stAnalyzeShowResult(
+            [
+                '——— Résultat de l’application Google ———',
+                'Statut : succès (toutes les étapes envoyées se sont terminées sans erreur).',
+                '',
+                bilan,
+                '',
+                'Vous pouvez vérifier les agendas.',
+                'Libellé « Semaine A / B » dans la barre du planning : uniquement en vue Semaine, Jour ou liste Planning (pas en vue Mois).',
+                savWarn
+            ]
+                .join('\n')
+                .trim()
+        );
+
+        showToast('Application sur Google Agenda terminée.', 'success', 6500);
         setStApplyButtonReady(false);
         lastAnalysis = null;
         document.dispatchEvent(new CustomEvent('planning-template-applied'));
     } finally {
         if (applyBtn) {
             applyBtn.textContent = applyBtn.getAttribute('data-label-rest') || applyLabelRest;
-            /* Succès : lastAnalysis effacé → garder désactivé. Échec : réactiver pour réessayer. */
-            if (lastAnalysis?.ok) {
-                applyBtn.removeAttribute('disabled');
-                applyBtn.disabled = false;
-            } else {
-                applyBtn.setAttribute('disabled', 'disabled');
-                applyBtn.disabled = true;
-            }
         }
+        setStModalActionsBusy(false);
+    }
+}
+
+function onStTemplateDragStart(e) {
+    const h = e.target?.closest?.('.st-drag-handle');
+    if (!h) return;
+    const dlg = document.getElementById('modal_semaines_types');
+    if (!dlg?.open || !dlg.contains(h)) return;
+    const tr = h.closest('tr[data-st-line]');
+    if (!(tr instanceof HTMLTableRowElement) || tr.getAttribute('data-st-editable') !== '1') return;
+    stDnDRow = tr;
+    e.dataTransfer?.setData('text/plain', 'semaines-types-row');
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+    tr.classList.add('opacity-40');
+}
+
+function onStTemplateDragEnd() {
+    if (stDnDRow) stDnDRow.classList.remove('opacity-40');
+    stDnDRow = null;
+}
+
+function onStTemplateDragOver(e) {
+    if (!stDnDRow) return;
+    const tb = e.target?.closest?.('#st-tbody-a, #st-tbody-b');
+    if (!tb) return;
+    const dlg = document.getElementById('modal_semaines_types');
+    if (!dlg?.open || !dlg.contains(tb)) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+}
+
+function onStTemplateDrop(e) {
+    const tb = e.target?.closest?.('#st-tbody-a, #st-tbody-b');
+    if (!tb || !stDnDRow) return;
+    const dlg = document.getElementById('modal_semaines_types');
+    if (!dlg?.open || !dlg.contains(tb)) return;
+    e.preventDefault();
+    const src = stDnDRow.parentElement;
+    if (src === tb) return;
+    const u = getPlanningSessionUser();
+    if (!u?.id) return;
+    const tbodyA = document.getElementById('st-tbody-a');
+    const tbodyB = document.getElementById('st-tbody-b');
+    if (tb !== tbodyA && tb !== tbodyB) return;
+
+    tb.appendChild(stDnDRow);
+    const ra = parseRowsFromTbody(tbodyA, 'A', u.id);
+    const rb = parseRowsFromTbody(tbodyB, 'B', u.id);
+    const overlapErr = validateNoOverlap([...ra, ...rb]);
+    if (overlapErr) {
+        src.appendChild(stDnDRow);
+        showToast(overlapErr, 'error');
     }
 }
 
@@ -878,4 +1120,8 @@ export function initSemainesTypesUi(currentUser) {
     );
 
     document.addEventListener('click', onSemainesTypesDocumentClick, { signal });
+    document.addEventListener('dragstart', onStTemplateDragStart, { signal });
+    document.addEventListener('dragend', onStTemplateDragEnd, { signal });
+    document.addEventListener('dragover', onStTemplateDragOver, { signal });
+    document.addEventListener('drop', onStTemplateDrop, { signal });
 }

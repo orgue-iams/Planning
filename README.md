@@ -4,7 +4,8 @@ Le projet compile Tailwind + DaisyUI en local (pas de script CDN Tailwind en pro
 
 ## Documentation projet
 
-- **[docs/README.md](./docs/README.md)** — index (spécification, architecture, roadmap).
+- **[docs/README.md](./docs/README.md)** — index (spec, architecture, roadmap).
+- **[docs/HANDOFF.md](./docs/HANDOFF.md)** — **reprise de session** : planning canonique Postgres + miroir Google, livré / backlog, checklist (pour un agent ou un dev qui reprend demain).
 
 ## Commandes
 
@@ -18,7 +19,7 @@ Le projet compile Tailwind + DaisyUI en local (pas de script CDN Tailwind en pro
 1. Lancer `npm run build:css` (ou `npm run deploy:pages` pour-pages, qui enchaîne le build)
 2. Vérifier que `css/tailwind.generated.css` fait partie des changements
 3. Vérifier que `index.html` ne contient pas `https://cdn.tailwindcss.com`
-4. Incrémenter `CACHE_NAME` dans `sw.js` si les assets changent
+4. Incrémenter `CACHE_NAME` dans `js/config/cache-name.js` si les assets changent
 5. Déployer (CI : workflow **Deploy GitHub Pages** sur `main` / `master`)
 
 ## Notes

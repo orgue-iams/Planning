@@ -2,7 +2,9 @@
  * Barre d’outils type Google Agenda : Auj., ‹ ›, titre de période, menu vues.
  */
 
-import { getWeekCycleAnchorMonday, weekCycleLabelForDate } from './week-cycle.js';
+import { getProfWeekCycleForToolbar, weekCycleLabelForDate } from './week-cycle.js';
+import { isProf } from './auth-logic.js';
+import { getPlanningSessionUser } from './session-user.js';
 
 const MONTH_LONG = [
     'janvier',
@@ -88,7 +90,15 @@ export function formatCalendarToolbarTitle(calendar) {
         base = view.title || '';
     }
 
-    const wc = weekCycleLabelForDate(getWeekCycleAnchorMonday(), start);
+    const u = getPlanningSessionUser();
+    const state = isProf(u) ? getProfWeekCycleForToolbar() : null;
+    /* Mois / année : une seule étiquette A/B serait trompeuse (plusieurs semaines à l’écran). */
+    const weekCycleOkView =
+        type === 'timeGridWeek' || type === 'timeGridDay' || type.startsWith('list');
+    const wc =
+        weekCycleOkView &&
+        state?.anchorMondayIso &&
+        weekCycleLabelForDate(state.anchorMondayIso, state.letterAtAnchor, start);
     return wc ? `${base} · ${wc}` : base;
 }
 

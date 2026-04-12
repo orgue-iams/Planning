@@ -3,6 +3,14 @@
  */
 import { getAccessToken } from './auth-logic.js';
 import { invokeCalendarBridge } from './calendar-bridge.js';
+import {
+    calendarListCacheKey,
+    cloneCachedCalendarRows,
+    getCalendarListCache,
+    setCalendarListCache
+} from './calendar-events-list-cache.js';
+import { fetchPlanningEventsForFullCalendar, planningGridUsesSupabaseDb } from './planning-events-db.js';
+import { getPlanningSessionUser } from './session-user.js';
 import { getPlanningConfig, isBackendAuthConfigured } from './supabase-client.js';
 import { demoEvents } from '../data/mock-events.js';
 
@@ -108,8 +116,29 @@ export function formatCoursLineFr(ev) {
  */
 export async function fetchCalendarEventsInRange(rangeStart, rangeEnd) {
     const { calendarBridgeUrl } = getPlanningConfig();
-    const useBridge = Boolean(calendarBridgeUrl) && isBackendAuthConfigured();
+    const useDbGrid = planningGridUsesSupabaseDb();
+    const useBridge = Boolean(calendarBridgeUrl) && isBackendAuthConfigured() && !useDbGrid;
+    if (useDbGrid) {
+        const u = getPlanningSessionUser();
+        const cacheKey = calendarListCacheKey(
+            rangeStart.toISOString(),
+            rangeEnd.toISOString(),
+            `db:${u?.id || ''}`
+        );
+        const hit = getCalendarListCache(cacheKey);
+        if (hit) return cloneCachedCalendarRows(hit);
+        const rows = await fetchPlanningEventsForFullCalendar(rangeStart, rangeEnd, u);
+        setCalendarListCache(cacheKey, cloneCachedCalendarRows(rows));
+        return rows;
+    }
     if (useBridge) {
+        const cacheKey = calendarListCacheKey(
+            rangeStart.toISOString(),
+            rangeEnd.toISOString(),
+            'bridge'
+        );
+        const hit = getCalendarListCache(cacheKey);
+        if (hit) return cloneCachedCalendarRows(hit);
         const token = await getAccessToken();
         if (!token) return [];
         const bridge = await invokeCalendarBridge(token, {
@@ -119,7 +148,9 @@ export async function fetchCalendarEventsInRange(rangeStart, rangeEnd) {
         });
         if (!bridge.ok) return [];
         const data = /** @type {{ events?: unknown[] }} */ (bridge.data || {});
-        return mapBridgeListEvents(Array.isArray(data.events) ? data.events : []);
+        const rows = mapBridgeListEvents(Array.isArray(data.events) ? data.events : []);
+        setCalendarListCache(cacheKey, cloneCachedCalendarRows(rows));
+        return rows;
     }
     const startMs = rangeStart.getTime();
     const endMs = rangeEnd.getTime();

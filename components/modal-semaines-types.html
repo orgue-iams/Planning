@@ -25,6 +25,7 @@
                         <table class="table table-sm w-full text-[11px] sm:text-xs min-w-[720px]">
                             <thead>
                                 <tr class="text-slate-500">
+                                    <th class="w-7 p-0" aria-label="Déplacer"></th>
                                     <th class="min-w-[6.5rem]">Prof</th>
                                     <th>Jour</th>
                                     <th>Début</th>
@@ -48,6 +49,7 @@
                         <table class="table table-sm w-full text-[11px] sm:text-xs min-w-[720px]">
                             <thead>
                                 <tr class="text-slate-500">
+                                    <th class="w-7 p-0" aria-label="Déplacer"></th>
                                     <th class="min-w-[6.5rem]">Prof</th>
                                     <th>Jour</th>
                                     <th>Début</th>
@@ -92,7 +94,7 @@
                         </div>
                     </fieldset>
                 </div>
-                <p class="text-[9px] text-slate-500 leading-snug">La semaine est celle du <strong>lundi–dimanche</strong> contenant la date de début ; le <strong>lundi suivant</strong> bascule sur l’autre type (A ↔ B), et ainsi de suite jusqu’à la fin.</p>
+                <p class="text-[9px] text-slate-500 leading-snug">La semaine type porte sur la semaine <strong>lundi → dimanche</strong> qui <strong>contient</strong> la date de début (ex. début le <strong>dimanche 12</strong> = semaine du <strong>lundi 6</strong> au dimanche 12, pas la semaine suivante). Le <strong>lundi suivant</strong> bascule A ↔ B, etc. Ce repère est <strong>personnel</strong> (chaque prof le sien). Après <strong>Appliquer</strong>, le libellé « Semaine A/B » dans le planning n’apparaît qu’en vue <strong>Semaine</strong>, <strong>Jour</strong> ou <strong>Planning</strong> (liste), pas en vue Mois.</p>
                 <div class="flex flex-wrap gap-2 items-center">
                     <button type="button" id="st-btn-analyze" class="btn btn-outline btn-sm font-black text-[11px]">1. Préparer l’application</button>
                     <button
@@ -108,6 +110,10 @@
                 <p id="st-btn-apply-hint" class="text-[9px] text-slate-500 m-0 mt-1 max-w-4xl leading-snug">
                     Le bouton <strong>2</strong> reste inactif tant que la préparation n’a pas réussi ; le résumé s’affiche dans l’encadré ci-dessous.
                 </p>
+                <div id="st-apply-progress-wrap" class="hidden mt-3 max-w-4xl space-y-1" aria-live="polite">
+                    <progress id="st-apply-progress" class="progress progress-primary w-full h-2.5" max="100" value="0"></progress>
+                    <p id="st-apply-progress-text" class="text-[9px] text-slate-600 m-0 leading-snug"></p>
+                </div>
                 <div id="st-analyze-out-wrap" class="rounded-lg border border-slate-200 bg-slate-50 p-3 max-w-4xl min-h-[3.5rem] mt-2" aria-live="polite" aria-atomic="true">
                     <p id="st-analyze-placeholder" class="text-[9px] text-slate-500 m-0 leading-relaxed" style="display: block">
                         Cliquez sur <strong>1. Préparer l’application</strong> : le résumé (bilan, conflits) s’affiche dans cet encadré. Ensuite activez <strong>2. Appliquer sur Google Agenda</strong> (à droite du bouton 1).
@@ -127,7 +133,7 @@
 
         <footer class="shrink-0 border-t border-slate-200 bg-white px-4 sm:px-6 py-3 shadow-[0_-4px_14px_-6px_rgba(15,23,42,0.08)]">
             <div class="max-w-[1600px] mx-auto w-full flex flex-wrap justify-end gap-2">
-                <button type="button" id="st-goto-cal" class="btn btn-primary btn-sm font-black text-[11px]">Fermer et aller au calendrier</button>
+                <button type="button" id="st-goto-cal" class="btn btn-primary btn-sm font-black text-[11px]">Fermer</button>
             </div>
         </footer>
     </div>

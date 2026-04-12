@@ -34,6 +34,17 @@
             </div>
         </div>
 
+        <div id="config-planning-notify-wrap" class="hidden rounded-xl border border-slate-200 bg-slate-50/90 p-3 mb-3 space-y-2">
+            <p class="text-[10px] font-bold text-slate-700">Alertes infrastructure (planning)</p>
+            <p class="text-[9px] text-slate-600 leading-snug">
+                Email pour le digest nocturne des erreurs techniques (base, bridge, envoi mail) — pas les messages métier de l’application.
+            </p>
+            <div>
+                <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="config-planning-error-notify-email">Destinataire</label>
+                <input type="email" id="config-planning-error-notify-email" autocomplete="email" placeholder="admin@exemple.fr" class="input input-sm h-9 w-full text-sm bg-white border border-slate-200 rounded-lg" />
+            </div>
+        </div>
+
         <div id="config-admin-actions" class="hidden mb-3">
             <button type="button" id="config-save-btn" class="btn btn-primary btn-sm font-black text-[11px]">Enregistrer</button>
         </div>

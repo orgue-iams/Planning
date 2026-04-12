@@ -13,8 +13,9 @@ Démarrage option 2 — Supabase + Google Agenda
    - Si la base existe déjà, exécuter aussi supabase/migrations/003_consultation_role.sql
      puis supabase/migrations/004_reservation_types.sql, 005_planning_admin_list_users_rpc.sql,
      006_consignes_ict.sql (si besoin), 007_google_calendar_pool.sql (pool calendriers perso + affectation auto),
-     009_organ_week_cycle.sql (semaines A/B affichées dans la barre du calendrier, réglage prof/admin : menu « Semaines types A / B »).
+     009_organ_week_cycle.sql (ancienne table globale, conservée pour compat ; l’app utilise surtout 014).
      010_organ_school_template.sql (année scolaire + plage chapelle, gabarit A/B, RPC élèves actifs + calendrier pool).
+     014_organ_prof_week_cycle.sql (repère semaine A/B par professeur, barre calendrier visible seulement pour le prof connecté ; rempli au « Appliquer » du gabarit).
    - Pour créer les comptes de base demandés (admin/élèves/prof), exécuter supabase/seed-users.sql
      (le script crée bien auth.users + auth.identities + profiles ; ne pas recopier d’ancienne variante
      qui n’insérait que auth.users — cela cassait GET /auth/v1/admin/users / « Gestion des comptes ».)
@@ -78,6 +79,11 @@ Démarrage option 2 — Supabase + Google Agenda
        Optionnel : GOOGLE_CALENDAR_TIMEZONE = Europe/Paris (défaut Europe/Paris)
        Workspace + délégation domain-wide : GOOGLE_CALENDAR_IMPERSONATE = orgue.iams@google.com
          et GOOGLE_CALENDAR_ID = primary (souvent le plus simple pour l’agenda principal).
+   - Secrets Edge (suite) — grille lue depuis Postgres + table `planning_event_google_mirror` :
+       calendar-bridge lit d’abord `SUPABASE_SERVICE_ROLE_KEY` (souvent injecté par la plateforme), sinon `SERVICE_ROLE_KEY`.
+       Si les miroirs ne s’écrivent pas : ajoute un secret Edge nommé **SERVICE_ROLE_KEY** (le dashboard **interdit** les noms
+       commençant par `SUPABASE_` pour les secrets saisis à la main) avec la **même valeur** que la clé « service_role »
+       (Settings → API). En local, `.env` peut utiliser `SUPABASE_SERVICE_ROLE_KEY` ou `SERVICE_ROLE_KEY`.
    - supabase functions deploy calendar-bridge
    - supabase functions deploy planning-admin
    - supabase functions deploy planning-slot-notify
