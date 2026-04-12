@@ -460,7 +460,11 @@ async function mirrorOwnerPersonalCalendarIfNeeded(
                 insP.status === 404
                     ? ' — Partagez ce calendrier secondaire avec le compte Google utilisé par calendar-bridge (même procédure que pour l’agenda principal : « Modifier les événements »). Si l’ID en base était une URL embed complète, utilisez uniquement xxx@group.calendar.google.com (normalisation côté serveur activée).'
                     : '';
-            console.error('[calendar-bridge] POST miroir pool:', msg + hint404);
+            const hintWriter =
+                /writer access|need to have writer|403/i.test(msg) && !hint404
+                    ? ' — Dans Google Agenda : ce calendrier secondaire → Partager avec l’e-mail du compte OAuth du bridge (ex. orgue.iams@gmail.com) avec « Modifier les événements », pas seulement lecture ou « public ».'
+                    : '';
+            console.error('[calendar-bridge] POST miroir pool:', msg + hint404 + hintWriter);
             return;
         }
         poolOutId = created.id || '';
