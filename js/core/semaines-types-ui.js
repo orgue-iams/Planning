@@ -1,9 +1,9 @@
 /**
- * Semaines types A/B : repère lundi, gabarit (prof), analyse / application Google.
+ * Semaines types A/B : gabarit (prof), analyse / application Google.
  */
 import { isAdmin, isPrivilegedUser } from './auth-logic.js';
 import { getPlanningSessionUser } from './session-user.js';
-import { fetchWeekCycleAnchor, getWeekCycleAnchorMonday, saveWeekCycleAnchor } from './week-cycle.js';
+import { fetchWeekCycleAnchor, getWeekCycleAnchorMonday } from './week-cycle.js';
 import { getSupabaseClient, isBackendAuthConfigured, getPlanningConfig } from './supabase-client.js';
 import { showToast } from '../utils/toast.js';
 import { populateTimeSelectElement } from '../utils/time-helpers.js';
@@ -12,11 +12,7 @@ import {
     getOrganSchoolSettingsCached,
     invalidateOrganSchoolSettingsCache
 } from './organ-settings.js';
-import {
-    analyzeTemplateApply,
-    executeTemplateApply,
-    nextMondayStrictlyAfter
-} from './template-apply-engine.js';
+import { analyzeTemplateApply, executeTemplateApply } from './template-apply-engine.js';
 
 const DOW_OPTS = [
     { v: 1, t: 'Lun' },
@@ -27,6 +23,8 @@ const DOW_OPTS = [
     { v: 6, t: 'Sam' },
     { v: 7, t: 'Dim' }
 ];
+
+const USERS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>`;
 
 /** @type {AbortController | null} */
 let stAbort = null;
@@ -50,9 +48,83 @@ function rowOverlap(d1, s1, e1, d2, s2, e2) {
     return s1 < e2 && s2 < e1;
 }
 
+function escapeAttr(s) {
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;');
+}
+
+/** @param {{ nom?: string, prenom?: string, display_name?: string, email?: string }} e */
+function elevePrenomNom(e) {
+    const n = String(e?.nom || '').trim();
+    const p = String(e?.prenom || '').trim();
+    if (p || n) return [p, n].filter(Boolean).join(' ').trim();
+    const d = String(e?.display_name || '').trim();
+    if (d) return d;
+    return String(e?.email || '').trim() || '—';
+}
+
+/** @param {string[]} ids @param {Map<string, object>} byId */
+function enrolledLabelsSorted(ids, byId) {
+    const rows = [];
+    for (const id of ids || []) {
+        const e = byId.get(id);
+        rows.push({
+            id,
+            nom: String(e?.nom || '').toLowerCase(),
+            prenom: String(e?.prenom || '').toLowerCase(),
+            label: e ? elevePrenomNom(e) : id
+        });
+    }
+    rows.sort((a, b) => {
+        const c = a.nom.localeCompare(b.nom, 'fr');
+        if (c !== 0) return c;
+        return a.prenom.localeCompare(b.prenom, 'fr');
+    });
+    return rows.map((r) => r.label);
+}
+
+function syncReadonlyStudentsText(tr, studentIds, elevesById) {
+    const el = tr.querySelector('.st-students-readonly-text');
+    if (!el) return;
+    const typ = tr.querySelector('.st-type')?.value || 'cours';
+    if (typ !== 'cours') {
+        el.textContent = '—';
+        return;
+    }
+    const labels = enrolledLabelsSorted(studentIds, elevesById);
+    el.textContent = labels.length ? labels.join(', ') : '—';
+}
+
+function wireStudentsToggle(tr, elevesById) {
+    const btn = tr.querySelector('.st-students-toggle');
+    const ro = tr.querySelector('.st-students-readonly-wrap');
+    const sel = tr.querySelector('.st-students');
+    if (!btn || !ro || !sel) return;
+    btn.addEventListener('click', () => {
+        const typ = tr.querySelector('.st-type')?.value || 'cours';
+        if (typ !== 'cours') return;
+        const editing = !sel.classList.contains('hidden');
+        if (editing) {
+            const studs = [];
+            for (const o of sel.selectedOptions) {
+                if (o.value) studs.push(o.value);
+            }
+            syncReadonlyStudentsText(tr, studs, elevesById);
+            sel.classList.add('hidden');
+            ro.classList.remove('hidden');
+        } else {
+            ro.classList.add('hidden');
+            sel.classList.remove('hidden');
+        }
+    });
+}
+
 function parseRowsFromTbody(tbody, weekLetter, ownerId) {
     const rows = [];
     for (const tr of tbody?.querySelectorAll('tr[data-st-line]') || []) {
+        if (tr.getAttribute('data-st-editable') !== '1') continue;
         const id = tr.getAttribute('data-line-id') || '';
         const dow = parseInt(tr.querySelector('.st-dow')?.value || '1', 10);
         const st = tr.querySelector('.st-start')?.value || '08:00';
@@ -112,24 +184,28 @@ function validateNoOverlap(rows) {
 
 function makeStudentOptionsHtml(eleves) {
     return (eleves || [])
-        .map(
-            (e) =>
-                `<option value="${e.user_id}">${escapeAttr(e.display_name || e.email)} (${escapeAttr(e.email)})</option>`
-        )
+        .map((e) => {
+            const lab = elevePrenomNom(e);
+            return `<option value="${e.user_id}">${escapeAttr(lab)}</option>`;
+        })
         .join('');
 }
 
-function escapeAttr(s) {
-    return String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/"/g, '&quot;')
-        .replace(/</g, '&lt;');
-}
-
-function appendTemplateRow(tbody, week, line, elevesOptionsHtml, isReadonly, ownerShort) {
+/**
+ * @param {HTMLElement} tbody
+ * @param {object | null} line
+ * @param {string} optHtml
+ * @param {{ isAdmin: boolean, ownerLabel: string, lineOwnerId: string, currentUserId: string, elevesById: Map<string, object> }} ctx
+ */
+function appendTemplateRow(tbody, line, optHtml, ctx) {
+    const { isAdmin, ownerLabel, lineOwnerId, currentUserId, elevesById } = ctx;
+    const isReadonly = isAdmin || lineOwnerId !== currentUserId;
     const tr = document.createElement('tr');
     tr.setAttribute('data-st-line', '1');
     tr.setAttribute('data-line-id', line?.id || '');
+    tr.setAttribute('data-owner-id', lineOwnerId);
+    tr.setAttribute('data-st-editable', isReadonly ? '0' : '1');
+
     const dowSel = DOW_OPTS.map(
         (o) => `<option value="${o.v}" ${line?.day_of_week === o.v ? 'selected' : ''}>${o.t}</option>`
     ).join('');
@@ -138,17 +214,35 @@ function appendTemplateRow(tbody, week, line, elevesOptionsHtml, isReadonly, own
     const st = String(line?.start_time || '08:00:00').slice(0, 5);
     const en = String(line?.end_time || '09:00:00').slice(0, 5);
     const title = escapeAttr(line?.title || '');
-    const adminCell = ownerShort
-        ? `<td class="text-[9px] font-mono text-slate-500">${escapeAttr(ownerShort)}</td>`
-        : '';
+    const sid = line?.studentIds || [];
+
+    let studentsCell = '';
+    if (isReadonly) {
+        const labels = enrolledLabelsSorted(sid, elevesById);
+        const txt = line?.slot_type === 'reservation' ? '—' : labels.length ? labels.join(', ') : '—';
+        studentsCell = `<td class="st-students-cell align-top">
+            <div class="st-students-readonly-wrap flex items-start gap-1 min-w-0">
+                <span class="st-students-readonly-text flex-1 min-w-0 text-[9px] text-slate-700 leading-snug">${escapeAttr(txt)}</span>
+            </div>
+        </td>`;
+    } else {
+        studentsCell = `<td class="st-students-cell align-top">
+            <div class="st-students-readonly-wrap flex items-start gap-1 min-w-0">
+                <span class="st-students-readonly-text flex-1 min-w-0 text-[9px] text-slate-700 leading-snug"></span>
+                <button type="button" class="st-students-toggle btn btn-ghost btn-xs p-0.5 min-h-0 h-auto shrink-0 border-0" title="Modifier les inscrits" aria-label="Modifier les inscrits">${USERS_SVG}</button>
+            </div>
+            <select multiple class="select select-xs st-students hidden w-full min-w-[8rem] max-h-24 text-[9px] bg-white border border-slate-200 rounded mt-0.5" size="4">${optHtml}</select>
+        </td>`;
+    }
+
     tr.innerHTML = `
-        ${adminCell}
+        <td class="text-[10px] font-bold text-slate-700 align-top">${escapeAttr(ownerLabel)}</td>
         <td><select class="select select-xs st-dow max-w-[4.5rem] font-bold bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${dowSel}</select></td>
         <td><select class="select select-xs st-start max-w-[4.5rem] font-mono bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
         <td><select class="select select-xs st-end max-w-[4.5rem] font-mono bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
         <td><select class="select select-xs st-type max-w-[5.5rem] font-bold bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${typeSel}</select></td>
         <td><input type="text" class="input input-xs st-title w-full min-w-[6rem] text-[10px] bg-white border border-slate-200 rounded" value="${title}" ${isReadonly ? 'readonly' : ''} /></td>
-        <td><select multiple class="select select-xs st-students min-w-[8rem] max-h-20 text-[9px] bg-white border border-slate-200 rounded" size="3" ${isReadonly ? 'disabled' : ''}>${elevesOptionsHtml}</select></td>
+        ${studentsCell}
         <td>${isReadonly ? '' : '<button type="button" class="btn btn-ghost btn-xs st-del font-black text-error">×</button>'}</td>
     `;
     tbody.appendChild(tr);
@@ -159,17 +253,42 @@ function appendTemplateRow(tbody, week, line, elevesOptionsHtml, isReadonly, own
     if (ss) ss.value = st;
     if (se) se.value = en;
     const stSel = tr.querySelector('.st-students');
-    if (stSel && line?.studentIds?.length) {
-        for (const id of line.studentIds) {
+    if (stSel && sid.length) {
+        for (const id of sid) {
             const o = stSel.querySelector(`option[value="${id}"]`);
             if (o) o.selected = true;
         }
+    }
+    if (!isReadonly) {
+        syncReadonlyStudentsText(tr, sid, elevesById);
+        wireStudentsToggle(tr, elevesById);
     }
     tr.querySelector('.st-del')?.addEventListener('click', () => tr.remove());
     tr.querySelector('.st-type')?.addEventListener('change', () => {
         const t = tr.querySelector('.st-type')?.value;
         const mul = tr.querySelector('.st-students');
-        if (mul) mul.classList.toggle('opacity-40', t !== 'cours');
+        const ro = tr.querySelector('.st-students-readonly-wrap');
+        const btn = tr.querySelector('.st-students-toggle');
+        if (t !== 'cours') {
+            if (mul) {
+                mul.classList.add('hidden');
+                for (const o of mul.options) o.selected = false;
+            }
+            ro?.classList.remove('hidden');
+            if (ro) tr.querySelector('.st-students-readonly-text').textContent = '—';
+            ro?.classList.toggle('opacity-40', true);
+            btn?.classList.add('hidden');
+        } else {
+            ro?.classList.remove('opacity-40');
+            btn?.classList.remove('hidden');
+            const cur = [];
+            if (mul) {
+                for (const o of mul.selectedOptions) {
+                    if (o.value) cur.push(o.value);
+                }
+            }
+            syncReadonlyStudentsText(tr, cur, elevesById);
+        }
     });
 }
 
@@ -182,6 +301,28 @@ async function loadEleves() {
         return [];
     }
     return data || [];
+}
+
+async function loadOwnerLabels(userIds) {
+    const uniq = [...new Set((userIds || []).filter(Boolean))];
+    if (!uniq.length) return new Map();
+    const sb = getSupabaseClient();
+    if (!sb) return new Map();
+    const { data, error } = await sb.rpc('planning_profiles_label_for_ids', { p_ids: uniq });
+    if (error) {
+        console.warn(error.message);
+        return new Map();
+    }
+    const m = new Map();
+    for (const row of data || []) {
+        const id = row.user_id;
+        const lab = String(row.label || '').trim();
+        m.set(id, lab || String(id).slice(0, 8));
+    }
+    for (const id of uniq) {
+        if (!m.has(id)) m.set(id, String(id).slice(0, 8));
+    }
+    return m;
 }
 
 async function loadLinesForModal(user, isAdm) {
@@ -209,15 +350,38 @@ async function loadLinesForModal(user, isAdm) {
     return { lines: lines || [], byLineStudents: map };
 }
 
+function defaultApplyStartYmd() {
+    const set = getOrganSchoolSettingsCached();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const ymdToday = today.toLocaleDateString('en-CA');
+    if (set?.school_year_start) {
+        const raw = String(set.school_year_start).slice(0, 10);
+        const ss = new Date(`${raw}T12:00:00`);
+        if (!Number.isNaN(ss.getTime()) && ss.getTime() > today.getTime()) return raw;
+    }
+    return ymdToday;
+}
+
+function defaultApplyEndYmd() {
+    const set = getOrganSchoolSettingsCached();
+    const endS = set?.school_year_end ? String(set.school_year_end).slice(0, 10) : '';
+    if (!endS) return '';
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endD = new Date(`${endS}T12:00:00`);
+    if (Number.isNaN(endD.getTime()) || endD.getTime() < today.getTime()) return '';
+    return endS;
+}
+
 async function openSemainesTypesModal(user) {
     const dlg = document.getElementById('modal_semaines_types');
     if (!dlg) return;
     const isAdm = isAdmin(user);
+    invalidateOrganSchoolSettingsCache();
+    await fetchOrganSchoolSettings();
     await fetchWeekCycleAnchor();
-    const anchorInp = document.getElementById('st-anchor-date');
-    if (anchorInp) anchorInp.value = getWeekCycleAnchorMonday() || '';
-    document.getElementById('st-anchor-save')?.classList.toggle('hidden', false);
-    document.getElementById('st-anchor-clear')?.classList.toggle('hidden', false);
+
     document.getElementById('st-gabarit-readonly-hint')?.classList.toggle('hidden', !isAdm);
     document.getElementById('st-add-row-a')?.classList.toggle('hidden', isAdm);
     document.getElementById('st-add-row-b')?.classList.toggle('hidden', isAdm);
@@ -225,57 +389,52 @@ async function openSemainesTypesModal(user) {
     document.getElementById('st-apply-section')?.classList.toggle('hidden', isAdm);
 
     const eleves = await loadEleves();
+    const elevesById = new Map(eleves.map((e) => [e.user_id, e]));
     const optHtml = makeStudentOptionsHtml(eleves);
     const { lines, byLineStudents } = await loadLinesForModal(user, isAdm);
+    const ownerIds = [...new Set(lines.map((l) => l.owner_user_id).filter(Boolean))];
+    const ownerLabels = await loadOwnerLabels(ownerIds);
+
     const ta = document.getElementById('st-tbody-a');
     const tb = document.getElementById('st-tbody-b');
     if (ta) ta.replaceChildren();
     if (tb) tb.replaceChildren();
 
-    document.querySelectorAll('#st-gabarit-section table thead tr').forEach((tr) => {
-        const hasOwner = tr.querySelector('th.st-th-owner');
-        if (isAdm && !hasOwner) {
-            const th = document.createElement('th');
-            th.className = 'st-th-owner text-[9px]';
-            th.textContent = 'Prof';
-            tr.insertBefore(th, tr.firstChild);
-        }
-        if (!isAdm && hasOwner) hasOwner.remove();
-    });
+    const ctxBase = {
+        isAdmin: isAdm,
+        currentUserId: String(user.id),
+        elevesById
+    };
 
     for (const line of lines) {
         const tbody = line.week_type === 'A' ? ta : tb;
         if (!tbody) continue;
         const sid = byLineStudents.get(line.id) || [];
-        const ownerShort = isAdm ? String(line.owner_user_id || '').slice(0, 8) : '';
-        appendTemplateRow(
-            tbody,
-            line.week_type,
-            { ...line, studentIds: sid },
-            optHtml,
-            isAdm,
-            ownerShort
-        );
+        const oid = String(line.owner_user_id || '');
+        const ownerLabel = ownerLabels.get(oid) || oid.slice(0, 8);
+        appendTemplateRow(tbody, { ...line, studentIds: sid }, optHtml, {
+            ...ctxBase,
+            ownerLabel,
+            lineOwnerId: oid
+        });
     }
 
-    await fetchOrganSchoolSettings();
-    const set = getOrganSchoolSettingsCached();
-    const endRo = document.getElementById('st-apply-end-ro');
-    if (endRo) endRo.value = set?.school_year_end?.slice(0, 10) || '';
     const applyStart = document.getElementById('st-apply-start');
-    if (applyStart && !applyStart.dataset.touched) {
-        applyStart.value = nextMondayStrictlyAfter().toLocaleDateString('en-CA');
-    }
+    if (applyStart) applyStart.value = defaultApplyStartYmd();
+    const applyEnd = document.getElementById('st-apply-end');
+    if (applyEnd) applyEnd.value = defaultApplyEndYmd();
+
     document.getElementById('st-analyze-out')?.classList.add('hidden');
     document.getElementById('st-btn-apply')?.classList.add('hidden');
     lastAnalysis = null;
     dlg.showModal();
 }
 
-function addEmptyRow(tbody, week, elevesHtml, user) {
+function addEmptyRow(tbody, elevesHtml, user, elevesById, ownerLabels) {
+    const oid = String(user.id);
+    const ownerLabel = ownerLabels.get(oid) || user.email || oid.slice(0, 8);
     appendTemplateRow(
         tbody,
-        week,
         {
             day_of_week: 1,
             start_time: '08:00:00',
@@ -285,8 +444,13 @@ function addEmptyRow(tbody, week, elevesHtml, user) {
             studentIds: []
         },
         elevesHtml,
-        false,
-        ''
+        {
+            isAdmin: false,
+            ownerLabel,
+            lineOwnerId: oid,
+            currentUserId: oid,
+            elevesById
+        }
     );
 }
 
@@ -313,54 +477,39 @@ export function initSemainesTypesUi(currentUser) {
         { signal }
     );
 
-    document.getElementById('st-anchor-save')?.addEventListener(
-        'click',
-        async () => {
-            const u = getPlanningSessionUser();
-            if (!u?.id) return;
-            const raw = document.getElementById('st-anchor-date')?.value?.trim() || null;
-            const r = await saveWeekCycleAnchor(raw, String(u.id));
-            if (!r.ok) {
-                showToast(r.error || 'Erreur repère.', 'error');
-                return;
-            }
-            showToast('Repère A/B enregistré.');
-            document.dispatchEvent(new CustomEvent('planning-week-cycle-updated'));
-        },
-        { signal }
-    );
-
-    document.getElementById('st-anchor-clear')?.addEventListener(
-        'click',
-        async () => {
-            const inp = document.getElementById('st-anchor-date');
-            if (inp) inp.value = '';
-            const u = getPlanningSessionUser();
-            if (!u?.id) return;
-            const r = await saveWeekCycleAnchor(null, String(u.id));
-            if (!r.ok) {
-                showToast(r.error || 'Erreur.', 'error');
-                return;
-            }
-            showToast('Affichage A/B désactivé.');
-            document.dispatchEvent(new CustomEvent('planning-week-cycle-updated'));
-        },
-        { signal }
-    );
-
     document.getElementById('st-add-row-a')?.addEventListener(
         'click',
         async () => {
+            const u = getPlanningSessionUser();
+            if (!u?.id) return;
             const eleves = await loadEleves();
-            addEmptyRow(document.getElementById('st-tbody-a'), 'A', makeStudentOptionsHtml(eleves), currentUser);
+            const elevesById = new Map(eleves.map((e) => [e.user_id, e]));
+            const ownerLabels = await loadOwnerLabels([u.id]);
+            addEmptyRow(
+                document.getElementById('st-tbody-a'),
+                makeStudentOptionsHtml(eleves),
+                u,
+                elevesById,
+                ownerLabels
+            );
         },
         { signal }
     );
     document.getElementById('st-add-row-b')?.addEventListener(
         'click',
         async () => {
+            const u = getPlanningSessionUser();
+            if (!u?.id) return;
             const eleves = await loadEleves();
-            addEmptyRow(document.getElementById('st-tbody-b'), 'B', makeStudentOptionsHtml(eleves), currentUser);
+            const elevesById = new Map(eleves.map((e) => [e.user_id, e]));
+            const ownerLabels = await loadOwnerLabels([u.id]);
+            addEmptyRow(
+                document.getElementById('st-tbody-b'),
+                makeStudentOptionsHtml(eleves),
+                u,
+                elevesById,
+                ownerLabels
+            );
         },
         { signal }
     );
@@ -426,8 +575,8 @@ export function initSemainesTypesUi(currentUser) {
                 }
                 await sb.from('organ_week_template_line_student').delete().eq('line_id', lineId);
                 if (r.slot_type === 'cours' && r.studentIds.length) {
-                    const rows = r.studentIds.map((sid) => ({ line_id: lineId, student_user_id: sid }));
-                    const { error: e2 } = await sb.from('organ_week_template_line_student').insert(rows);
+                    const rowsIns = r.studentIds.map((sid) => ({ line_id: lineId, student_user_id: sid }));
+                    const { error: e2 } = await sb.from('organ_week_template_line_student').insert(rowsIns);
                     if (e2) {
                         showToast(e2.message, 'error');
                         return;
@@ -445,15 +594,14 @@ export function initSemainesTypesUi(currentUser) {
             const u = getPlanningSessionUser();
             const sb = getSupabaseClient();
             if (!u?.id || !sb || isAdmin(u)) return;
+            await fetchOrganSchoolSettings();
+            await fetchWeekCycleAnchor();
             const anchor = getWeekCycleAnchorMonday();
             if (!anchor) {
-                showToast('Définissez d’abord le lundi semaine A.', 'error');
-                return;
-            }
-            await fetchOrganSchoolSettings();
-            const set = getOrganSchoolSettingsCached();
-            if (!set?.school_year_start || !set?.school_year_end) {
-                showToast('L’administrateur doit d’abord définir l’année scolaire (Configuration).', 'error');
+                showToast(
+                    'Renseignez le début d’année scolaire dans Configuration (repère A/B), ou un lundi semaine A en base.',
+                    'error'
+                );
                 return;
             }
             const mainId = mainCalId();
@@ -461,9 +609,14 @@ export function initSemainesTypesUi(currentUser) {
                 showToast('mainGoogleCalendarId manquant dans la config.', 'error');
                 return;
             }
-            const applyStart = document.getElementById('st-apply-start')?.value;
-            if (!applyStart) {
-                showToast('Choisissez une date de prise en compte.', 'error');
+            const applyStart = document.getElementById('st-apply-start')?.value?.trim();
+            const applyEnd = document.getElementById('st-apply-end')?.value?.trim();
+            if (!applyStart || !applyEnd) {
+                showToast('Indiquez une date de début et une fin d’application.', 'error');
+                return;
+            }
+            if (applyEnd < applyStart) {
+                showToast('La fin d’application doit être le même jour ou après le début.', 'error');
                 return;
             }
             const { lines, byLineStudents } = await loadLinesForModal(u, false);
@@ -497,7 +650,7 @@ export function initSemainesTypesUi(currentUser) {
                 profUserId: u.id,
                 profEmail: u.email,
                 applyStartYmd: applyStart,
-                schoolEndYmd: set.school_year_end.slice(0, 10),
+                schoolEndYmd: applyEnd,
                 anchorMondayIso: anchor,
                 lines: linePayload,
                 mainCalendarId: mainId
@@ -559,9 +712,4 @@ export function initSemainesTypesUi(currentUser) {
         },
         { signal }
     );
-
-    document.getElementById('st-apply-start')?.addEventListener('change', () => {
-        const el = document.getElementById('st-apply-start');
-        if (el) el.dataset.touched = '1';
-    });
 }

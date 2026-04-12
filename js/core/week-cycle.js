@@ -1,9 +1,11 @@
 /**
- * Semaine A / B (alternance 2 semaines), ancrée sur un lundi « semaine A » en base.
+ * Semaine A / B (alternance 2 semaines) : ancrage en base (`organ_week_cycle.anchor_monday`)
+ * ou, si absent, lundi de la semaine contenant le début d’année scolaire (`organ_school_settings`).
  */
 import { getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
+import { fetchOrganSchoolSettings, getOrganSchoolSettingsCached } from './organ-settings.js';
 
-/** @type {string | null} date ISO YYYY-MM-DD (lundi) ou null si désactivé */
+/** @type {string | null} date ISO YYYY-MM-DD (lundi) effectif ou null */
 let cachedAnchorMonday = null;
 
 export function getWeekCycleAnchorMonday() {
@@ -39,6 +41,15 @@ export function weekCycleLabelForDate(anchorMondayIso, d) {
     return diffWeeks % 2 === 0 ? 'Semaine A' : 'Semaine B';
 }
 
+function mondayIsoFromSchoolYearStart() {
+    const start = getOrganSchoolSettingsCached()?.school_year_start;
+    if (!start) return null;
+    const ymd = String(start).slice(0, 10);
+    const d = toLocalDateFromIsoDate(ymd);
+    if (Number.isNaN(d.getTime())) return null;
+    return mondayOfLocalWeek(d).toLocaleDateString('en-CA');
+}
+
 export async function fetchWeekCycleAnchor() {
     if (!isBackendAuthConfigured()) {
         cachedAnchorMonday = null;
@@ -49,6 +60,7 @@ export async function fetchWeekCycleAnchor() {
         cachedAnchorMonday = null;
         return null;
     }
+    await fetchOrganSchoolSettings();
     const { data, error } = await sb.from('organ_week_cycle').select('anchor_monday').eq('id', 1).maybeSingle();
     if (error) {
         console.warn('[week-cycle]', error.message);
@@ -56,7 +68,8 @@ export async function fetchWeekCycleAnchor() {
         return null;
     }
     const raw = data?.anchor_monday;
-    cachedAnchorMonday = raw ? String(raw).slice(0, 10) : null;
+    const fromDb = raw ? String(raw).slice(0, 10) : null;
+    cachedAnchorMonday = fromDb || mondayIsoFromSchoolYearStart() || null;
     return cachedAnchorMonday;
 }
 
