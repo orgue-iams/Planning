@@ -56,7 +56,9 @@ Démarrage option 2 — Supabase + Google Agenda
      droit « Modifier les événements ». Sinon l’API renvoie souvent « Not Found » ou « writer access » sur le secondaire.
      Si GOOGLE_SERVICE_ACCOUNT_JSON est défini, le bridge utilise le SA (`client_email` du JSON), pas orgue.iams@… :
      partager chaque agenda « Planning IAMS xx » avec cet e-mail SA en « Modifier les événements » (le partage
-     uniquement avec orgue.iams ne suffit pas).
+     uniquement avec orgue.iams ne suffit pas). En masse : script Apps Script
+     `shareServiceAccountWriterOnAllPlanningIams()` dans `scripts/google-create-planning-calendars.gs`
+     (renseigner SERVICE_ACCOUNT_EMAIL_BRIDGE = client_email, service Google Calendar API activé).
      En base, stocker l’ID `xxx@group.calendar.google.com` (pas l’URL embed entière) — l’admin et le bridge
      normalisent désormais les URLs `?src=…`.
    - Contrôle du pool : `npx supabase db query --linked -f supabase/manual/verify-google-calendar-pool.sql -o table --agent=no`

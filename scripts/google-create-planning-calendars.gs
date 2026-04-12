@@ -21,6 +21,11 @@
  * Vérification : listPlanningCalendarsPrefix() journalise les agendas dont le nom commence par NAME_PREFIX.
  *
  * Export global : exportPlanningCalendarsToSheetAndCsv() → feuille + CSV (tous les IAMS possédés).
+ *
+ * --- Compte de service Supabase (calendar-bridge) ---
+ * Renseignez SERVICE_ACCOUNT_EMAIL_BRIDGE puis exécutez shareServiceAccountWriterOnAllPlanningIams()
+ * pour inviter le SA en « Modifier les événements » sur tous les agendas « Planning IAMS NN » possédés
+ * (évite de le faire à la main sur 50 calendriers). Service Google Calendar API activé.
  */
 
 /** Premier numéro de la plage (inclus). */
@@ -39,6 +44,113 @@ var SLEEP_MS_BETWEEN = 500;
  * Nécessite le service avancé Google Calendar API.
  */
 var CREATE_PUBLIC_ACL_AFTER_EACH = true;
+
+/**
+ * client_email du JSON GOOGLE_SERVICE_ACCOUNT_JSON (secrets Supabase).
+ * Ex. xxx@votre-projet.iam.gserviceaccount.com — obligatoire pour shareServiceAccountWriterOnAllPlanningIams().
+ */
+var SERVICE_ACCOUNT_EMAIL_BRIDGE = '';
+
+/**
+ * Ajoute ou met à jour une ACL « writer » pour le compte de service sur un calendrier (API Calendar).
+ * @returns {'skip'|'updated'|'inserted'}
+ */
+function ensureWriterAclForServiceAccount_(calendarId, saEmail, logLabel) {
+  var saTrim = String(saEmail || '').trim();
+  var saLower = saTrim.toLowerCase();
+  if (!saTrim) {
+    throw new Error('ensureWriterAclForServiceAccount_: e-mail SA vide');
+  }
+  var resp = Calendar.Acl.list(calendarId);
+  var items = resp && resp.items ? resp.items : [];
+  var j;
+  for (j = 0; j < items.length; j++) {
+    var it = items[j];
+    var sc = it.scope || {};
+    if (String(sc.type || '').toLowerCase() !== 'user') {
+      continue;
+    }
+    if (String(sc.value || '').trim().toLowerCase() !== saLower) {
+      continue;
+    }
+    var role = String(it.role || '').toLowerCase();
+    if (role === 'writer' || role === 'owner') {
+      return 'skip';
+    }
+    if (it.id) {
+      Calendar.Acl.update(
+        {
+          role: 'writer',
+          scope: { type: 'user', value: saTrim }
+        },
+        calendarId,
+        it.id
+      );
+      Logger.log('[SA writer] rôle → writer : ' + logLabel);
+      return 'updated';
+    }
+  }
+  Calendar.Acl.insert(
+    {
+      role: 'writer',
+      scope: { type: 'user', value: saTrim }
+    },
+    calendarId
+  );
+  Logger.log('[SA writer] invitation writer : ' + logLabel);
+  return 'inserted';
+}
+
+/**
+ * Pour chaque calendrier possédé « Planning IAMS » + numéro : partage writer avec le compte de service
+ * (même identité que calendar-bridge avec GOOGLE_SERVICE_ACCOUNT_JSON).
+ * Remplir SERVICE_ACCOUNT_EMAIL_BRIDGE puis Exécuter cette fonction une fois.
+ */
+function shareServiceAccountWriterOnAllPlanningIams() {
+  var sa = String(SERVICE_ACCOUNT_EMAIL_BRIDGE || '').trim();
+  if (!sa) {
+    throw new Error(
+      'Renseignez SERVICE_ACCOUNT_EMAIL_BRIDGE en tête de fichier (client_email du JSON SA Supabase).'
+    );
+  }
+  var cals = CalendarApp.getAllCalendars();
+  var nDone = 0;
+  var nSkip = 0;
+  var nErr = 0;
+  var i;
+  for (i = 0; i < cals.length; i++) {
+    var c = cals[i];
+    if (!c.isOwnedByMe()) {
+      continue;
+    }
+    var name = String(c.getName()).replace(/\s+$/, '');
+    var num = planningIamsNameSuffixNumber_(name);
+    if (isNaN(num)) {
+      continue;
+    }
+    var calId = c.getId();
+    try {
+      var r = ensureWriterAclForServiceAccount_(calId, sa, name);
+      if (r === 'skip') {
+        nSkip++;
+      } else {
+        nDone++;
+      }
+      Utilities.sleep(150);
+    } catch (e) {
+      Logger.log('[SA writer] ERREUR ' + name + ' : ' + e);
+      nErr++;
+    }
+  }
+  Logger.log(
+    '[SA writer] Terminé — nouveaux ou mis à jour: ' +
+      nDone +
+      ', déjà writer: ' +
+      nSkip +
+      ', erreurs: ' +
+      nErr
+  );
+}
 
 /**
  * Nom du calendrier pour le numéro n (ex. 3 → Planning IAMS 03).
