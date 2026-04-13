@@ -6,16 +6,14 @@ Démarrage option 2 — Supabase + Google Agenda
    - Authentication → activer Email (mot de passe)
    - SQL Editor → coller et exécuter le fichier schema.sql
    - Créer 1 compte test via Authentication → Users → Add user
-   - Table Editor → profiles : ajuster display_name et role (admin / prof / eleve / consultation) pour ce compte
+   - Table Editor → profiles : ajuster display_name et role (admin / prof / eleve) pour ce compte
 
 2) SQL complémentaire (règles + annonces + trigger invite)
    - SQL Editor → exécuter supabase/migrations/002_admin_content.sql
-   - Si la base existe déjà, exécuter aussi supabase/migrations/003_consultation_role.sql
-     puis supabase/migrations/004_reservation_types.sql, 005_planning_admin_list_users_rpc.sql,
-     006_consignes_ict.sql (si besoin), 007_google_calendar_pool.sql (pool calendriers perso + affectation auto),
-     009_organ_week_cycle.sql (ancienne table globale, conservée pour compat ; l’app utilise surtout 014).
-     010_organ_school_template.sql (année scolaire + plage chapelle, gabarit A/B, RPC élèves actifs + calendrier pool).
-     014_organ_prof_week_cycle.sql (repère semaine A/B par professeur, barre calendrier visible seulement pour le prof connecté ; rempli au « Appliquer » du gabarit).
+   - Si la base existe déjà, enchaîner les migrations SQL du dossier supabase/migrations dans l’ordre des numéros
+     (ex. 004_reservation_types.sql, 005_planning_admin_list_users_rpc.sql,
+     006_consignes_ict.sql si besoin, 007_google_calendar_pool.sql, 009_organ_week_cycle.sql,
+     010_organ_school_template.sql, 014_organ_prof_week_cycle.sql, puis les suivantes jusqu’à la dernière).
    - Pour créer les comptes de base demandés (admin/élèves/prof), exécuter supabase/seed-users.sql
      (le script crée bien auth.users + auth.identities + profiles ; ne pas recopier d’ancienne variante
      qui n’insérait que auth.users — cela cassait GET /auth/v1/admin/users / « Gestion des comptes ».)

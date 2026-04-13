@@ -3,8 +3,7 @@
  * Ne commitez pas de vraies clés dans un dépôt public : utilisez des secrets côté hébergeur
  * ou remplissez ce fichier uniquement sur le serveur de prod.
  *
- * Option 2 : Supabase = auth + profils ; Google Agenda = source des créneaux ;
- * Edge Function calendar-bridge = JWT utilisateur + API Google Calendar v3 (compte de service ou refresh token).
+ * Supabase = auth + profils + (optionnel) grille `planning_event` ; Google Agenda via Edge Function calendar-bridge.
  * Edge Function planning-slot-notify = e-mail Brevo au propriétaire si un tiers modifie / déplace / supprime son créneau.
  */
 window.__PLANNING_CONFIG__ = window.__PLANNING_CONFIG__ || {
@@ -14,7 +13,7 @@ window.__PLANNING_CONFIG__ = window.__PLANNING_CONFIG__ || {
      * En production : URL de l’Edge Function.
      * Ex. https://<project-ref>.supabase.co/functions/v1/calendar-bridge
      * Elle vérifie le JWT puis appelle l’API Google Calendar (secrets GOOGLE_* côté Supabase).
-     * Laisser vide + pas de clé Supabase = mode démo local inchangé.
+     * Laisser vide uniquement si vous n’utilisez pas la synchro Google (grille 100 % Postgres possible).
      */
     calendarBridgeUrl: 'https://dqgzvddphbjibkszcdun.supabase.co/functions/v1/calendar-bridge',
 

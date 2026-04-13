@@ -1,5 +1,5 @@
 /**
- * Authentification : mode démo (USERS locaux) ou Supabase (option 2 : prod).
+ * Authentification Supabase (GoTrue).
  */
 
 import {
@@ -66,59 +66,6 @@ export const PASSWORD_POLICY_LINES = [
     'Évitez un mot de passe trop simple ou déjà utilisé ailleurs (recommandation).'
 ];
 
-/** Comptes démo si Supabase non configuré */
-const USERS = {
-    'admin@iams.fr': { pass: '1234', name: 'Nicolas M.', email: 'admin@iams.fr', role: 'admin' },
-    'prof@iams.fr': { pass: '1234', name: 'Prof. Durif', email: 'prof@iams.fr', role: 'prof' },
-    'eleve1@iams.fr': { pass: '1234', name: 'Jean (Élève 1)', email: 'eleve1@iams.fr', role: 'eleve' },
-    'eleve2@iams.fr': { pass: '1234', name: 'Marie (Élève 2)', email: 'eleve2@iams.fr', role: 'eleve' },
-    'consultation@iams.fr': { pass: '1234', name: 'Compte consultation', email: 'consultation@iams.fr', role: 'consultation' }
-};
-
-const DEMO_SESSION_KEY = 'planning_demo_user_v1';
-
-export function clearDemoSession() {
-    try {
-        localStorage.removeItem(DEMO_SESSION_KEY);
-        sessionStorage.removeItem(DEMO_SESSION_KEY);
-    } catch {
-        /* */
-    }
-}
-
-function persistDemoSessionAfterLogin(emailKey, rememberMe) {
-    try {
-        const primary = rememberMe ? localStorage : sessionStorage;
-        const secondary = rememberMe ? sessionStorage : localStorage;
-        secondary.removeItem(DEMO_SESSION_KEY);
-        primary.setItem(DEMO_SESSION_KEY, JSON.stringify({ email: emailKey }));
-    } catch {
-        /* */
-    }
-}
-
-/** Session démo persistée (localStorage si « se souvenir », sinon sessionStorage). */
-export function tryRestoreDemoSession() {
-    if (isBackendAuthConfigured()) return null;
-    try {
-        const remember = getRememberMePreference();
-        const st = remember ? localStorage : sessionStorage;
-        const raw = st.getItem(DEMO_SESSION_KEY);
-        if (!raw) return null;
-        const o = JSON.parse(raw);
-        const id = String(o?.email ?? '').trim().toLowerCase();
-        if (!id) return null;
-        const row = USERS[id];
-        if (!row) {
-            clearDemoSession();
-            return null;
-        }
-        return { name: row.name, email: row.email, role: row.role };
-    } catch {
-        return null;
-    }
-}
-
 export function isPrivilegedUser(user) {
     return !!(user && (user.role === 'admin' || user.role === 'prof'));
 }
@@ -133,7 +80,7 @@ export function isAdmin(user) {
 }
 
 export function roleLabelFr(role) {
-    const m = { admin: 'Admin', prof: 'Prof', eleve: 'Élève', consultation: 'Consultation' };
+    const m = { admin: 'Admin', prof: 'Prof', eleve: 'Élève' };
     return m[role] || role || '';
 }
 
@@ -153,54 +100,43 @@ export function setPasswordModalMode(isTokenReset) {
  * @returns {Promise<{ success: boolean, user?: { name: string, email: string, role: string, id?: string } }>}
  */
 export async function login(email, pass, rememberMe = true) {
+    if (!isBackendAuthConfigured()) {
+        showToast('Configuration Supabase absente : renseignez supabaseUrl et supabaseAnonKey dans planning.config.js.', 'error');
+        return { success: false };
+    }
     const id = String(email).trim().toLowerCase();
     const remember = rememberMe !== false;
 
-    if (isBackendAuthConfigured()) {
-        setRememberMePreference(remember);
-        purgeSupabaseKeysFromStorage(remember ? sessionStorage : localStorage);
-        const supabase = getSupabaseClient();
-        if (!supabase) {
-            showToast('Configuration Supabase invalide.', 'error');
-            return { success: false };
-        }
-        try {
-            await supabase.auth.signOut({ scope: 'local' });
-        } catch {
-            /* session absente ou stockage restreint */
-        }
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email: id,
-            password: pass
-        });
-        if (error) {
-            showToast(error.message || 'Identifiants invalides', 'error');
-            return { success: false };
-        }
-        const user = await fetchAppUserFromSession(data.session);
-        if (!user) {
-            showToast('Session invalide.', 'error');
-            return { success: false };
-        }
-        document.getElementById('modal_login')?.close();
-        return { success: true, user };
-    }
-
     setRememberMePreference(remember);
-    const row = USERS[id];
-    if (row && row.pass === pass) {
-        persistDemoSessionAfterLogin(id, remember);
-        document.getElementById('modal_login')?.close();
-        return {
-            success: true,
-            user: { name: row.name, email: row.email, role: row.role }
-        };
+    purgeSupabaseKeysFromStorage(remember ? sessionStorage : localStorage);
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+        showToast('Configuration Supabase invalide.', 'error');
+        return { success: false };
     }
-    showToast('Identifiants invalides', 'error');
-    return { success: false };
+    try {
+        await supabase.auth.signOut({ scope: 'local' });
+    } catch {
+        /* session absente ou stockage restreint */
+    }
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email: id,
+        password: pass
+    });
+    if (error) {
+        showToast(error.message || 'Identifiants invalides', 'error');
+        return { success: false };
+    }
+    const user = await fetchAppUserFromSession(data.session);
+    if (!user) {
+        showToast('Session invalide.', 'error');
+        return { success: false };
+    }
+    document.getElementById('modal_login')?.close();
+    return { success: true, user };
 }
 
-/** Restaure la session au chargement (Supabase uniquement). */
+/** Restaure la session au chargement. */
 export async function tryRestoreSession() {
     if (!isBackendAuthConfigured()) return null;
     const supabase = getSupabaseClient();
@@ -244,40 +180,38 @@ export async function updatePassword() {
         return false;
     }
 
-    if (isBackendAuthConfigured()) {
-        const supabase = getSupabaseClient();
-        if (!supabase) return false;
+    if (!isBackendAuthConfigured()) {
+        showToast('Configuration Supabase requise pour modifier le mot de passe.', 'error');
+        return false;
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) return false;
 
-        if (!isTokenReset) {
-            const oldPass = oldPassEl?.value || '';
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user?.email) {
-                showToast('Session expirée. Reconnectez-vous.', 'error');
-                return false;
-            }
-            const check = await supabase.auth.signInWithPassword({
-                email: user.email,
-                password: oldPass
-            });
-            if (check.error) {
-                showToast('Ancien mot de passe incorrect.', 'error');
-                return false;
-            }
-        }
-
-        const { error } = await supabase.auth.updateUser({ password: newPass });
-        if (error) {
-            showToast(error.message || 'Impossible de mettre à jour le mot de passe.', 'error');
+    if (!isTokenReset) {
+        const oldPass = oldPassEl?.value || '';
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.email) {
+            showToast('Session expirée. Reconnectez-vous.', 'error');
             return false;
         }
-        if (isTokenReset) {
-            clearSupabasePasswordRecoveryPending();
+        const check = await supabase.auth.signInWithPassword({
+            email: user.email,
+            password: oldPass
+        });
+        if (check.error) {
+            showToast('Ancien mot de passe incorrect.', 'error');
+            return false;
         }
-        showToast('Mot de passe modifié avec succès !');
-        document.getElementById('modal_password').close();
-        return true;
     }
 
+    const { error } = await supabase.auth.updateUser({ password: newPass });
+    if (error) {
+        showToast(error.message || 'Impossible de mettre à jour le mot de passe.', 'error');
+        return false;
+    }
+    if (isTokenReset) {
+        clearSupabasePasswordRecoveryPending();
+    }
     showToast('Mot de passe modifié avec succès !');
     document.getElementById('modal_password').close();
     return true;
@@ -296,7 +230,6 @@ export function hasSupabaseRecoveryInUrl() {
     }
     const sp = new URLSearchParams(window.location.search);
     if (sp.get('type') === 'recovery') return true;
-    // Flux PKCE : échange du code au chargement ; on retarde l’ouverture de la modale login le temps que ça parte.
     if (sp.get('code')) return true;
     return false;
 }
@@ -344,51 +277,32 @@ export async function shouldResumeSupabasePasswordRecovery() {
 }
 
 export async function sendResetLink(email) {
+    if (!isBackendAuthConfigured()) {
+        showToast('Configuration Supabase requise pour la réinitialisation par e-mail.', 'error');
+        return;
+    }
     const addr = String(email).trim();
     if (!addr.includes('@')) {
         showToast('Email invalide', 'error');
         return;
     }
 
-    if (isBackendAuthConfigured()) {
-        const supabase = getSupabaseClient();
-        if (!supabase) return;
-        const redirectTo = `${window.location.origin}${window.location.pathname}`;
-        const { error } = await supabase.auth.resetPasswordForEmail(addr, { redirectTo });
-        if (error) {
-            showToast(error.message || 'Impossible d’envoyer le lien.', 'error');
-            return;
-        }
-        showToast('Si cette adresse est enregistrée, un e-mail de réinitialisation a été envoyé.', 'info');
-        document.getElementById('modal_forgot').close();
-        document.getElementById('modal_login')?.showModal();
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+    const redirectTo = `${window.location.origin}${window.location.pathname}`;
+    const { error } = await supabase.auth.resetPasswordForEmail(addr, { redirectTo });
+    if (error) {
+        showToast(error.message || 'Impossible d’envoyer le lien.', 'error');
         return;
     }
-
-    const token = Math.random().toString(36).substring(2, 15);
-    const resetURL = `${window.location.origin}${window.location.pathname}?token=${token}`;
-    console.log('Lien démo :', resetURL);
-    showToast(`Un mail a été envoyé à ${addr}.`, 'info');
+    showToast('Si cette adresse est enregistrée, un e-mail de réinitialisation a été envoyé.', 'info');
     document.getElementById('modal_forgot').close();
     document.getElementById('modal_login')?.showModal();
 }
 
+/** Réservé aux flux d’auth Supabase (fragment / code) ; pas d’autre usage. */
 export function checkUrlToken() {
-    const params = new URLSearchParams(window.location.search);
-    if (!params.get('token')) return;
-
-    if (isBackendAuthConfigured()) {
-        return;
-    }
-
-    setTimeout(() => {
-        const loginModal = document.getElementById('modal_login');
-        if (loginModal) loginModal.close();
-        setPasswordModalMode(true);
-        document.getElementById('modal_password').showModal();
-        window.history.replaceState({}, document.title, window.location.pathname);
-        document.getElementById('new-pass')?.focus();
-    }, 500);
+    /* Ancien paramètre ?token= démo supprimé. */
 }
 
 let logoutImpl = () => window.location.reload();
@@ -399,7 +313,6 @@ export function setLogoutHandler(fn) {
 
 export async function logout() {
     clearSupabasePasswordRecoveryPending();
-    clearDemoSession();
     if (isBackendAuthConfigured()) {
         await getSupabaseClient()?.auth.signOut();
     }

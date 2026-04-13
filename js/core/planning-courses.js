@@ -10,9 +10,9 @@ import {
     setCalendarListCache
 } from './calendar-events-list-cache.js';
 import { fetchPlanningEventsForFullCalendar, planningGridUsesSupabaseDb } from './planning-events-db.js';
+import { formatTimeFr24 } from '../utils/time-helpers.js';
 import { getPlanningSessionUser } from './session-user.js';
 import { getPlanningConfig, isBackendAuthConfigured } from './supabase-client.js';
-import { demoEvents } from '../data/mock-events.js';
 
 /** Même normalisation que fc-settings (réponse bridge → extendedProps cohérents). */
 export function mapBridgeListEvents(raw) {
@@ -66,7 +66,6 @@ export function filterCoursEventsForUser(events, user) {
     const role = String(user?.role ?? '').toLowerCase();
     const cours = events.filter((ev) => String(ev?.extendedProps?.type ?? '').toLowerCase() === 'cours');
     if (!me) return [];
-    if (role === 'consultation') return cours;
     if (role === 'admin') return cours;
     if (role === 'prof') {
         return cours.filter((ev) => String(ev?.extendedProps?.owner ?? '').trim().toLowerCase() === me);
@@ -104,8 +103,8 @@ export function formatCoursLineFr(ev) {
     const end = ev?.end ? new Date(String(ev.end)) : null;
     if (!start || Number.isNaN(start.getTime())) return `${title} — ${profName}`;
     const day = start.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
-    const t0 = start.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-    const t1 = end && !Number.isNaN(end.getTime()) ? end.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+    const t0 = formatTimeFr24(start);
+    const t1 = end && !Number.isNaN(end.getTime()) ? formatTimeFr24(end) : '';
     const hours = t1 ? `${t0} – ${t1}` : t0;
     return `${day}, ${hours} — ${title} — ${profName}`;
 }
@@ -152,21 +151,5 @@ export async function fetchCalendarEventsInRange(rangeStart, rangeEnd) {
         setCalendarListCache(cacheKey, cloneCachedCalendarRows(rows));
         return rows;
     }
-    const startMs = rangeStart.getTime();
-    const endMs = rangeEnd.getTime();
-    return demoEvents
-        .filter((e) => {
-            const t = new Date(e.start).getTime();
-            return t >= startMs && t <= endMs;
-        })
-        .map((e) => {
-            const ins = e.extendedProps?.inscrits;
-            const inscrits = Array.isArray(ins)
-                ? ins.map((x) => String(x).trim().toLowerCase()).filter(Boolean)
-                : [];
-            return {
-                ...e,
-                extendedProps: { ...e.extendedProps, inscrits }
-            };
-        });
+    return [];
 }

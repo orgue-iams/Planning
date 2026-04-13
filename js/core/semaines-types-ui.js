@@ -13,8 +13,9 @@ import {
 } from './organ-settings.js';
 import {
     analyzeTemplateApply,
-    executeTemplateApply,
-    formatTemplateApplyPartialSummary
+    executeTemplateDatabasePhase,
+    formatTemplateApplyPartialSummary,
+    runTemplateGoogleBackgroundSync
 } from './template-apply-engine.js';
 import { saveProfWeekCycleFromApply } from './week-cycle.js';
 
@@ -115,14 +116,33 @@ function setStGotoCalBusy(busy) {
     }
 }
 
-/** Grise et désactive les actions gabarit / préparation / application / fermer pendant une opération réseau. */
+function setStGoogleSyncHintVisible(visible) {
+    const el = document.getElementById('st-google-sync-hint');
+    if (!el) return;
+    el.classList.toggle('hidden', !visible);
+}
+
+/** Grise et désactive les actions pendant une opération réseau. Préparation / application aussi bloquées pendant la synchro Google en arrière-plan. */
 function setStModalActionsBusy(busy) {
     const save = document.getElementById('st-save-gabarit');
     const analyze = document.getElementById('st-btn-analyze');
     const apply = document.getElementById('st-btn-apply');
-    for (const btn of [save, analyze]) {
-        if (!btn) continue;
+    const analyzeApplyLocked = busy || stGoogleSyncInFlight;
+
+    if (save) {
         if (busy) {
+            save.setAttribute('disabled', 'disabled');
+            save.disabled = true;
+            save.classList.add('btn-disabled', 'opacity-50', 'pointer-events-none');
+        } else {
+            save.removeAttribute('disabled');
+            save.disabled = false;
+            save.classList.remove('btn-disabled', 'opacity-50', 'pointer-events-none');
+        }
+    }
+    for (const btn of [analyze]) {
+        if (!btn) continue;
+        if (analyzeApplyLocked) {
             btn.setAttribute('disabled', 'disabled');
             btn.disabled = true;
             btn.classList.add('btn-disabled', 'opacity-50', 'pointer-events-none');
@@ -134,7 +154,7 @@ function setStModalActionsBusy(busy) {
     }
     setStGotoCalBusy(busy);
     if (apply) {
-        if (busy) {
+        if (analyzeApplyLocked) {
             apply.setAttribute('disabled', 'disabled');
             apply.disabled = true;
             apply.classList.add('btn-disabled', 'opacity-50', 'pointer-events-none');
@@ -181,7 +201,7 @@ function formatPrepareSummaryText(s, applyStart, firstWeekLetter, applyEnd) {
         `Créations — travail perso : ${s.createTravailCount}`,
         '',
         ...conflictBlock,
-        'Vérifiez le résumé ci-dessus puis cliquez « 2. Appliquer sur Google Agenda » (à droite du bouton 1) pour écrire dans Google. En cas d’échec avant toute modification sur Google, une nouvelle tentative automatique peut avoir lieu ; après un début d’exécution, le message d’erreur indique ce qui a déjà été fait.'
+        'Vérifiez le résumé puis « 2. Appliquer » : la base est mise à jour en premier, puis Google en arrière-plan (avec pauses anti-quota). Pendant la synchro Google, les boutons Préparer / Appliquer restent indisponibles jusqu’à la fin.'
     ].join('\n');
 }
 
@@ -229,6 +249,8 @@ function resetStAnalyzeOutput() {
 let stAbort = null;
 /** @type {object | null} */
 let lastAnalysis = null;
+/** True tant que la synchro Google du gabarit (étape 2) n’est pas terminée. */
+let stGoogleSyncInFlight = false;
 let stUiBound = false;
 /** @type {HTMLTableRowElement | null} */
 let stDnDRow = null;
@@ -237,6 +259,7 @@ export function resetSemainesTypesUiBindings() {
     stAbort?.abort();
     stAbort = null;
     lastAnalysis = null;
+    stGoogleSyncInFlight = false;
     stUiBound = false;
     stDnDRow = null;
 }
@@ -744,6 +767,14 @@ async function runSemainesTypesAnalyze() {
     const u = getPlanningSessionUser();
     const sb = getSupabaseClient();
     if (!u?.id || !sb || isAdmin(u)) return;
+    if (stGoogleSyncInFlight) {
+        showToast(
+            'Synchronisation Google du gabarit en cours : attendez la fin avant de relancer « Préparer ».',
+            'info',
+            7000
+        );
+        return;
+    }
 
     const analyzeBtn = document.getElementById('st-btn-analyze');
     const analyzeLabelRest =
@@ -859,9 +890,13 @@ async function runSemainesTypesAnalyze() {
 async function runSemainesTypesApply() {
     const u = getPlanningSessionUser();
     if (!u?.email || !lastAnalysis?.ok) return;
+    if (stGoogleSyncInFlight) {
+        showToast('Synchronisation Google du gabarit encore en cours.', 'info', 5000);
+        return;
+    }
     if (
         !confirm(
-            'Appliquer maintenant sur Google Agenda ? Les suppressions listées seront exécutées puis les créations.'
+            'La base de données est mise à jour en premier, puis Google Agenda en arrière-plan (calendrier général, puis agendas concernés), avec des pauses pour limiter les quotas. Vous pourrez fermer cette fenêtre pendant la synchro Google ; les boutons Préparer / Appliquer resteront indisponibles jusqu’à la fin. Continuer ?'
         )
     ) {
         return;
@@ -903,85 +938,145 @@ async function runSemainesTypesApply() {
             document.dispatchEvent(new CustomEvent('planning-week-cycle-updated'));
         }
 
-        const r = await executeTemplateApply(lastAnalysis, {
+        const dbR = await executeTemplateDatabasePhase(lastAnalysis, {
             profEmail: u.email,
+            profUserId: u.id,
             mainCalendarId: mainId,
             onProgress: onStApplyProgress
         });
-        if (!r?.ok) {
-            const detail = r?.error || 'Échec application.';
-            const partialBlock = r?.partial ? formatTemplateApplyPartialSummary(r.partial) : '';
-            const dbNote = sav.ok
-                ? 'Le repère semaine A/B a été enregistré en base avant l’écriture Google. Les agendas peuvent être incomplets ; après correction, lancez « 1. Préparer » puis « 2. Appliquer » à nouveau.'
-                : '';
-            const fullDetail = [detail, partialBlock, dbNote].filter(Boolean).join('\n\n');
-            const oneLine = detail.split('\n').find((l) => l.trim()) || 'Échec application.';
-            if (pBar) {
-                if (r?.partial && r.partial.grandTotal > 0) {
-                    pBar.value = Math.min(
-                        100,
-                        Math.round((100 * r.partial.grandDone) / r.partial.grandTotal)
-                    );
-                } else {
-                    pBar.value = 100;
-                }
-            }
+        if (!dbR?.ok) {
+            const detail = dbR?.error || 'Échec enregistrement base.';
+            if (pBar) pBar.value = 100;
             if (pTxt) {
-                pTxt.textContent = r?.partial
-                    ? `Interrompu après ${r.partial.grandDone} / ${r.partial.grandTotal} — ${oneLine}`
-                    : `Interrompu : ${oneLine}`;
+                pTxt.textContent = detail;
                 pTxt.classList.add('text-red-700', 'font-bold');
             }
-            stAnalyzeShowError('Application Google interrompue', fullDetail);
-            showToast(oneLine, 'error', 9000);
+            stAnalyzeShowError('Base de données', detail);
+            showToast(detail.split('\n')[0] || detail, 'error', 8000);
             return;
         }
+
         if (pTxt) pTxt.classList.remove('text-red-700', 'font-bold');
         if (pBar) pBar.value = 100;
-        if (pTxt) pTxt.textContent = 'Terminé avec succès — résumé dans l’encadré ci-dessous.';
+        if (pTxt) {
+            pTxt.textContent =
+                dbR.mode === 'supabase'
+                    ? 'Base à jour. Synchronisation Google en cours en arrière-plan…'
+                    : 'Mise à jour Google en cours en arrière-plan…';
+        }
 
-        const st = r.stats || { deleteTotal: 0, upsertTotal: 0 };
-        const sum = analysisSnapshot?.summary;
-        const savWarn =
-            sav.skipped
-                ? '\n\nNote : repère semaine A/B non enregistré (auth backend non configurée). Libellé A/B dans la barre du planning : inchangé côté base.'
-                : '';
-        const repereBilanLine = sav.ok ? 'Repère A/B : enregistré en base avant l’écriture Google.' : null;
-        const bilan =
-            sum != null
-                ? [
-                      ...(repereBilanLine ? [repereBilanLine] : []),
-                      `Suppressions prévues (analyse) — général / élèves / prof : ${sum.deleteMainCount} / ${sum.deleteStudentPersoCount} / ${sum.deleteProfPersoCount}`,
-                      `Écritures exécutées cette fois : ${st.upsertTotal} événement(s) Google ; suppressions exécutées : ${st.deleteTotal}.`
-                  ].join('\n')
-                : sav.ok
-                  ? `Repère A/B enregistré en base. Suppressions exécutées : ${st.deleteTotal}. Écritures Google : ${st.upsertTotal}.`
-                  : `Suppressions exécutées : ${st.deleteTotal}. Écritures Google : ${st.upsertTotal}.`;
-
-        stAnalyzeShowResult(
-            [
-                '——— Résultat de l’application Google ———',
-                'Statut : succès (toutes les étapes envoyées se sont terminées sans erreur).',
-                '',
-                bilan,
-                '',
-                'Vous pouvez vérifier les agendas.',
-                'Libellé « Semaine A / B » dans la barre du planning : uniquement en vue Semaine, Jour ou liste Planning (pas en vue Mois).',
-                savWarn
-            ]
-                .join('\n')
-                .trim()
+        showToast(
+            dbR.mode === 'supabase'
+                ? 'Gabarit enregistré en base. Les agendas Google se mettent à jour en arrière-plan (vous pouvez fermer cette fenêtre).'
+                : 'Mise à jour des agendas Google en arrière-plan…',
+            'success',
+            7500
         );
 
-        showToast('Application sur Google Agenda terminée.', 'success', 6500);
-        setStApplyButtonReady(false);
-        lastAnalysis = null;
+        if (applyBtn) applyBtn.textContent = applyBtn.getAttribute('data-label-rest') || applyLabelRest;
+
+        stGoogleSyncInFlight = true;
+        setStGoogleSyncHintVisible(true);
+        setStModalActionsBusy(false);
         document.dispatchEvent(new CustomEvent('planning-template-applied'));
+
+        void runTemplateGoogleBackgroundSync({
+            analysis: analysisSnapshot,
+            ctx: { profEmail: u.email, profUserId: u.id, mainCalendarId: mainId },
+            dbResult: dbR,
+            onProgress: onStApplyProgress
+        })
+            .then((gR) => {
+                if (!gR?.ok) {
+                    const detail = gR?.error || 'Échec synchronisation Google.';
+                    const partialBlock = gR?.partial ? formatTemplateApplyPartialSummary(gR.partial) : '';
+                    const dbNote =
+                        'La base a été modifiée : vérifiez les agendas, puis lancez « 1. Préparer » avant un nouvel essai si besoin.';
+                    const fullDetail = [detail, partialBlock, dbNote].filter(Boolean).join('\n\n');
+                    const oneLine = detail.split('\n').find((l) => l.trim()) || detail;
+                    if (pTxt) {
+                        pTxt.textContent = gR?.partial
+                            ? `Google interrompu après ${gR.partial.grandDone} / ${gR.partial.grandTotal} — ${oneLine}`
+                            : `Google : ${oneLine}`;
+                        pTxt.classList.add('text-red-700', 'font-bold');
+                    }
+                    stAnalyzeShowError('Synchronisation Google interrompue', fullDetail);
+                    showToast(oneLine, 'error', 9000);
+                    lastAnalysis = null;
+                    setStApplyButtonReady(false);
+                    return;
+                }
+
+                if (pTxt) {
+                    pTxt.classList.remove('text-red-700', 'font-bold');
+                    pTxt.textContent = 'Synchronisation Google terminée — résumé ci-dessous.';
+                }
+
+                const st = gR.stats || { deleteTotal: 0, upsertTotal: 0 };
+                const sum = analysisSnapshot?.summary;
+                const savWarn =
+                    sav.skipped
+                        ? '\n\nNote : repère semaine A/B non enregistré (auth backend non configurée). Libellé A/B dans la barre du planning : inchangé côté base.'
+                        : '';
+                const repereBilanLine = sav.ok ? 'Repère A/B : enregistré en base avant la synchro Google.' : null;
+                const bilan =
+                    sum != null
+                        ? [
+                              ...(repereBilanLine ? [repereBilanLine] : []),
+                              `Suppressions prévues (analyse) — général / élèves / prof : ${sum.deleteMainCount} / ${sum.deleteStudentPersoCount} / ${sum.deleteProfPersoCount}`,
+                              gR.skipped
+                                  ? 'Pont Google non configuré : aucune écriture distante.'
+                                  : `Opérations Google exécutées : ${st.upsertTotal} écriture(s) ; ${st.deleteTotal} suppression(s) de miroirs.`
+                          ].join('\n')
+                        : sav.ok
+                          ? `Repère A/B enregistré. Google : ${st.deleteTotal} suppression(s), ${st.upsertTotal} écriture(s).`
+                          : `Google : ${st.deleteTotal} suppression(s), ${st.upsertTotal} écriture(s).`;
+
+                stAnalyzeShowResult(
+                    [
+                        '——— Résultat ———',
+                        gR.skipped
+                            ? 'Statut : base à jour ; pont Google absent ou ignoré.'
+                            : 'Statut : base et Google Agenda synchronisés.',
+                        '',
+                        bilan,
+                        '',
+                        'Vous pouvez vérifier les agendas.',
+                        'Libellé « Semaine A / B » dans la barre du planning : uniquement en vue Semaine, Jour ou liste Planning (pas en vue Mois).',
+                        savWarn
+                    ]
+                        .join('\n')
+                        .trim()
+                );
+
+                showToast(
+                    gR.skipped ? 'Base à jour (Google non synchronisé — pont absent).' : 'Synchronisation Google terminée.',
+                    'success',
+                    6500
+                );
+                lastAnalysis = null;
+                setStApplyButtonReady(false);
+                document.dispatchEvent(new CustomEvent('planning-template-applied'));
+            })
+            .catch((e) => {
+                const msg = e instanceof Error ? e.message : String(e);
+                showToast(msg, 'error', 8000);
+                stAnalyzeShowError('Synchronisation Google', msg);
+                lastAnalysis = null;
+                setStApplyButtonReady(false);
+            })
+            .finally(() => {
+                stGoogleSyncInFlight = false;
+                setStGoogleSyncHintVisible(false);
+                setStModalActionsBusy(false);
+            });
     } finally {
         if (applyBtn) {
             applyBtn.textContent = applyBtn.getAttribute('data-label-rest') || applyLabelRest;
         }
-        setStModalActionsBusy(false);
+        if (!stGoogleSyncInFlight) {
+            setStModalActionsBusy(false);
+        }
     }
 }
 

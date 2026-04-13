@@ -69,7 +69,7 @@ begin
         v_display_name := coalesce(nullif(trim(v_item ->> 'display_name'), ''), split_part(v_email, '@', 1));
         v_role := lower(coalesce(v_item ->> 'role', 'eleve'));
 
-        if v_role not in ('admin', 'prof', 'eleve', 'consultation') then
+        if v_role not in ('admin', 'prof', 'eleve') then
             v_role := 'eleve';
         end if;
 

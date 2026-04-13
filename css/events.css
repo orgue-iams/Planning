@@ -41,11 +41,9 @@
 .event-other-eleve,
 .event-by-prof,
 .event-by-admin,
-.event-by-consultation,
 .event-student-block,
 .event-peer-prof,
-.event-admin-block,
-.event-readonly-consult {
+.event-admin-block {
     --slot-bg-strong: #68a1e5;
     --slot-bg-soft: #92b9ec;
     color: #0f172a !important;

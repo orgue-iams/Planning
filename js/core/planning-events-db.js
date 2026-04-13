@@ -21,6 +21,12 @@ export function planningDbSlotTypeToBridgeType(slotType) {
  * @param {object} row — ligne RPC
  * @param {object | null} _currentUser réservé (drag/édition appliqués après import dynamique)
  */
+function normalizeInscritsFromRpc(row) {
+    const raw = row?.inscrits_emails;
+    if (!Array.isArray(raw)) return [];
+    return raw.map((x) => String(x).trim().toLowerCase()).filter(Boolean);
+}
+
 export function mapPlanningDbRowToFcEvent(row, _currentUser) {
     const owner = String(row.owner_email || '').trim().toLowerCase();
     const typ = slotTypeToPlanningExtendedType(row.slot_type);
@@ -40,7 +46,7 @@ export function mapPlanningDbRowToFcEvent(row, _currentUser) {
             ownerDisplayName: owner ? owner.split('@')[0] : '',
             ownerRole: '',
             type: typ,
-            inscrits: []
+            inscrits: normalizeInscritsFromRpc(row)
         }
     };
 }
@@ -54,6 +60,19 @@ export function mapPlanningDbRowToFcEvent(row, _currentUser) {
 export async function fetchPlanningEventsForFullCalendar(start, end, currentUser) {
     const sb = getSupabaseClient();
     if (!sb || !isBackendAuthConfigured()) return [];
+
+    let { data: sessionData } = await sb.auth.getSession();
+    let session = sessionData?.session ?? null;
+    if (!session) {
+        const { data: refData } = await sb.auth.refreshSession();
+        session = refData?.session ?? null;
+    }
+    if (!session) {
+        throw new Error(
+            'Session Supabase indisponible pour charger le planning. Fermez la modale de connexion puis reconnectez-vous.'
+        );
+    }
+
     const { data, error } = await sb.rpc('planning_events_in_range', {
         p_start: start.toISOString(),
         p_end: end.toISOString()
@@ -65,6 +84,26 @@ export async function fetchPlanningEventsForFullCalendar(start, end, currentUser
         const ev = mapPlanningDbRowToFcEvent(row, currentUser);
         return { ...ev, ...fcDragResizePropsForEvent(ev, currentUser) };
     });
+}
+
+/**
+ * Lignes brutes RPC (sans dépendance calendar-logic) — gabarits, scripts.
+ * @param {Date} start
+ * @param {Date} end
+ * @returns {Promise<object[]>}
+ */
+export async function fetchPlanningEventRowsInRange(start, end) {
+    const sb = getSupabaseClient();
+    if (!sb || !isBackendAuthConfigured()) return [];
+    const { data, error } = await sb.rpc('planning_events_in_range', {
+        p_start: start.toISOString(),
+        p_end: end.toISOString()
+    });
+    if (error) {
+        console.warn('[planning-events-db] fetchPlanningEventRowsInRange', error.message);
+        return [];
+    }
+    return Array.isArray(data) ? data : [];
 }
 
 /**
@@ -133,6 +172,54 @@ export async function deletePlanningEventRow(canonicalId) {
     if (!id) return { ok: false, error: 'Identifiant manquant.' };
     const { error } = await sb.from('planning_event').delete().eq('id', id);
     if (error) return { ok: false, error: error.message };
+    return { ok: true, error: null };
+}
+
+/**
+ * @returns {Promise<{ user_id: string, email: string, display_name: string }[]>}
+ */
+export async function fetchPlanningListElevesActifs() {
+    const sb = getSupabaseClient();
+    if (!sb || !isBackendAuthConfigured()) return [];
+    const { data, error } = await sb.rpc('planning_list_eleves_actifs');
+    if (error) {
+        console.warn('[planning-events-db] planning_list_eleves_actifs', error.message);
+        return [];
+    }
+    const rows = Array.isArray(data) ? data : [];
+    return rows.map((r) => ({
+        user_id: String(r.user_id ?? '').trim(),
+        email: String(r.email ?? '').trim(),
+        display_name: String(r.display_name ?? '').trim()
+    }));
+}
+
+/**
+ * Remplace les inscriptions (cours). `studentUserIds` = ids `auth.users` des élèves.
+ * @param {string} eventId
+ * @param {string[]} studentUserIds
+ */
+export async function replacePlanningEventEnrollment(eventId, studentUserIds) {
+    const sb = getSupabaseClient();
+    if (!sb || !isBackendAuthConfigured()) {
+        return { ok: false, error: 'Session indisponible.' };
+    }
+    const eid = String(eventId || '').trim();
+    if (!eid) return { ok: false, error: 'Événement manquant.' };
+    const seen = new Set();
+    const ids = (Array.isArray(studentUserIds) ? studentUserIds : [])
+        .map((x) => String(x).trim())
+        .filter((id) => {
+            if (!id || seen.has(id)) return false;
+            seen.add(id);
+            return true;
+        });
+    const { error: delErr } = await sb.from('planning_event_enrollment').delete().eq('event_id', eid);
+    if (delErr) return { ok: false, error: delErr.message };
+    if (ids.length === 0) return { ok: true, error: null };
+    const rows = ids.map((student_user_id) => ({ event_id: eid, student_user_id }));
+    const { error: insErr } = await sb.from('planning_event_enrollment').insert(rows);
+    if (insErr) return { ok: false, error: insErr.message };
     return { ok: true, error: null };
 }
 

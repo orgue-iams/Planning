@@ -18,13 +18,14 @@
 
 - **`015_planning_events_canonical.sql`** : `planning_event`, `planning_event_enrollment`, `planning_event_google_mirror`, `planning_infra_error_log`, RLS de base, RPC `planning_events_in_range` (évoluée en 016), `planning_error_notify_email`.
 - **`016_planning_event_rls_prof_and_mirror.sql`** : RLS prof/admin (créneaux pour autrui, édition élève/prof), RPC `planning_user_id_for_email`, index unique miroir `(event_id, target)`, politique SELECT miroir pour owner/prof/admin, trigger `sync_generation`, **remplacement** de `planning_events_in_range` via `DROP FUNCTION` + `CREATE` (colonnes `main_google_event_id`, `pool_google_event_id`).
+- **`017_planning_events_in_range_inscrits.sql`** : RPC `planning_events_in_range` avec colonne **`inscrits_emails`** (agrégat depuis `planning_event_enrollment` + `auth.users`) ; **`SECURITY DEFINER`** avec filtre identique à l’ancienne RLS `planning_event_select` (pas d’élévation de privilèges hors périmètre visible).
 
 À appliquer sur l’environnement cible : `supabase db push` (déjà validé une fois le `DROP FUNCTION` ajouté pour le changement de signature).
 
 ### Front (JS)
 
 - **`js/config/planning.config.js`** : `planningGridReadsFromSupabase: true` (grille = DB).
-- **`js/core/planning-events-db.js`** : RPC, mapping FC, `upsertPlanningEventRow`, `deletePlanningEventRow`, `fetchPlanningMirrorTargetsForDelete`, `planningUserIdForEmail`, import dynamique de `calendar-logic` pour éviter cycle.
+- **`js/core/planning-events-db.js`** : RPC, mapping FC (`extendedProps.inscrits` depuis `inscrits_emails`), `upsertPlanningEventRow`, `deletePlanningEventRow`, `fetchPlanningMirrorTargetsForDelete`, `planningUserIdForEmail`, import dynamique de `calendar-logic` pour éviter cycle.
 - **`js/core/calendar-logic.js`** : sauvegarde modale + récurrence + création rapide en mode DB ; suppression DB + delete Google via miroirs ; `syncReservationEventToGoogle` avec `planningEventId` ; pas de conflit « liste Google » si grille DB (`googleAgendaConflictCheckWanted`).
 - **`js/core/reservation-motifs.js`** : `motifToPlanningDbSlotType` (Travail → `travail perso`).
 - **`js/config/fc-settings.js`** / **`planning-courses.js`** / **`calendar-events-list-cache.js`** : cache avec scope `db:userId` vs `bridge`.
@@ -48,8 +49,8 @@ Numérotation indicative ; détail technique dans le code / migrations existante
 2. **Job nocturne** : réaligner tous les calendriers (général + pool) sur la DB — **non implémenté** (pg_cron, Edge schedulée, ou GitHub Action + script service role).
 3. **Digest nocturne erreurs infra** : lire `planning_infra_error_log` où `digest_sent_at IS NULL`, envoyer un mail à `planning_error_notify_email`, marquer `digest_sent_at` — **non implémenté** (aucune écriture systématique dans `planning_infra_error_log` depuis l’app ou le bridge pour l’instant).
 4. **Écriture dans `planning_infra_error_log`** : en cas d’échec bridge / DB critique (401 service account, etc.) — partiellement spécifié ; à brancher côté bridge ou front sans spammer l’utilisateur.
-5. **`planning_event_enrollment`** : enrichir `planning_events_in_range` (ou RPC dédiée) + `mapPlanningDbRowToFcEvent` pour remplir `extendedProps.inscrits` (profil élève / cours) — **non fait** (`inscrits: []` pour l’instant).
-6. **Semaines types / gabarit** : flux « Appliquer gabarit » doit **écrire dans `planning_event`** (ou RPC bulk) au lieu de ou en plus du bridge Google seul — **à vérifier / brancher** selon `template-apply-engine.js` et scripts existants.
+5. **`planning_event_enrollment`** : RPC + mapping FC (017) ; **modale réservation** (admin/prof, motif Cours) : liste multi `planning_list_eleves_actifs` + `replacePlanningEventEnrollment` + bridge `inscrits` ; création rapide **élève** + Cours : auto-inscription à soi-même. **Migration 018** : RLS insert/select/delete enrollment pour **prof** sur cours propriétaire élève/prof.
+6. **Semaines types / gabarit** : **`executeTemplateDatabasePhase`** (Postgres seul, sans Google) puis **`runTemplateGoogleBackgroundSync`** : suppressions miroirs triées **général → pool prof → autres**, upserts **un par un** avec pauses (`GOOGLE_BG_*_GAP_MS`) pour limiter les quotas ; UI bloque Préparer / Appliquer jusqu’à la fin (`stGoogleSyncInFlight`). Mode Google-only : même synchro séquentielle sans étape base.
 7. **Cohérence hors modale** : tout créneau créé uniquement côté Google (ancien flux) ne doit plus exister si la grille est 100 % DB ; migrations données éventuelles hors périmètre « fresh start ».
 8. **Tests / CI** : pas de tests auto sur le nouveau flux DB + bridge.
 

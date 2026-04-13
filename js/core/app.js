@@ -35,7 +35,6 @@ import {
     setPasswordModalMode,
     setLogoutHandler,
     tryRestoreSession,
-    tryRestoreDemoSession,
     getRememberMePreference,
     isPrivilegedUser,
     roleLabelFr,
@@ -63,6 +62,7 @@ import { fetchWeekCycleAnchor, clearProfWeekCycleCache } from './week-cycle.js';
 import { fetchOrganSchoolSettings, invalidateOrganSchoolSettingsCache } from './organ-settings.js';
 import { CACHE_NAME } from '../config/cache-name.js';
 import { normalizePlanningRole } from './planning-roles.js';
+import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
 
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker
@@ -89,6 +89,7 @@ function performLogout() {
     resetSemainesTypesUiBindings();
     resetConfigUiBindings();
     invalidateOrganSchoolSettingsCache();
+    invalidateCalendarListCache();
     currentEvent = null;
     if (calendar) {
         unbindTimeGridColumnSync?.();
@@ -124,12 +125,10 @@ function performLogout() {
 
 function syncHelpModalContent(user) {
     const r = normalizePlanningRole(user?.role);
-    const isConsultation = r === 'consultation';
     const isStaff = r === 'prof' || r === 'admin';
     const isAdmin = r === 'admin';
 
-    document.getElementById('help-block-consultation')?.classList.toggle('hidden', !isConsultation);
-    document.getElementById('help-block-active')?.classList.toggle('hidden', isConsultation);
+    document.getElementById('help-block-active')?.classList.remove('hidden');
 
     document.getElementById('help-block-staff')?.classList.toggle('hidden', !isStaff);
     document.getElementById('help-block-menu-privileged')?.classList.toggle('hidden', !isStaff);
@@ -165,7 +164,9 @@ function refreshHeaderUser(user) {
         roleEl.classList.remove('hidden');
     }
     menuWrap?.classList.remove('hidden');
-    shell?.classList.add('planning-shell--weekstrip');
+    const r = String(user.role || '').toLowerCase();
+    const showWeekStrip = r !== 'admin' && r !== 'prof';
+    shell?.classList.toggle('planning-shell--weekstrip', showWeekStrip);
     void refreshHeaderWeekStrip(user);
 }
 
@@ -299,6 +300,7 @@ function initCalendarAndRevealUi() {
             populateTimeSelects('event-start', 'event-end');
             populateTimeSelects('event-recur-start', 'event-recur-end');
         }
+        invalidateCalendarListCache();
         calendar = new FullCalendar.Calendar(calendarEl, getCalendarConfig(handlers, currentUser));
         calendar.render();
         const toolbarCtl = initCalendarToolbar(calendar);
@@ -441,6 +443,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     populateTimeSelects('event-recur-start', 'event-recur-end');
     checkUrlToken();
 
+    if (!isBackendAuthConfigured()) {
+        showToast(
+            'Renseignez supabaseUrl et supabaseAnonKey dans js/config/planning.config.js pour utiliser l’application.',
+            'error',
+            12000
+        );
+    }
+
     let unsubscribeRecovery = () => {};
     unsubscribeRecovery = subscribeSupabasePasswordRecovery(() => {
         unsubscribeRecovery();
@@ -459,9 +469,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await new Promise((r) => setTimeout(r, 200));
     }
 
-    const restored = isBackendAuthConfigured()
-        ? await tryRestoreSession()
-        : tryRestoreDemoSession();
+    const restored = await tryRestoreSession();
     if (restored) {
         currentUser = restored;
         setPlanningSessionUser(currentUser);
@@ -625,10 +633,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    const hasResetToken = new URLSearchParams(window.location.search).has('token');
     const supabaseRecoveryUrl = hasSupabaseRecoveryInUrl();
     const passModalOpen = document.getElementById('modal_password')?.open;
-    if (!hasResetToken && !supabaseRecoveryUrl && !currentUser?.email && !passModalOpen) {
+    if (!supabaseRecoveryUrl && !currentUser?.email && !passModalOpen) {
         const dlg = document.getElementById('modal_login');
         const rememberCb = document.getElementById('login-remember-me');
         if (rememberCb) rememberCb.checked = getRememberMePreference();

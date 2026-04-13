@@ -7,6 +7,8 @@ alwaysApply: true
 
 Ne **pas** terminer une réponse par une section du type **« À faire de ton côté »** qui liste des commandes (`git`, `supabase`, `npm`, etc.), des déploiements Edge Functions, ou des vérifications en base / dans des fichiers **sans les avoir exécutées**.
 
+**Supabase :** migrations (`db push` / script du repo) et déploiements Edge — **toujours les lancer** quand la tâche les rend nécessaires et que la CLI est disponible ; ne pas déléguer par défaut à l’utilisateur (voir aussi `.cursor/rules/supabase-edge-auto-deploy.mdc`).
+
 - **Exécuter** les commandes pertinentes dans le terminal (depuis le bon répertoire du repo).
 - **Lire** ou **modifier** les fichiers nécessaires pour confirmer l’état (migrations, config, workflows).
 - Si un outil échoue (auth Supabase absente, réseau, droits), **le signaler clairement** après avoir **tenté**, plutôt que de supposer que l’utilisateur le fera.

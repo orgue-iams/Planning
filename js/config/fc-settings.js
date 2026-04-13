@@ -4,7 +4,6 @@
  */
 
 import { showToast } from '../utils/toast.js';
-import { demoEvents } from '../data/mock-events.js';
 import { getAccessToken } from '../core/auth-logic.js';
 import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from '../core/supabase-client.js';
 import { invokeCalendarBridge } from '../core/calendar-bridge.js';
@@ -142,7 +141,7 @@ export const getCalendarConfig = (handlers, currentUser) => {
             scheduleTimeGridColumnSync(document.getElementById('calendar'));
         },
 
-        /* Source des créneaux : RPC Postgres si planningGridReadsFromSupabase, sinon bridge Google ; démo sinon.
+        /* Source des créneaux : RPC Postgres si planningGridReadsFromSupabase, sinon bridge Google.
          * Cache mémoire 90 s + clé par scope (db:userId ou bridge). */
         events: (fetchInfo, successCallback, failureCallback) => {
             void (async () => {
@@ -194,12 +193,10 @@ export const getCalendarConfig = (handlers, currentUser) => {
                             rows = cloneCachedCalendarRows(cached);
                         } else {
                             let token = await getAccessToken();
-                            if (!token) {
-                                const supabase = getSupabaseClient();
-                                if (supabase) {
-                                    await supabase.auth.refreshSession();
-                                    token = await getAccessToken();
-                                }
+                            const supabase = getSupabaseClient();
+                            if (!token && supabase) {
+                                await supabase.auth.refreshSession();
+                                token = await getAccessToken();
                             }
                             if (loadSignal?.aborted) return;
                             if (token) {
@@ -246,14 +243,20 @@ export const getCalendarConfig = (handlers, currentUser) => {
                                 setCalendarListCache(cacheKey, cloneCachedCalendarRows(rows));
                             } else {
                                 rows = [];
+                                showToast(
+                                    'Impossible de charger l’agenda : session expirée ou absente. Reconnectez-vous.',
+                                    'error',
+                                    6000
+                                );
                             }
                         }
                     } else {
-                        rows = demoEvents.map((e) => ({ ...e }));
-                        rows = rows.filter((ev) => {
-                            const d = new Date(ev.start);
-                            return d >= start && d < end;
-                        });
+                        rows = [];
+                        if (isBackendAuthConfigured()) {
+                            console.warn(
+                                '[planning] Aucune source grille : activer planningGridReadsFromSupabase ou renseigner calendarBridgeUrl.'
+                            );
+                        }
                     }
 
                     /* Dédoublonnage défensif : évite les superpositions après navigation semaine suivante/précédente. */
@@ -302,9 +305,17 @@ export const getCalendarConfig = (handlers, currentUser) => {
 
         eventContent: (arg) => handlers.renderEventContent(arg),
 
+        eventTimeFormat: {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+            meridiem: false
+        },
+
         slotLabelFormat: {
             hour: '2-digit',
             minute: '2-digit',
+            hour12: false,
             meridiem: false
         },
         /* dayHeaderContent remplace l’affichage ; dayHeaderFormat sert au titre / accessibilité FC. */

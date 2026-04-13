@@ -16,8 +16,7 @@ Application web **PWA** de planning autour de l’orgue : consultation et gestio
 |------|----------------|
 | **admin** | Gestion des comptes, pool Google secondaire, configuration org, gabarits ; accès complet aux motifs de réservation (dont Fermeture). |
 | **prof** | Créneaux cours / travail perso. sur le calendrier principal ou personnel (pool) ; gabarit semaines types ; pas de motif Fermeture en création. |
-| **eleve** | Réservations personnelles et cours ; UI simplifiée (titres de réservation, pas de champ « titre libre » comme les profs selon les écrans). |
-| **consultation** | Lecture ; pas d’édition ; pas de calendrier secondaire IAMS. |
+| **eleve** | Réservations personnelles et cours ; UI simplifiée (motif + titre selon les écrans). |
 
 Les règles fines (qui peut glisser-déposer quoi, passé interdit, etc.) sont dans `js/core/calendar-logic.js` et les politiques **RLS** SQL.
 
@@ -25,7 +24,7 @@ Les règles fines (qui peut glisser-déposer quoi, passé interdit, etc.) sont d
 
 - **Motifs de réservation** : Travail perso. (valeur stockée `Travail`), Cours, Fermeture (admin seulement en liste). Couleur / type technique dérivés du motif (`reservation-motifs.js`).
 - **Calendrier principal** : agenda Google « général » (tous les créneaux orgue).
-- **Calendrier personnel (pool)** : un agenda Google secondaire **attribué** à l’utilisateur (hors consultation) pour réservations « travail » / usage perso. côté Google.
+- **Calendrier personnel (pool)** : un agenda Google secondaire **attribué** à l’utilisateur (élève / prof / admin) pour réservations « travail » / usage perso. côté Google.
 - **Semaines A/B** : ancrage sur un lundi de référence ; gabarit par semaine (lignes jour / heure / type cours–travail / élèves inscrits).
 - **Inscrits** : élèves rattachés à une ligne de cours (gabarit) ; propagés vers Google (description / propriétés privées selon implémentation bridge).
 

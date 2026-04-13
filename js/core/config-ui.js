@@ -10,18 +10,15 @@ import {
     invalidateOrganSchoolSettingsCache
 } from './organ-settings.js';
 import { showToast } from '../utils/toast.js';
+import { normalizeHHmmInput } from '../utils/time-helpers.js';
 
 let bound = false;
 
 function timeDbToInput(t) {
     if (!t) return '08:00';
     const s = String(t).slice(0, 5);
-    return s.length === 5 ? s : '08:00';
-}
-
-function inputTimeToDb(s) {
-    const x = String(s || '').slice(0, 5);
-    return x.length === 5 ? `${x}:00` : '08:00:00';
+    const n = normalizeHHmmInput(s.length === 5 ? s : '');
+    return n || '08:00';
 }
 
 async function fillConfigModal() {
@@ -64,11 +61,17 @@ export function initConfigUi(currentUser) {
 
     document.getElementById('config-save-btn')?.addEventListener('click', async () => {
         if (!admin) return;
+        const mn = normalizeHHmmInput(document.getElementById('config-chapel-min')?.value);
+        const mx = normalizeHHmmInput(document.getElementById('config-chapel-max')?.value);
+        if (!mn || !mx) {
+            showToast('Heures chapelle invalides : format 24 h (ex. 08:00, 22:00).', 'error');
+            return;
+        }
         const r = await saveOrganSchoolSettingsAdmin({
             school_year_start: document.getElementById('config-school-start')?.value || null,
             school_year_end: document.getElementById('config-school-end')?.value || null,
-            chapel_slot_min: inputTimeToDb(document.getElementById('config-chapel-min')?.value),
-            chapel_slot_max: inputTimeToDb(document.getElementById('config-chapel-max')?.value),
+            chapel_slot_min: `${mn}:00`,
+            chapel_slot_max: `${mx}:00`,
             planning_error_notify_email: document.getElementById('config-planning-error-notify-email')?.value ?? ''
         });
         if (!r.ok) {

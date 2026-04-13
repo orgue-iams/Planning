@@ -4,10 +4,10 @@
 
 ## Déjà en place (résumé)
 
-- Auth **Supabase** + mode **démo** sans backend.
+- Auth **Supabase** uniquement (`supabaseUrl` + `supabaseAnonKey` requis dans `planning.config.js`).
 - Calendrier **FullCalendar** ; sync **Google** via **`calendar-bridge`** (compte de service ou OAuth).
 - **Grille en mode canonique DB** (quand `planningGridReadsFromSupabase: true`) : RPC `planning_events_in_range`, écriture `planning_event`, suppression + sync Google via `planning_event_google_mirror` ; secrets Edge **`SERVICE_ROLE_KEY`** ou auto `SUPABASE_SERVICE_ROLE_KEY` pour persistance miroir côté bridge — voir **HANDOFF.md**.
-- **Rôles** admin / prof / élève / consultation avec règles d’édition dans `calendar-logic.js` ; RLS SQL alignée (prof sur créneaux élèves/prof, etc.).
+- **Rôles** admin / prof / élève avec règles d’édition dans `calendar-logic.js` ; RLS SQL alignée (prof sur créneaux élèves/prof, etc.).
 - **Motifs** : Travail perso. / Cours / Fermeture ; mapping DB `motifToPlanningDbSlotType` (`travail perso`, `cours`, `fermeture`).
 - **Profils** : `nom` + `prenom`, liste admin, création / invitation.
 - **Pool** calendriers Google secondaires + attribution / libellés.

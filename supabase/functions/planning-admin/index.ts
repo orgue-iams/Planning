@@ -9,7 +9,7 @@ import { normalizeGoogleCalendarId } from '../_shared/normalize_google_calendar_
 const MIN_PASSWORD_LEN = 6;
 
 /** Aligné sur public.profiles.role (check SQL). */
-const PLANNING_ROLES = ['admin', 'prof', 'eleve', 'consultation'] as const;
+const PLANNING_ROLES = ['admin', 'prof', 'eleve'] as const;
 
 function isPlanningRole(r: string): boolean {
     return (PLANNING_ROLES as readonly string[]).includes(r.toLowerCase());
@@ -366,7 +366,7 @@ Deno.serve(async (req) => {
             }
             if (!isPlanningRole(role)) {
                 return new Response(
-                    JSON.stringify({ error: 'Rôle invalide : admin, prof, eleve ou consultation uniquement.' }),
+                    JSON.stringify({ error: 'Rôle invalide : admin, prof ou eleve uniquement.' }),
                     {
                         status: 400,
                         headers: { ...cors, 'Content-Type': 'application/json' }
@@ -417,7 +417,7 @@ Deno.serve(async (req) => {
             }
             if (!isPlanningRole(role)) {
                 return new Response(
-                    JSON.stringify({ error: 'Rôle invalide : admin, prof, eleve ou consultation uniquement.' }),
+                    JSON.stringify({ error: 'Rôle invalide : admin, prof ou eleve uniquement.' }),
                     {
                         status: 400,
                         headers: { ...cors, 'Content-Type': 'application/json' }
@@ -479,7 +479,7 @@ Deno.serve(async (req) => {
             }
             if (!isPlanningRole(role)) {
                 return new Response(
-                    JSON.stringify({ error: 'Rôle invalide : admin, prof, eleve ou consultation uniquement.' }),
+                    JSON.stringify({ error: 'Rôle invalide : admin, prof ou eleve uniquement.' }),
                     {
                         status: 400,
                         headers: { ...cors, 'Content-Type': 'application/json' }

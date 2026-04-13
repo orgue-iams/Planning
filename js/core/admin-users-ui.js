@@ -138,7 +138,7 @@ function renderUsersTable(users) {
         const label = String(u.personal_calendar_label ?? '').trim();
         const hasCal = Boolean(String(u.personal_google_calendar_id ?? '').trim());
         const calIdRaw = String(u.personal_google_calendar_id ?? '').trim();
-        const showCalCopy = u.role !== 'consultation' && calIdRaw;
+        const showCalCopy = Boolean(calIdRaw);
         const calLabelHtml = label
             ? `<span class="text-slate-800 truncate min-w-0">${escapeTd(label)}</span>`
             : hasCal
@@ -147,10 +147,7 @@ function renderUsersTable(users) {
         const copyBtn = showCalCopy
             ? `<button type="button" class="btn btn-ghost btn-xs btn-square h-8 w-8 min-h-8 p-0 border-0 text-slate-600 hover:bg-slate-200/90 hover:text-slate-900 shrink-0 group admin-btn-copy-cal-url" data-calendar-id="${escapeAttr(calIdRaw)}" title="Copier URL" aria-label="Copier l’URL du calendrier">${ADMIN_CAL_URL_COPY_SVG}</button>`
             : '';
-        const calCell =
-            u.role === 'consultation'
-                ? '<span class="text-slate-400">—</span>'
-                : `<div class="flex items-center justify-center gap-1 min-w-0 max-w-full">${calLabelHtml}${copyBtn}</div>`;
+        const calCell = `<div class="flex items-center justify-center gap-1 min-w-0 max-w-full">${calLabelHtml}${copyBtn}</div>`;
         const nameCell = escapeTd(
             formatProfileFullName(u.nom, u.prenom) || String(u.display_name ?? '').trim() || '—'
         );

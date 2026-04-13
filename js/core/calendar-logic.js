@@ -4,12 +4,12 @@
  */
 
 import { showToast } from '../utils/toast.js';
+import { formatTimeFr24, formatWeekdayDayTimeFr24 } from '../utils/time-helpers.js';
 import { getAccessToken, isBackendAuthConfigured, isPrivilegedUser } from './auth-logic.js';
-import { invokeCalendarBridge } from './calendar-bridge.js';
+import { bridgeDeleteEvent, invokeCalendarBridge } from './calendar-bridge.js';
 import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
 import { getPlanningConfig, getSupabaseClient } from './supabase-client.js';
 import { invokeSlotNotify } from './slot-notify-api.js';
-import { getDefaultReservationTitle, getProfile } from '../utils/user-profile.js';
 import { isPlanningRole } from './planning-roles.js';
 import {
     RESERVATION_MOTIFS,
@@ -24,7 +24,9 @@ import {
     upsertPlanningEventRow,
     deletePlanningEventRow,
     fetchPlanningMirrorTargetsForDelete,
-    planningUserIdForEmail
+    planningUserIdForEmail,
+    fetchPlanningListElevesActifs,
+    replacePlanningEventEnrollment
 } from './planning-events-db.js';
 
 let saveReservationInFlight = false;
@@ -72,6 +74,95 @@ function normalizeRole(role) {
     return isPlanningRole(r) ? r : '';
 }
 
+/** Références modale réservation (listener motif → affichage inscrits). */
+let reservationModalUserRef = /** @type {object | null} */ (null);
+let reservationModalCanEditRef = false;
+
+function canManageReservationInscrits(currentUser) {
+    const r = normalizeRole(currentUser?.role);
+    return r === 'admin' || r === 'prof';
+}
+
+function getReservationInscritsSelection() {
+    const multi = document.getElementById('event-inscrits-select');
+    if (!multi) return { userIds: [], emailsCsv: '' };
+    const userIds = [];
+    const emails = [];
+    for (let i = 0; i < multi.options.length; i++) {
+        const o = multi.options[i];
+        if (o.selected) {
+            userIds.push(o.value);
+            const em = String(o.dataset.email || '').trim().toLowerCase();
+            if (em) emails.push(em);
+        }
+    }
+    return { userIds, emailsCsv: emails.join(',') };
+}
+
+function updateReservationInscritsWrapVisibility(currentUser, canEdit) {
+    const wrap = document.getElementById('wrap-reservation-inscrits');
+    const multi = document.getElementById('event-inscrits-select');
+    const sel = document.getElementById('event-motif-select');
+    if (!wrap || !multi || !sel) return;
+    const show = canManageReservationInscrits(currentUser) && sel.value === 'Cours';
+    wrap.classList.toggle('hidden', !show);
+    multi.disabled = !canEdit || !show;
+}
+
+function ensureReservationMotifInscritsListener() {
+    const sel = document.getElementById('event-motif-select');
+    if (!sel || sel.dataset.inscritsMotifBound === '1') return;
+    sel.dataset.inscritsMotifBound = '1';
+    sel.addEventListener('change', () => {
+        updateReservationInscritsWrapVisibility(reservationModalUserRef, reservationModalCanEditRef);
+    });
+}
+
+async function prepareReservationInscritsSelect(currentUser, event, canEdit) {
+    ensureReservationMotifInscritsListener();
+    const wrap = document.getElementById('wrap-reservation-inscrits');
+    const multi = document.getElementById('event-inscrits-select');
+    if (!wrap || !multi) return;
+    if (!canManageReservationInscrits(currentUser)) {
+        wrap.classList.add('hidden');
+        return;
+    }
+    const rows = await fetchPlanningListElevesActifs();
+    multi.innerHTML = '';
+    const pre = new Set(
+        (event && Array.isArray(event.extendedProps?.inscrits) ? event.extendedProps.inscrits : [])
+            .map((e) => String(e).trim().toLowerCase())
+            .filter(Boolean)
+    );
+    for (const r of rows) {
+        if (!r.user_id) continue;
+        const label = `${r.display_name || r.email} · ${r.email}`;
+        const opt = new Option(label, r.user_id);
+        opt.dataset.email = String(r.email || '').trim().toLowerCase();
+        opt.selected = pre.has(opt.dataset.email);
+        multi.add(opt);
+    }
+    updateReservationInscritsWrapVisibility(currentUser, canEdit);
+}
+
+/**
+ * @param {string} eventId
+ * @param {string} dbSlotType
+ * @returns {Promise<{ ok: boolean, emailsCsv: string, error?: string | null }>}
+ */
+async function syncPlanningEnrollmentAfterSave(eventId, dbSlotType) {
+    if (!planningGridUsesSupabaseDb() || !eventId) return { ok: true, emailsCsv: '' };
+    if (dbSlotType === 'cours') {
+        const { userIds, emailsCsv } = getReservationInscritsSelection();
+        const enr = await replacePlanningEventEnrollment(eventId, userIds);
+        if (!enr.ok) return { ok: false, emailsCsv: '', error: enr.error };
+        return { ok: true, emailsCsv, error: null };
+    }
+    const enr = await replacePlanningEventEnrollment(eventId, []);
+    if (!enr.ok) return { ok: false, emailsCsv: '', error: enr.error };
+    return { ok: true, emailsCsv: '', error: null };
+}
+
 /** @param {import('@fullcalendar/core').EventApi | null} event */
 export function ownerInfoFromEvent(event, currentUser) {
     const ownerEmail = String(
@@ -108,7 +199,7 @@ async function prepareReservationOwnerSelect(currentUser, event, canEditEvent) {
 
     if (!wrap || !sel) return;
 
-    if (r === 'eleve' || r === 'consultation') {
+    if (r === 'eleve') {
         wrap.classList.add('hidden');
         editorOwnerEl?.classList.remove('hidden');
         return;
@@ -156,7 +247,7 @@ async function prepareReservationOwnerSelect(currentUser, event, canEditEvent) {
 
 function getReservationSlotOwnerEmail(currentUser, currentEventRef) {
     const r = normalizeRole(currentUser?.role);
-    if (r === 'eleve' || r === 'consultation') {
+    if (r === 'eleve') {
         return String(currentUser?.email || '').trim();
     }
     const wrap = document.getElementById('wrap-reservation-owner-target');
@@ -231,7 +322,6 @@ export function fcDragResizePropsForEventStart(startLike, currentUser) {
 function canCurrentUserEditEventIgnoringPast(currentUser, event) {
     if (!currentUser?.email || !event) return false;
     const meRole = normalizeRole(currentUser.role);
-    if (meRole === 'consultation') return false;
     if (meRole === 'admin') return true;
 
     const owner = ownerInfoFromEvent(event, currentUser);
@@ -257,7 +347,6 @@ function roleFromOwnerEmail(email) {
     if (e === 'admin@iams.fr' || e === 'nicolas.marestin@gmail.com') return 'admin';
     if (e.startsWith('prof')) return 'prof';
     if (e.startsWith('eleve') || e.startsWith('élève')) return 'eleve';
-    if (e.startsWith('consultation')) return 'consultation';
     return '';
 }
 
@@ -425,6 +514,13 @@ export async function syncReservationEventToGoogle(calendarEvent) {
         showToast('Créneau sans identifiant base : synchronisation impossible.', 'error');
         return { ok: false };
     }
+    const inscritsArr = Array.isArray(calendarEvent.extendedProps?.inscrits)
+        ? calendarEvent.extendedProps.inscrits
+        : [];
+    const inscritsCsv = inscritsArr
+        .map((x) => String(x).trim().toLowerCase())
+        .filter(Boolean)
+        .join(',');
     const payload = {
         ...(fromDb && canonicalId ? { planningEventId: canonicalId } : {}),
         ...(gid ? { googleEventId: gid } : {}),
@@ -433,7 +529,8 @@ export async function syncReservationEventToGoogle(calendarEvent) {
         end: end.toISOString(),
         type,
         owner,
-        ...(poolLink ? { poolGoogleEventId: poolLink } : {})
+        ...(poolLink ? { poolGoogleEventId: poolLink } : {}),
+        ...(inscritsCsv ? { inscrits: inscritsCsv } : {})
     };
     const r = await invokeCalendarBridge(token, { action: 'upsert', events: [payload] });
     if (!r.ok && !r.skipped) {
@@ -536,11 +633,7 @@ export function getEventContent(arg, currentUser) {
         };
     }
 
-    const formatTime = (date) =>
-        date.toLocaleTimeString('fr-FR', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+    const formatTime = (date) => formatTimeFr24(date);
 
     const endDisplay = new Date(end);
     const sameCalendarDay =
@@ -732,8 +825,7 @@ function overlapToastMessage(conflict) {
     const t = String(conflict?.title || 'Occupation').trim() || 'Occupation';
     const r = eventRangeForOverlap(conflict);
     if (!r) return `Ce créneau chevauche une autre réservation : « ${t} ».`;
-    const tf = (d) =>
-        d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', weekday: 'short', day: 'numeric' });
+    const tf = (d) => formatWeekdayDayTimeFr24(d);
     return `Chevauchement avec « ${t} » (${tf(r.start)} – ${tf(r.end)}). Choisissez un autre horaire.`;
 }
 
@@ -892,8 +984,6 @@ function getReservationTextTitleFromForm(currentUser, motif) {
     const input = document.getElementById('event-title-input');
     const typed = String(input?.value || '').trim();
     if (typed) return typed;
-    const byProfile = String(getDefaultReservationTitle(currentUser?.email) || '').trim();
-    if (byProfile) return byProfile;
     return motifDisplayLabel(motif);
 }
 
@@ -1010,8 +1100,8 @@ export function buildReservationFormFields(currentUser, event) {
     if (event) {
         titleInput.value = String(event.title || '').trim();
     } else {
-        const fallback = String(getProfile(currentUser?.email).defaultTitle || '').trim();
-        titleInput.value = fallback;
+        const m = sel.value || inferredMotif;
+        titleInput.value = motifDisplayLabel(m);
     }
 }
 
@@ -1145,6 +1235,27 @@ async function finalizeQuickReservationInBackground(
                 showToast(ur.error || 'Enregistrement impossible.', 'error');
                 return;
             }
+            let quickInscritsCsv = '';
+            if (dbSlotType === 'cours') {
+                let qIds = [];
+                if (normalizeRole(currentUser.role) === 'eleve') {
+                    const selfId = await planningUserIdForEmail(currentUser.email);
+                    if (selfId) {
+                        qIds = [selfId];
+                        quickInscritsCsv = String(currentUser.email || '')
+                            .trim()
+                            .toLowerCase();
+                    }
+                }
+                const enrQ = await replacePlanningEventEnrollment(ur.id, qIds);
+                if (!enrQ.ok) {
+                    if (created) created.remove();
+                    showToast(enrQ.error || 'Inscriptions impossibles.', 'error');
+                    return;
+                }
+            } else {
+                await replacePlanningEventEnrollment(ur.id, []);
+            }
             const syncDb = await trySyncGoogleCalendar([
                 {
                     planningEventId: ur.id,
@@ -1152,7 +1263,8 @@ async function finalizeQuickReservationInBackground(
                     start: rangeStart.toISOString(),
                     end: rangeEnd.toISOString(),
                     type: bridgeType,
-                    owner: currentUser.email
+                    owner: currentUser.email,
+                    ...(quickInscritsCsv ? { inscrits: quickInscritsCsv } : {})
                 }
             ]);
             if (calendarBridgeWanted() && !syncDb.ok && !syncDb.skipped) {
@@ -1235,12 +1347,6 @@ export async function quickCreateFromSelection(calendar, selectInfo, currentUser
         showToast('Connectez-vous pour réserver.', 'error');
         return;
     }
-    if (normalizeRole(currentUser.role) === 'consultation') {
-        showToast('Le profil consultation est en lecture seule.', 'error');
-        calendar.unselect();
-        return;
-    }
-
     if (
         selectInfo.view.type === 'dayGridMonth' ||
         selectInfo.view.type.startsWith('list') ||
@@ -1295,11 +1401,6 @@ export async function quickCreateFromDateClick(calendar, clickDate, currentUser,
         showToast('Connectez-vous pour réserver.', 'error');
         return;
     }
-    if (normalizeRole(currentUser.role) === 'consultation') {
-        showToast('Le profil consultation est en lecture seule.', 'error');
-        return;
-    }
-
     if (viewType.startsWith('list')) {
         await openModal(new Date(clickDate), null, null, currentUser);
         return;
@@ -1343,12 +1444,10 @@ export async function quickCreateFromDateClick(calendar, clickDate, currentUser,
 export async function openModal(start, end, event, currentUser, calendarForClip = null) {
     const modal = document.getElementById('modal_reservation');
     if (!modal) return;
-    if (!event && normalizeRole(currentUser?.role) === 'consultation') {
-        showToast('Le profil consultation est en lecture seule.', 'error');
-        return;
-    }
     const isPastSlot = Boolean(event && isReservationStartBeforeTodayLocal(event));
     const canEditEvent = !event || canCurrentUserEditEvent(currentUser, event);
+    reservationModalUserRef = currentUser;
+    reservationModalCanEditRef = canEditEvent;
     const owner = ownerInfoFromEvent(event, currentUser);
     const ownerText = ownerIdentityLabel(owner);
 
@@ -1370,6 +1469,17 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         if (desc) desc.textContent = (event.title || 'Occupation').trim() || 'Occupation';
         if (ownerEl) ownerEl.textContent = ownerText;
         if (whenEl) whenEl.textContent = formatOccupationWhenSentence(start, end);
+        const irw = document.getElementById('wrap-readonly-inscrits');
+        const ir = document.getElementById('event-readonly-inscrits');
+        if (ir && irw) {
+            const ins = event?.extendedProps?.inscrits;
+            if (Array.isArray(ins) && ins.length > 0) {
+                ir.textContent = ins.join(', ');
+                irw.classList.remove('hidden');
+            } else {
+                irw.classList.add('hidden');
+            }
+        }
         modalActions?.classList.add('justify-end');
         modalActions?.classList.remove('justify-between');
         document.getElementById('btn-save')?.classList.add('hidden');
@@ -1496,7 +1606,8 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         'event-recur-end',
         'recur-mode-all',
         'recur-mode-days',
-        'reservation-slot-owner-email'
+        'reservation-slot-owner-email',
+        'event-inscrits-select'
     ];
     fields.forEach((id) => {
         const el = document.getElementById(id);
@@ -1511,6 +1622,7 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     document.getElementById('btn-delete').classList.toggle('hidden', !canEditEvent || !event);
 
     await prepareReservationOwnerSelect(currentUser, event || null, canEditEvent);
+    await prepareReservationInscritsSelect(currentUser, event || null, canEditEvent);
 
     modal.showModal();
     requestAnimationFrame(() => {
@@ -1752,6 +1864,10 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
                 return;
             }
             const dbSlotType = motifToPlanningDbSlotType(motif);
+            if (dbSlotType === 'cours' && getReservationInscritsSelection().userIds.length === 0) {
+                showToast('Pour un cours, sélectionnez au moins un élève inscrit.', 'error');
+                return;
+            }
             const bridgeType = planningDbSlotTypeToBridgeType(dbSlotType);
             /** @type {Record<string, unknown>[]} */
             const bridgeEventsDb = [];
@@ -1771,13 +1887,19 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
                     showToast(ur.error || 'Enregistrement base impossible.', 'error');
                     return;
                 }
+                const enrollR = await syncPlanningEnrollmentAfterSave(ur.id, dbSlotType);
+                if (!enrollR.ok) {
+                    showToast(enrollR.error || 'Enregistrement des inscriptions impossible.', 'error');
+                    return;
+                }
                 bridgeEventsDb.push({
                     planningEventId: ur.id,
                     title,
                     start: startIso,
                     end: endIso,
                     type: bridgeType,
-                    owner: slotOwnerEmail || currentUser.email
+                    owner: slotOwnerEmail || currentUser.email,
+                    ...(enrollR.emailsCsv ? { inscrits: enrollR.emailsCsv } : {})
                 });
             }
             const syncMultiDb = await trySyncGoogleCalendar(bridgeEventsDb);
@@ -1901,6 +2023,10 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
             return;
         }
         const dbSlotType = motifToPlanningDbSlotType(motif);
+        if (dbSlotType === 'cours' && getReservationInscritsSelection().userIds.length === 0) {
+            showToast('Pour un cours, sélectionnez au moins un élève inscrit.', 'error');
+            return;
+        }
         const bridgeType = planningDbSlotTypeToBridgeType(dbSlotType);
         const startIso = new Date(startStr).toISOString();
         const endIso = new Date(endStr).toISOString();
@@ -1920,6 +2046,11 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
             showToast(ur.error || 'Enregistrement base impossible.', 'error');
             return;
         }
+        const enrollSync = await syncPlanningEnrollmentAfterSave(ur.id, dbSlotType);
+        if (!enrollSync.ok) {
+            showToast(enrollSync.error || 'Enregistrement des inscriptions impossible.', 'error');
+            return;
+        }
         const payloadDb = {
             planningEventId: ur.id,
             ...(gid ? { googleEventId: gid } : {}),
@@ -1928,7 +2059,8 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
             end: endIso,
             type: bridgeType,
             owner: ownerForBridge || currentUser.email,
-            ...(poolLinkExisting ? { poolGoogleEventId: poolLinkExisting } : {})
+            ...(poolLinkExisting ? { poolGoogleEventId: poolLinkExisting } : {}),
+            ...(enrollSync.emailsCsv ? { inscrits: enrollSync.emailsCsv } : {})
         };
         const syncSingleDb = await trySyncGoogleCalendar([payloadDb]);
         if (calendarBridgeWanted() && !syncSingleDb.ok && !syncSingleDb.skipped) {
@@ -2075,11 +2207,7 @@ export async function deleteReservation(calendar, currentEventRef, currentUser) 
         const targets = await fetchPlanningMirrorTargetsForDelete(canonicalId);
         if (tokenDb && targets.length > 0) {
             for (const t of targets) {
-                const rDel = await invokeCalendarBridge(tokenDb, {
-                    action: 'delete',
-                    googleEventId: t.googleEventId,
-                    calendarId: t.calendarId
-                });
+                const rDel = await bridgeDeleteEvent(tokenDb, t.googleEventId, t.calendarId);
                 if (!rDel.ok && !rDel.skipped) {
                     showToast(`Suppression agenda : ${rDel.error || 'échec'}`, 'error');
                     return;
@@ -2123,18 +2251,14 @@ export async function deleteReservation(calendar, currentEventRef, currentUser) 
             if (poolGid) {
                 const poolCal = await fetchPoolCalendarIdForUser(currentUser.id);
                 if (poolCal) {
-                    const rPool = await invokeCalendarBridge(token, {
-                        action: 'delete',
-                        googleEventId: poolGid,
-                        calendarId: poolCal
-                    });
+                    const rPool = await bridgeDeleteEvent(token, poolGid, poolCal);
                     if (!rPool.ok && !rPool.skipped) {
                         showToast(`Suppression agenda perso : ${rPool.error || 'échec'}`, 'error');
                         return;
                     }
                 }
             }
-            const r = await invokeCalendarBridge(token, { action: 'delete', googleEventId: gid });
+            const r = await bridgeDeleteEvent(token, gid, undefined);
             if (!r.ok && !r.skipped) {
                 showToast(`Suppression agenda : ${r.error || 'échec'}`, 'error');
                 return;

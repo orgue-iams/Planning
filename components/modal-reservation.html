@@ -13,6 +13,10 @@
                     <p class="text-[11px] font-bold uppercase text-slate-500 tracking-wide">Motif / cours</p>
                     <p id="event-readonly-description" class="text-[15px] font-black text-slate-900 leading-snug mt-0.5"></p>
                 </div>
+                <div id="wrap-readonly-inscrits" class="hidden">
+                    <p class="text-[11px] font-bold uppercase text-slate-500 tracking-wide">Inscrits</p>
+                    <p id="event-readonly-inscrits" class="text-[13px] text-slate-800 leading-snug mt-0.5"></p>
+                </div>
             </div>
             <div id="wrap-reservation-editor" class="space-y-4">
             <p id="event-editor-owner" class="text-[13px] font-bold text-slate-800 leading-snug rounded-lg bg-slate-50 px-3 py-2 border border-slate-200"></p>
@@ -88,6 +92,11 @@
             <div id="wrap-reservation-title" class="form-control">
                 <label class="label py-0" for="event-title-input"><span class="label-text font-bold text-[11px] uppercase text-slate-500">Titre</span></label>
                 <input id="event-title-input" type="text" maxlength="120" class="input input-sm w-full font-bold text-sm h-11 bg-slate-50 border border-slate-200 rounded-lg shadow-sm focus:border-slate-300 focus:outline-none focus:ring-0" />
+            </div>
+            <div id="wrap-reservation-inscrits" class="form-control hidden">
+                <label class="label py-0" for="event-inscrits-select"><span class="label-text font-bold text-[11px] uppercase text-slate-500">Inscrits (cours)</span></label>
+                <p class="text-[9px] text-slate-500 -mt-1 mb-1 leading-snug">Maintenez <kbd class="kbd kbd-xs">Ctrl</kbd> ou <kbd class="kbd kbd-xs">⌘</kbd> pour en choisir plusieurs.</p>
+                <select id="event-inscrits-select" multiple size="5" aria-label="Élèves inscrits au cours" class="select select-sm w-full font-bold text-sm min-h-[7.5rem] bg-slate-50 border border-slate-200 rounded-lg shadow-sm focus:border-slate-300 focus:outline-none focus:ring-0 py-1"></select>
             </div>
             </div>
         </div>

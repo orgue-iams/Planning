@@ -3,8 +3,18 @@
  * TODO: e-mail récapitulatif par élève après application (hors V1).
  */
 import { getAccessToken } from './auth-logic.js';
-import { getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
+import { getSupabaseClient, getPlanningConfig, isBackendAuthConfigured } from './supabase-client.js';
 import { bridgeListEvents, bridgeDeleteEvent, bridgeUpsertEvents } from './calendar-bridge.js';
+import {
+    planningGridUsesSupabaseDb,
+    upsertPlanningEventRow,
+    replacePlanningEventEnrollment,
+    fetchPlanningMirrorTargetsForDelete,
+    deletePlanningEventRow,
+    planningUserIdForEmail,
+    fetchPlanningEventRowsInRange,
+    planningDbSlotTypeToBridgeType
+} from './planning-events-db.js';
 import {
     mondayOfLocalWeek,
     weekTypeLetterForAlternance,
@@ -13,10 +23,10 @@ import {
 } from './week-cycle.js';
 
 const APPLY_RETRIES = 3;
-/** Lots côté client : moins d’allers-retours HTTP vers la fonction Edge (chaque lot enchaîne les événements côté serveur). */
-const UPSERT_BATCH = 24;
-/** Suppressions Google indépendantes en parallèle (plafonné — évite les rafales tout en accélérant). */
-const DELETE_CONCURRENCY = 8;
+/** Pause entre suppressions Google (client) pour limiter les quotas. */
+const GOOGLE_BG_DELETE_GAP_MS = 450;
+/** Pause entre deux appels bridge d’upsert (souvent 1 événement par requête côté Edge). */
+const GOOGLE_BG_UPSERT_GAP_MS = 550;
 
 /**
  * Bilan lisible quand l’application s’arrête en cours (Google n’offre pas de transaction globale).
@@ -35,24 +45,86 @@ export function formatTemplateApplyPartialSummary(partial) {
     ].join('\n');
 }
 
+function sleepMsLocal(ms) {
+    return new Promise((r) => setTimeout(r, ms));
+}
+
+function normCalKey(id) {
+    return String(id || '').trim().toLowerCase();
+}
+
 /**
- * @template T
- * @param {T[]} items
- * @param {number} concurrency
- * @param {(item: T) => Promise<void>} fn
+ * Suppressions Google : général → pool prof → autres (agendas élèves).
+ * @param {{ googleEventId: string, calendarId: string }[]} tasks
  */
-async function runPoolConcurrency(items, concurrency, fn) {
-    if (!items.length) return;
-    const n = Math.min(Math.max(1, concurrency), items.length);
-    let next = 0;
-    async function worker() {
-        while (true) {
-            const i = next++;
-            if (i >= items.length) break;
-            await fn(items[i]);
+function sortGoogleCleanupTasks(tasks, mainCalendarId, profPoolId) {
+    const m = normCalKey(mainCalendarId);
+    const p = normCalKey(profPoolId);
+    return [...tasks].sort((a, b) => {
+        const ca = normCalKey(a.calendarId);
+        const cb = normCalKey(b.calendarId);
+        const tier = (c) => {
+            if (m && c === m) return 0;
+            if (p && c === p) return 1;
+            return 2;
+        };
+        const d = tier(ca) - tier(cb);
+        if (d !== 0) return d;
+        return ca.localeCompare(cb);
+    });
+}
+
+/**
+ * @param {Awaited<ReturnType<typeof analyzeTemplateApply>>} analysis
+ * @param {{ profEmail: string, mainCalendarId: string }} ctx
+ */
+function buildGoogleOnlyDeletesAndUpserts(analysis, ctx) {
+    const profEmail = normEmail(ctx.profEmail);
+    const map = analysis.studentCalByEmail instanceof Map ? analysis.studentCalByEmail : new Map();
+    const delMain = analysis.toDeleteMain;
+    const delStud = analysis.toDeleteStudentPersonal;
+    const delProf = analysis.toDeleteProfPerso;
+    const totalDel = delMain.length + delStud.length + delProf.length;
+    /** @type {Record<string, unknown>[]} */
+    const upserts = [];
+    for (const slot of analysis.plannedMainCours) {
+        upserts.push({
+            title: String(slot.line.title || 'Cours').trim() || 'Cours',
+            start: slot.start.toISOString(),
+            end: slot.end.toISOString(),
+            type: 'cours',
+            owner: profEmail,
+            calendarId: ctx.mainCalendarId,
+            inscrits: slot.studentEmail,
+            templateLineId: slot.line.id
+        });
+        const calId = map.get(slot.studentEmail);
+        if (calId) {
+            upserts.push({
+                title: String(slot.line.title || 'Cours').trim() || 'Cours',
+                start: slot.start.toISOString(),
+                end: slot.end.toISOString(),
+                type: 'cours',
+                owner: profEmail,
+                calendarId: calId,
+                inscrits: slot.studentEmail,
+                templateLineId: slot.line.id
+            });
         }
     }
-    await Promise.all(Array.from({ length: n }, () => worker()));
+    for (const tr of analysis.plannedTravailPerso) {
+        if (!analysis.profPoolId) continue;
+        upserts.push({
+            title: String(tr.line.title || 'Travail').trim() || 'Travail personnel',
+            start: tr.start.toISOString(),
+            end: tr.end.toISOString(),
+            type: 'reservation',
+            owner: profEmail,
+            calendarId: analysis.profPoolId,
+            templateLineId: tr.line.id
+        });
+    }
+    return { delMain, delStud, delProf, upserts, totalDel, upsertTotal: upserts.length };
 }
 
 /** @param {Date} today */
@@ -172,6 +244,30 @@ function normEmail(s) {
     return String(s || '')
         .trim()
         .toLowerCase();
+}
+
+/**
+ * Un cours gabarit avec plusieurs élèves → un seul créneau base + N inscriptions.
+ * @param {{ start: Date, end: Date, line: object, studentEmail: string }[]} plannedMainCours
+ */
+function groupTemplatePlannedCours(plannedMainCours) {
+    const m = new Map();
+    for (const slot of plannedMainCours || []) {
+        const lid = slot.line?.id ?? '';
+        const key = `${slot.start.getTime()}_${slot.end.getTime()}_${lid}`;
+        if (!m.has(key)) {
+            m.set(key, {
+                start: slot.start,
+                end: slot.end,
+                line: slot.line,
+                studentEmails: []
+            });
+        }
+        const g = m.get(key);
+        const ne = normEmail(slot.studentEmail);
+        if (ne && !g.studentEmails.includes(ne)) g.studentEmails.push(ne);
+    }
+    return Array.from(m.values());
 }
 
 /** Message lisible quand la liste d’événements Google échoue (souvent 404 / droits SA). */
@@ -403,6 +499,7 @@ export async function analyzeTemplateApply(p) {
 
     return {
         ok: true,
+        profUserId: p.profUserId,
         plannedMainCours: mainCreates,
         plannedTravailPerso: travailSlots,
         toDeleteMain,
@@ -417,126 +514,275 @@ export async function analyzeTemplateApply(p) {
 }
 
 /**
- * @param {Awaited<ReturnType<typeof analyzeTemplateApply>>} analysis
- * @param {{
- *   profEmail: string,
- *   mainCalendarId: string,
- *   onProgress?: (ev: { phase: string; done: number; total: number; detail?: string }) => void
- * }} ctx
+ * Étape 1 : uniquement Postgres (pas d’appel Google). Les miroirs à nettoyer sont collectés avant DELETE.
+ * Si la grille n’est pas en base, retourne `google_only` (tout passera par la synchro Google en arrière-plan).
  */
-export async function executeTemplateApply(analysis, ctx) {
+export async function executeTemplateDatabasePhase(analysis, ctx) {
     if (!analysis?.ok) return { ok: false, error: 'Analyse invalide.' };
     const profEmail = normEmail(ctx.profEmail);
     const onProgress = typeof ctx.onProgress === 'function' ? ctx.onProgress : null;
-    const report = (phase, done, total, detail) => {
-        onProgress?.({ phase, done, total, detail: detail || '' });
+    const report = (/** @type {string} */ detail, /** @type {number} */ done, /** @type {number} */ total) => {
+        onProgress?.({ phase: 'db', done, total, detail });
     };
-    const map = analysis.studentCalByEmail instanceof Map ? analysis.studentCalByEmail : new Map();
 
-    const delMain = analysis.toDeleteMain;
-    const delStud = analysis.toDeleteStudentPersonal;
-    const delProf = analysis.toDeleteProfPerso;
-    const totalDel = delMain.length + delStud.length + delProf.length;
-
-    const upserts = [];
-    for (const slot of analysis.plannedMainCours) {
-        upserts.push({
-            title: String(slot.line.title || 'Cours').trim() || 'Cours',
-            start: slot.start.toISOString(),
-            end: slot.end.toISOString(),
-            type: 'cours',
-            owner: profEmail,
-            calendarId: ctx.mainCalendarId,
-            inscrits: slot.studentEmail,
-            templateLineId: slot.line.id
-        });
-        const calId = map.get(slot.studentEmail);
-        if (calId) {
-            upserts.push({
-                title: String(slot.line.title || 'Cours').trim() || 'Cours',
-                start: slot.start.toISOString(),
-                end: slot.end.toISOString(),
-                type: 'cours',
-                owner: profEmail,
-                calendarId: calId,
-                inscrits: slot.studentEmail,
-                templateLineId: slot.line.id
-            });
-        }
+    if (!planningGridUsesSupabaseDb()) {
+        return { ok: true, mode: 'google_only' };
     }
-    for (const tr of analysis.plannedTravailPerso) {
-        if (!analysis.profPoolId) continue;
-        upserts.push({
-            title: String(tr.line.title || 'Travail').trim() || 'Travail personnel',
-            start: tr.start.toISOString(),
-            end: tr.end.toISOString(),
-            type: 'reservation',
+
+    const profUid =
+        String(ctx.profUserId || analysis.profUserId || '').trim() ||
+        (await planningUserIdForEmail(profEmail));
+    if (!profUid) return { ok: false, error: 'Identifiant professeur introuvable pour la grille base.' };
+
+    const rangeStart = new Date(analysis.timeMinIso);
+    const rangeEnd = new Date(analysis.timeMaxIso);
+    const dbRows = await fetchPlanningEventRowsInRange(rangeStart, rangeEnd);
+    const toClearDb = dbRows.filter((r) => {
+        if (normEmail(r.owner_email) !== profEmail) return false;
+        const st = String(r.slot_type || '');
+        return st === 'cours' || st === 'travail perso';
+    });
+    const groupedCours = groupTemplatePlannedCours(analysis.plannedMainCours);
+    const travailList = analysis.profPoolId ? analysis.plannedTravailPerso : [];
+    const delDbTotal = toClearDb.length;
+    const createCount = groupedCours.length + travailList.length;
+    const gtDb = delDbTotal + createCount;
+    const activeGt = gtDb > 0 ? gtDb : 1;
+    let grandDone = 0;
+
+    /** @type {{ googleEventId: string, calendarId: string }[]} */
+    const googleCleanupTasks = [];
+    const seenCleanup = new Set();
+
+    report('Grille Postgres : analyse des suppressions…', 0, activeGt);
+
+    for (const row of toClearDb) {
+        const canonicalId = String(row.id || '').trim();
+        if (!canonicalId) continue;
+        const targets = await fetchPlanningMirrorTargetsForDelete(canonicalId);
+        for (const t of targets) {
+            const k = `${normCalKey(t.calendarId)}|${String(t.googleEventId || '').trim()}`;
+            if (!k.endsWith('|') && !seenCleanup.has(k)) {
+                seenCleanup.add(k);
+                googleCleanupTasks.push({
+                    googleEventId: String(t.googleEventId).trim(),
+                    calendarId: String(t.calendarId).trim()
+                });
+            }
+        }
+        const drow = await deletePlanningEventRow(canonicalId);
+        if (!drow.ok) return { ok: false, error: drow.error || 'Suppression base' };
+        grandDone += 1;
+        report(`Suppression base (${grandDone}/${delDbTotal})`, grandDone, activeGt);
+    }
+
+    /** @type {Record<string, unknown>[]} */
+    const bridgeDbPayloads = [];
+
+    for (const g of groupedCours) {
+        const titleC = String(g.line?.title || 'Cours').trim() || 'Cours';
+        const startIso = g.start.toISOString();
+        const endIso = g.end.toISOString();
+        const ur = await upsertPlanningEventRow({
+            id: null,
+            startIso,
+            endIso,
+            title: titleC,
+            dbSlotType: 'cours',
+            ownerEmail: profEmail,
+            ownerUserId: profUid
+        });
+        if (!ur.ok || !ur.id) return { ok: false, error: ur.error || 'Insertion cours base' };
+        const userIds = [];
+        const emailsLower = [];
+        for (const em of g.studentEmails) {
+            const uid = await planningUserIdForEmail(em);
+            if (uid) userIds.push(uid);
+            if (em) emailsLower.push(normEmail(em));
+        }
+        const enr = await replacePlanningEventEnrollment(ur.id, userIds);
+        if (!enr.ok) return { ok: false, error: enr.error || 'Inscriptions cours base' };
+        const emailsCsv = [...new Set(emailsLower)].filter(Boolean).join(',');
+        bridgeDbPayloads.push({
+            planningEventId: ur.id,
+            title: titleC,
+            start: startIso,
+            end: endIso,
+            type: planningDbSlotTypeToBridgeType('cours'),
+            owner: profEmail,
+            ...(emailsCsv ? { inscrits: emailsCsv } : {}),
+            templateLineId: g.line?.id
+        });
+        grandDone += 1;
+        report(`Créneau cours en base (${bridgeDbPayloads.length}/${groupedCours.length})`, grandDone, activeGt);
+    }
+
+    for (let ti = 0; ti < travailList.length; ti++) {
+        const tr = travailList[ti];
+        const titleT = String(tr.line?.title || 'Travail').trim() || 'Travail personnel';
+        const startIso = tr.start.toISOString();
+        const endIso = tr.end.toISOString();
+        const ur = await upsertPlanningEventRow({
+            id: null,
+            startIso,
+            endIso,
+            title: titleT,
+            dbSlotType: 'travail perso',
+            ownerEmail: profEmail,
+            ownerUserId: profUid
+        });
+        if (!ur.ok || !ur.id) return { ok: false, error: ur.error || 'Insertion travail base' };
+        const enrT = await replacePlanningEventEnrollment(ur.id, []);
+        if (!enrT.ok) return { ok: false, error: enrT.error || 'Inscriptions travail base' };
+        bridgeDbPayloads.push({
+            planningEventId: ur.id,
+            title: titleT,
+            start: startIso,
+            end: endIso,
+            type: planningDbSlotTypeToBridgeType('travail perso'),
             owner: profEmail,
             calendarId: analysis.profPoolId,
-            templateLineId: tr.line.id
+            templateLineId: tr.line?.id
         });
+        grandDone += 1;
+        report(`Travail perso en base (${ti + 1}/${travailList.length})`, grandDone, activeGt);
     }
 
-    const upsertTotal = upserts.length;
-    const grandTotal = totalDel + upsertTotal;
-    const gt = grandTotal > 0 ? grandTotal : 1;
+    if (gtDb === 0) {
+        report('Rien à modifier en base.', 1, 1);
+    }
+
+    return {
+        ok: true,
+        mode: 'supabase',
+        googleCleanupTasks,
+        bridgeDbPayloads,
+        stats: { deleteTotal: delDbTotal, upsertTotal: bridgeDbPayloads.length }
+    };
+}
+
+/**
+ * Étape 2 (arrière-plan) : Google, lentiel — général puis pool prof puis agendas élèves pour les suppressions ;
+ * upserts un par un avec pause.
+ * @param {{
+ *   analysis: Awaited<ReturnType<typeof analyzeTemplateApply>>,
+ *   ctx: { profEmail: string, profUserId?: string, mainCalendarId: string },
+ *   dbResult: { ok: true, mode: 'google_only' } | { ok: true, mode: 'supabase', googleCleanupTasks: object[], bridgeDbPayloads: object[], stats: object },
+ *   onProgress?: (ev: { phase: string; done: number; total: number; detail?: string }) => void
+ * }} p
+ */
+export async function runTemplateGoogleBackgroundSync(p) {
+    const { analysis, ctx, dbResult, onProgress } = p;
+    if (!dbResult || dbResult.ok !== true) {
+        return { ok: false, error: 'Phase base invalide.' };
+    }
+    const report = (detail, done, total) => {
+        onProgress?.({ phase: 'google-sync', done, total, detail: detail || '' });
+    };
+
+    const bridgeConfigured = Boolean(String(getPlanningConfig().calendarBridgeUrl || '').trim());
+    if (!bridgeConfigured) {
+        report('Pont Google non configuré — synchro ignorée.', 1, 1);
+        return { ok: true, skipped: true, stats: { deleteTotal: 0, upsertTotal: 0 } };
+    }
 
     for (let attempt = 1; attempt <= APPLY_RETRIES; attempt++) {
         let grandDone = 0;
         let deletesDone = 0;
         let upsertsDone = 0;
+        let activeGt = 1;
+        let activeTotalDel = 0;
+        let activeUpsertTotal = 0;
         try {
             const token = await getAccessToken();
             if (!token) throw new Error('Session expirée.');
 
-            report('apply', 0, gt, 'Connexion à Google…');
+            if (dbResult.mode === 'supabase') {
+                const cleanup = sortGoogleCleanupTasks(
+                    dbResult.googleCleanupTasks,
+                    ctx.mainCalendarId,
+                    analysis.profPoolId || ''
+                );
+                const ups = dbResult.bridgeDbPayloads;
+                activeTotalDel = cleanup.length;
+                activeUpsertTotal = ups.length;
+                const totalSteps = cleanup.length + ups.length;
+                activeGt = totalSteps > 0 ? totalSteps : 1;
 
-            const bumpDel = (detail) => {
-                grandDone += 1;
-                deletesDone += 1;
-                report('apply', grandDone, gt, detail);
-            };
-            const bumpUp = (detail) => {
-                grandDone += 1;
-                upsertsDone += 1;
-                report('apply', grandDone, gt, detail);
-            };
+                report('Connexion Google…', 0, activeGt);
 
-            await runPoolConcurrency(delMain, DELETE_CONCURRENCY, async (d) => {
-                const r = await bridgeDeleteEvent(token, d.googleEventId, d.calendarId);
-                if (r.skipped) throw new Error('Pont agenda non configuré.');
-                if (!r.ok) throw new Error(r.error || 'Suppression général');
-                bumpDel('Suppression — planning général');
-            });
-            await runPoolConcurrency(delStud, DELETE_CONCURRENCY, async (d) => {
-                const r = await bridgeDeleteEvent(token, d.googleEventId, d.calendarId);
-                if (r.skipped) throw new Error('Pont agenda non configuré.');
-                if (!r.ok) throw new Error(r.error || 'Suppression perso élève');
-                bumpDel('Suppression — agendas élèves');
-            });
-            await runPoolConcurrency(delProf, DELETE_CONCURRENCY, async (d) => {
-                const r = await bridgeDeleteEvent(token, d.googleEventId, d.calendarId);
-                if (r.skipped) throw new Error('Pont agenda non configuré.');
-                if (!r.ok) throw new Error(r.error || 'Suppression perso prof');
-                bumpDel('Suppression — agenda perso prof');
-            });
-
-            if (upsertTotal > 0) {
-                for (let i = 0; i < upserts.length; i += UPSERT_BATCH) {
-                    const slice = upserts.slice(i, i + UPSERT_BATCH);
-                    const r = await bridgeUpsertEvents(token, slice, undefined);
-                    if (r.skipped) throw new Error('Pont agenda non configuré.');
-                    if (!r.ok) throw new Error(r.error || 'Création agenda');
-                    for (let k = 0; k < slice.length; k++) bumpUp('Écriture sur Google Calendar');
+                for (let i = 0; i < cleanup.length; i++) {
+                    const t = cleanup[i];
+                    const rDel = await bridgeDeleteEvent(token, t.googleEventId, t.calendarId);
+                    if (!rDel.ok && !rDel.skipped) throw new Error(rDel.error || 'Suppression Google');
+                    grandDone += 1;
+                    deletesDone += 1;
+                    report(`Suppression Google ${i + 1}/${cleanup.length} (général → prof → élèves)`, grandDone, activeGt);
+                    if (i < cleanup.length - 1 || ups.length > 0) await sleepMsLocal(GOOGLE_BG_DELETE_GAP_MS);
                 }
-            } else if (grandTotal === 0) {
-                report('apply', 1, 1, 'Rien à modifier (0 suppression, 0 création).');
+
+                for (let i = 0; i < ups.length; i++) {
+                    const rUp = await bridgeUpsertEvents(token, [ups[i]], undefined);
+                    if (rUp.skipped) {
+                        report('Pont Google indisponible — arrêt des écritures.', grandDone, activeGt);
+                        return { ok: true, skipped: true, stats: { deleteTotal: deletesDone, upsertTotal: upsertsDone } };
+                    }
+                    if (!rUp.ok) throw new Error(rUp.error || 'Écriture Google');
+                    grandDone += 1;
+                    upsertsDone += 1;
+                    report(`Écriture Google ${i + 1}/${ups.length}`, grandDone, activeGt);
+                    if (i < ups.length - 1) await sleepMsLocal(GOOGLE_BG_UPSERT_GAP_MS);
+                }
+
+                if (totalSteps === 0) {
+                    report('Aucune opération Google nécessaire.', 1, 1);
+                }
+
+                return {
+                    ok: true,
+                    stats: { deleteTotal: cleanup.length, upsertTotal: ups.length }
+                };
             }
 
-            return {
-                ok: true,
-                stats: { deleteTotal: totalDel, upsertTotal: upsertTotal }
-            };
+            /* google_only */
+            const { delMain, delStud, delProf, upserts, totalDel, upsertTotal } = buildGoogleOnlyDeletesAndUpserts(
+                analysis,
+                ctx
+            );
+            const orderedDel = [...delMain, ...delStud, ...delProf];
+            const totalSteps = orderedDel.length + upserts.length;
+            activeGt = totalSteps > 0 ? totalSteps : 1;
+            activeTotalDel = totalDel;
+            activeUpsertTotal = upsertTotal;
+
+            report('Google uniquement : suppressions (général → élèves → prof)…', 0, activeGt);
+
+            for (let i = 0; i < orderedDel.length; i++) {
+                const d = orderedDel[i];
+                const rDel = await bridgeDeleteEvent(token, d.googleEventId, d.calendarId);
+                if (rDel.skipped) throw new Error('Pont agenda non configuré.');
+                if (!rDel.ok) throw new Error(rDel.error || 'Suppression Google');
+                grandDone += 1;
+                deletesDone += 1;
+                report(`Suppression ${i + 1}/${orderedDel.length}`, grandDone, activeGt);
+                if (i < orderedDel.length - 1 || upserts.length > 0) await sleepMsLocal(GOOGLE_BG_DELETE_GAP_MS);
+            }
+
+            for (let i = 0; i < upserts.length; i++) {
+                const rUp = await bridgeUpsertEvents(token, [upserts[i]], undefined);
+                if (rUp.skipped) throw new Error('Pont agenda non configuré.');
+                if (!rUp.ok) throw new Error(rUp.error || 'Écriture Google');
+                grandDone += 1;
+                upsertsDone += 1;
+                report(`Écriture ${i + 1}/${upserts.length}`, grandDone, activeGt);
+                if (i < upserts.length - 1) await sleepMsLocal(GOOGLE_BG_UPSERT_GAP_MS);
+            }
+
+            if (totalSteps === 0) {
+                report('Rien à modifier sur Google.', 1, 1);
+            }
+
+            return { ok: true, stats: { deleteTotal: totalDel, upsertTotal } };
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
             const human = humanizeGoogleCalendarApplyError(msg);
@@ -544,11 +790,11 @@ export async function executeTemplateApply(analysis, ctx) {
                 grandDone > 0
                     ? {
                           grandDone,
-                          grandTotal: gt,
+                          grandTotal: activeGt,
                           deletesDone,
                           upsertsDone,
-                          totalDel,
-                          upsertTotal
+                          totalDel: activeTotalDel,
+                          upsertTotal: activeUpsertTotal
                       }
                     : undefined;
             if (partial) {

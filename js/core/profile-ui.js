@@ -1,12 +1,12 @@
 /**
  * Modale Profil + bandeau « cours de la semaine » dans l’en-tête.
  */
-import { roleLabelFr, isPrivilegedUser } from './auth-logic.js';
+import { roleLabelFr } from './auth-logic.js';
 import { getPlanningSessionUser } from './session-user.js';
-import { getProfile, saveProfile } from '../utils/user-profile.js';
 import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
 import { googleCalendarEmbedUrl } from '../utils/google-calendar-url.js';
 import { showToast } from '../utils/toast.js';
+import { formatTimeFr24 } from '../utils/time-helpers.js';
 import {
     filterCoursEventsForUser,
     sortEventsByStart,
@@ -16,63 +16,6 @@ import {
 } from './planning-courses.js';
 
 let profileUiBound = false;
-
-function parseTitleLines(raw) {
-    return String(raw || '')
-        .split('\n')
-        .map((l) => l.trim())
-        .filter((l) => l.length > 0);
-}
-
-function renderPreferredRadios(wrap, lines, preferredIndex) {
-    if (!wrap) return;
-    wrap.replaceChildren();
-    if (!lines.length) {
-        const p = document.createElement('p');
-        p.className = 'text-[10px] text-slate-400 leading-snug m-0';
-        p.textContent =
-            'Ajoutez au moins une ligne ci-dessus pour choisir le titre proposé par défaut dans la modale.';
-        wrap.appendChild(p);
-        return;
-    }
-    const legend = document.createElement('p');
-    legend.className = 'text-[10px] font-bold text-slate-500 mb-1.5 m-0';
-    legend.textContent = 'Titre par défaut (modale) :';
-    wrap.appendChild(legend);
-    let idx = preferredIndex;
-    if (idx < 0 || idx >= lines.length) idx = 0;
-    lines.forEach((line, i) => {
-        const label = document.createElement('label');
-        label.className = 'flex items-start gap-2 cursor-pointer text-[12px] text-slate-800 leading-snug';
-        const radio = document.createElement('input');
-        radio.type = 'radio';
-        radio.name = 'profile-preferred-title';
-        radio.value = String(i);
-        radio.checked = i === idx;
-        const span = document.createElement('span');
-        span.textContent = line;
-        label.append(radio, span);
-        wrap.appendChild(label);
-    });
-}
-
-function readPreferredIndex(wrap) {
-    if (!wrap) return 0;
-    const c = wrap.querySelector('input[name="profile-preferred-title"]:checked');
-    const v = c ? parseInt(String(c.value), 10) : 0;
-    return Number.isFinite(v) && v >= 0 ? v : 0;
-}
-
-function refreshProfileTitleRadios() {
-    const ta = document.getElementById('profile-title-lines');
-    const prefWrap = document.getElementById('profile-preferred-wrap');
-    const u = getPlanningSessionUser();
-    if (!u?.email || !ta || !prefWrap) return;
-    const lines = parseTitleLines(ta.value);
-    let preferred = readPreferredIndex(prefWrap);
-    if (preferred >= lines.length) preferred = Math.max(0, lines.length - 1);
-    renderPreferredRadios(prefWrap, lines, preferred);
-}
 
 async function loadPersonalPoolRow(userId) {
     if (!isBackendAuthConfigured() || !userId) {
@@ -116,6 +59,13 @@ export async function refreshHeaderWeekStrip(user) {
         el.textContent = '';
         return;
     }
+    const r = String(user.role || '').toLowerCase();
+    if (r === 'admin' || r === 'prof') {
+        wrap.classList.add('hidden');
+        el.textContent = '';
+        el.title = '';
+        return;
+    }
     wrap.classList.remove('hidden');
     el.textContent = 'Chargement des cours…';
 
@@ -154,7 +104,7 @@ export async function refreshHeaderWeekStrip(user) {
                 month: 'long',
                 year: 'numeric'
             });
-            const hour = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            const hour = formatTimeFr24(d);
             el.textContent = `Pas de cours cette semaine, le prochain cours sera le ${dateStr} à ${hour} : ${String(next.title || 'Cours').trim()}`;
         } else {
             el.textContent =
@@ -172,9 +122,12 @@ async function fillProfileModal(user) {
     document.getElementById('profile-email').textContent = user.email || '—';
     document.getElementById('profile-role-label').textContent = roleLabelFr(user.role);
 
+    const isEleve = String(user.role).toLowerCase() === 'eleve';
+    document.getElementById('profile-cours-section')?.classList.toggle('hidden', !isEleve);
+
     const hint = document.getElementById('profile-cours-hint');
     if (hint) {
-        hint.classList.toggle('hidden', String(user.role).toLowerCase() !== 'eleve');
+        hint.classList.toggle('hidden', !isEleve);
     }
 
     const { mainGoogleCalendarId, mainGoogleCalendarLabel } = getPlanningConfig();
@@ -201,8 +154,6 @@ async function fillProfileModal(user) {
     const nonePers = document.getElementById('profile-personal-cal-none');
     const { id: persId, label: persLabel } = await loadPersonalPoolRow(user.id);
     const persUrl = googleCalendarEmbedUrl(persId);
-    const isConsultation = String(user.role).toLowerCase() === 'consultation';
-
     if (persUrl && rowPers && inpPers) {
         rowPers.classList.remove('hidden');
         inpPers.value = persUrl;
@@ -219,49 +170,40 @@ async function fillProfileModal(user) {
         if (namePers) namePers.textContent = '';
         if (nonePers) {
             nonePers.classList.remove('hidden');
-            nonePers.textContent = isConsultation
-                ? 'Profil consultation : aucun calendrier personnel IAMS n’est attribué.'
-                : 'Aucun calendrier secondaire IAMS n’est associé à votre compte pour le moment.';
+            nonePers.textContent =
+                'Aucun calendrier secondaire IAMS n’est associé à votre compte pour le moment.';
         }
     }
 
     const ul = document.getElementById('profile-cours-list');
     const empty = document.getElementById('profile-cours-empty');
     if (ul) ul.replaceChildren();
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 60);
     let list = [];
-    try {
-        const evs = await fetchCalendarEventsInRange(start, end);
-        list = sortEventsByStart(filterCoursEventsForUser(evs, user));
-    } catch {
-        /* */
-    }
-    if (ul) {
-        for (const ev of list) {
-            const li = document.createElement('li');
-            li.className = 'pl-0 border-l-2 border-slate-200 pl-2';
-            li.textContent = formatCoursLineFr(ev);
-            ul.appendChild(li);
+    if (isEleve) {
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(start);
+        end.setDate(end.getDate() + 60);
+        try {
+            const evs = await fetchCalendarEventsInRange(start, end);
+            list = sortEventsByStart(filterCoursEventsForUser(evs, user));
+        } catch {
+            /* */
         }
+        if (ul) {
+            for (const ev of list) {
+                const li = document.createElement('li');
+                li.className = 'pl-0 border-l-2 border-slate-200 pl-2';
+                li.textContent = formatCoursLineFr(ev);
+                ul.appendChild(li);
+            }
+        }
+        if (empty) {
+            empty.classList.toggle('hidden', list.length > 0);
+        }
+    } else if (empty) {
+        empty.classList.add('hidden');
     }
-    if (empty) {
-        empty.classList.toggle('hidden', list.length > 0);
-    }
-
-    const titlesWrap = document.getElementById('profile-reservation-titles-wrap');
-    const ta = document.getElementById('profile-title-lines');
-    const prefWrap = document.getElementById('profile-preferred-wrap');
-    const showTitles = isPrivilegedUser(user);
-    if (titlesWrap) titlesWrap.classList.toggle('hidden', !showTitles);
-    if (showTitles && ta && prefWrap && user.email) {
-        const p = getProfile(user.email);
-        ta.value = p.titleLines.join('\n');
-        renderPreferredRadios(prefWrap, p.titleLines, p.preferredIndex);
-    }
-
 }
 
 export function resetProfileUiBindings() {
@@ -291,19 +233,4 @@ export function initProfileUi(currentUser) {
     document.getElementById('profile-copy-personal')?.addEventListener('click', () =>
         void copyInputUrl('profile-url-personal')
     );
-
-    document.getElementById('profile-title-lines')?.addEventListener('input', () => refreshProfileTitleRadios());
-
-    document.getElementById('profile-labels-btn-save')?.addEventListener('click', async () => {
-        const u = getPlanningSessionUser();
-        const ta = document.getElementById('profile-title-lines');
-        const prefWrap = document.getElementById('profile-preferred-wrap');
-        if (!u?.email || !ta) return;
-        const lines = parseTitleLines(ta.value);
-        refreshProfileTitleRadios();
-        const preferredIndex = readPreferredIndex(prefWrap);
-        await saveProfile(u.email, lines, preferredIndex);
-        showToast('Titres enregistrés.');
-    });
-
 }

@@ -31,7 +31,6 @@ const ASSETS = [
   './js/utils/time-helpers.js',
   './js/utils/touch-handler.js',
   './js/utils/toast.js',
-  './js/data/mock-events.js',
   './components/headers.html',
   './components/modal-login.html',
   './components/modal-reservation.html',

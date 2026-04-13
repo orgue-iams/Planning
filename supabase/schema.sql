@@ -6,7 +6,7 @@ create table if not exists public.profiles (
     nom text not null default '',
     prenom text not null default '',
     display_name text,
-    role text not null default 'eleve' check (role in ('admin', 'prof', 'eleve', 'consultation')),
+    role text not null default 'eleve' check (role in ('admin', 'prof', 'eleve')),
     reservation_types jsonb not null default '{"labels":[],"favoriteLabel":""}'::jsonb,
     updated_at timestamptz default now()
 );
@@ -63,7 +63,7 @@ declare
     v_reservation jsonb;
 begin
     v_role := lower(trim(coalesce(new.raw_user_meta_data ->> 'role', 'eleve')));
-    if v_role not in ('eleve', 'prof', 'consultation') then
+    if v_role not in ('eleve', 'prof') then
         v_role := 'eleve';
     end if;
 

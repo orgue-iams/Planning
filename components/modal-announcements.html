@@ -6,14 +6,38 @@
         </p>
 
         <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-3 space-y-2 mb-3 shrink-0">
-            <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="text-[9px] font-bold text-slate-500">Début</label>
-                    <input type="datetime-local" id="ann-start" class="input input-sm input-bordered w-full text-xs" />
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div class="space-y-1">
+                    <span class="text-[9px] font-bold text-slate-500 block">Début</span>
+                    <input type="date" id="ann-start-date" lang="fr" class="input input-sm input-bordered w-full text-xs font-mono mb-1" />
+                    <input
+                        type="text"
+                        id="ann-start-time"
+                        class="input input-sm input-bordered w-full text-xs font-mono"
+                        maxlength="5"
+                        placeholder="08:00"
+                        title="Heure 24 h"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        spellcheck="false"
+                        lang="fr"
+                    />
                 </div>
-                <div>
-                    <label class="text-[9px] font-bold text-slate-500">Fin</label>
-                    <input type="datetime-local" id="ann-end" class="input input-sm input-bordered w-full text-xs" />
+                <div class="space-y-1">
+                    <span class="text-[9px] font-bold text-slate-500 block">Fin</span>
+                    <input type="date" id="ann-end-date" lang="fr" class="input input-sm input-bordered w-full text-xs font-mono mb-1" />
+                    <input
+                        type="text"
+                        id="ann-end-time"
+                        class="input input-sm input-bordered w-full text-xs font-mono"
+                        maxlength="5"
+                        placeholder="08:00"
+                        title="Heure 24 h"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        spellcheck="false"
+                        lang="fr"
+                    />
                 </div>
             </div>
             <div id="ann-quill-mount" class="planning-quill-mount planning-quill-mount--compact"></div>

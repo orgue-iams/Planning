@@ -41,7 +41,7 @@
 
 | Module | Rôle |
 |--------|------|
-| `js/core/auth-logic.js` | Login / logout, démo locale si pas de Supabase, politique mots de passe |
+| `js/core/auth-logic.js` | Login / logout Supabase, politique mots de passe |
 | `js/core/supabase-client.js` | Client Supabase, `planning.config.js` |
 | `js/core/supabase-auth.js` | Session → utilisateur app (`name`, `email`, `role`, `id`) + `nom`/`prenom`/`display_name` |
 | `js/core/session-user.js` | Utilisateur courant pour le reste de l’UI |
@@ -65,7 +65,7 @@
 ### Schéma et migrations
 
 - Fichier de référence historique : `supabase/schema.sql` (nouveau projet vierge).
-- Évolutions versionnées : `supabase/migrations/` (jusqu’à **`016`** : notamment **`015`** événements canoniques `planning_event` + miroir + infra log, **`016`** RLS prof, RPC `planning_user_id_for_email`, extension RPC grille avec ids Google miroir).
+- Évolutions versionnées : `supabase/migrations/` (jusqu’à **`017`** : **`015–016`** événements canoniques, RLS prof, RPC grille + miroirs Google ; **`017`** colonne `inscrits_emails` sur `planning_events_in_range`, fonction **security definer** avec filtre aligné sur l’ancienne RLS select).
 - **RLS** : lecture / update profil par utilisateur ; fonctions `security definer` pour listes admin / élèves actifs ; politiques **`planning_event`** / **`planning_event_google_mirror`** (voir migrations).
 
 ### Edge Functions (Deno)

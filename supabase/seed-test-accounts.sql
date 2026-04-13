@@ -9,8 +9,7 @@ declare
         jsonb_build_object('email', 'prof.test1@iams.local', 'password', 'ProfTest1234!', 'display_name', 'Prof Test 1', 'role', 'prof'),
         jsonb_build_object('email', 'prof.test2@iams.local', 'password', 'ProfTest2234!', 'display_name', 'Prof Test 2', 'role', 'prof'),
         jsonb_build_object('email', 'eleve.test1@iams.local', 'password', 'EleveTest1234!', 'display_name', 'Élève Test 1', 'role', 'eleve'),
-        jsonb_build_object('email', 'eleve.test2@iams.local', 'password', 'EleveTest2234!', 'display_name', 'Élève Test 2', 'role', 'eleve'),
-        jsonb_build_object('email', 'consult.test@iams.local', 'password', 'ConsultTest1234!', 'display_name', 'Consultation Test', 'role', 'consultation')
+        jsonb_build_object('email', 'eleve.test2@iams.local', 'password', 'EleveTest2234!', 'display_name', 'Élève Test 2', 'role', 'eleve')
     );
     v_item jsonb;
     v_email text;
@@ -43,7 +42,7 @@ begin
         v_password := v_item ->> 'password';
         v_display_name := coalesce(nullif(trim(v_item ->> 'display_name'), ''), split_part(v_email, '@', 1));
         v_role := lower(coalesce(v_item ->> 'role', 'eleve'));
-        if v_role not in ('admin', 'prof', 'eleve', 'consultation') then
+        if v_role not in ('admin', 'prof', 'eleve') then
             v_role := 'eleve';
         end if;
 

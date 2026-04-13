@@ -8,22 +8,22 @@
         </p>
 
         <dl class="text-[11px] space-y-2 mb-4 border border-slate-100 rounded-xl p-3 bg-slate-50/80">
-            <div class="flex flex-col gap-0.5">
-                <dt class="text-[9px] font-black uppercase text-slate-400 tracking-wide">Nom</dt>
-                <dd id="profile-display-name" class="text-slate-800 font-medium">—</dd>
+            <div class="flex flex-row flex-wrap items-baseline gap-x-2 gap-y-0">
+                <dt class="shrink-0 text-[9px] font-black uppercase text-slate-400 tracking-wide">Nom</dt>
+                <dd id="profile-display-name" class="min-w-0 flex-1 text-slate-800 font-medium m-0">—</dd>
             </div>
-            <div class="flex flex-col gap-0.5">
-                <dt class="text-[9px] font-black uppercase text-slate-400 tracking-wide">E-mail</dt>
-                <dd id="profile-email" class="text-slate-800 font-mono text-[10px] break-all">—</dd>
+            <div class="flex flex-row flex-wrap items-baseline gap-x-2 gap-y-0">
+                <dt class="shrink-0 text-[9px] font-black uppercase text-slate-400 tracking-wide">E-mail</dt>
+                <dd id="profile-email" class="min-w-0 flex-1 text-slate-800 font-mono text-[10px] break-all m-0">—</dd>
             </div>
-            <div class="flex flex-col gap-0.5">
-                <dt class="text-[9px] font-black uppercase text-slate-400 tracking-wide">Profil</dt>
-                <dd id="profile-role-label" class="text-slate-800">—</dd>
+            <div class="flex flex-row flex-wrap items-baseline gap-x-2 gap-y-0">
+                <dt class="shrink-0 text-[9px] font-black uppercase text-slate-400 tracking-wide">Profil</dt>
+                <dd id="profile-role-label" class="min-w-0 flex-1 text-slate-800 m-0">—</dd>
             </div>
         </dl>
 
         <div class="rounded-xl border border-slate-200 bg-white p-3 mb-4">
-            <p class="text-[10px] font-bold text-slate-700 mb-1">Agendas Google (consultation)</p>
+            <p class="text-[10px] font-bold text-slate-700 mb-1">Agendas Google</p>
             <p class="text-[9px] text-slate-500 leading-snug mb-3">
                 <strong>Planning général</strong> : tous les créneaux de l’orgue. <strong>Votre calendrier personnel</strong> : vos réservations « travail ».
                 Dans Google Agenda : <em>Paramètres</em> → <em>Ajouter un agenda</em> → <em>À partir de l’URL</em>, ou utilisez le lien « intégrer » pour un aperçu.
@@ -48,33 +48,10 @@
                     </button>
                 </div>
             </div>
-            <p id="profile-personal-cal-none" class="hidden text-[9px] text-slate-500 italic mt-2">Profil consultation : aucun calendrier personnel IAMS n’est attribué.</p>
+            <p id="profile-personal-cal-none" class="hidden text-[9px] text-slate-500 italic mt-2">Aucun calendrier personnel IAMS n’est attribué à ce compte.</p>
         </div>
 
-        <div id="profile-reservation-titles-wrap" class="hidden rounded-xl border border-slate-200 bg-white p-3 mb-4">
-            <p class="text-[10px] font-bold text-slate-700 mb-1">Titres pour la fenêtre de réservation</p>
-            <p class="text-[9px] text-slate-500 leading-snug mb-2">
-                Une ligne par intitulé souvent utilisé (répétition, cours particulier, etc.). Le titre coché est proposé par défaut dans la <strong>modale</strong> de réservation. Les créations <strong>rapides</strong> sur la grille utilisent votre <strong>nom</strong>.
-            </p>
-            <div class="form-control mb-2">
-                <label class="label py-0" for="profile-title-lines"
-                    ><span class="label-text font-bold text-[10px] uppercase text-slate-500">Titres (une par ligne)</span></label
-                >
-                <textarea
-                    id="profile-title-lines"
-                    rows="6"
-                    maxlength="2000"
-                    class="textarea textarea-bordered w-full text-sm bg-slate-50 leading-snug min-h-[6.5rem]"
-                    placeholder="Ex.&#10;Répétition Bach&#10;Cours avec M. Dupont"
-                ></textarea>
-            </div>
-            <div id="profile-preferred-wrap" class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 min-h-[2.75rem] mb-2"></div>
-            <button type="button" id="profile-labels-btn-save" class="btn btn-primary btn-sm font-black text-[11px] w-full sm:w-auto">
-                Enregistrer les titres
-            </button>
-        </div>
-
-        <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-3 mb-3">
+        <div id="profile-cours-section" class="hidden rounded-xl border border-slate-200 bg-slate-50/80 p-3 mb-3">
             <p class="text-[10px] font-bold text-slate-700 mb-1">Cours auxquels je suis inscrit</p>
             <p id="profile-cours-hint" class="text-[9px] text-slate-500 leading-snug mb-2 hidden">
                 Les inscriptions aux cours peuvent être indiquées dans Google Agenda sur l’événement : ligne

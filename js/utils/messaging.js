@@ -73,7 +73,7 @@ export function markBroadcastSeen(id) {
 /** Popup réservée aux élèves et profs (pas à l’admin qui diffuse). */
 export function shouldShowBroadcast(user) {
     if (!user || user.role === 'admin') return false;
-    if (user.role !== 'eleve' && user.role !== 'prof' && user.role !== 'consultation') return false;
+    if (user.role !== 'eleve' && user.role !== 'prof') return false;
     const b = getBroadcast();
     if (!b || !b.text) return false;
     return b.id !== getLastSeenBroadcastId();

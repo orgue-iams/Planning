@@ -114,12 +114,25 @@ export async function bridgeListEvents(accessToken, p, options = {}) {
 }
 
 /**
+ * DELETE Google : 404 / « already deleted » = succès idempotent (événement déjà retiré manuellement).
+ * @param {string | null | undefined} error
+ */
+export function isGoogleCalendarDeleteAlreadyRemoved(error) {
+    const s = String(error || '').trim().toLowerCase();
+    if (!s) return false;
+    if (/\b404\b/.test(s) || /\b410\b/.test(s)) return true;
+    if (/resource has been deleted/.test(s)) return true;
+    if (/not\s*found|already\s*deleted|no\s*longer\s*available|was\s*deleted|gone/.test(s)) return true;
+    return false;
+}
+
+/**
  * @param {string | null} accessToken
  * @param {string} googleEventId
  * @param {string} [calendarId]
  */
 export async function bridgeDeleteEvent(accessToken, googleEventId, calendarId, options) {
-    return invokeCalendarBridge(
+    const r = await invokeCalendarBridge(
         accessToken,
         {
             action: 'delete',
@@ -128,6 +141,11 @@ export async function bridgeDeleteEvent(accessToken, googleEventId, calendarId, 
         },
         options
     );
+    if (r.ok || r.skipped || r.aborted) return r;
+    if (isGoogleCalendarDeleteAlreadyRemoved(r.error)) {
+        return { ok: true, data: r.data, alreadyGone: true };
+    }
+    return r;
 }
 
 /**

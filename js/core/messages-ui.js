@@ -1,16 +1,9 @@
 /**
- * Modale Consignes + popup annonce après connexion (localStorage en démo, Supabase en prod).
+ * Modale Consignes ; annonces planifiées via Supabase (menu Annonces / bandeau login).
  */
 
 import { showToast } from '../utils/toast.js';
-import {
-    getRulesText,
-    setRulesText,
-    getBroadcast,
-    publishBroadcast,
-    markBroadcastSeen,
-    shouldShowBroadcast
-} from '../utils/messaging.js';
+import { getRulesText, markBroadcastSeen } from '../utils/messaging.js';
 import { isPrivilegedUser } from './auth-logic.js';
 import { isBackendAuthConfigured } from './supabase-client.js';
 import { fetchOrganRulesRemote, saveOrganRulesRemote } from '../utils/org-content.js';
@@ -106,16 +99,9 @@ export function initMessagesUi(_ignored) {
         const priv = isPrivilegedUser(u);
         const backend = isBackendAuthConfigured();
         if (priv) {
-            btnEdit?.classList.remove('hidden');
-            if (backend) {
-                adminBlock?.classList.add('hidden');
-                backendHint?.classList.remove('hidden');
-            } else {
-                adminBlock?.classList.remove('hidden');
-                backendHint?.classList.add('hidden');
-                const b = getBroadcast();
-                if (broadcastEditor) broadcastEditor.value = b?.text || '';
-            }
+            btnEdit?.classList.toggle('hidden', !backend);
+            adminBlock?.classList.add('hidden');
+            backendHint?.classList.toggle('hidden', !backend);
         } else {
             btnEdit?.classList.add('hidden');
             adminBlock?.classList.add('hidden');
@@ -234,15 +220,14 @@ export function initMessagesUi(_ignored) {
             if (!rulesQuill) return;
             const html = rulesQuill.root.innerHTML;
             const t = sanitizeRulesHtml(normalizeQuillMarkup(html));
-            const backend = isBackendAuthConfigured();
-            if (backend) {
-                const res = await saveOrganRulesRemote(t);
-                if (!res.ok) {
-                    showToast(res.error || 'Erreur', 'error');
-                    return;
-                }
-            } else {
-                setRulesText(t);
+            if (!isBackendAuthConfigured()) {
+                showToast('Configuration Supabase requise pour enregistrer les consignes.', 'error');
+                return;
+            }
+            const res = await saveOrganRulesRemote(t);
+            if (!res.ok) {
+                showToast(res.error || 'Erreur', 'error');
+                return;
             }
             resetRulesQuill();
             editWrap?.classList.add('hidden');
@@ -259,10 +244,7 @@ export function initMessagesUi(_ignored) {
     btnPublish?.addEventListener(
         'click',
         () => {
-            if (isBackendAuthConfigured()) return;
-            const t = broadcastEditor?.value ?? '';
-            publishBroadcast(t);
-            showToast(t ? 'Annonce publiée (visible aux élèves et profs).' : 'Annonce effacée.');
+            showToast('Utilisez le menu utilisateur → Annonces (Supabase) pour publier une annonce.', 'info');
         },
         { signal }
     );
@@ -287,19 +269,6 @@ export function initMessagesUi(_ignored) {
 }
 
 export async function tryShowBroadcastPopup(currentUser) {
-    const modal = document.getElementById('modal_broadcast');
-    const body = document.getElementById('broadcast-body');
-    if (!modal || !body) return;
-
-    /* Avec Supabase : les annonces planifiées ne s’affichent que sur l’écran de connexion (bandeau). */
-    if (isBackendAuthConfigured()) {
-        return;
-    }
-
-    if (!shouldShowBroadcast(currentUser)) return;
-    const b = getBroadcast();
-    if (!b) return;
-    modal.dataset.broadcastId = b.id;
-    body.innerHTML = `<div class="organ-rich">${formatSimpleRichHtml(b.text)}</div>`;
-    modal.showModal();
+    void currentUser;
+    /* Popups locales supprimées : annonces via Supabase uniquement. */
 }

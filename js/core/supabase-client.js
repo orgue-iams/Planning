@@ -3,7 +3,7 @@
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
 
-/** @returns {{ supabaseUrl: string, supabaseAnonKey: string, calendarBridgeUrl: string, mainGoogleCalendarId: string, mainGoogleCalendarLabel: string }} */
+/** @returns {Record<string, unknown> & { supabaseUrl: string, supabaseAnonKey: string, calendarBridgeUrl: string, mainGoogleCalendarId: string, mainGoogleCalendarLabel: string, planningGridReadsFromSupabase: boolean }} */
 export function getPlanningConfig() {
     const c = typeof window !== 'undefined' ? window.__PLANNING_CONFIG__ : null;
     return {
@@ -11,7 +11,8 @@ export function getPlanningConfig() {
         supabaseAnonKey: String(c?.supabaseAnonKey ?? '').trim(),
         calendarBridgeUrl: String(c?.calendarBridgeUrl ?? '').trim(),
         mainGoogleCalendarId: String(c?.mainGoogleCalendarId ?? '').trim(),
-        mainGoogleCalendarLabel: String(c?.mainGoogleCalendarLabel ?? '').trim()
+        mainGoogleCalendarLabel: String(c?.mainGoogleCalendarLabel ?? '').trim(),
+        planningGridReadsFromSupabase: Boolean(c?.planningGridReadsFromSupabase)
     };
 }
 

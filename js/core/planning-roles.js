@@ -2,7 +2,7 @@
  * Rôles applicatifs (alignés sur public.profiles.role et les checks Supabase).
  * Valeurs stables en API : pas d’accents, pas de synonymes.
  */
-export const PLANNING_ROLES = Object.freeze(['admin', 'prof', 'eleve', 'consultation']);
+export const PLANNING_ROLES = Object.freeze(['admin', 'prof', 'eleve']);
 
 /** @param {unknown} role */
 export function isPlanningRole(role) {
@@ -20,5 +20,4 @@ export const PLANNING_ROLE_OPTIONS = Object.freeze([
     { value: 'admin', label: 'Admin' },
     { value: 'prof', label: 'Prof' },
     { value: 'eleve', label: 'Élève' },
-    { value: 'consultation', label: 'Consultation' }
 ]);

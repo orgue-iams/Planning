@@ -22,14 +22,39 @@
 
         <div class="rounded-xl border border-slate-200 bg-slate-50/90 p-3 mb-4 space-y-2">
             <p class="text-[10px] font-bold text-slate-700">Plage horaire chapelle (grille)</p>
+            <p class="text-[9px] text-slate-500">Heures au format <strong>24 h</strong> (ex. <code class="text-[8px] bg-white px-0.5 rounded">08:00</code> le matin, <code class="text-[8px] bg-white px-0.5 rounded">20:00</code> le soir).</p>
             <div class="flex flex-wrap gap-2 items-end">
                 <div>
                     <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="config-chapel-min">Première heure</label>
-                    <input type="time" id="config-chapel-min" step="1800" class="input input-sm h-9 text-sm font-mono bg-white border border-slate-200 rounded-lg" />
+                    <input
+                        type="text"
+                        id="config-chapel-min"
+                        class="input input-sm h-9 text-sm font-mono bg-white border border-slate-200 rounded-lg w-full"
+                        maxlength="5"
+                        placeholder="08:00"
+                        title="Heure 24 h (ex. 08:00 ou 20:00)"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        spellcheck="false"
+                        pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
+                        lang="fr"
+                    />
                 </div>
                 <div>
                     <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="config-chapel-max">Dernière heure affichée</label>
-                    <input type="time" id="config-chapel-max" step="1800" class="input input-sm h-9 text-sm font-mono bg-white border border-slate-200 rounded-lg" />
+                    <input
+                        type="text"
+                        id="config-chapel-max"
+                        class="input input-sm h-9 text-sm font-mono bg-white border border-slate-200 rounded-lg w-full"
+                        maxlength="5"
+                        placeholder="22:00"
+                        title="Heure 24 h (ex. 08:00 ou 22:00)"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        spellcheck="false"
+                        pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
+                        lang="fr"
+                    />
                 </div>
             </div>
         </div>

@@ -5,6 +5,8 @@ alwaysApply: true
 
 # Déploiement Supabase (DB + Edge Functions)
 
+**Règle fixe :** l’agent **peut et doit** appliquer les **migrations** et effectuer les **déploiements Edge Functions nécessaires** lui-même (CLI / `npm run deploy:supabase`), dès que l’environnement le permet. **Ne pas** se limiter à demander à l’utilisateur de le faire ni à une liste « à faire de votre côté » sans avoir tenté les commandes.
+
 Quand vous modifiez `supabase/functions/**`, `supabase/migrations/**` ou `supabase/config.toml` de façon à impacter l’hébergement :
 
 1. **Exécuter vous-même le déploiement** en fin de tâche (ne pas seulement dire à l’utilisateur de le faire). **Autonomie attendue** notamment pour **`supabase db push`** (migrations) et **`supabase functions deploy <nom>`** (ou le script ci-dessous) après changement d’une fonction — sans attendre que l’utilisateur le fasse.

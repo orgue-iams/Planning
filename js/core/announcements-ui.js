@@ -16,19 +16,43 @@ import {
     quillGetPlainText,
     quillSetHtml
 } from '../utils/planning-quill.js';
+import { normalizeHHmmInput } from '../utils/time-helpers.js';
 
-function toLocalInputValue(iso) {
-    if (!iso) return '';
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '';
-    const pad = (n) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+function pad2(n) {
+    return String(n).padStart(2, '0');
 }
 
-function fromLocalInputValue(s) {
-    if (!s) return null;
-    const d = new Date(s);
-    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+/** @param {string | null | undefined} iso */
+function setBoundsFromIso(iso, dateEl, timeEl) {
+    if (!dateEl || !timeEl) return;
+    if (!iso) {
+        dateEl.value = '';
+        timeEl.value = '';
+        return;
+    }
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) {
+        dateEl.value = '';
+        timeEl.value = '';
+        return;
+    }
+    dateEl.value = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    timeEl.value = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+/**
+ * @returns {{ starts: string | null, ends: string | null }}
+ */
+function readBoundsIso() {
+    const sd = document.getElementById('ann-start-date')?.value?.trim();
+    const st = normalizeHHmmInput(document.getElementById('ann-start-time')?.value);
+    const ed = document.getElementById('ann-end-date')?.value?.trim();
+    const et = normalizeHHmmInput(document.getElementById('ann-end-time')?.value);
+    if (!sd || !st || !ed || !et) return { starts: null, ends: null };
+    const ds = new Date(`${sd}T${st}:00`);
+    const de = new Date(`${ed}T${et}:00`);
+    if (Number.isNaN(ds.getTime()) || Number.isNaN(de.getTime())) return { starts: null, ends: null };
+    return { starts: ds.toISOString(), ends: de.toISOString() };
 }
 
 /** @type {AbortController | null} */
@@ -88,11 +112,13 @@ export function initAnnouncementsUi(currentUser) {
                 modal?.showModal();
                 return;
             }
+            const sd = document.getElementById('ann-start-date');
+            const st = document.getElementById('ann-start-time');
+            const ed = document.getElementById('ann-end-date');
+            const et = document.getElementById('ann-end-time');
             if (latest) {
-                const start = document.getElementById('ann-start');
-                const end = document.getElementById('ann-end');
-                if (start && latest.starts_at) start.value = toLocalInputValue(latest.starts_at);
-                if (end && latest.ends_at) end.value = toLocalInputValue(latest.ends_at);
+                setBoundsFromIso(latest.starts_at, sd, st);
+                setBoundsFromIso(latest.ends_at, ed, et);
                 const prepared = sanitizeRulesHtml(normalizeQuillMarkup(String(latest.body ?? '')));
                 quillSetHtml(annQuill, prepared);
             } else {
@@ -116,10 +142,9 @@ export function initAnnouncementsUi(currentUser) {
                 showToast('Saisissez un message.', 'error');
                 return;
             }
-            const starts = fromLocalInputValue(document.getElementById('ann-start')?.value || '');
-            const ends = fromLocalInputValue(document.getElementById('ann-end')?.value || '');
+            const { starts, ends } = readBoundsIso();
             if (!starts || !ends) {
-                showToast('Indiquez début et fin.', 'error');
+                showToast('Indiquez début et fin (date + heure au format 24 h, ex. 08:00 ou 20:00).', 'error');
                 return;
             }
             if (new Date(ends) <= new Date(starts)) {
@@ -139,10 +164,12 @@ export function initAnnouncementsUi(currentUser) {
             }
             if (row?.body != null && annQuill) {
                 quillSetHtml(annQuill, sanitizeRulesHtml(normalizeQuillMarkup(String(row.body))));
-                const startEl = document.getElementById('ann-start');
-                const endEl = document.getElementById('ann-end');
-                if (startEl && row.starts_at) startEl.value = toLocalInputValue(row.starts_at);
-                if (endEl && row.ends_at) endEl.value = toLocalInputValue(row.ends_at);
+                const sd = document.getElementById('ann-start-date');
+                const st = document.getElementById('ann-start-time');
+                const ed = document.getElementById('ann-end-date');
+                const et = document.getElementById('ann-end-time');
+                setBoundsFromIso(row.starts_at, sd, st);
+                setBoundsFromIso(row.ends_at, ed, et);
             }
         },
         { signal }
@@ -153,14 +180,18 @@ export function initAnnouncementsUi(currentUser) {
  * @param {boolean} [force] — quand true, réinitialise les dates même si déjà remplies (réouverture modale).
  */
 export function presetAnnouncementDateInputs(force = false) {
-    const start = document.getElementById('ann-start');
-    const end = document.getElementById('ann-end');
-    if (!start || !end) return;
-    if (!force && start.value) return;
+    const sd = document.getElementById('ann-start-date');
+    const st = document.getElementById('ann-start-time');
+    const ed = document.getElementById('ann-end-date');
+    const et = document.getElementById('ann-end-time');
+    if (!sd || !st || !ed || !et) return;
+    if (!force && sd.value) return;
     const a = new Date();
     a.setMinutes(0, 0, 0);
     const b = new Date(a);
     b.setDate(b.getDate() + 7);
-    start.value = toLocalInputValue(a.toISOString());
-    end.value = toLocalInputValue(b.toISOString());
+    sd.value = `${a.getFullYear()}-${pad2(a.getMonth() + 1)}-${pad2(a.getDate())}`;
+    st.value = `${pad2(a.getHours())}:${pad2(a.getMinutes())}`;
+    ed.value = `${b.getFullYear()}-${pad2(b.getMonth() + 1)}-${pad2(b.getDate())}`;
+    et.value = `${pad2(b.getHours())}:${pad2(b.getMinutes())}`;
 }

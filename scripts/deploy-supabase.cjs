@@ -1,9 +1,13 @@
 'use strict';
 
 /**
- * Déploiement local : migrations puis toutes les Edge Functions.
+ * Déploiement local : migrations puis Edge Functions.
  * Référence projet : variable d’environnement SUPABASE_PROJECT_REF, sinon supabase/project-ref (une ligne).
  * Prérequis : `supabase login` sur la machine (et lien DB si db push l’exige).
+ *
+ * Usage :
+ *   node scripts/deploy-supabase.cjs              → db push + toutes les fonctions
+ *   node scripts/deploy-supabase.cjs calendar-bridge → une seule fonction (pas de db push)
  */
 
 const { readFileSync } = require('fs');
@@ -45,7 +49,19 @@ if (!projectRef) {
 
 console.log(`Projet Supabase (ref) : ${projectRef}`);
 
-run('Migrations (db push)', 'supabase', ['db', 'push', '--yes']);
-run('Edge Functions (toutes)', 'supabase', ['functions', 'deploy', '--project-ref', projectRef, '--yes']);
+const fnOnly = process.argv[2] && String(process.argv[2]).trim();
+if (fnOnly) {
+    run(`Edge Function (${fnOnly})`, 'supabase', [
+        'functions',
+        'deploy',
+        fnOnly,
+        '--project-ref',
+        projectRef,
+        '--yes'
+    ]);
+} else {
+    run('Migrations (db push)', 'supabase', ['db', 'push', '--yes']);
+    run('Edge Functions (toutes)', 'supabase', ['functions', 'deploy', '--project-ref', projectRef, '--yes']);
+}
 
 console.log('\nDéploiement Supabase terminé.\n');

@@ -46,7 +46,8 @@ function formatFrWhen(startIso: string, endIso: string) {
             month: 'long',
             year: 'numeric',
             hour: '2-digit',
-            minute: '2-digit'
+            minute: '2-digit',
+            hour12: false
         };
         return `${a.toLocaleString('fr-FR', opts)} — ${b.toLocaleString('fr-FR', opts)}`;
     } catch {
