@@ -12,7 +12,7 @@ export function calendarListCacheKey(timeMinIso, timeMaxIso, scopeKey = '') {
     return `${scopeKey}\x1e${timeMinIso}\x1e${timeMaxIso}`;
 }
 
-/** @param {unknown[]} rows — format déjà normalisé (ex. sortie de mapBridgeListEvents) */
+/** @param {unknown[]} rows — format événements FullCalendar (RPC planning) */
 export function getCalendarListCache(key) {
     const e = cache.get(key);
     if (!e) return null;

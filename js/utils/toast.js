@@ -13,8 +13,10 @@ function getToastMountParent() {
     return document.body;
 }
 
+/* pointer-events-auto sur le montage : avec pointer-events-none, les clics traversent la zone fixe
+ * et retombent sur le <dialog> parent → app.js wireDialogBackdropClose() fermait la modale (ex. gestion comptes). */
 const TOAST_MOUNT_CLASS =
-    'planning-toast-mount toast toast-bottom toast-end fixed flex flex-col gap-2 p-0 bottom-4 end-4 z-[2147483647] pointer-events-none [&>.alert]:pointer-events-auto';
+    'planning-toast-mount toast toast-bottom toast-end fixed flex flex-col gap-2 p-0 bottom-4 end-4 z-[2147483647] pointer-events-auto';
 
 export function showToast(message, variant = 'success', durationMs = 3200) {
     const parent = getToastMountParent();

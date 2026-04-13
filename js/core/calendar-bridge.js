@@ -1,4 +1,10 @@
-import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
+import {
+    getPlanningConfig,
+    getSupabaseClient,
+    isBackendAuthConfigured,
+    isInvalidRefreshTokenError,
+    clearCorruptedLocalAuthSession
+} from './supabase-client.js';
 
 /**
  * Appelle le pont (Apps Script ou Edge Function) qui synchronise avec Google Agenda.
@@ -52,7 +58,8 @@ export async function invokeCalendarBridge(accessToken, body, options) {
         if ((res.status === 401 || res.status === 403) && isBackendAuthConfigured()) {
             const supabase = getSupabaseClient();
             if (supabase) {
-                const { data: refData } = await supabase.auth.refreshSession();
+                const { data: refData, error: refErr } = await supabase.auth.refreshSession();
+                if (refErr && isInvalidRefreshTokenError(refErr)) await clearCorruptedLocalAuthSession();
                 let nextTok = refData?.session?.access_token ?? null;
                 if (!nextTok) {
                     const { data: { session } } = await supabase.auth.getSession();

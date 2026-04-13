@@ -295,6 +295,8 @@ type EventPayloadInput = {
     inscrits?: string;
     templateLineId?: string;
     poolGoogleEventId?: string;
+    /** UUID `planning_event.id` — étiquette Google pour retrouver l’événement si les ids connus sont invalides (évite POST = doublon). */
+    planningEventId?: string;
 };
 
 /** Sur l’événement « miroir » du calendrier pool, ne pas recopier planningPoolEventId (réservé au principal). */
@@ -316,6 +318,8 @@ function googleEventResource(
     if (tid) priv.planningTemplateLineId = tid;
     const poolGid = (ev.poolGoogleEventId ?? '').trim();
     if (poolGid && !opts?.forPoolCalendarWrite) priv.planningPoolEventId = poolGid;
+    const pev = (ev.planningEventId ?? '').trim();
+    if (pev) priv.planningEventId = pev;
     return {
         summary: ev.title,
         description: descParts.join(' '),
@@ -337,6 +341,60 @@ async function gcalFetch(accessToken: string, pathWithQuery: string, init?: Requ
         }
     });
     return res;
+}
+
+function dedupeGoogleEventIds(candidates: Array<string | undefined | null>): string[] {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const c of candidates) {
+        const t = String(c ?? '').trim();
+        if (!t || seen.has(t)) continue;
+        seen.add(t);
+        out.push(t);
+    }
+    return out;
+}
+
+/**
+ * Liste les ids d’événements portant `privateExtendedProperty` planningEventId=<uuid> (toutes pages courtes).
+ */
+async function listEventIdsByPlanningPrivateProperty(
+    accessToken: string,
+    calendarIdRaw: string,
+    planningUuid: string
+): Promise<string[]> {
+    const u = planningUuid.trim();
+    if (!u) return [];
+    const encCal = encodeURIComponent(resolveCalendarId(calendarIdRaw));
+    const collected: string[] = [];
+    let pageToken = '';
+    for (let page = 0; page < 12; page++) {
+        const params = new URLSearchParams({
+            privateExtendedProperty: `planningEventId=${u}`,
+            singleEvents: 'true',
+            maxResults: '250'
+        });
+        if (pageToken) params.set('pageToken', pageToken);
+        const res = await gcalFetch(accessToken, `/calendars/${encCal}/events?${params}`);
+        const raw = await res.text();
+        if (!res.ok) {
+            console.warn('[calendar-bridge] list by planningEventId', res.status, raw.slice(0, 240));
+            break;
+        }
+        let data: { items?: Array<{ id?: string }>; nextPageToken?: string };
+        try {
+            data = JSON.parse(raw) as { items?: Array<{ id?: string }>; nextPageToken?: string };
+        } catch {
+            break;
+        }
+        for (const it of data.items ?? []) {
+            const id = String(it?.id ?? '').trim();
+            if (id) collected.push(id);
+        }
+        pageToken = String(data.nextPageToken ?? '').trim();
+        if (!pageToken) break;
+    }
+    return dedupeGoogleEventIds(collected);
 }
 
 async function fetchPlanningPoolCalendarId(
@@ -426,11 +484,12 @@ async function fetchPlanningPoolCalendarIdForOwnerEmail(
 /**
  * Crée ou met à jour l’événement copié sur un calendrier secondaire (pool).
  * @param poolCal ID déjà normalisé (ex. via normalizeGoogleCalendarId).
+ * @param poolEventIdCandidates ids connus (client + base), essayés en PATCH avant recherche par `planningEventId` puis POST.
  */
 async function createOrUpdatePoolCalendarEventCopy(
     accessToken: string,
     poolCal: string,
-    existingPoolEventId: string,
+    poolEventIdCandidates: string[],
     baseFields: EventPayloadInput
 ): Promise<string> {
     const poolPayload = googleEventResource(
@@ -438,9 +497,10 @@ async function createOrUpdatePoolCalendarEventCopy(
         { forPoolCalendarWrite: true }
     );
     const encPool = encodeURIComponent(poolCal);
-    let poolOutId = existingPoolEventId.trim();
+    const candidates = dedupeGoogleEventIds(poolEventIdCandidates);
+    const planningUuid = String(baseFields.planningEventId ?? '').trim();
 
-    if (poolOutId) {
+    for (const poolOutId of candidates) {
         const encEid = encodeURIComponent(poolOutId);
         const patchP = await gcalFetch(accessToken, `/calendars/${encPool}/events/${encEid}`, {
             method: 'PATCH',
@@ -451,7 +511,29 @@ async function createOrUpdatePoolCalendarEventCopy(
             console.error('[calendar-bridge] PATCH miroir pool:', patchP.status, await patchP.text());
             return '';
         }
-        poolOutId = '';
+    }
+
+    if (planningUuid) {
+        const found = await listEventIdsByPlanningPrivateProperty(accessToken, poolCal, planningUuid);
+        if (found.length > 0) {
+            const keep = found[0];
+            const encKeep = encodeURIComponent(keep);
+            const patchK = await gcalFetch(accessToken, `/calendars/${encPool}/events/${encKeep}`, {
+                method: 'PATCH',
+                body: JSON.stringify(poolPayload)
+            });
+            if (patchK.ok) {
+                for (const extra of found.slice(1)) {
+                    await deleteGoogleCalendarEventQuiet(accessToken, poolCal, extra);
+                }
+                return keep;
+            }
+            console.warn(
+                '[calendar-bridge] PATCH miroir pool (retrouvé par planningEventId):',
+                patchK.status,
+                await patchK.text()
+            );
+        }
     }
 
     const insP = await gcalFetch(accessToken, `/calendars/${encPool}/events`, {
@@ -645,7 +727,8 @@ async function syncCoursStudentPoolMirrors(
         type: String(ev.type || 'reservation'),
         owner: String(ev.owner || ''),
         inscrits: ev.inscrits,
-        templateLineId: ev.templateLineId
+        templateLineId: ev.templateLineId,
+        ...(planningEventId.trim() ? { planningEventId: planningEventId.trim() } : {})
     };
 
     const results: Array<{ target_user_id: string; google_calendar_id: string; google_event_id: string }> =
@@ -656,7 +739,7 @@ async function syncCoursStudentPoolMirrors(
         const gid = await createOrUpdatePoolCalendarEventCopy(
             accessToken,
             meta.poolCal,
-            prior?.google_event_id ?? '',
+            dedupeGoogleEventIds([prior?.google_event_id ?? '']),
             baseFields
         );
         if (!gid) {
@@ -685,7 +768,8 @@ async function mirrorOwnerPersonalCalendarIfNeeded(
     supabaseAnonKey: string,
     ev: NonNullable<BridgeBody['events']>[0],
     body: BridgeBody,
-    mainCalendarEventId: string
+    mainCalendarEventId: string,
+    poolMirrorGoogleIdFromDb: string
 ): Promise<{ poolGoogleEventId: string; poolCalendarId: string } | null> {
     if (!supabaseUrl || !supabaseAnonKey || !user.id) {
         console.warn('[calendar-bridge] mirror skip: supabase url/anon key ou user.id manquant');
@@ -730,6 +814,7 @@ async function mirrorOwnerPersonalCalendarIfNeeded(
     const end = ev.end;
     if (!title || !start || !end) return null;
 
+    const planningPid = String(ev.planningEventId ?? '').trim();
     const baseFields: EventPayloadInput = {
         title,
         start,
@@ -737,13 +822,17 @@ async function mirrorOwnerPersonalCalendarIfNeeded(
         type: String(ev.type || 'reservation'),
         owner: String(ev.owner || ''),
         inscrits: ev.inscrits,
-        templateLineId: ev.templateLineId
+        templateLineId: ev.templateLineId,
+        ...(planningPid ? { planningEventId: planningPid } : {})
     };
 
     const poolOutId = await createOrUpdatePoolCalendarEventCopy(
         accessToken,
         poolCal,
-        String(ev.poolGoogleEventId ?? '').trim(),
+        dedupeGoogleEventIds([
+            String(ev.poolGoogleEventId ?? '').trim(),
+            String(poolMirrorGoogleIdFromDb ?? '').trim()
+        ]),
         baseFields
     );
 
@@ -880,6 +969,113 @@ function sleepMs(ms: number): Promise<void> {
     return new Promise((r) => setTimeout(r, ms));
 }
 
+async function assertPlanningAdmin(
+    supabaseUrl: string,
+    anonKey: string,
+    jwt: string,
+    userId: string
+): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+    const base = supabaseUrl.replace(/\/$/, '');
+    const res = await fetch(
+        `${base}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=role`,
+        {
+            headers: { apikey: anonKey, Authorization: `Bearer ${jwt}` }
+        }
+    );
+    if (!res.ok) {
+        return { ok: false, status: 403, error: 'Profil indisponible' };
+    }
+    const arr = (await res.json()) as Array<{ role?: string }>;
+    const role = arr[0]?.role;
+    if (role !== 'admin') {
+        return { ok: false, status: 403, error: 'Forbidden: admin only' };
+    }
+    return { ok: true };
+}
+
+async function fetchAssignedPoolCalendarIdsForWipe(supabaseUrl: string, serviceKey: string): Promise<string[]> {
+    if (!serviceKey.trim()) return [];
+    const base = supabaseUrl.replace(/\/$/, '');
+    const res = await fetch(
+        `${base}/rest/v1/google_calendar_pool?assigned_user_id=not.is.null&select=google_calendar_id`,
+        {
+            headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` }
+        }
+    );
+    if (!res.ok) return [];
+    const arr = (await res.json()) as Array<{ google_calendar_id?: string }>;
+    if (!Array.isArray(arr)) return [];
+    const out: string[] = [];
+    for (const r of arr) {
+        const id = String(r.google_calendar_id ?? '').trim();
+        if (id) out.push(id);
+    }
+    return out;
+}
+
+function uniqueNormCalendarIds(ids: string[]): string[] {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const raw of ids) {
+        const n = normalizeGoogleCalendarId(raw) || raw.trim();
+        if (!n) continue;
+        const k = n.toLowerCase();
+        if (seen.has(k)) continue;
+        seen.add(k);
+        out.push(n);
+    }
+    return out;
+}
+
+async function listAllEventsInRangePaged(
+    accessToken: string,
+    rawCalendarId: string,
+    timeMin: string,
+    timeMax: string
+): Promise<GCalEvent[]> {
+    const encCal = encodeURIComponent(normalizeGoogleCalendarId(rawCalendarId) || rawCalendarId);
+    const collected: GCalEvent[] = [];
+    let pageToken: string | undefined;
+    for (;;) {
+        const params = new URLSearchParams({
+            timeMin,
+            timeMax,
+            singleEvents: 'true',
+            orderBy: 'startTime',
+            maxResults: '250'
+        });
+        if (pageToken) params.set('pageToken', pageToken);
+        const res = await gcalFetch(accessToken, `/calendars/${encCal}/events?${params}`);
+        const data = (await res.json()) as {
+            items?: GCalEvent[];
+            nextPageToken?: string;
+            error?: { message?: string };
+        };
+        if (!res.ok) {
+            throw new Error(data.error?.message || `List HTTP ${res.status}`);
+        }
+        for (const it of data.items ?? []) {
+            if (it?.id) collected.push(it);
+        }
+        pageToken = data.nextPageToken;
+        if (!pageToken) break;
+    }
+    return collected;
+}
+
+async function deleteGoogleEventIdInCalendar(
+    accessToken: string,
+    rawCalendarId: string,
+    eventId: string
+): Promise<boolean> {
+    const encCal = encodeURIComponent(normalizeGoogleCalendarId(rawCalendarId) || rawCalendarId);
+    const encEid = encodeURIComponent(eventId);
+    const res = await gcalFetch(accessToken, `/calendars/${encCal}/events/${encEid}`, {
+        method: 'DELETE'
+    });
+    return res.status === 204 || res.ok || res.status === 404 || res.status === 410;
+}
+
 function isGoogleCalendarRateLimited(status: number, bodyText: string): boolean {
     if (status === 429) return true;
     if (status !== 403) return false;
@@ -894,6 +1090,39 @@ function isGoogleCalendarRateLimited(status: number, bodyText: string): boolean 
     } catch {
         return /rate limit|quota|usageLimits/i.test(bodyText);
     }
+}
+
+/**
+ * IDs Google fiables pour PATCH (évite POST = doublon si le client n’a pas reçu les ids via RPC car sync_status ≠ ok).
+ */
+async function fetchPlanningMirrorGoogleIdsForUpsert(
+    supabaseUrl: string,
+    serviceKey: string,
+    planningEventId: string
+): Promise<{ main: string; poolOwner: string }> {
+    const out = { main: '', poolOwner: '' };
+    if (!supabaseUrl || !serviceKey.trim() || !planningEventId.trim()) return out;
+    const base = supabaseUrl.replace(/\/$/, '');
+    const res = await fetch(
+        `${base}/rest/v1/planning_event_google_mirror?event_id=eq.${encodeURIComponent(planningEventId)}&select=target,google_event_id`,
+        {
+            headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` }
+        }
+    );
+    if (!res.ok) {
+        console.warn('[calendar-bridge] fetch mirror ids', res.status, await res.text());
+        return out;
+    }
+    const arr = (await res.json()) as Array<{ target?: string; google_event_id?: string | null }>;
+    if (!Array.isArray(arr)) return out;
+    for (const r of arr) {
+        const ge = String(r.google_event_id ?? '').trim();
+        if (!ge) continue;
+        const t = String(r.target ?? '');
+        if (t === 'main') out.main = ge;
+        if (t === 'pool_owner') out.poolOwner = ge;
+    }
+    return out;
 }
 
 /**
@@ -914,8 +1143,27 @@ async function upsertSingleCalendarEvent(
     if (!title || !start || !end) {
         throw new Error('Champs title, start et end requis pour chaque événement');
     }
+
+    const serviceKeyMerge = (
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
+        Deno.env.get('SERVICE_ROLE_KEY') ??
+        ''
+    ).trim();
+    const planningIdMerge = String(ev.planningEventId ?? '').trim();
+    let mid = { main: '', poolOwner: '' };
+    if (planningIdMerge && serviceKeyMerge && supabaseUrl) {
+        mid = await fetchPlanningMirrorGoogleIdsForUpsert(
+            supabaseUrl,
+            serviceKeyMerge,
+            planningIdMerge
+        );
+    }
+
     const calIdUpsert = encodeURIComponent(resolveCalendarId(ev.calendarId ?? body.calendarId));
-    const payload = googleEventResource({
+    const mainCalResolved = resolveCalendarId(ev.calendarId ?? body.calendarId);
+    const poolLinkForMain = String(mid.poolOwner || ev.poolGoogleEventId || '').trim();
+
+    const mainPayloadBase: EventPayloadInput = {
         title,
         start,
         end,
@@ -923,14 +1171,16 @@ async function upsertSingleCalendarEvent(
         owner: String(ev.owner || ''),
         inscrits: ev.inscrits,
         templateLineId: ev.templateLineId,
-        poolGoogleEventId: ev.poolGoogleEventId
-    });
-    const gid = ev.googleEventId?.trim();
+        ...(poolLinkForMain ? { poolGoogleEventId: poolLinkForMain } : {}),
+        ...(planningIdMerge ? { planningEventId: planningIdMerge } : {})
+    };
+    const payload = googleEventResource(mainPayloadBase);
 
     let mainOutId = '';
+    const mainCandidates = dedupeGoogleEventIds([mid.main, ev.googleEventId]);
 
-    if (gid) {
-        const encEid = encodeURIComponent(gid);
+    for (const tryGid of mainCandidates) {
+        const encEid = encodeURIComponent(tryGid);
         for (let attempt = 0; attempt < 5; attempt++) {
             if (attempt > 0) await sleepMs(Math.min(2500, 350 * 2 ** (attempt - 1)));
             const patch = await gcalFetch(accessToken, `/calendars/${calIdUpsert}/events/${encEid}`, {
@@ -939,12 +1189,45 @@ async function upsertSingleCalendarEvent(
             });
             const pt = await patch.text();
             if (patch.ok) {
-                mainOutId = gid;
+                mainOutId = tryGid;
                 break;
             }
             if (patch.status === 404) break;
             if (isGoogleCalendarRateLimited(patch.status, pt) && attempt < 4) continue;
             throw new Error(pt.slice(0, 200) || `PATCH ${patch.status}`);
+        }
+        if (mainOutId) break;
+    }
+
+    if (!mainOutId && planningIdMerge) {
+        const foundMain = await listEventIdsByPlanningPrivateProperty(
+            accessToken,
+            mainCalResolved,
+            planningIdMerge
+        );
+        if (foundMain.length > 0) {
+            const keep = foundMain[0];
+            const encEid = encodeURIComponent(keep);
+            for (let attempt = 0; attempt < 5; attempt++) {
+                if (attempt > 0) await sleepMs(Math.min(2500, 350 * 2 ** (attempt - 1)));
+                const patch = await gcalFetch(accessToken, `/calendars/${calIdUpsert}/events/${encEid}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify(payload)
+                });
+                const pt = await patch.text();
+                if (patch.ok) {
+                    mainOutId = keep;
+                    break;
+                }
+                if (patch.status === 404) break;
+                if (isGoogleCalendarRateLimited(patch.status, pt) && attempt < 4) continue;
+                throw new Error(pt.slice(0, 200) || `PATCH ${patch.status}`);
+            }
+            if (mainOutId) {
+                for (const extra of foundMain.slice(1)) {
+                    await deleteGoogleCalendarEventQuiet(accessToken, mainCalResolved, extra);
+                }
+            }
         }
     }
 
@@ -982,10 +1265,10 @@ async function upsertSingleCalendarEvent(
         supabaseAnonKey,
         ev,
         body,
-        mainOutId
+        mainOutId,
+        mid.poolOwner
     );
 
-    const mainCalResolved = resolveCalendarId(ev.calendarId ?? body.calendarId);
     const planningId = String(ev.planningEventId ?? '').trim();
     /* Secret manuel Edge : le dashboard refuse SUPABASE_* → SERVICE_ROLE_KEY (même JWT que la clé service_role). */
     const serviceKey = (
@@ -1149,6 +1432,65 @@ Deno.serve(async (req) => {
                 /* */
             }
             return jsonResponse({ ok: false, error: msg }, 200);
+        }
+
+        if (action === 'adminWipeCalendarsInRange') {
+            const timeMin = String(body.timeMin ?? '').trim();
+            const timeMax = String(body.timeMax ?? '').trim();
+            if (!timeMin || !timeMax) {
+                return jsonResponse({ ok: false, error: 'timeMin et timeMax requis (ISO 8601)' }, 400);
+            }
+            const adminGate = await assertPlanningAdmin(supabaseUrl, supabaseAnonKey, jwt, user.id);
+            if (!adminGate.ok) {
+                return jsonResponse({ ok: false, error: adminGate.error }, adminGate.status);
+            }
+
+            const serviceKey = (
+                Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
+                Deno.env.get('SERVICE_ROLE_KEY') ??
+                ''
+            ).trim();
+            let mainCal: string;
+            try {
+                mainCal = calendarId();
+            } catch (e) {
+                return jsonResponse(
+                    {
+                        ok: false,
+                        error: e instanceof Error ? e.message : 'GOOGLE_CALENDAR_ID manquant'
+                    },
+                    500
+                );
+            }
+            const poolIds = await fetchAssignedPoolCalendarIdsForWipe(supabaseUrl, serviceKey);
+            const allCalendars = uniqueNormCalendarIds([mainCal, ...poolIds]);
+
+            const deletedByCalendar: Record<string, number> = {};
+            const calendarErrors: string[] = [];
+
+            for (const cal of allCalendars) {
+                try {
+                    const items = await listAllEventsInRangePaged(accessToken, cal, timeMin, timeMax);
+                    let n = 0;
+                    for (const ev of items) {
+                        const eid = ev.id?.trim();
+                        if (!eid) continue;
+                        const okDel = await deleteGoogleEventIdInCalendar(accessToken, cal, eid);
+                        if (okDel) n++;
+                        await sleepMs(35);
+                    }
+                    deletedByCalendar[cal] = n;
+                } catch (e) {
+                    const msg = e instanceof Error ? e.message : String(e);
+                    calendarErrors.push(`${cal}: ${msg}`);
+                }
+            }
+
+            return jsonResponse({
+                ok: true,
+                deletedByCalendar,
+                ...(calendarErrors.length > 0 ? { errors: calendarErrors } : {})
+            });
         }
 
         if (action === 'upsert' && body.events && body.events.length > 0) {

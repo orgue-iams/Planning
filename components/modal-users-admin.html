@@ -1,7 +1,7 @@
 <dialog id="modal_users_admin" class="modal">
     <div class="modal-box p-5 w-[96%] max-w-5xl max-h-[90dvh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col">
         <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest shrink-0">Gestion des comptes</h3>
-        <p class="text-[10px] text-slate-500 mb-3 leading-snug">Création directe de compte (avec mot de passe) ou invitation par e-mail, puis gestion des rôles, du statut (liste), suppression et réinitialisation du mot de passe. Le pool des calendriers secondaires se gère depuis le menu utilisateur → <strong>Calendriers secondaires</strong>.</p>
+        <p class="text-[10px] text-slate-500 mb-3 leading-snug">Création directe de compte (avec mot de passe) ou invitation par e-mail s’enregistrent tout de suite. Les changements dans le tableau (nom, prénom, e-mail, rôle, statut) ne sont envoyés qu’avec <strong>Sauver et fermer</strong>. Suppression et mot de passe restent immédiats. Le pool des calendriers secondaires : menu utilisateur → <strong>Calendriers secondaires</strong>.</p>
 
         <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-2 sm:p-2.5 mb-3 shrink-0">
             <p class="text-[9px] font-black uppercase text-slate-500 mb-1.5 tracking-wide">Créer / inviter</p>
@@ -52,10 +52,11 @@
         </div>
 
         <div class="flex-1 min-h-0 overflow-x-auto overflow-y-auto border border-slate-200 rounded-xl">
-            <table class="table table-xs table-pin-rows admin-users-table w-full min-w-[32rem]">
+            <table class="table table-xs table-pin-rows admin-users-table w-full min-w-[40rem]">
                 <thead>
                     <tr class="bg-slate-100">
-                        <th class="min-w-[7rem]">Nom</th>
+                        <th class="min-w-[6.5rem]">Nom</th>
+                        <th class="min-w-[6.5rem]">Prénom</th>
                         <th class="min-w-[9rem]">E-mail</th>
                         <th class="w-28">Rôle</th>
                         <th class="w-24">Statut</th>
@@ -67,8 +68,9 @@
             </table>
         </div>
 
-        <div class="modal-action shrink-0 mt-3 pt-2 border-t border-slate-100">
-            <button type="button" class="btn btn-ghost btn-sm font-normal text-[11px]" onclick="document.getElementById('modal_users_admin').close()">Fermer</button>
+        <div class="modal-action shrink-0 mt-3 pt-2 border-t border-slate-100 flex flex-wrap justify-end gap-2">
+            <button type="button" id="admin-users-btn-cancel" class="btn btn-ghost btn-sm font-normal text-[11px]">Annuler</button>
+            <button type="button" id="admin-users-btn-save-close" class="btn btn-primary btn-sm font-normal text-[11px]">Sauver et fermer</button>
         </div>
     </div>
 </dialog>

@@ -25,11 +25,14 @@ function renderPoolTableRows(rows) {
     if (list.length === 0) {
         const tr = document.createElement('tr');
         tr.innerHTML =
-            '<td colspan="4" class="text-[10px] text-slate-500 text-center py-4">Aucune entrée. Ajoutez un calendrier ci-dessus.</td>';
+            '<td colspan="3" class="text-[10px] text-slate-500 text-center py-4">Aucune entrée. Ajoutez un calendrier ci-dessus.</td>';
         tb.appendChild(tr);
         return;
     }
-    for (const r of list) {
+    const sorted = [...list].sort((a, b) =>
+        String(a.label || '').localeCompare(String(b.label || ''), 'fr', { sensitivity: 'base' })
+    );
+    for (const r of sorted) {
         const tr = document.createElement('tr');
         const free = !r.assigned_user_id;
         const st = free
@@ -38,7 +41,6 @@ function renderPoolTableRows(rows) {
         tr.innerHTML = `
             <td class="text-[10px] max-w-[10rem] truncate" title="${escapeAttr(r.label || '')}">${escapeTd(r.label || '—')}</td>
             <td class="text-[9px] font-mono break-all">${escapeTd(r.google_calendar_id)}</td>
-            <td class="text-[10px]">${escapeTd(String(r.sort_order ?? 0))}</td>
             <td class="text-[10px]">${st}</td>`;
         tb.appendChild(tr);
     }
@@ -88,8 +90,6 @@ export function initAdminCalendarPoolUi(currentUser) {
             document.getElementById('calendar-pool-google-id')?.value ?? ''
         );
         const label = document.getElementById('calendar-pool-label')?.value?.trim() || '';
-        const sortRaw = document.getElementById('calendar-pool-sort')?.value;
-        const sort_order = sortRaw !== undefined && sortRaw !== '' ? Number(sortRaw) : 0;
         if (!google_calendar_id) {
             showToast('Indiquez l’ID du calendrier Google.', 'error');
             return;
@@ -98,7 +98,7 @@ export function initAdminCalendarPoolUi(currentUser) {
             await planningAdminInvoke('add_calendar_pool', {
                 google_calendar_id,
                 label: label || undefined,
-                sort_order: Number.isFinite(sort_order) ? sort_order : 0
+                sort_order: 0
             });
             showToast('Calendrier ajouté au pool.');
             const gid = document.getElementById('calendar-pool-google-id');

@@ -537,6 +537,48 @@ Deno.serve(async (req) => {
             });
         }
 
+        if (action === 'update_user_nom_prenom') {
+            const userId = String(body.user_id ?? '');
+            const nom = String(body.nom ?? '').trim();
+            const prenom = String(body.prenom ?? '').trim();
+            if (!userId) {
+                return new Response(JSON.stringify({ error: 'user_id requis' }), {
+                    status: 400,
+                    headers: { ...cors, 'Content-Type': 'application/json' }
+                });
+            }
+            if (!nom || !prenom) {
+                return new Response(
+                    JSON.stringify({ error: 'Le nom et le prénom sont obligatoires (champs séparés).' }),
+                    { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } }
+                );
+            }
+            const fullName = planningFullName(nom, prenom);
+
+            const { error: pErr } = await admin
+                .from('profiles')
+                .update({ nom, prenom, updated_at: new Date().toISOString() })
+                .eq('id', userId);
+            if (pErr) throw pErr;
+
+            const { data: authUser, error: guErr } = await admin.auth.admin.getUserById(userId);
+            if (guErr) throw guErr;
+            const meta = (authUser.user?.user_metadata ?? {}) as Record<string, unknown>;
+            const { error: muErr } = await admin.auth.admin.updateUserById(userId, {
+                user_metadata: {
+                    ...meta,
+                    nom,
+                    prenom,
+                    display_name: fullName
+                }
+            });
+            if (muErr) throw muErr;
+
+            return new Response(JSON.stringify({ ok: true }), {
+                headers: { ...cors, 'Content-Type': 'application/json' }
+            });
+        }
+
         if (action === 'suspend') {
             const userId = String(body.user_id ?? '');
             if (!userId) {

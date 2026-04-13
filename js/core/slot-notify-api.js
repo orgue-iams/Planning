@@ -2,7 +2,13 @@
  * Edge Function planning-slot-notify — e-mail au propriétaire d’un créneau modifié par un tiers.
  */
 import { getAccessToken } from './auth-logic.js';
-import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
+import {
+    getPlanningConfig,
+    getSupabaseClient,
+    isBackendAuthConfigured,
+    isInvalidRefreshTokenError,
+    clearCorruptedLocalAuthSession
+} from './supabase-client.js';
 
 function parseBody(text) {
     if (!text || !text.trim()) return {};
@@ -45,7 +51,8 @@ export async function invokeSlotNotify(payload) {
     if (res.status === 401) {
         const supabase = getSupabaseClient();
         if (supabase) {
-            await supabase.auth.refreshSession();
+            const { error: refErr } = await supabase.auth.refreshSession();
+            if (refErr && isInvalidRefreshTokenError(refErr)) await clearCorruptedLocalAuthSession();
             token = await getAccessToken();
             if (token) res = await doFetch(token);
         }

@@ -45,6 +45,7 @@ const ASSETS = [
   './js/core/login-banner.js',
   './js/core/admin-api.js',
   './js/core/admin-users-ui.js',
+  './js/core/admin-clear-week.js',
   './js/core/admin-calendar-pool-ui.js',
   './js/core/session-user.js',
   './js/core/slot-notify-api.js',

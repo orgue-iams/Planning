@@ -6,7 +6,7 @@
 
 - Auth **Supabase** uniquement (`supabaseUrl` + `supabaseAnonKey` requis dans `planning.config.js`).
 - Calendrier **FullCalendar** ; sync **Google** via **`calendar-bridge`** (compte de service ou OAuth).
-- **Grille en mode canonique DB** (quand `planningGridReadsFromSupabase: true`) : RPC `planning_events_in_range`, écriture `planning_event`, suppression + sync Google via `planning_event_google_mirror` ; secrets Edge **`SERVICE_ROLE_KEY`** ou auto `SUPABASE_SERVICE_ROLE_KEY` pour persistance miroir côté bridge — voir **HANDOFF.md**.
+- **Grille canonique DB** : RPC `planning_events_in_range`, écriture `planning_event`, suppression + sync Google via `planning_event_google_mirror` ; secrets Edge **`SERVICE_ROLE_KEY`** ou auto `SUPABASE_SERVICE_ROLE_KEY` pour persistance miroir côté bridge — voir **HANDOFF.md**.
 - **Rôles** admin / prof / élève avec règles d’édition dans `calendar-logic.js` ; RLS SQL alignée (prof sur créneaux élèves/prof, etc.).
 - **Motifs** : Travail perso. / Cours / Fermeture ; mapping DB `motifToPlanningDbSlotType` (`travail perso`, `cours`, `fermeture`).
 - **Profils** : `nom` + `prenom`, liste admin, création / invitation.
@@ -21,6 +21,7 @@
 
 - **`planning.config.js`** : anon key souvent en clair — acceptable pour anon ; dépôt public → préférer injection CI / env.
 - **Retry sync, job nocturne, digest `planning_infra_error_log`** : spécifiés dans HANDOFF, **non implémentés**.
+- **TODO futur** : contrôle de cohérence Postgres ↔ calendrier **général** uniquement (rapport d’écarts) — voir HANDOFF § backlog point 9 ; **pas prioritaire pour l’instant**.
 - **Inscrits cours** en grille DB : champs `inscrits` FC encore vides côté RPC mapping — à brancher sur `planning_event_enrollment`.
 - **Edge Functions** : version déployée = contrat attendu par le front (déployer après chaque changement de bridge).
 

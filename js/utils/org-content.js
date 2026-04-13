@@ -3,6 +3,15 @@
  */
 import { getSupabaseClient, isBackendAuthConfigured } from '../core/supabase-client.js';
 
+/** Contenu HTML d’annonce sans texte utile après retrait des balises (ex. paragraphe Quill vide). */
+function loginScheduledBodyIsEmpty(html) {
+    const t = String(html ?? '')
+        .replace(/<[^>]+>/g, '')
+        .replace(/\u00a0/g, ' ')
+        .trim();
+    return t.length === 0;
+}
+
 export async function fetchOrganRulesRemote() {
     if (!isBackendAuthConfigured()) return null;
     const sb = getSupabaseClient();
@@ -46,7 +55,7 @@ export async function fetchActiveLoginMessage() {
         console.warn('[login message]', error.message);
         return null;
     }
-    if (!data?.body) return null;
+    if (!data?.body || loginScheduledBodyIsEmpty(data.body)) return null;
     return { id: data.id, body: data.body };
 }
 
@@ -88,10 +97,17 @@ export async function replaceLoginAnnouncementRemote({ body, startsAt, endsAt })
     const { data: u } = await sb.auth.getUser();
     const { error: delErr } = await sb.from('scheduled_messages').delete().eq('channel', 'login');
     if (delErr) return { ok: false, error: delErr.message };
+    const html = String(body ?? '');
+    if (loginScheduledBodyIsEmpty(html)) {
+        return { ok: true, row: null };
+    }
+    if (!startsAt || !endsAt) {
+        return { ok: false, error: 'Indiquez début et fin (date + heure).' };
+    }
     const { data, error } = await sb
         .from('scheduled_messages')
         .insert({
-            body: String(body || '').trim(),
+            body: html.trim(),
             starts_at: startsAt,
             ends_at: endsAt,
             channel: 'login',

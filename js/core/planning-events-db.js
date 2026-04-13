@@ -1,8 +1,13 @@
 /**
  * Créneaux planning : lecture depuis Postgres (RPC planning_events_in_range).
- * Google n’est plus la source d’affichage de la grille lorsque planningGridReadsFromSupabase est activé.
+ * La grille FullCalendar ne lit jamais la liste Google ; calendar-bridge sert au miroir (upsert/delete).
  */
-import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
+import {
+    getSupabaseClient,
+    isBackendAuthConfigured,
+    isInvalidRefreshTokenError,
+    clearCorruptedLocalAuthSession
+} from './supabase-client.js';
 
 /** Alignement types base → extendedProps.type (couleurs / bridge historique). */
 export function slotTypeToPlanningExtendedType(slotType) {
@@ -15,6 +20,17 @@ export function slotTypeToPlanningExtendedType(slotType) {
 /** Colonne `slot_type` → type attendu par calendar-bridge / Google. */
 export function planningDbSlotTypeToBridgeType(slotType) {
     return slotTypeToPlanningExtendedType(slotType);
+}
+
+/** `slot_type` SQL pour mise à jour drag/resize (priorité à la valeur issue de la RPC). */
+export function planningDbSlotTypeForEventUpdate(ev) {
+    const explicit = String(ev?.extendedProps?.planningDbSlotType || '').trim();
+    if (explicit) return explicit;
+    const t = String(ev?.extendedProps?.type || '').trim();
+    if (t === 'fermeture') return 'fermeture';
+    if (t === 'cours') return 'cours';
+    if (t === 'reservation') return 'travail perso';
+    return 'travail perso';
 }
 
 /**
@@ -40,6 +56,8 @@ export function mapPlanningDbRowToFcEvent(row, _currentUser) {
         extendedProps: {
             planningRowSource: 'supabase',
             planningCanonicalId: row.id,
+            /** Colonne `slot_type` brute (déplacement / redimensionnement sans ambiguïté concert/autre). */
+            planningDbSlotType: row.slot_type,
             googleEventId: mainG,
             poolGoogleEventId: poolG,
             owner,
@@ -61,10 +79,14 @@ export async function fetchPlanningEventsForFullCalendar(start, end, currentUser
     const sb = getSupabaseClient();
     if (!sb || !isBackendAuthConfigured()) return [];
 
-    let { data: sessionData } = await sb.auth.getSession();
+    let { data: sessionData, error: sessErr } = await sb.auth.getSession();
+    if (sessErr && isInvalidRefreshTokenError(sessErr)) {
+        await clearCorruptedLocalAuthSession();
+    }
     let session = sessionData?.session ?? null;
     if (!session) {
-        const { data: refData } = await sb.auth.refreshSession();
+        const { data: refData, error: refErr } = await sb.auth.refreshSession();
+        if (refErr && isInvalidRefreshTokenError(refErr)) await clearCorruptedLocalAuthSession();
         session = refData?.session ?? null;
     }
     if (!session) {
@@ -226,13 +248,15 @@ export async function replacePlanningEventEnrollment(eventId, studentUserIds) {
 /**
  * Lignes miroir Google (pour supprimer sur les bons calendriers avant DELETE planning_event).
  * @param {string} eventId
+ * @param {{ anySyncStatus?: boolean }} [options] — si `anySyncStatus`, inclut les miroirs non « ok » (purge admin).
  * @returns {Promise<{ calendarId: string, googleEventId: string }[]>}
  */
-export async function fetchPlanningMirrorTargetsForDelete(eventId) {
+export async function fetchPlanningMirrorTargetsForDelete(eventId, options = {}) {
     const sb = getSupabaseClient();
     if (!sb || !isBackendAuthConfigured()) return [];
     const id = String(eventId || '').trim();
     if (!id) return [];
+    const anySyncStatus = Boolean(options.anySyncStatus);
     const { data, error } = await sb
         .from('planning_event_google_mirror')
         .select('google_calendar_id,google_event_id,sync_status')
@@ -243,20 +267,16 @@ export async function fetchPlanningMirrorTargetsForDelete(eventId) {
     }
     const rows = Array.isArray(data) ? data : [];
     return rows
-        .filter(
-            (r) =>
-                r &&
-                String(r.sync_status || '') === 'ok' &&
-                String(r.google_event_id || '').trim() &&
-                String(r.google_calendar_id || '').trim()
-        )
+        .filter((r) => {
+            if (!r) return false;
+            if (!String(r.google_event_id || '').trim()) return false;
+            if (!String(r.google_calendar_id || '').trim()) return false;
+            if (anySyncStatus) return true;
+            return String(r.sync_status || '') === 'ok';
+        })
         .map((r) => ({
             calendarId: String(r.google_calendar_id).trim(),
             googleEventId: String(r.google_event_id).trim()
         }));
 }
 
-export function planningGridUsesSupabaseDb() {
-    const c = getPlanningConfig();
-    return Boolean(c?.planningGridReadsFromSupabase) && isBackendAuthConfigured();
-}

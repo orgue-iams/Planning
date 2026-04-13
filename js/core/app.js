@@ -19,12 +19,10 @@ import {
     onCalendarEventDragStart,
     onCalendarEventDragStop,
     syncReservationEventToGoogle,
-    bridgeGoogleIdFromFcEvent,
-    ensureGoogleAgendaSlotsFreeOrAbort,
     captureResizeStart,
     maybeNotifySlotOwnerAfterThirdPartyEdit,
     ownerInfoFromEvent,
-    refetchCalendarEventsFromGoogle
+    refetchPlanningGrid
 } from './calendar-logic.js';
 import {
     login,
@@ -58,6 +56,7 @@ import { setPlanningSessionUser, getPlanningSessionUser } from './session-user.j
 import { initProfileUi, resetProfileUiBindings, refreshHeaderWeekStrip } from './profile-ui.js';
 import { initSemainesTypesUi, resetSemainesTypesUiBindings } from './semaines-types-ui.js';
 import { initConfigUi, resetConfigUiBindings } from './config-ui.js';
+import { bindAdminClearWeekButton } from './admin-clear-week.js';
 import { fetchWeekCycleAnchor, clearProfWeekCycleCache } from './week-cycle.js';
 import { fetchOrganSchoolSettings, invalidateOrganSchoolSettingsCache } from './organ-settings.js';
 import { CACHE_NAME } from '../config/cache-name.js';
@@ -156,6 +155,7 @@ function refreshHeaderUser(user) {
         menuWrap?.classList.add('hidden');
         stripWrap?.classList.add('hidden');
         shell?.classList.remove('planning-shell--weekstrip');
+        document.getElementById('btn-admin-clear-week')?.classList.add('hidden');
         return;
     }
     if (nameEl) nameEl.textContent = user.name;
@@ -165,6 +165,7 @@ function refreshHeaderUser(user) {
     }
     menuWrap?.classList.remove('hidden');
     const r = String(user.role || '').toLowerCase();
+    document.getElementById('btn-admin-clear-week')?.classList.toggle('hidden', r !== 'admin');
     const showWeekStrip = r !== 'admin' && r !== 'prof';
     shell?.classList.toggle('planning-shell--weekstrip', showWeekStrip);
     void refreshHeaderWeekStrip(user);
@@ -244,17 +245,11 @@ function initCalendarAndRevealUi() {
                 showToast('Vous ne pouvez pas déplacer ce créneau.', 'error');
                 return;
             }
-            const okGoogle = await ensureGoogleAgendaSlotsFreeOrAbort(
-                info.view.calendar,
-                [{ start: info.event.start, end: info.event.end }],
-                bridgeGoogleIdFromFcEvent(info.event)
-            );
-            if (!okGoogle) {
+            const sync = await syncReservationEventToGoogle(info.event, info.view.calendar);
+            if (!sync.ok) {
                 info.revert();
                 return;
             }
-            const sync = await syncReservationEventToGoogle(info.event);
-            if (!sync.ok) return;
             const oi = ownerInfoFromEvent(info.event, currentUser);
             const me = String(currentUser?.email ?? '')
                 .trim()
@@ -303,6 +298,7 @@ function initCalendarAndRevealUi() {
         invalidateCalendarListCache();
         calendar = new FullCalendar.Calendar(calendarEl, getCalendarConfig(handlers, currentUser));
         calendar.render();
+        bindAdminClearWeekButton(() => calendar, () => currentUser);
         const toolbarCtl = initCalendarToolbar(calendar);
         handlers.onDatesSet = () => {
             toolbarCtl?.refreshTitle();
@@ -312,7 +308,7 @@ function initCalendarAndRevealUi() {
         void fetchWeekCycleAnchor(currentUser).then(() => toolbarCtl?.refreshTitle());
         document.addEventListener('planning-week-cycle-updated', () => toolbarCtl?.refreshTitle());
         document.addEventListener('planning-template-applied', () => {
-            void refetchCalendarEventsFromGoogle(calendar).catch(() => {
+            void refetchPlanningGrid(calendar).catch(() => {
                 /* */
             });
         });
@@ -355,10 +351,37 @@ function initCalendarAndRevealUi() {
     requestAnimationFrame(() => void mount());
 }
 
+/**
+ * Si le pointerdown a commencé dans .modal-box, on ignore le clic sur le fond du <dialog>
+ * (ex. sélection de texte commencée dans la modale, relâchée sur le backdrop).
+ */
+const dialogPointerStartedInModalBox = new WeakMap();
+
 /** Fermer une modale en cliquant sur le fond (hors .modal-box). L’événement a pour cible l’élément <dialog>. */
 function wireDialogBackdropClose() {
+    document.addEventListener(
+        'pointerdown',
+        (e) => {
+            const t = e.target;
+            if (!(t instanceof Node)) return;
+            const dlg = t.closest?.('dialog[open]');
+            if (!dlg) return;
+            const box = dlg.querySelector('.modal-box');
+            if (box instanceof HTMLElement && box.contains(t)) {
+                dialogPointerStartedInModalBox.set(dlg, true);
+            } else {
+                dialogPointerStartedInModalBox.delete(dlg);
+            }
+        },
+        true
+    );
+
     document.addEventListener('click', (e) => {
         if (e.target instanceof HTMLDialogElement && e.target.open) {
+            if (dialogPointerStartedInModalBox.get(e.target)) {
+                dialogPointerStartedInModalBox.delete(e.target);
+                return;
+            }
             if (
                 e.target.id === 'modal_password' &&
                 isBackendAuthConfigured() &&
@@ -366,6 +389,8 @@ function wireDialogBackdropClose() {
             ) {
                 return;
             }
+            /* Gestion des comptes : fermeture fond / abandon gérés dans admin-users-ui.js */
+            if (e.target.id === 'modal_users_admin') return;
             e.target.close();
         }
     });

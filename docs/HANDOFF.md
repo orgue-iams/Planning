@@ -8,7 +8,7 @@
 |---------|----------|
 | **Source de vérité** | PostgreSQL : table `planning_event` (+ `planning_event_enrollment` pour les inscriptions cours). |
 | **Google Calendar** | **Miroir** pour les utilisateurs (lecture abonnement / confort) ; écriture par l’app via `calendar-bridge`, pas de logique métier dans Google. |
-| **Grille FullCalendar** | Avec `planningGridReadsFromSupabase: true` : lecture via RPC `planning_events_in_range` (pas de `list` bridge pour l’affichage normal). |
+| **Grille FullCalendar** | Lecture via RPC `planning_events_in_range` uniquement (pas de mode « liste Google » côté front). |
 | **Sync** | Après écriture DB → push Google (général + pool concerné) ; table `planning_event_google_mirror` pour tracer ids / statut ; `sync_generation` sur `planning_event` pour invalidation future des retries. |
 | **Erreurs infra** | Table `planning_infra_error_log` + e-mail digest nocturne (paramètre `planning_error_notify_email` dans `organ_school_settings`) — **pas encore implémenté** côté job / envoi. |
 
@@ -24,15 +24,16 @@
 
 ### Front (JS)
 
-- **`js/config/planning.config.js`** : `planningGridReadsFromSupabase: true` (grille = DB).
+- **`js/config/planning.config.js`** : pas de drapeau grille : la grille lit toujours Postgres si session Supabase OK.
 - **`js/core/planning-events-db.js`** : RPC, mapping FC (`extendedProps.inscrits` depuis `inscrits_emails`), `upsertPlanningEventRow`, `deletePlanningEventRow`, `fetchPlanningMirrorTargetsForDelete`, `planningUserIdForEmail`, import dynamique de `calendar-logic` pour éviter cycle.
-- **`js/core/calendar-logic.js`** : sauvegarde modale + récurrence + création rapide en mode DB ; suppression DB + delete Google via miroirs ; `syncReservationEventToGoogle` avec `planningEventId` ; pas de conflit « liste Google » si grille DB (`googleAgendaConflictCheckWanted`).
+- **`js/core/calendar-logic.js`** : sauvegarde modale + récurrence + création rapide (Postgres + miroir Google) ; suppression DB + delete Google via miroirs ; `syncReservationEventToGoogle` avec `planningEventId` ; `refetchPlanningGrid` après changements.
 - **`js/core/reservation-motifs.js`** : `motifToPlanningDbSlotType` (Travail → `travail perso`).
-- **`js/config/fc-settings.js`** / **`planning-courses.js`** / **`calendar-events-list-cache.js`** : cache avec scope `db:userId` vs `bridge`.
+- **`js/config/fc-settings.js`** / **`planning-courses.js`** / **`calendar-events-list-cache.js`** : cache liste grille avec clé `db:userId`.
 - **`organ-settings.js`**, **`modal-config.html`**, **`config-ui.js`** : chargement / enregistrement `planning_error_notify_email` (admin).
 
 ### Edge — `calendar-bridge`
 
+- Action **`adminWipeCalendarsInRange`** (JWT **admin** uniquement) : `timeMin` / `timeMax` ISO ; liste puis supprime **tous** les événements Google sur la plage pour `GOOGLE_CALENDAR_ID` + chaque `google_calendar_pool` avec `assigned_user_id` non null (dédup). Sert le bouton « Vider semaine » quand la base et Google sont désynchronisés.
 - Payload événement : `planningEventId` (UUID `planning_event`).
 - Après upsert Google : persistance `planning_event_google_mirror` si **`SUPABASE_SERVICE_ROLE_KEY`** (auto) ou **`SERVICE_ROLE_KEY`** (secret Edge manuel — le dashboard **interdit** le préfixe `SUPABASE_` pour les secrets saisis à la main).
 - Retour `poolGoogleEventId` optionnel dans `results[]`.
@@ -53,13 +54,14 @@ Numérotation indicative ; détail technique dans le code / migrations existante
 6. **Semaines types / gabarit** : **`executeTemplateDatabasePhase`** (Postgres seul, sans Google) puis **`runTemplateGoogleBackgroundSync`** : suppressions miroirs triées **général → pool prof → autres**, upserts **un par un** avec pauses (`GOOGLE_BG_*_GAP_MS`) pour limiter les quotas ; UI bloque Préparer / Appliquer jusqu’à la fin (`stGoogleSyncInFlight`). Mode Google-only : même synchro séquentielle sans étape base.
 7. **Cohérence hors modale** : tout créneau créé uniquement côté Google (ancien flux) ne doit plus exister si la grille est 100 % DB ; migrations données éventuelles hors périmètre « fresh start ».
 8. **Tests / CI** : pas de tests auto sur le nouveau flux DB + bridge.
+9. **TODO futur (non prioritaire)** : **contrôle de cohérence** entre Postgres et le **calendrier général** Google seul — comparer une plage (ex. semaine courante + *n* semaines), produire un **rapport d’écarts** (base sans miroir, Google sans ligne base, horaires différents) ; correction automatique éventuelle dans un second temps. Alternative plus légère au job nocturne « tous calendriers » (point 2). **Pas pour le moment.**
 
 ## Checklist rapide « environnement prêt »
 
 - [ ] Migrations **015** et **016** appliquées (`supabase db push`).
 - [ ] `calendar-bridge` **redéployé** après les changements TypeScript.
 - [ ] Secret Edge **`SERVICE_ROLE_KEY`** = JWT **service_role** (Settings → API), si l’auto-injection `SUPABASE_SERVICE_ROLE_KEY` ne suffit pas.
-- [ ] Front : `planningGridReadsFromSupabase: true` et `CACHE_NAME` incrémenté si besoin après changements JS (`js/config/cache-name.js`).
+- [ ] Front : `CACHE_NAME` incrémenté si besoin après changements JS (`js/config/cache-name.js`).
 
 ## Fichiers clés (navigation)
 

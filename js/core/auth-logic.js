@@ -7,7 +7,9 @@ import {
     isBackendAuthConfigured,
     getRememberMePreference,
     setRememberMePreference,
-    purgeSupabaseKeysFromStorage
+    purgeSupabaseKeysFromStorage,
+    isInvalidRefreshTokenError,
+    clearCorruptedLocalAuthSession
 } from './supabase-client.js';
 import { showToast } from '../utils/toast.js';
 
@@ -104,7 +106,11 @@ export async function login(email, pass, rememberMe = true) {
         showToast('Configuration Supabase absente : renseignez supabaseUrl et supabaseAnonKey dans planning.config.js.', 'error');
         return { success: false };
     }
-    const id = String(email).trim().toLowerCase();
+    const id = String(email ?? '').trim().toLowerCase();
+    if (!id) {
+        showToast('Veuillez renseigner votre email.', 'error');
+        return { success: false };
+    }
     const remember = rememberMe !== false;
 
     setRememberMePreference(remember);
@@ -124,7 +130,18 @@ export async function login(email, pass, rememberMe = true) {
         password: pass
     });
     if (error) {
-        showToast(error.message || 'Identifiants invalides', 'error');
+        const raw = String(error.message || '').toLowerCase();
+        let msg = error.message || 'Identifiants invalides.';
+        if (raw.includes('missing email') || raw.includes('missing phone')) {
+            msg = 'Veuillez renseigner votre email.';
+        } else if (
+            raw.includes('invalid login credentials') ||
+            raw.includes('invalid_credentials') ||
+            raw.includes('invalid email or password')
+        ) {
+            msg = 'Email ou mot de passe incorrect.';
+        }
+        showToast(msg, 'error');
         return { success: false };
     }
     const user = await fetchAppUserFromSession(data.session);
@@ -141,8 +158,33 @@ export async function tryRestoreSession() {
     if (!isBackendAuthConfigured()) return null;
     const supabase = getSupabaseClient();
     if (!supabase) return null;
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+        data: { session: sess0 },
+        error: sessErr
+    } = await supabase.auth.getSession();
+    if (sessErr && isInvalidRefreshTokenError(sessErr)) {
+        await clearCorruptedLocalAuthSession();
+        return null;
+    }
+    let session = sess0;
     if (!session) return null;
+
+    const now = Math.floor(Date.now() / 1000);
+    const exp = typeof session.expires_at === 'number' ? session.expires_at : 0;
+    const needsRefresh = !exp || exp < now + 120;
+    if (needsRefresh) {
+        const { data: ref, error: refErr } = await supabase.auth.refreshSession();
+        if (refErr) {
+            if (isInvalidRefreshTokenError(refErr)) await clearCorruptedLocalAuthSession();
+            return null;
+        }
+        if (!ref?.session) {
+            await clearCorruptedLocalAuthSession();
+            return null;
+        }
+        session = ref.session;
+    }
+
     return fetchAppUserFromSession(session);
 }
 
@@ -151,14 +193,25 @@ export async function getAccessToken() {
     if (!isBackendAuthConfigured()) return null;
     const supabase = getSupabaseClient();
     if (!supabase) return null;
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error || !session) return null;
+    const {
+        data: { session },
+        error
+    } = await supabase.auth.getSession();
+    if (error) {
+        if (isInvalidRefreshTokenError(error)) await clearCorruptedLocalAuthSession();
+        return null;
+    }
+    if (!session) return null;
     const exp = session.expires_at;
     if (typeof exp === 'number') {
         const now = Math.floor(Date.now() / 1000);
         if (exp < now + 180) {
             const { data: ref, error: rerr } = await supabase.auth.refreshSession();
-            if (!rerr && ref?.session?.access_token) return ref.session.access_token;
+            if (rerr) {
+                if (isInvalidRefreshTokenError(rerr)) await clearCorruptedLocalAuthSession();
+                return null;
+            }
+            if (ref?.session?.access_token) return ref.session.access_token;
         }
     }
     return session.access_token ?? null;
@@ -268,7 +321,15 @@ export async function shouldResumeSupabasePasswordRecovery() {
     if (!isSupabasePasswordRecoveryPending()) return false;
     const supabase = getSupabaseClient();
     if (!supabase) return false;
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+        data: { session },
+        error
+    } = await supabase.auth.getSession();
+    if (error && isInvalidRefreshTokenError(error)) {
+        await clearCorruptedLocalAuthSession();
+        clearSupabasePasswordRecoveryPending();
+        return false;
+    }
     if (!session) {
         clearSupabasePasswordRecoveryPending();
         return false;

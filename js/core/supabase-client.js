@@ -3,7 +3,7 @@
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
 
-/** @returns {Record<string, unknown> & { supabaseUrl: string, supabaseAnonKey: string, calendarBridgeUrl: string, mainGoogleCalendarId: string, mainGoogleCalendarLabel: string, planningGridReadsFromSupabase: boolean }} */
+/** @returns {Record<string, unknown> & { supabaseUrl: string, supabaseAnonKey: string, calendarBridgeUrl: string, mainGoogleCalendarId: string, mainGoogleCalendarLabel: string }} */
 export function getPlanningConfig() {
     const c = typeof window !== 'undefined' ? window.__PLANNING_CONFIG__ : null;
     return {
@@ -12,7 +12,6 @@ export function getPlanningConfig() {
         calendarBridgeUrl: String(c?.calendarBridgeUrl ?? '').trim(),
         mainGoogleCalendarId: String(c?.mainGoogleCalendarId ?? '').trim(),
         mainGoogleCalendarLabel: String(c?.mainGoogleCalendarLabel ?? '').trim(),
-        planningGridReadsFromSupabase: Boolean(c?.planningGridReadsFromSupabase)
     };
 }
 
@@ -108,6 +107,37 @@ export function getSupabaseClient() {
         }
     });
     return _client;
+}
+
+/**
+ * GoTrue renvoie cette erreur quand le refresh token a été révoqué, expiré, ou que le stockage local est incohérent.
+ * Sans purge, chaque chargement retente indéfiniment et encombre la console.
+ * @param {unknown} err
+ */
+export function isInvalidRefreshTokenError(err) {
+    if (!err || typeof err !== 'object') return false;
+    const o = /** @type {{ code?: string; message?: string }} */ (err);
+    const code = String(o.code || '').toLowerCase();
+    const msg = String(o.message || '').toLowerCase();
+    return (
+        code === 'refresh_token_not_found' ||
+        code === 'invalid_refresh_token' ||
+        /invalid.?refresh.?token/.test(msg) ||
+        /refresh.?token.?not.?found/.test(msg)
+    );
+}
+
+/** Retire session + clés `sb-*` des deux bacs (évite « Se souvenir » vs onglet sans mémorisation désynchronisés). */
+export async function clearCorruptedLocalAuthSession() {
+    try {
+        if (_client) await _client.auth.signOut({ scope: 'local' });
+    } catch {
+        /* session déjà vide ou stockage restreint */
+    }
+    if (typeof window !== 'undefined') {
+        purgeSupabaseKeysFromStorage(localStorage);
+        purgeSupabaseKeysFromStorage(sessionStorage);
+    }
 }
 
 /**

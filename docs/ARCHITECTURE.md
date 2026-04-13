@@ -79,7 +79,7 @@
 
 ## Configuration front
 
-- `js/config/planning.config.js` : `supabaseUrl`, `supabaseAnonKey`, `calendarBridgeUrl`, `planningGridReadsFromSupabase`, IDs / labels Google « principal » pour liens profil.
+- `js/config/planning.config.js` : `supabaseUrl`, `supabaseAnonKey`, `calendarBridgeUrl`, IDs / labels Google « principal » pour liens profil.
 - Ne pas commiter de secrets en clair sur un dépôt public ; en CI/CD, injecter ou surcharger ce fichier.
 
 ## Déploiement
@@ -89,7 +89,7 @@
 
 ## Diagramme simplifié des flux « créneau »
 
-### Mode grille lue depuis Postgres (`planningGridReadsFromSupabase: true`)
+### Grille lue depuis Postgres
 
 ```mermaid
 sequenceDiagram
@@ -108,8 +108,4 @@ sequenceDiagram
     BR-->>App: results (google ids)
     App->>App: refetch RPC planning_events_in_range
 ```
-
-### Mode historique (grille = liste Google)
-
-Même idée sans étape `planning_event` : `App->>BR: upsert` puis refetch `list` ou mise à jour locale selon flux.
 

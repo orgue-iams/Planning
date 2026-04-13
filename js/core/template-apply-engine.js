@@ -6,7 +6,6 @@ import { getAccessToken } from './auth-logic.js';
 import { getSupabaseClient, getPlanningConfig, isBackendAuthConfigured } from './supabase-client.js';
 import { bridgeListEvents, bridgeDeleteEvent, bridgeUpsertEvents } from './calendar-bridge.js';
 import {
-    planningGridUsesSupabaseDb,
     upsertPlanningEventRow,
     replacePlanningEventEnrollment,
     fetchPlanningMirrorTargetsForDelete,
@@ -515,7 +514,7 @@ export async function analyzeTemplateApply(p) {
 
 /**
  * Étape 1 : uniquement Postgres (pas d’appel Google). Les miroirs à nettoyer sont collectés avant DELETE.
- * Si la grille n’est pas en base, retourne `google_only` (tout passera par la synchro Google en arrière-plan).
+ * Sans session Supabase configurée, retourne `google_only` (tout passera par la synchro Google en arrière-plan).
  */
 export async function executeTemplateDatabasePhase(analysis, ctx) {
     if (!analysis?.ok) return { ok: false, error: 'Analyse invalide.' };
@@ -525,7 +524,7 @@ export async function executeTemplateDatabasePhase(analysis, ctx) {
         onProgress?.({ phase: 'db', done, total, detail });
     };
 
-    if (!planningGridUsesSupabaseDb()) {
+    if (!isBackendAuthConfigured()) {
         return { ok: true, mode: 'google_only' };
     }
 

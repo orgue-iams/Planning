@@ -19,3 +19,12 @@ Quand vous modifiez `supabase/functions/**`, `supabase/migrations/**` ou `supaba
 6. Si le déploiement est impossible, l’indiquer **une fois** avec la raison précise.
 
 Fonctions du projet : déployées en bloc par la CLI (`calendar-bridge`, `planning-admin`, `planning-slot-notify` — voir `supabase/functions/` et `config.toml`).
+
+## Checklist avant de répondre à l’utilisateur
+
+Si cette session a **modifié** un fichier sous `supabase/functions/**` ou `supabase/migrations/**` : la réponse n’est **pas** terminée tant que la commande de déploiement n’a **pas** été tentée depuis la racine `Planning` :
+
+- une seule fonction touchée : `node scripts/deploy-supabase.cjs <nom>` (ex. `calendar-bridge`) ;
+- sinon : `npm run deploy:supabase`.
+
+Ne pas se contenter d’écrire « il faut redéployer » sans avoir lancé la commande (sauf échec documenté : CLI absente, `supabase login` requis, etc.).

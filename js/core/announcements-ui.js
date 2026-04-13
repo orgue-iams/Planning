@@ -86,7 +86,7 @@ export function initAnnouncementsUi(currentUser) {
         annQuill = null;
         annQuill = createPlanningQuill(mount, {
             placeholder: 'Votre message…',
-            adminFontStepper: currentUser?.role === 'admin'
+            compactAnnouncementToolbar: true
         });
         return annQuill;
     };
@@ -139,7 +139,13 @@ export function initAnnouncementsUi(currentUser) {
             if (!annQuill) return;
             const body = sanitizeRulesHtml(normalizeQuillMarkup(annQuill.root.innerHTML));
             if (!quillGetPlainText(annQuill)) {
-                showToast('Saisissez un message.', 'error');
+                const res = await replaceLoginAnnouncementRemote({ body: '', startsAt: null, endsAt: null });
+                if (!res.ok) {
+                    showToast(res.error || 'Erreur', 'error');
+                    return;
+                }
+                showToast('Annonce effacée (aucun message sur l’écran de connexion).');
+                quillSetHtml(annQuill, '');
                 return;
             }
             const { starts, ends } = readBoundsIso();

@@ -1,51 +1,16 @@
 /**
  * Cours (événements type=cours) : filtrage par rôle / inscriptions, plages de dates.
  */
-import { getAccessToken } from './auth-logic.js';
-import { invokeCalendarBridge } from './calendar-bridge.js';
 import {
     calendarListCacheKey,
     cloneCachedCalendarRows,
     getCalendarListCache,
     setCalendarListCache
 } from './calendar-events-list-cache.js';
-import { fetchPlanningEventsForFullCalendar, planningGridUsesSupabaseDb } from './planning-events-db.js';
+import { fetchPlanningEventsForFullCalendar } from './planning-events-db.js';
 import { formatTimeFr24 } from '../utils/time-helpers.js';
 import { getPlanningSessionUser } from './session-user.js';
-import { getPlanningConfig, isBackendAuthConfigured } from './supabase-client.js';
-
-/** Même normalisation que fc-settings (réponse bridge → extendedProps cohérents). */
-export function mapBridgeListEvents(raw) {
-    const list = Array.isArray(raw) ? raw : [];
-    return list.map((ev) => {
-        const o = /** @type {Record<string, unknown>} */ (ev);
-        const ext = o.extendedProps;
-        const xp =
-            ext && typeof ext === 'object' && !Array.isArray(ext)
-                ? { .../** @type {Record<string, unknown>} */ (ext) }
-                : {};
-        const gid =
-            (typeof o.id === 'string' && o.id) ||
-            (typeof xp.googleEventId === 'string' && xp.googleEventId) ||
-            '';
-        if (gid) {
-            xp.googleEventId = gid;
-            o.id = gid;
-        }
-        if (!Array.isArray(xp.inscrits)) {
-            if (xp.inscrits == null) xp.inscrits = [];
-            else if (typeof xp.inscrits === 'string') {
-                xp.inscrits = String(xp.inscrits)
-                    .split(/[,;]/)
-                    .map((s) => s.trim().toLowerCase())
-                    .filter(Boolean);
-            } else {
-                xp.inscrits = [];
-            }
-        }
-        return { ...o, extendedProps: xp };
-    });
-}
+import { isBackendAuthConfigured } from './supabase-client.js';
 
 /** Début lundi 00:00 et fin dimanche 23:59:59.999 (locale). */
 export function isoWeekRangeLocal(d) {
@@ -91,7 +56,7 @@ export function sortEventsByStart(events) {
 }
 
 /**
- * @param {{ title?: string; start?: string; end?: string; extendedProps?: { owner?: string; ownerDisplayName?: string } }} ev
+ * @param {{ title?: string, start?: string, end?: string, extendedProps?: { owner?: string, ownerDisplayName?: string } }} ev
  */
 export function formatCoursLineFr(ev) {
     const title = String(ev?.title ?? 'Cours').trim() || 'Cours';
@@ -114,42 +79,16 @@ export function formatCoursLineFr(ev) {
  * @param {Date} rangeEnd
  */
 export async function fetchCalendarEventsInRange(rangeStart, rangeEnd) {
-    const { calendarBridgeUrl } = getPlanningConfig();
-    const useDbGrid = planningGridUsesSupabaseDb();
-    const useBridge = Boolean(calendarBridgeUrl) && isBackendAuthConfigured() && !useDbGrid;
-    if (useDbGrid) {
-        const u = getPlanningSessionUser();
-        const cacheKey = calendarListCacheKey(
-            rangeStart.toISOString(),
-            rangeEnd.toISOString(),
-            `db:${u?.id || ''}`
-        );
-        const hit = getCalendarListCache(cacheKey);
-        if (hit) return cloneCachedCalendarRows(hit);
-        const rows = await fetchPlanningEventsForFullCalendar(rangeStart, rangeEnd, u);
-        setCalendarListCache(cacheKey, cloneCachedCalendarRows(rows));
-        return rows;
-    }
-    if (useBridge) {
-        const cacheKey = calendarListCacheKey(
-            rangeStart.toISOString(),
-            rangeEnd.toISOString(),
-            'bridge'
-        );
-        const hit = getCalendarListCache(cacheKey);
-        if (hit) return cloneCachedCalendarRows(hit);
-        const token = await getAccessToken();
-        if (!token) return [];
-        const bridge = await invokeCalendarBridge(token, {
-            action: 'list',
-            timeMin: rangeStart.toISOString(),
-            timeMax: rangeEnd.toISOString()
-        });
-        if (!bridge.ok) return [];
-        const data = /** @type {{ events?: unknown[] }} */ (bridge.data || {});
-        const rows = mapBridgeListEvents(Array.isArray(data.events) ? data.events : []);
-        setCalendarListCache(cacheKey, cloneCachedCalendarRows(rows));
-        return rows;
-    }
-    return [];
+    if (!isBackendAuthConfigured()) return [];
+    const u = getPlanningSessionUser();
+    const cacheKey = calendarListCacheKey(
+        rangeStart.toISOString(),
+        rangeEnd.toISOString(),
+        `db:${u?.id || ''}`
+    );
+    const hit = getCalendarListCache(cacheKey);
+    if (hit) return cloneCachedCalendarRows(hit);
+    const rows = await fetchPlanningEventsForFullCalendar(rangeStart, rangeEnd, u);
+    setCalendarListCache(cacheKey, cloneCachedCalendarRows(rows));
+    return rows;
 }

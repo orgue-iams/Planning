@@ -24,11 +24,5 @@ window.__PLANNING_CONFIG__ = window.__PLANNING_CONFIG__ || {
     mainGoogleCalendarId: 'orgue.iams@gmail.com',
 
     /** Nom affiché au-dessus du lien dans la modale Profil (sinon libellé par défaut côté app). */
-    mainGoogleCalendarLabel: 'Planning général',
-
-    /**
-     * true = grille FullCalendar via RPC `planning_events_in_range` (migration 015).
-     * false = liste Google (calendar-bridge), comportement historique.
-     */
-    planningGridReadsFromSupabase: true
+    mainGoogleCalendarLabel: 'Planning général'
 };

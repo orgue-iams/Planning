@@ -1,5 +1,11 @@
 import { getAccessToken } from './auth-logic.js';
-import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
+import {
+    getPlanningConfig,
+    getSupabaseClient,
+    isBackendAuthConfigured,
+    isInvalidRefreshTokenError,
+    clearCorruptedLocalAuthSession
+} from './supabase-client.js';
 
 function parseFunctionsBody(text) {
     if (!text || !text.trim()) return {};
@@ -65,7 +71,8 @@ export async function planningAdminInvoke(action, payload = {}) {
     if (res.status === 401 && isBackendAuthConfigured()) {
         const supabase = getSupabaseClient();
         if (supabase) {
-            await supabase.auth.refreshSession();
+            const { error: refErr } = await supabase.auth.refreshSession();
+            if (refErr && isInvalidRefreshTokenError(refErr)) await clearCorruptedLocalAuthSession();
             token = await getAccessToken();
             if (token) res = await doFetch(token);
         }
