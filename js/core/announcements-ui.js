@@ -104,7 +104,7 @@ export function initAnnouncementsUi(currentUser) {
         'click',
         async (e) => {
             e.preventDefault();
-            document.getElementById('btn-user-menu')?.blur();
+            document.getElementById('btn-header-settings')?.blur();
             /* Charger d’abord, puis créer Quill une seule fois (évite barres dupliquées si fermeture pendant le fetch). */
             const latest = await fetchLatestLoginAnnouncementForEdit();
             ensureAnnQuill();

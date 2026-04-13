@@ -555,7 +555,7 @@ export function initAdminUsersUi(currentUser) {
 
     document.getElementById('menu-item-users-admin')?.addEventListener('click', (e) => {
         e.preventDefault();
-        document.getElementById('btn-user-menu')?.blur();
+        document.getElementById('btn-header-settings')?.blur();
         const dlg = document.getElementById('modal_users_admin');
         if (!dlg) {
             showToast('Fenêtre de gestion indisponible. Rechargez la page.', 'error');

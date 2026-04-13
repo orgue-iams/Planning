@@ -1193,7 +1193,6 @@ function onSemainesTypesDocumentClick(e) {
 
 export function initSemainesTypesUi(currentUser) {
     const show = isBackendAuthConfigured() && isPrivilegedUser(currentUser);
-    document.getElementById('menu-item-week-cycle-wrap')?.classList.toggle('hidden', !show);
     if (!show) return;
     if (stUiBound) return;
     stUiBound = true;
@@ -1202,11 +1201,11 @@ export function initSemainesTypesUi(currentUser) {
     stAbort = new AbortController();
     const { signal } = stAbort;
 
-    document.getElementById('menu-item-week-cycle')?.addEventListener(
+    document.getElementById('btn-header-semaines-types')?.addEventListener(
         'click',
         (e) => {
             e.preventDefault();
-            document.getElementById('btn-user-menu')?.blur();
+            document.getElementById('btn-header-semaines-types')?.blur();
             const u = getPlanningSessionUser();
             if (!u?.id) return;
             void openSemainesTypesModal(u);

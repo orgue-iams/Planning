@@ -26,6 +26,14 @@
 | `js/core/app.js` | Init : `loadUIComponents`, FullCalendar, auth, toolbar, liaison `calendar-logic` |
 | `js/utils/loader.js` | `fetch` parallèle des fragments HTML → injection dans `#app-header` / `#app-modals` |
 
+## Barre du haut (`components/headers.html`)
+
+- **Nom affiché** : prénom puis nom (`formatProfileFullName` + `supabase-auth.js`).
+- **Icône calendrier** (`#btn-header-semaines-types`) : prof. / admin. — modale semaines types A/B (`semaines-types-ui.js`).
+- **Icône engrenage** : même public — menu **Réglages** : configuration planning, gestion comptes (admin), calendriers des utilisateurs (admin), annonces (prof./admin.).
+- **Icône personne** : tous les rôles — Profil, mot de passe, aide, déconnexion.
+- Visibilité des deux premiers blocs : `refreshHeaderUser` dans `app.js` (staff + backend configuré).
+
 ## Cœur métier calendrier
 
 | Module | Rôle |
@@ -45,7 +53,7 @@
 | `js/core/supabase-client.js` | Client Supabase, `planning.config.js` |
 | `js/core/supabase-auth.js` | Session → utilisateur app (`name`, `email`, `role`, `id`) + `nom`/`prenom`/`display_name` |
 | `js/core/session-user.js` | Utilisateur courant pour le reste de l’UI |
-| `js/utils/profile-full-name.js` | `formatProfileFullName(nom, prenom)` |
+| `js/utils/profile-full-name.js` | `formatProfileFullName(nom, prenom)` → affichage **Prénom Nom** (bandeau, session) |
 | `js/utils/user-profile.js` | Préférences `reservation_types` (titres) + sync `profiles` |
 
 ## Fonctionnalités par domaine (fichiers repères)

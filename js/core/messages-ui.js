@@ -244,7 +244,7 @@ export function initMessagesUi(_ignored) {
     btnPublish?.addEventListener(
         'click',
         () => {
-            showToast('Utilisez le menu utilisateur → Annonces (Supabase) pour publier une annonce.', 'info');
+            showToast('Utilisez le menu Réglages (engrenage) → Annonces (Supabase) pour publier une annonce.', 'info');
         },
         { signal }
     );

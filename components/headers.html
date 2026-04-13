@@ -13,23 +13,41 @@
             <button type="button" id="btn-rules" class="btn btn-ghost btn-xs font-sans font-semibold normal-case text-[11px] sm:text-[13px] leading-tight text-slate-700 border border-slate-200 bg-white shadow-sm hover:bg-slate-50 hover:border-slate-300 px-2 sm:px-2.5 h-8 sm:h-9 max-sm:h-7 max-sm:min-h-7 max-sm:px-1.5 max-sm:text-[10px] max-sm:leading-tight max-w-[min(52vw,11rem)] sm:max-w-[min(72vw,18rem)] max-sm:max-w-[min(46vw,9.5rem)] truncate shrink-0" title="Consignes">Consignes</button>
         </div>
 
-        <div class="flex items-center justify-end gap-1 sm:gap-2 min-w-0 max-sm:gap-0.5">
+        <div class="flex items-center justify-end gap-0.5 sm:gap-1 min-w-0 max-sm:gap-0.5">
             <div id="user-identity" class="flex flex-col items-end min-w-0 mr-0.5 sm:mr-1 leading-tight max-sm:mr-0">
                 <span id="user-display-name" class="text-[10px] sm:text-[11px] font-black text-slate-800 truncate max-w-[6.5rem] sm:max-w-[12rem] max-sm:max-w-[4.25rem] max-sm:text-[8px] max-sm:leading-tight">Invité</span>
                 <span id="user-display-role" class="text-[9px] font-bold text-slate-500 uppercase tracking-wide truncate max-w-[6.5rem] sm:max-w-[12rem] hidden max-sm:hidden"></span>
             </div>
+            <!-- Prof / admin : semaines types (icône calendrier, à gauche des réglages) -->
+            <div id="header-semaines-types-wrap" class="hidden shrink-0">
+                <button type="button" id="btn-header-semaines-types" class="btn btn-ghost btn-square btn-xs sm:btn-sm border border-transparent hover:border-slate-200 max-sm:!h-7 max-sm:!w-7 max-sm:!min-h-0" aria-label="Semaines types A / B" title="Semaines types A / B">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-5 sm:w-5 max-sm:h-4 max-sm:w-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                </button>
+            </div>
+            <!-- Prof / admin : réglages (pool, comptes, config, annonces) -->
+            <div id="header-settings-wrap" class="hidden dropdown dropdown-end shrink-0">
+                <div tabindex="0" role="button" id="btn-header-settings" class="btn btn-ghost btn-square btn-xs sm:btn-sm border border-transparent hover:border-slate-200 max-sm:!h-7 max-sm:!w-7 max-sm:!min-h-0" aria-label="Réglages" aria-haspopup="menu" title="Réglages">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-5 sm:w-5 max-sm:h-4 max-sm:w-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </div>
+                <ul tabindex="0" class="dropdown-content menu z-[100] mt-1 w-56 rounded-box border border-slate-200 bg-base-100 p-2 shadow-lg">
+                    <li class="hidden" id="menu-item-config-wrap"><a href="#" id="menu-item-config" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Configuration du planning</a></li>
+                    <li class="hidden" id="menu-item-users-admin-wrap"><a href="#" id="menu-item-users-admin" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Gestion des comptes</a></li>
+                    <li class="hidden" id="menu-item-calendar-pool-wrap"><a href="#" id="menu-item-calendar-pool" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Calendriers des utilisateurs</a></li>
+                    <li class="hidden" id="menu-item-announcements-wrap"><a href="#" id="menu-item-announcements" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Annonces</a></li>
+                </ul>
+            </div>
             <div id="user-menu-wrap" class="dropdown dropdown-end hidden shrink-0">
-                <div tabindex="0" role="button" id="btn-user-menu" class="btn btn-ghost btn-square btn-xs sm:btn-sm border border-transparent hover:border-slate-200 max-sm:!h-7 max-sm:!w-7 max-sm:!min-h-0" aria-label="Menu utilisateur" aria-haspopup="menu">
+                <div tabindex="0" role="button" id="btn-user-menu" class="btn btn-ghost btn-square btn-xs sm:btn-sm border border-transparent hover:border-slate-200 max-sm:!h-7 max-sm:!w-7 max-sm:!min-h-0" aria-label="Menu utilisateur" aria-haspopup="menu" title="Compte">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-5 sm:w-5 max-sm:h-4 max-sm:w-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                 </div>
                 <ul tabindex="0" class="dropdown-content menu z-[100] mt-1 w-56 rounded-box border border-slate-200 bg-base-100 p-2 shadow-lg">
-                    <li class="hidden" id="menu-item-users-admin-wrap"><a href="#" id="menu-item-users-admin" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Gestion des comptes</a></li>
-                    <li class="hidden" id="menu-item-calendar-pool-wrap"><a href="#" id="menu-item-calendar-pool" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Calendriers secondaires</a></li>
-                    <li class="hidden" id="menu-item-announcements-wrap"><a href="#" id="menu-item-announcements" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Annonces</a></li>
-                    <li class="hidden" id="menu-item-config-wrap"><a href="#" id="menu-item-config" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Configuration</a></li>
-                    <li class="hidden" id="menu-item-week-cycle-wrap"><a href="#" id="menu-item-week-cycle" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Semaines types A / B</a></li>
                     <li><a href="#" id="menu-item-profile" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Profil</a></li>
                     <li><a href="#" id="menu-item-change-password" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Changer mon mot de passe</a></li>
                     <li><a href="#" id="menu-item-help" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Aide</a></li>

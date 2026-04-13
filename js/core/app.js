@@ -136,6 +136,7 @@ function syncHelpModalContent(user) {
     document.getElementById('help-li-week-cycle')?.classList.toggle('hidden', !isStaff);
     document.getElementById('help-li-announcements')?.classList.toggle('hidden', !isStaff);
     document.getElementById('help-li-admin-users')?.classList.toggle('hidden', !isAdmin);
+    document.getElementById('help-li-calendar-pool')?.classList.toggle('hidden', !isAdmin);
 
     document.getElementById('help-block-eleve-notify')?.classList.toggle('hidden', r !== 'eleve');
 }
@@ -153,6 +154,8 @@ function refreshHeaderUser(user) {
             roleEl.classList.add('hidden');
         }
         menuWrap?.classList.add('hidden');
+        document.getElementById('header-semaines-types-wrap')?.classList.add('hidden');
+        document.getElementById('header-settings-wrap')?.classList.add('hidden');
         stripWrap?.classList.add('hidden');
         shell?.classList.remove('planning-shell--weekstrip');
         document.getElementById('btn-admin-clear-week')?.classList.add('hidden');
@@ -165,6 +168,9 @@ function refreshHeaderUser(user) {
     }
     menuWrap?.classList.remove('hidden');
     const r = String(user.role || '').toLowerCase();
+    const staff = isBackendAuthConfigured() && (r === 'prof' || r === 'admin');
+    document.getElementById('header-semaines-types-wrap')?.classList.toggle('hidden', !staff);
+    document.getElementById('header-settings-wrap')?.classList.toggle('hidden', !staff);
     document.getElementById('btn-admin-clear-week')?.classList.toggle('hidden', r !== 'admin');
     const showWeekStrip = r !== 'admin' && r !== 'prof';
     shell?.classList.toggle('planning-shell--weekstrip', showWeekStrip);

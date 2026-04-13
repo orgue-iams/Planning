@@ -1,5 +1,5 @@
 /**
- * Pool calendriers Google secondaires — modale depuis le menu utilisateur (admin).
+ * Pool calendriers Google secondaires — modale Réglages → Calendriers des utilisateurs (admin).
  */
 import { isAdmin } from './auth-logic.js';
 import { isBackendAuthConfigured } from './supabase-client.js';
@@ -65,7 +65,7 @@ export function initAdminCalendarPoolUi(currentUser) {
 
     document.getElementById('menu-item-calendar-pool')?.addEventListener('click', (e) => {
         e.preventDefault();
-        document.getElementById('btn-user-menu')?.blur();
+        document.getElementById('btn-header-settings')?.blur();
         const dlg = document.getElementById('modal_calendar_pool');
         if (!dlg) {
             showToast('Fenêtre pool indisponible. Rechargez la page.', 'error');

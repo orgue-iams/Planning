@@ -30,6 +30,7 @@
 - **`js/core/reservation-motifs.js`** : `motifToPlanningDbSlotType` (Travail → `travail perso`).
 - **`js/config/fc-settings.js`** / **`planning-courses.js`** / **`calendar-events-list-cache.js`** : cache liste grille avec clé `db:userId`.
 - **`organ-settings.js`**, **`modal-config.html`**, **`config-ui.js`** : chargement / enregistrement `planning_error_notify_email` (admin).
+- **Header** : menu compte (icône personne) commun à tous les rôles ; **Réglages** (engrenage) et **sem. types** (calendrier) pour prof. / admin. ; libellé UI **Calendriers des utilisateurs** pour le pool Google (admin.).
 
 ### Edge — `calendar-bridge`
 

@@ -55,7 +55,7 @@ export function initConfigUi(currentUser) {
 
     document.getElementById('menu-item-config')?.addEventListener('click', (ev) => {
         ev.preventDefault();
-        document.getElementById('btn-user-menu')?.blur();
+        document.getElementById('btn-header-settings')?.blur();
         void fillConfigModal().then(() => document.getElementById('modal_config')?.showModal());
     });
 
