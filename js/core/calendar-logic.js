@@ -338,7 +338,6 @@ function allowedMotifsForReservationModal(currentUser, event) {
 
 function defaultMotifForRole(role) {
     const r = normalizeRole(role);
-    if (r === 'prof') return 'Cours';
     return 'Travail';
 }
 
@@ -574,17 +573,27 @@ export async function maybeNotifySlotOwnerAfterThirdPartyEdit({
         .toLowerCase();
     if (!actor || !owner || owner === actor) return;
 
-    const r = await invokeSlotNotify({
-        action,
-        targetEmail: owner,
-        actorEmail: actor,
-        actorDisplayName: String(currentUser?.name ?? '').trim() || actor,
-        slotTitle: String(slotTitle ?? '').trim() || 'Créneau',
-        slotStartIso: slotStart instanceof Date ? slotStart.toISOString() : String(slotStart ?? ''),
-        slotEndIso: slotEnd instanceof Date ? slotEnd.toISOString() : String(slotEnd ?? ''),
-        previousStartIso: String(previousStartIso ?? ''),
-        previousEndIso: String(previousEndIso ?? '')
-    });
+    let r;
+    try {
+        r = await invokeSlotNotify({
+            action,
+            targetEmail: owner,
+            actorEmail: actor,
+            actorDisplayName: String(currentUser?.name ?? '').trim() || actor,
+            slotTitle: String(slotTitle ?? '').trim() || 'Créneau',
+            slotStartIso: slotStart instanceof Date ? slotStart.toISOString() : String(slotStart ?? ''),
+            slotEndIso: slotEnd instanceof Date ? slotEnd.toISOString() : String(slotEnd ?? ''),
+            previousStartIso: String(previousStartIso ?? ''),
+            previousEndIso: String(previousEndIso ?? '')
+        });
+    } catch (e) {
+        console.warn('[slot-notify] échec appel', e);
+        showToast(
+            `L’e-mail n’a pas pu être envoyé à ${String(targetOwnerDisplayName ?? '').trim() || owner}. Merci de le ou la prévenir directement.`,
+            'error'
+        );
+        return;
+    }
 
     const label = String(targetOwnerDisplayName ?? '').trim() || owner;
     if (r.skipped) return;

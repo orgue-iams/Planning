@@ -1,7 +1,11 @@
 /**
  * Modale Profil + bandeau « cours de la semaine » dans l’en-tête.
  */
-import { roleLabelFr } from './auth-logic.js';
+import {
+    roleLabelFr,
+    updateCurrentUserEmail,
+    updateCurrentUserPasswordSimple
+} from './auth-logic.js';
 import { getPlanningSessionUser } from './session-user.js';
 import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
 import { googleCalendarEmbedUrl } from '../utils/google-calendar-url.js';
@@ -119,8 +123,16 @@ export async function refreshHeaderWeekStrip(user) {
 
 async function fillProfileModal(user) {
     document.getElementById('profile-display-name').textContent = user.name || '—';
-    document.getElementById('profile-email').textContent = user.email || '—';
+    const emailInput = document.getElementById('profile-email-input');
+    if (emailInput instanceof HTMLInputElement) {
+        emailInput.value = user.email || '';
+    }
+    document.getElementById('profile-email-hint')?.classList.add('hidden');
     document.getElementById('profile-role-label').textContent = roleLabelFr(user.role);
+    const passNew = document.getElementById('profile-pass-new');
+    const passConfirm = document.getElementById('profile-pass-confirm');
+    if (passNew instanceof HTMLInputElement) passNew.value = '';
+    if (passConfirm instanceof HTMLInputElement) passConfirm.value = '';
 
     const isEleve = String(user.role).toLowerCase() === 'eleve';
     document.getElementById('profile-cours-section')?.classList.toggle('hidden', !isEleve);
@@ -233,4 +245,51 @@ export function initProfileUi(currentUser) {
     document.getElementById('profile-copy-personal')?.addEventListener('click', () =>
         void copyInputUrl('profile-url-personal')
     );
+
+    document.getElementById('profile-email-save')?.addEventListener('click', async () => {
+        const input = document.getElementById('profile-email-input');
+        if (!(input instanceof HTMLInputElement)) return;
+        const res = await updateCurrentUserEmail(input.value);
+        if (!res.ok) {
+            showToast(res.error || 'Impossible de modifier l’e-mail.', 'error');
+            return;
+        }
+        document.getElementById('profile-email-hint')?.classList.remove('hidden');
+        showToast('Demande de changement d’e-mail enregistrée.', 'success');
+    });
+
+    const passToggle = document.getElementById('profile-pass-toggle');
+    const passShow = document.getElementById('profile-pass-icon-show');
+    const passHide = document.getElementById('profile-pass-icon-hide');
+    const applyPassVisibility = (visible) => {
+        const type = visible ? 'text' : 'password';
+        document.getElementById('profile-pass-new')?.setAttribute('type', type);
+        document.getElementById('profile-pass-confirm')?.setAttribute('type', type);
+        passToggle?.setAttribute('aria-pressed', String(visible));
+        passToggle?.setAttribute(
+            'aria-label',
+            visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'
+        );
+        passShow?.classList.toggle('hidden', visible);
+        passHide?.classList.toggle('hidden', !visible);
+    };
+    passToggle?.addEventListener('click', () => {
+        const vis = document.getElementById('profile-pass-new')?.getAttribute('type') === 'text';
+        applyPassVisibility(!vis);
+    });
+    document.getElementById('modal_profile')?.addEventListener('close', () => applyPassVisibility(false));
+
+    document.getElementById('profile-pass-save')?.addEventListener('click', async () => {
+        const a = /** @type {HTMLInputElement | null} */ (document.getElementById('profile-pass-new'));
+        const b = /** @type {HTMLInputElement | null} */ (document.getElementById('profile-pass-confirm'));
+        const res = await updateCurrentUserPasswordSimple(a?.value || '', b?.value || '');
+        if (!res.ok) {
+            showToast(res.error || 'Impossible de modifier le mot de passe.', 'error');
+            return;
+        }
+        if (a) a.value = '';
+        if (b) b.value = '';
+        applyPassVisibility(false);
+        showToast('Mot de passe modifié avec succès.', 'success');
+    });
 }

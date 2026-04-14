@@ -430,6 +430,7 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
     tr.setAttribute('data-line-id', line?.id || '');
     tr.setAttribute('data-owner-id', lineOwnerId);
     tr.setAttribute('data-st-editable', isReadonly ? '0' : '1');
+    tr.classList.add(line?.slot_type === 'cours' ? 'st-row-cours' : 'st-row-travail');
 
     const dowSel = DOW_OPTS.map(
         (o) => `<option value="${o.v}" ${line?.day_of_week === o.v ? 'selected' : ''}>${o.t}</option>`
@@ -467,10 +468,10 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
     tr.innerHTML = `
         ${dragCell}
         <td class="text-[10px] font-bold text-slate-700 align-top">${escapeAttr(ownerLabel)}</td>
+        <td><select class="select select-xs st-type max-w-[5.5rem] text-[10px] font-bold bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${typeSel}</select></td>
         <td><select class="select select-xs st-dow max-w-[4.5rem] font-bold bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${dowSel}</select></td>
-        <td><select class="select select-xs st-start max-w-[4.5rem] font-mono bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
-        <td><select class="select select-xs st-end max-w-[4.5rem] font-mono bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
-        <td><select class="select select-xs st-type max-w-[5.5rem] font-bold bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${typeSel}</select></td>
+        <td><select class="select select-xs st-start max-w-[4.5rem] text-[10px] font-mono bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
+        <td><select class="select select-xs st-end max-w-[4.5rem] text-[10px] font-mono bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
         <td><input type="text" class="input input-xs st-title w-full min-w-[6rem] text-[10px] bg-white border border-slate-200 rounded" value="${title}" ${isReadonly ? 'readonly' : ''} /></td>
         ${studentsCell}
         <td>${isReadonly ? '' : '<button type="button" class="btn btn-ghost btn-xs st-del font-black text-error">×</button>'}</td>
@@ -519,6 +520,20 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
             }
             syncReadonlyStudentsText(tr, cur, elevesById);
         }
+        tr.classList.toggle('st-row-cours', t === 'cours');
+        tr.classList.toggle('st-row-travail', t !== 'cours');
+    });
+    tr.querySelector('.st-students')?.addEventListener('blur', () => {
+        const mul = tr.querySelector('.st-students');
+        const ro = tr.querySelector('.st-students-readonly-wrap');
+        if (!mul || mul.classList.contains('hidden')) return;
+        const studs = [];
+        for (const o of mul.selectedOptions) {
+            if (o.value) studs.push(o.value);
+        }
+        syncReadonlyStudentsText(tr, studs, elevesById);
+        mul.classList.add('hidden');
+        ro?.classList.remove('hidden');
     });
 }
 

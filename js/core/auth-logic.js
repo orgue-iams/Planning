@@ -271,6 +271,51 @@ export async function updatePassword() {
 }
 
 /**
+ * Mise à jour d'e-mail depuis la modale Profil.
+ * @param {string} rawEmail
+ * @returns {Promise<{ ok: boolean, error?: string }>}
+ */
+export async function updateCurrentUserEmail(rawEmail) {
+    const email = String(rawEmail ?? '').trim().toLowerCase();
+    if (!email || !email.includes('@')) {
+        return { ok: false, error: 'Veuillez saisir une adresse e-mail valide.' };
+    }
+    if (!isBackendAuthConfigured()) {
+        return { ok: false, error: 'Configuration Supabase requise.' };
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) return { ok: false, error: 'Supabase indisponible.' };
+    const { error } = await supabase.auth.updateUser({ email });
+    if (error) return { ok: false, error: error.message || 'Impossible de modifier l’e-mail.' };
+    return { ok: true };
+}
+
+/**
+ * Mise à jour de mot de passe depuis la modale Profil (sans ancien mot de passe).
+ * @param {string} newPass
+ * @param {string} confirmPass
+ * @returns {Promise<{ ok: boolean, error?: string }>}
+ */
+export async function updateCurrentUserPasswordSimple(newPass, confirmPass) {
+    const a = String(newPass ?? '');
+    const b = String(confirmPass ?? '');
+    if (a.length < MIN_PASS_LEN) {
+        return { ok: false, error: `Le mot de passe doit contenir au moins ${MIN_PASS_LEN} caractères.` };
+    }
+    if (a !== b) {
+        return { ok: false, error: 'Les mots de passe ne correspondent pas.' };
+    }
+    if (!isBackendAuthConfigured()) {
+        return { ok: false, error: 'Configuration Supabase requise.' };
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) return { ok: false, error: 'Supabase indisponible.' };
+    const { error } = await supabase.auth.updateUser({ password: a });
+    if (error) return { ok: false, error: error.message || 'Impossible de modifier le mot de passe.' };
+    return { ok: true };
+}
+
+/**
  * Indique si l’URL actuelle ressemble au retour d’un e-mail de réinitialisation Supabase
  * (fragment #… ou redirection PKCE avec ?code=).
  */

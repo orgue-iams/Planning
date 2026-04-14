@@ -278,6 +278,7 @@ function initCalendarAndRevealUi() {
                     previousEndIso: info.oldEvent.end.toISOString()
                 });
             }
+            await refetchPlanningGrid(info.view.calendar);
         },
         onEventResize: (info) => {
             if (!canCurrentUserEditEvent(currentUser, info.event)) {
@@ -562,14 +563,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    document.getElementById('menu-item-change-password')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById('btn-user-menu')?.blur();
-        if (!currentUser) return;
-        setPasswordModalMode(false);
-        document.getElementById('modal_password')?.showModal();
-        requestAnimationFrame(() => document.getElementById('old-pass')?.focus());
-    });
     document.getElementById('menu-item-logout')?.addEventListener('click', async (e) => {
         e.preventDefault();
         document.getElementById('btn-user-menu')?.blur();

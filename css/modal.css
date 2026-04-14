@@ -478,3 +478,18 @@
     opacity: 0.55;
     cursor: not-allowed;
 }
+
+/* Semaines types : lignes lisibles (petit texte) + rappel couleur type de créneau. */
+#modal_semaines_types #st-tbody-a tr td,
+#modal_semaines_types #st-tbody-b tr td {
+    font-size: 0.625rem;
+    line-height: 1.25rem;
+}
+#modal_semaines_types #st-tbody-a tr.st-row-cours,
+#modal_semaines_types #st-tbody-b tr.st-row-cours {
+    background: rgb(254 243 199 / 0.45);
+}
+#modal_semaines_types #st-tbody-a tr.st-row-travail,
+#modal_semaines_types #st-tbody-b tr.st-row-travail {
+    background: rgb(219 234 254 / 0.38);
+}

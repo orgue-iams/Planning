@@ -3,7 +3,7 @@
         <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest">Profil</h3>
 
         <p class="text-[10px] text-slate-600 mb-3 leading-snug">
-            Informations de compte (lecture seule). Les liens d’agenda ci-dessous servent uniquement à
+            Informations de compte. Les liens d’agenda ci-dessous servent uniquement à
             <strong>consulter</strong> le planning dans Google Agenda (abonnement ICS / « Autres agendas ») — pas à modifier les réservations sur ce site.
         </p>
 
@@ -14,11 +14,33 @@
             </div>
             <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2">
                 <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none">E-mail</dt>
-                <dd id="profile-email" class="m-0 min-w-0 text-sm font-medium leading-snug text-slate-800 break-all">—</dd>
+                <dd class="m-0 min-w-0">
+                    <div class="flex items-stretch gap-1.5">
+                        <input type="email" id="profile-email-input" class="input input-xs input-bordered flex-1 min-w-0 text-[11px] h-8" autocomplete="email" />
+                        <button type="button" id="profile-email-save" class="btn btn-xs h-8 min-h-0">Enregistrer</button>
+                    </div>
+                    <p id="profile-email-hint" class="text-[9px] text-slate-500 mt-1 hidden">Vérifiez votre boîte e-mail si une confirmation est demandée par Supabase.</p>
+                </dd>
             </div>
-            <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2 last:pb-0">
+            <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2">
                 <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none">Profil</dt>
                 <dd id="profile-role-label" class="m-0 min-w-0 text-sm font-medium leading-snug text-slate-800">—</dd>
+            </div>
+            <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2 last:pb-0">
+                <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none">Mot de passe</dt>
+                <dd class="m-0 min-w-0">
+                    <div class="flex flex-col gap-1.5">
+                        <div class="relative w-full">
+                            <input type="password" id="profile-pass-new" class="input input-xs input-bordered w-full text-[11px] h-8 pr-9" placeholder="Nouveau mot de passe" autocomplete="new-password" />
+                            <button type="button" id="profile-pass-toggle" class="btn btn-ghost btn-xs btn-square absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 min-h-0" aria-label="Afficher le mot de passe" aria-pressed="false">
+                                <span id="profile-pass-icon-show" aria-hidden="true">👁</span>
+                                <span id="profile-pass-icon-hide" class="hidden" aria-hidden="true">🙈</span>
+                            </button>
+                        </div>
+                        <input type="password" id="profile-pass-confirm" class="input input-xs input-bordered w-full text-[11px] h-8" placeholder="Confirmer le mot de passe" autocomplete="new-password" />
+                        <button type="button" id="profile-pass-save" class="btn btn-xs w-fit">Mettre à jour</button>
+                    </div>
+                </dd>
             </div>
         </dl>
 
