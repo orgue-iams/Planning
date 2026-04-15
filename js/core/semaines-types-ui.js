@@ -570,12 +570,15 @@ async function loadOwnerLabels(userIds) {
     return m;
 }
 
-async function loadLinesForModal(user, isAdm) {
+/** Charge tous les gabarits (tous profs) pour affichage A/B ; l’édition reste limitée aux lignes du prof courant côté UI. */
+async function loadLinesForModal() {
     const sb = getSupabaseClient();
     if (!sb) return { lines: [], byLineStudents: new Map() };
-    let q = sb.from('organ_week_template_line').select('*').order('week_type').order('day_of_week');
-    if (!isAdm) q = q.eq('owner_user_id', user.id);
-    const { data: lines, error } = await q;
+    const { data: lines, error } = await sb
+        .from('organ_week_template_line')
+        .select('*')
+        .order('week_type')
+        .order('day_of_week');
     if (error) {
         showToast(error.message, 'error');
         return { lines: [], byLineStudents: new Map() };
@@ -636,7 +639,7 @@ async function openSemainesTypesModal(user) {
     const eleves = await loadEleves();
     const elevesById = new Map(eleves.map((e) => [e.user_id, e]));
     const optHtml = makeStudentOptionsHtml(eleves);
-    const { lines, byLineStudents } = await loadLinesForModal(user, isAdm);
+    const { lines, byLineStudents } = await loadLinesForModal();
     const ownerIds = [...new Set(lines.map((l) => l.owner_user_id).filter(Boolean))];
     const ownerLabels = await loadOwnerLabels(ownerIds);
 
@@ -828,7 +831,9 @@ async function runSemainesTypesAnalyze() {
         const firstWeekRaw = document.querySelector('input[name="st-apply-first-week"]:checked')?.value;
         const firstWeekLetter = firstWeekRaw === 'B' ? 'B' : 'A';
 
-        const { lines, byLineStudents } = await loadLinesForModal(u, false);
+        const { lines: allTemplateLines, byLineStudents } = await loadLinesForModal();
+        const uid = String(u.id);
+        const lines = allTemplateLines.filter((l) => String(l.owner_user_id || '') === uid);
         const { data: evs } = await sb.rpc('planning_list_eleves_actifs');
         const byId = new Map((evs || []).map((e) => [e.user_id, e.email]));
         const linePayload = [];
