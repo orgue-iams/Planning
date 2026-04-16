@@ -11,6 +11,18 @@
     color: #3f3f1e !important;
 }
 
+.event-concert {
+    --slot-bg-strong: #a855f7;
+    --slot-bg-soft: #ddd6fe;
+    color: #2e1065 !important;
+}
+
+.event-autre {
+    --slot-bg-strong: #0d9488;
+    --slot-bg-soft: #99f6e4;
+    color: #062d2a !important;
+}
+
 .event-travail-mine {
     --slot-bg-strong: #61c71b;
     --slot-bg-soft: #8fda5b;
@@ -136,7 +148,7 @@
 
 /* Légende */
 .planning-legend {
-    font-size: 0.75rem;
+    font-size: 0.65rem;
 }
 
 .planning-legend .legend-item {
@@ -160,6 +172,14 @@
 
 .legend-swatch--cours {
     background: #f6e36a;
+}
+
+.legend-swatch--concert {
+    background: #a855f7;
+}
+
+.legend-swatch--autre {
+    background: #0d9488;
 }
 
 .legend-swatch--travail-mine {

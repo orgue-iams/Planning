@@ -12,8 +12,11 @@ import {
 /** Alignement types base → extendedProps.type (couleurs / bridge historique). */
 export function slotTypeToPlanningExtendedType(slotType) {
     const s = String(slotType || '').trim();
-    if (s === 'travail perso' || s === 'autre') return 'reservation';
-    if (s === 'concert') return 'cours';
+    if (s === 'fermeture') return 'fermeture';
+    if (s === 'cours') return 'cours';
+    if (s === 'concert') return 'concert';
+    if (s === 'autre') return 'autre';
+    if (s === 'travail perso') return 'reservation';
     return s;
 }
 
@@ -29,6 +32,8 @@ export function planningDbSlotTypeForEventUpdate(ev) {
     const t = String(ev?.extendedProps?.type || '').trim();
     if (t === 'fermeture') return 'fermeture';
     if (t === 'cours') return 'cours';
+    if (t === 'concert') return 'concert';
+    if (t === 'autre') return 'autre';
     if (t === 'reservation') return 'travail perso';
     return 'travail perso';
 }
@@ -58,6 +63,7 @@ export function mapPlanningDbRowToFcEvent(row, _currentUser) {
             planningCanonicalId: row.id,
             /** Colonne `slot_type` brute (déplacement / redimensionnement sans ambiguïté concert/autre). */
             planningDbSlotType: row.slot_type,
+            ownerUserId: String(row.owner_user_id ?? '').trim(),
             googleEventId: mainG,
             poolGoogleEventId: poolG,
             owner,

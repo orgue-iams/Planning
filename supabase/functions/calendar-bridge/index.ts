@@ -224,6 +224,8 @@ function googleColorIdForPlanningType(type: string): string {
     const t = String(type || '').trim().toLowerCase();
     if (t === 'fermeture') return '6'; /* Tangerine — orange */
     if (t === 'cours' || t === 'maintenance') return '5'; /* Banana — jaune */
+    if (t === 'concert') return '11'; /* Dark purple — Concert */
+    if (t === 'autre') return '1'; /* Lavender — Autre */
     /* reservation et défaut = Travail → bleu (même teinte côté app que « travail other / Autres ») */
     return '7'; /* Peacock — bleu */
 }

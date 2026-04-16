@@ -420,6 +420,8 @@ function defaultMotifForRole(role) {
 function slotTypeToMotif(slotType) {
     const s = String(slotType || '').trim().toLowerCase();
     if (s === 'fermeture') return 'Fermeture';
+    if (s === 'concert') return 'Concert';
+    if (s === 'autre') return 'Autre';
     if (s === 'cours' || s === 'maintenance') return 'Cours';
     return 'Travail';
 }
@@ -707,7 +709,14 @@ export function getEventContent(arg, currentUser) {
         colorClass = 'event-fermeture';
     } else if (type === 'cours' || type === 'maintenance') {
         colorClass = 'event-cours';
+    } else if (type === 'concert') {
+        colorClass = 'event-concert';
+    } else if (type === 'autre') {
+        colorClass = 'event-autre';
+    } else if (type === 'reservation') {
+        colorClass = isMine ? 'event-travail-mine' : 'event-travail-other';
     } else {
+        // Repli : si un type inconnu arrive, l’aligner sur la logique Travail.
         colorClass = isMine ? 'event-travail-mine' : 'event-travail-other';
     }
 
