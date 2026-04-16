@@ -22,6 +22,8 @@ Le projet compile Tailwind + DaisyUI en local (pas de script CDN Tailwind en pro
 4. Incrémenter `CACHE_NAME` dans `js/config/cache-name.js` si les assets changent
 5. Déployer (CI : workflow **Deploy GitHub Pages** sur `main` / `master`)
 
+Version cache actuelle : `orgue-v158`.
+
 ## Notes
 
 - `sw.js` met en cache `css/tailwind.generated.css`

@@ -19,6 +19,7 @@
 - **`015_planning_events_canonical.sql`** : `planning_event`, `planning_event_enrollment`, `planning_event_google_mirror`, `planning_infra_error_log`, RLS de base, RPC `planning_events_in_range` (évoluée en 016), `planning_error_notify_email`.
 - **`016_planning_event_rls_prof_and_mirror.sql`** : RLS prof/admin (créneaux pour autrui, édition élève/prof), RPC `planning_user_id_for_email`, index unique miroir `(event_id, target)`, politique SELECT miroir pour owner/prof/admin, trigger `sync_generation`, **remplacement** de `planning_events_in_range` via `DROP FUNCTION` + `CREATE` (colonnes `main_google_event_id`, `pool_google_event_id`).
 - **`017_planning_events_in_range_inscrits.sql`** : RPC `planning_events_in_range` avec colonne **`inscrits_emails`** (agrégat depuis `planning_event_enrollment` + `auth.users`) ; **`SECURITY DEFINER`** avec filtre identique à l’ancienne RLS `planning_event_select` (pas d’élévation de privilèges hors périmètre visible).
+- **`022_planning_profiles_label_for_ids_allow_all_roles.sql`** : élargit `planning_profiles_label_for_ids` à tous les rôles planning (admin/prof/eleve/consultation) pour afficher partout des libellés **Prénom Nom**.
 
 À appliquer sur l’environnement cible : `supabase db push` (déjà validé une fois le `DROP FUNCTION` ajouté pour le changement de signature).
 
@@ -27,7 +28,9 @@
 - **`js/config/planning.config.js`** : pas de drapeau grille : la grille lit toujours Postgres si session Supabase OK.
 - **`js/core/planning-events-db.js`** : RPC, mapping FC (`extendedProps.inscrits` depuis `inscrits_emails`), `upsertPlanningEventRow`, `deletePlanningEventRow`, `fetchPlanningMirrorTargetsForDelete`, `planningUserIdForEmail`, import dynamique de `calendar-logic` pour éviter cycle.
 - **`js/core/calendar-logic.js`** : sauvegarde modale + récurrence + création rapide (Postgres + miroir Google) ; suppression DB + delete Google via miroirs ; `syncReservationEventToGoogle` avec `planningEventId` ; `refetchPlanningGrid` après changements.
-- **`js/core/reservation-motifs.js`** : `motifToPlanningDbSlotType` (Travail → `travail perso`).
+- **`js/core/reservation-motifs.js`** : motifs alignés `Travail` / `Cours` / `Concert` / `Autre` / `Fermeture` (mapping DB explicite).
+- **`js/core/calendar-logic.js`** : modale Cours (liste inscrits lecture seule, édition via icône utilisateurs, DnD + clic/double-clic, limite 5), mise à jour immédiate couleur/type local, libellés propriétaire en **Prénom Nom**.
+- **`js/core/semaines-types-ui.js`** : même UX de sélection élèves que la modale créneau, affichage inscrits en multi-lignes, ajout de ligne visible (scroll + highlight).
 - **`js/config/fc-settings.js`** / **`planning-courses.js`** / **`calendar-events-list-cache.js`** : cache liste grille avec clé `db:userId`.
 - **`organ-settings.js`**, **`modal-config.html`**, **`config-ui.js`** : chargement / enregistrement `planning_error_notify_email` (admin).
 - **Header** : menu compte (icône personne) commun à tous les rôles ; **Réglages** (engrenage) et **sem. types** (calendrier) pour prof. / admin. ; libellé UI **Calendriers des utilisateurs** pour le pool Google (admin.).
@@ -59,10 +62,10 @@ Numérotation indicative ; détail technique dans le code / migrations existante
 
 ## Checklist rapide « environnement prêt »
 
-- [ ] Migrations **015** et **016** appliquées (`supabase db push`).
+- [ ] Migrations **015 → 022** appliquées (`supabase db push`).
 - [ ] `calendar-bridge` **redéployé** après les changements TypeScript.
 - [ ] Secret Edge **`SERVICE_ROLE_KEY`** = JWT **service_role** (Settings → API), si l’auto-injection `SUPABASE_SERVICE_ROLE_KEY` ne suffit pas.
-- [ ] Front : `CACHE_NAME` incrémenté si besoin après changements JS (`js/config/cache-name.js`).
+- [ ] Front : `CACHE_NAME` incrémenté si besoin après changements JS/CSS/components (`js/config/cache-name.js`, actuel : `orgue-v158`).
 
 ## Fichiers clés (navigation)
 

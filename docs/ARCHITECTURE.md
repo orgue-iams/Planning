@@ -45,6 +45,13 @@
 | `js/core/calendar-toolbar.js` | Boutons vue, navigation, menu |
 | `js/core/reservation-motifs.js` | Motifs, normalisation, libellés affichés (`motifDisplayLabel`) |
 
+### Conventions de rendu (état actuel)
+
+- Motifs distincts : `Fermeture`, `Cours`, `Travail`, `Concert`, `Autre`.
+- `Concert` / `Autre` / `Travail` n’ouvrent pas de gestion d’inscrits.
+- Modale `Cours` : inscrits en lecture seule par défaut ; édition via icône utilisateurs (double-clic/clic + drag&drop), max 5 élèves.
+- Légende planning : libellé explicite **« Autres réservations »** pour éviter la confusion avec le motif **« Autre »**.
+
 ## Authentification et session
 
 | Module | Rôle |
@@ -73,7 +80,7 @@
 ### Schéma et migrations
 
 - Fichier de référence historique : `supabase/schema.sql` (nouveau projet vierge).
-- Évolutions versionnées : `supabase/migrations/` (jusqu’à **`017`** : **`015–016`** événements canoniques, RLS prof, RPC grille + miroirs Google ; **`017`** colonne `inscrits_emails` sur `planning_events_in_range`, fonction **security definer** avec filtre aligné sur l’ancienne RLS select).
+- Évolutions versionnées : `supabase/migrations/` (jusqu’à **`022`** : base canonique `015–016`, inscrits RPC `017`, RLS enrollment prof `018`, visibilités select `021`, labels profils cross-rôles `022`).
 - **RLS** : lecture / update profil par utilisateur ; fonctions `security definer` pour listes admin / élèves actifs ; politiques **`planning_event`** / **`planning_event_google_mirror`** (voir migrations).
 
 ### Edge Functions (Deno)
