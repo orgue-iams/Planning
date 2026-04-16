@@ -326,7 +326,7 @@ function syncReadonlyStudentsText(tr, studentIds, elevesById) {
         return;
     }
     const labels = enrolledLabelsSorted(studentIds, elevesById);
-    el.textContent = labels.length ? labels.join(', ') : '—';
+    el.textContent = labels.length ? labels.join('\n') : '—';
 }
 
 function wireStudentsToggle(tr, elevesById) {
@@ -352,6 +352,13 @@ function wireStudentsToggle(tr, elevesById) {
         const move = (id, pick) => {
             const o = [...sel.options].find((x) => String(x.value) === id);
             if (!o) return;
+            if (pick && !o.selected) {
+                const chosenCount = sel.selectedOptions.length;
+                if (chosenCount >= 5) {
+                    showToast('Maximum 5 élèves pour un créneau Cours.', 'error');
+                    return;
+                }
+            }
             o.selected = pick;
             renderDnD();
         };
@@ -360,11 +367,15 @@ function wireStudentsToggle(tr, elevesById) {
                 el.addEventListener('dragstart', (ev) => {
                     ev.dataTransfer?.setData('text/plain', el.getAttribute('data-student-id') || '');
                 });
-                el.addEventListener('click', () => move(el.getAttribute('data-student-id') || '', pick));
+                // UX demandée : double-clic pour basculer un élève entre listes.
+                el.addEventListener('dblclick', () => move(el.getAttribute('data-student-id') || '', pick));
             });
             zone.addEventListener('dragover', (ev) => ev.preventDefault());
+            zone.addEventListener('dragenter', () => zone.classList.add('st-dnd-drop-active'));
+            zone.addEventListener('dragleave', () => zone.classList.remove('st-dnd-drop-active'));
             zone.addEventListener('drop', (ev) => {
                 ev.preventDefault();
+                zone.classList.remove('st-dnd-drop-active');
                 move(ev.dataTransfer?.getData('text/plain') || '', pick);
             });
         };
@@ -375,7 +386,7 @@ function wireStudentsToggle(tr, elevesById) {
         const typ = tr.querySelector('.st-type')?.value || 'cours';
         if (typ !== 'cours') return;
         const editing = dnd instanceof HTMLElement ? !dnd.classList.contains('hidden') : !sel.classList.contains('hidden');
-        if (editing) {
+        const closeEditing = () => {
             const studs = [];
             for (const o of sel.selectedOptions) {
                 if (o.value) studs.push(o.value);
@@ -384,11 +395,30 @@ function wireStudentsToggle(tr, elevesById) {
             sel.classList.add('hidden');
             dnd?.classList.add('hidden');
             ro.classList.remove('hidden');
+            outsideHandler && document.removeEventListener('pointerdown', outsideHandler);
+            focusHandler && tr.removeEventListener('focusout', focusHandler);
+        };
+        /** @type {((e: PointerEvent) => void) | null} */
+        let outsideHandler = null;
+        /** @type {((e: FocusEvent) => void) | null} */
+        let focusHandler = null;
+        if (editing) {
+            closeEditing();
         } else {
             ro.classList.add('hidden');
             sel.classList.remove('hidden');
             dnd?.classList.remove('hidden');
             renderDnD();
+            outsideHandler = (e) => {
+                if (!tr.contains(e.target)) closeEditing();
+            };
+            document.addEventListener('pointerdown', outsideHandler);
+            focusHandler = (e) => {
+                const rt = /** @type {any} */ (e.relatedTarget);
+                if (rt && tr.contains(rt)) return;
+                closeEditing();
+            };
+            tr.addEventListener('focusout', focusHandler);
         }
     });
 }
@@ -492,7 +522,7 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
     let studentsCell = '';
     if (isReadonly) {
         const labels = enrolledLabelsSorted(sid, elevesById);
-        const txt = line?.slot_type === 'reservation' ? '—' : labels.length ? labels.join(', ') : '—';
+        const txt = line?.slot_type === 'reservation' ? '—' : labels.length ? labels.join('\n') : '—';
         studentsCell = `<td class="st-students-cell align-top">
             <div class="st-students-readonly-wrap flex items-start gap-1 min-w-0">
                 <span class="st-students-readonly-text flex-1 min-w-0 text-[9px] text-slate-700 leading-snug">${escapeAttr(txt)}</span>
@@ -508,11 +538,11 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
             <div class="st-students-dnd hidden mt-0.5 space-y-1">
                 <div>
                     <p class="text-[9px] text-slate-500">Disponibles</p>
-                    <div class="st-students-avail max-h-20 overflow-auto border border-slate-200 rounded bg-white p-1"></div>
+                    <div class="st-students-avail min-h-[6.5rem] max-h-20 overflow-auto border-2 border-dashed border-slate-200 rounded bg-white p-1.5"></div>
                 </div>
                 <div>
                     <p class="text-[9px] text-slate-500">Inscrits</p>
-                    <div class="st-students-chosen max-h-20 overflow-auto border border-slate-200 rounded bg-slate-50 p-1"></div>
+                    <div class="st-students-chosen min-h-[6.5rem] max-h-20 overflow-auto border border-slate-200 rounded bg-slate-50 p-1.5"></div>
                 </div>
             </div>
         </td>`;

@@ -59,6 +59,10 @@ function normalizeRole(role) {
 let reservationModalUserRef = /** @type {object | null} */ (null);
 let reservationModalCanEditRef = false;
 
+const MAX_COURS_STUDENTS = 5;
+let reservationInscritsUiBound = false;
+let reservationInscritsOutsideBound = false;
+
 function canManageReservationInscrits(currentUser) {
     const r = normalizeRole(currentUser?.role);
     return r === 'admin' || r === 'prof';
@@ -84,10 +88,37 @@ function updateReservationInscritsWrapVisibility(currentUser, canEdit) {
     const wrap = document.getElementById('wrap-reservation-inscrits');
     const multi = document.getElementById('event-inscrits-select');
     const sel = document.getElementById('event-motif-select');
+    const toggle = document.getElementById('event-inscrits-users-toggle');
     if (!wrap || !multi || !sel) return;
     const show = canManageReservationInscrits(currentUser) && sel.value === 'Cours';
     wrap.classList.toggle('hidden', !show);
     multi.disabled = !canEdit || !show;
+    if (toggle instanceof HTMLButtonElement) {
+        toggle.disabled = !canEdit || !show;
+    }
+    // UX : même si on peut modifier, on n'affiche la liste "Disponibles"
+    // qu'après clic sur l'icône utilisateurs.
+    setReservationInscritsEditMode(false, canEdit);
+}
+
+/**
+ * @param {boolean} editMode "mode édition" (affiche la liste des non-inscrits)
+ * @param {boolean} canEdit "autorisation" (admin/prof + event éditable)
+ */
+function setReservationInscritsEditMode(editMode, canEdit) {
+    const wrap = document.getElementById('wrap-reservation-inscrits');
+    const availWrap = document.getElementById('event-inscrits-available-wrap');
+    const grid = document.getElementById('event-inscrits-grid');
+    const multi = document.getElementById('event-inscrits-select');
+    const toggle = document.getElementById('event-inscrits-users-toggle');
+    const allowed = Boolean(editMode && canEdit);
+    if (!wrap || !availWrap || !grid || !multi) return;
+    wrap.dataset.inscritsEditMode = allowed ? '1' : '0';
+    availWrap.classList.toggle('hidden', !allowed);
+    grid.classList.toggle('grid-cols-2', allowed);
+    grid.classList.toggle('grid-cols-1', !allowed);
+    if (toggle instanceof HTMLButtonElement) toggle.setAttribute('aria-pressed', allowed ? 'true' : 'false');
+    renderReservationInscritsDnD(multi, allowed);
 }
 
 function ensureReservationMotifInscritsListener() {
@@ -102,7 +133,7 @@ function ensureReservationMotifInscritsListener() {
         const isCours = String(sel.value || '').trim() === 'Cours';
         if (!isCours && multi instanceof HTMLSelectElement) {
             for (const o of multi.options) o.selected = false;
-            renderReservationInscritsDnD(multi, reservationModalCanEditRef);
+            setReservationInscritsEditMode(false, reservationModalCanEditRef);
         }
     });
 }
@@ -129,6 +160,13 @@ function renderReservationInscritsDnD(multi, canEdit) {
     const move = (id, toSelected) => {
         const opt = [...multi.options].find((o) => String(o.value) === id);
         if (!opt) return;
+        if (toSelected && !opt.selected) {
+            const chosenCount = [...multi.options].filter((o) => o.selected).length;
+            if (chosenCount >= MAX_COURS_STUDENTS) {
+                showToast(`Maximum ${MAX_COURS_STUDENTS} élèves pour un créneau Cours.`, 'error');
+                return;
+            }
+        }
         opt.selected = toSelected;
         renderReservationInscritsDnD(multi, canEdit);
     };
@@ -137,15 +175,19 @@ function renderReservationInscritsDnD(multi, canEdit) {
             el.addEventListener('dragstart', (ev) => {
                 ev.dataTransfer?.setData('text/plain', el.getAttribute('data-student-id') || '');
             });
-            el.addEventListener('click', () => move(el.getAttribute('data-student-id') || '', toSelected));
+            // UX demandée : double-clic pour basculer un élève entre listes.
+            el.addEventListener('dblclick', () => move(el.getAttribute('data-student-id') || '', toSelected));
         });
     };
     bindZone(availWrap, true);
     bindZone(selWrap, false);
     const setDrop = (zone, toSelected) => {
+        zone.addEventListener('dragenter', () => zone.classList.add('st-dnd-drop-active'));
+        zone.addEventListener('dragleave', () => zone.classList.remove('st-dnd-drop-active'));
         zone.addEventListener('dragover', (ev) => ev.preventDefault());
         zone.addEventListener('drop', (ev) => {
             ev.preventDefault();
+            zone.classList.remove('st-dnd-drop-active');
             const id = ev.dataTransfer?.getData('text/plain') || '';
             move(id, toSelected);
         });
@@ -162,6 +204,28 @@ async function prepareReservationInscritsSelect(currentUser, event, canEdit) {
     if (!canManageReservationInscrits(currentUser)) {
         wrap.classList.add('hidden');
         return;
+    }
+    // Bind UI (icône + fermeture quand on clique ailleurs)
+    if (!reservationInscritsUiBound) {
+        reservationInscritsUiBound = true;
+        const toggle = document.getElementById('event-inscrits-users-toggle');
+        toggle?.addEventListener('click', () => {
+            const current = wrap.dataset.inscritsEditMode === '1';
+            setReservationInscritsEditMode(!current, reservationModalCanEditRef);
+        });
+        if (!reservationInscritsOutsideBound) {
+            reservationInscritsOutsideBound = true;
+            document.addEventListener('pointerdown', (e) => {
+                if (wrap.dataset.inscritsEditMode !== '1') return;
+                if (!wrap.contains(e.target)) setReservationInscritsEditMode(false, reservationModalCanEditRef);
+            });
+            wrap.addEventListener('focusout', (e) => {
+                if (wrap.dataset.inscritsEditMode !== '1') return;
+                const rt = /** @type {any} */ (e.relatedTarget);
+                if (rt && wrap.contains(rt)) return;
+                setReservationInscritsEditMode(false, reservationModalCanEditRef);
+            });
+        }
     }
     const rows = await fetchPlanningListElevesActifs();
     const rowsSorted = [...rows].sort((a, b) => {
@@ -188,7 +252,8 @@ async function prepareReservationInscritsSelect(currentUser, event, canEdit) {
         opt.selected = pre.has(opt.dataset.email);
         multi.add(opt);
     }
-    renderReservationInscritsDnD(multi, canEdit);
+    // UX : à l'ouverture, on affiche seulement les inscrits (read-only).
+    setReservationInscritsEditMode(false, canEdit);
     updateReservationInscritsWrapVisibility(currentUser, canEdit);
 }
 
@@ -215,6 +280,7 @@ export function ownerInfoFromEvent(event, currentUser) {
     const ownerEmail = String(
         event?.extendedProps?.owner || currentUser?.email || ''
     ).trim().toLowerCase();
+    const ownerUserId = String(event?.extendedProps?.ownerUserId ?? '').trim();
     const ownerName =
         String(
             event?.extendedProps?.ownerDisplayName ||
@@ -226,19 +292,49 @@ export function ownerInfoFromEvent(event, currentUser) {
         event?.extendedProps?.ownerRole || event?.extendedProps?.owner_role || ''
     );
     const ownerRole = ownerRoleRaw || roleFromOwnerEmail(ownerEmail);
-    return { ownerEmail, ownerName, ownerRole };
+    return { ownerEmail, ownerName, ownerRole, ownerUserId };
 }
 
-function ownerIdentityLabel(owner, currentUser = null, includeActor = false) {
-    const name = owner.ownerName || 'Inconnu';
+function ownerIdentityLabel(
+    owner,
+    currentUser = null,
+    includeActor = false,
+    ownerLabelOverride = '',
+    actorLabelOverride = ''
+) {
+    const name = ownerLabelOverride || owner.ownerName || 'Inconnu';
     const me = String(currentUser?.email || '')
         .trim()
         .toLowerCase();
     if (includeActor && me && owner.ownerEmail && owner.ownerEmail !== me) {
-        const actor = String(currentUser?.name || '').trim() || me.split('@')[0] || 'inconnu';
+        const actor =
+            actorLabelOverride ||
+            String(currentUser?.name || '').trim() ||
+            me.split('@')[0] ||
+            'inconnu';
         return `Réservé par ${name}. Modifié par ${actor}`;
     }
     return `Réservé par ${name}`;
+}
+
+async function fetchProfileLabelsForUserIds(userIds) {
+    const ids = Array.isArray(userIds) ? userIds.filter(Boolean).map((x) => String(x).trim()) : [];
+    if (!ids.length) return new Map();
+    if (!isBackendAuthConfigured()) return new Map();
+    const sb = getSupabaseClient();
+    if (!sb) return new Map();
+    try {
+        const { data, error } = await sb.rpc('planning_profiles_label_for_ids', { p_ids: ids });
+        if (error) {
+            console.warn('[Planning] planning_profiles_label_for_ids', error.message);
+            return new Map();
+        }
+        const rows = Array.isArray(data) ? data : [];
+        return new Map(rows.map((r) => [String(r.user_id), String(r.label)]));
+    } catch (e) {
+        console.warn('[Planning] planning_profiles_label_for_ids (rpc)', e);
+        return new Map();
+    }
 }
 
 /**
@@ -1218,7 +1314,7 @@ function reservationDisplayTitleForCurrentUser(currentUser) {
 }
 
 /** En-tête modale édition : libellé selon le rôle (élève = nom seul, sans « Réservé par »). */
-function applyReservationEditorShellForRole(currentUser, event) {
+function applyReservationEditorShellForRole(currentUser, event, ownerLabelOverride = '', actorLabelOverride = '') {
     const editorOwnerEl = document.getElementById('event-editor-owner');
     const wrapTitle = document.getElementById('wrap-reservation-title');
     const wrapMotif = document.getElementById('wrap-reservation-motif');
@@ -1241,7 +1337,13 @@ function applyReservationEditorShellForRole(currentUser, event) {
         if (!event && editorOwnerEl) {
             editorOwnerEl.classList.add('hidden');
         } else if (editorOwnerEl) {
-            editorOwnerEl.textContent = ownerIdentityLabel(owner, currentUser, true);
+            editorOwnerEl.textContent = ownerIdentityLabel(
+                owner,
+                currentUser,
+                true,
+                ownerLabelOverride,
+                actorLabelOverride
+            );
             editorOwnerEl.classList.remove('hidden');
         }
         wrapTitle?.classList.remove('hidden');
@@ -1521,7 +1623,20 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     reservationModalUserRef = currentUser;
     reservationModalCanEditRef = canEditEvent;
     const owner = ownerInfoFromEvent(event, currentUser);
-    const ownerText = ownerIdentityLabel(owner, currentUser, false);
+    let ownerLabelOverride = '';
+    let actorLabelOverride = '';
+    if (event) {
+        const ids = [owner.ownerUserId, currentUser?.id].filter(Boolean);
+        const labelMap = await fetchProfileLabelsForUserIds(ids);
+        if (owner.ownerUserId && labelMap.has(owner.ownerUserId)) {
+            ownerLabelOverride = String(labelMap.get(owner.ownerUserId) || '');
+        }
+        if (currentUser?.id && labelMap.has(currentUser.id)) {
+            actorLabelOverride = String(labelMap.get(currentUser.id) || '');
+        }
+    }
+
+    const ownerText = ownerIdentityLabel(owner, currentUser, false, ownerLabelOverride);
 
     const wrapRead = document.getElementById('wrap-reservation-readonly');
     const wrapEdit = document.getElementById('wrap-reservation-editor');
@@ -1568,7 +1683,12 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     modalActions?.classList.add('justify-between');
 
     buildReservationFormFields(currentUser, event || null);
-    applyReservationEditorShellForRole(currentUser, event || null);
+    applyReservationEditorShellForRole(
+        currentUser,
+        event || null,
+        ownerLabelOverride,
+        actorLabelOverride
+    );
 
     const toDateInput = (d) => d.toLocaleDateString('en-CA');
     const startEl = document.getElementById('event-start');
