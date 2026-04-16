@@ -280,6 +280,13 @@ function escapeAttr(s) {
         .replace(/</g, '&lt;');
 }
 
+function firstNameOnly(label) {
+    const raw = String(label || '').trim();
+    if (!raw) return '';
+    const parts = raw.split(/\s+/).filter(Boolean);
+    return parts[0] || raw;
+}
+
 /** @param {{ nom?: string, prenom?: string, display_name?: string, email?: string }} e */
 function elevePrenomNom(e) {
     const n = String(e?.nom || '').trim();
@@ -326,11 +333,48 @@ function wireStudentsToggle(tr, elevesById) {
     const btn = tr.querySelector('.st-students-toggle');
     const ro = tr.querySelector('.st-students-readonly-wrap');
     const sel = tr.querySelector('.st-students');
+    const dnd = tr.querySelector('.st-students-dnd');
     if (!btn || !ro || !sel) return;
+    const renderDnD = () => {
+        if (!(dnd instanceof HTMLElement)) return;
+        const avail = dnd.querySelector('.st-students-avail');
+        const chosen = dnd.querySelector('.st-students-chosen');
+        if (!(avail instanceof HTMLElement) || !(chosen instanceof HTMLElement)) return;
+        const opts = [...sel.options].map((o) => ({
+            id: String(o.value || ''),
+            label: String(o.textContent || '').trim(),
+            selected: Boolean(o.selected)
+        }));
+        const mk = (r) =>
+            `<button type="button" class="btn btn-ghost btn-xs h-auto min-h-0 py-0.5 px-1 text-[9px] w-full justify-start cursor-grab" draggable="true" data-student-id="${escapeAttr(r.id)}">${escapeAttr(r.label)}</button>`;
+        avail.innerHTML = opts.filter((x) => !x.selected).map(mk).join('');
+        chosen.innerHTML = opts.filter((x) => x.selected).map(mk).join('');
+        const move = (id, pick) => {
+            const o = [...sel.options].find((x) => String(x.value) === id);
+            if (!o) return;
+            o.selected = pick;
+            renderDnD();
+        };
+        const bind = (zone, pick) => {
+            zone.querySelectorAll('[data-student-id]').forEach((el) => {
+                el.addEventListener('dragstart', (ev) => {
+                    ev.dataTransfer?.setData('text/plain', el.getAttribute('data-student-id') || '');
+                });
+                el.addEventListener('click', () => move(el.getAttribute('data-student-id') || '', pick));
+            });
+            zone.addEventListener('dragover', (ev) => ev.preventDefault());
+            zone.addEventListener('drop', (ev) => {
+                ev.preventDefault();
+                move(ev.dataTransfer?.getData('text/plain') || '', pick);
+            });
+        };
+        bind(avail, true);
+        bind(chosen, false);
+    };
     btn.addEventListener('click', () => {
         const typ = tr.querySelector('.st-type')?.value || 'cours';
         if (typ !== 'cours') return;
-        const editing = !sel.classList.contains('hidden');
+        const editing = dnd instanceof HTMLElement ? !dnd.classList.contains('hidden') : !sel.classList.contains('hidden');
         if (editing) {
             const studs = [];
             for (const o of sel.selectedOptions) {
@@ -338,10 +382,13 @@ function wireStudentsToggle(tr, elevesById) {
             }
             syncReadonlyStudentsText(tr, studs, elevesById);
             sel.classList.add('hidden');
+            dnd?.classList.add('hidden');
             ro.classList.remove('hidden');
         } else {
             ro.classList.add('hidden');
             sel.classList.remove('hidden');
+            dnd?.classList.remove('hidden');
+            renderDnD();
         }
     });
 }
@@ -457,7 +504,17 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
                 <span class="st-students-readonly-text flex-1 min-w-0 text-[9px] text-slate-700 leading-snug"></span>
                 <button type="button" class="st-students-toggle btn btn-ghost btn-xs p-0.5 min-h-0 h-auto shrink-0 border-0" title="Modifier les inscrits" aria-label="Modifier les inscrits">${USERS_SVG}</button>
             </div>
-            <select multiple class="select select-xs st-students hidden w-full min-w-[8rem] max-h-24 text-[9px] bg-white border border-slate-200 rounded mt-0.5" size="4">${optHtml}</select>
+            <select multiple class="st-students hidden" size="4">${optHtml}</select>
+            <div class="st-students-dnd hidden mt-0.5 space-y-1">
+                <div>
+                    <p class="text-[9px] text-slate-500">Disponibles</p>
+                    <div class="st-students-avail max-h-20 overflow-auto border border-slate-200 rounded bg-white p-1"></div>
+                </div>
+                <div>
+                    <p class="text-[9px] text-slate-500">Inscrits</p>
+                    <div class="st-students-chosen max-h-20 overflow-auto border border-slate-200 rounded bg-slate-50 p-1"></div>
+                </div>
+            </div>
         </td>`;
     }
 
@@ -468,10 +525,10 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
     tr.innerHTML = `
         ${dragCell}
         <td class="text-[10px] font-bold text-slate-700 align-top">${escapeAttr(ownerLabel)}</td>
-        <td><select class="select select-xs st-type max-w-[5.5rem] text-[10px] font-bold bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${typeSel}</select></td>
-        <td><select class="select select-xs st-dow max-w-[4.5rem] font-bold bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${dowSel}</select></td>
-        <td><select class="select select-xs st-start max-w-[4.5rem] text-[10px] font-mono bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
-        <td><select class="select select-xs st-end max-w-[4.5rem] text-[10px] font-mono bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
+        <td><select class="select select-xs st-type max-w-[5.5rem] text-[10px] font-bold text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${typeSel}</select></td>
+        <td><select class="select select-xs st-dow max-w-[4.5rem] text-[10px] font-bold text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${dowSel}</select></td>
+        <td><select class="select select-xs st-start max-w-[4.5rem] text-[10px] font-bold text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
+        <td><select class="select select-xs st-end max-w-[4.5rem] text-[10px] font-bold text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
         <td><input type="text" class="input input-xs st-title w-full min-w-[6rem] text-[10px] bg-white border border-slate-200 rounded" value="${title}" ${isReadonly ? 'readonly' : ''} /></td>
         ${studentsCell}
         <td>${isReadonly ? '' : '<button type="button" class="btn btn-ghost btn-xs st-del font-black text-error">×</button>'}</td>
@@ -498,6 +555,7 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
     tr.querySelector('.st-type')?.addEventListener('change', () => {
         const t = tr.querySelector('.st-type')?.value;
         const mul = tr.querySelector('.st-students');
+        const dnd = tr.querySelector('.st-students-dnd');
         const ro = tr.querySelector('.st-students-readonly-wrap');
         const btn = tr.querySelector('.st-students-toggle');
         if (t !== 'cours') {
@@ -505,6 +563,7 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
                 mul.classList.add('hidden');
                 for (const o of mul.options) o.selected = false;
             }
+            dnd?.classList.add('hidden');
             ro?.classList.remove('hidden');
             if (ro) tr.querySelector('.st-students-readonly-text').textContent = '—';
             ro?.classList.toggle('opacity-40', true);
@@ -562,7 +621,7 @@ async function loadOwnerLabels(userIds) {
     for (const row of data || []) {
         const id = row.user_id;
         const lab = String(row.label || '').trim();
-        m.set(id, lab || String(id).slice(0, 8));
+        m.set(id, firstNameOnly(lab) || String(id).slice(0, 8));
     }
     for (const id of uniq) {
         if (!m.has(id)) m.set(id, String(id).slice(0, 8));

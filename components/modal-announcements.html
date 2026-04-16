@@ -5,7 +5,7 @@
             Un seul message à la fois : <strong>publier</strong> remplace toute annonce précédente pour cet écran. Mise en forme : gras, italique, souligné. Laisser le texte vide et publier pour retirer l’annonce de l’écran de connexion.
         </p>
 
-        <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-3 space-y-2 mb-3 shrink-0">
+        <div class="rounded-xl border border-slate-200 bg-white p-3 space-y-2 mb-3 shrink-0">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div class="space-y-1">
                     <span class="text-[9px] font-bold text-slate-500 block">Début</span>
@@ -41,10 +41,10 @@
                 </div>
             </div>
             <div id="ann-quill-mount" class="planning-quill-mount planning-quill-mount--compact"></div>
-            <button type="button" id="ann-publish-btn" class="btn btn-primary btn-sm w-full font-black text-[11px]">Publier (remplace l’ancienne)</button>
         </div>
 
-        <div class="modal-action shrink-0 mt-2">
+        <div class="modal-action shrink-0 mt-2 flex gap-2 justify-end">
+            <button type="button" id="ann-publish-btn" class="btn btn-primary btn-sm font-black text-[11px]">Publier (remplace l’ancienne)</button>
             <button type="button" class="btn btn-ghost btn-sm font-black text-[11px]" onclick="document.getElementById('modal_announcements').close()">Fermer</button>
         </div>
     </div>

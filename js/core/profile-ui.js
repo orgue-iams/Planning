@@ -258,25 +258,16 @@ export function initProfileUi(currentUser) {
         showToast('Demande de changement d’e-mail enregistrée.', 'success');
     });
 
-    const passToggle = document.getElementById('profile-pass-toggle');
-    const passShow = document.getElementById('profile-pass-icon-show');
-    const passHide = document.getElementById('profile-pass-icon-hide');
+    const passToggle = document.getElementById('profile-pass-show-plain');
     const applyPassVisibility = (visible) => {
         const type = visible ? 'text' : 'password';
         document.getElementById('profile-pass-new')?.setAttribute('type', type);
         document.getElementById('profile-pass-confirm')?.setAttribute('type', type);
-        passToggle?.setAttribute('aria-pressed', String(visible));
-        passToggle?.setAttribute(
-            'aria-label',
-            visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'
-        );
-        passShow?.classList.toggle('hidden', visible);
-        passHide?.classList.toggle('hidden', !visible);
+        if (passToggle instanceof HTMLInputElement) passToggle.checked = visible;
     };
-    passToggle?.addEventListener('click', () => {
-        const vis = document.getElementById('profile-pass-new')?.getAttribute('type') === 'text';
-        applyPassVisibility(!vis);
-    });
+    passToggle?.addEventListener('change', (e) =>
+        applyPassVisibility(Boolean((e.target instanceof HTMLInputElement && e.target.checked)))
+    );
     document.getElementById('modal_profile')?.addEventListener('close', () => applyPassVisibility(false));
 
     document.getElementById('profile-pass-save')?.addEventListener('click', async () => {

@@ -1,6 +1,6 @@
 <dialog id="modal_reservation" class="modal">
     <div class="modal-box p-5 w-[94%] max-w-[380px] max-h-[90dvh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col">
-        <h3 class="font-black text-xs mb-3 uppercase text-slate-500 border-b pb-2 tracking-widest shrink-0">Détails de l'occupation</h3>
+        <h3 class="font-black text-xs mb-3 uppercase text-slate-500 border-b pb-2 tracking-widest shrink-0">Détails du créneau</h3>
         
         <div id="wrap-reservation-body" class="space-y-4 overflow-y-auto flex-1 min-h-0 py-1">
             <div id="wrap-reservation-readonly" class="hidden space-y-3 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
@@ -19,7 +19,6 @@
                 </div>
             </div>
             <div id="wrap-reservation-editor" class="space-y-4">
-            <p id="event-editor-owner" class="text-[13px] font-bold text-slate-800 leading-snug rounded-lg bg-slate-50 px-3 py-2 border border-slate-200"></p>
             <div id="wrap-reservation-owner-target" class="hidden form-control">
                 <label class="label py-0" for="reservation-slot-owner-email">
                     <span class="label-text font-bold text-[11px] uppercase text-slate-500">Créneau pour</span>
@@ -28,6 +27,15 @@
                 <p class="text-[9px] text-slate-500 mt-1 leading-snug">Le propriétaire reçoit aussi l’événement sur son agenda personnel IAMS (pool).</p>
             </div>
 
+            <div id="wrap-reservation-motif" class="form-control">
+                <label class="label py-0"><span class="label-text font-bold text-[11px] uppercase text-slate-500">Motif</span></label>
+                <p id="event-motif-hint-fermeture" class="text-[10px] text-slate-500 -mt-1 mb-1">Le motif <strong>Fermeture</strong> est réservé aux administrateurs.</p>
+                <select id="event-motif-select" class="select select-sm w-full font-bold text-sm h-11 bg-slate-50 border border-slate-200 rounded-lg shadow-sm focus:border-slate-300 focus:outline-none focus:ring-0"></select>
+            </div>
+            <div id="wrap-reservation-title" class="form-control">
+                <label class="label py-0" for="event-title-input"><span class="label-text font-bold text-[11px] uppercase text-slate-500">Titre</span></label>
+                <input id="event-title-input" type="text" maxlength="120" class="input input-sm w-full font-bold text-sm h-11 bg-slate-50 border border-slate-200 rounded-lg shadow-sm focus:border-slate-300 focus:outline-none focus:ring-0" />
+            </div>
             <div id="wrap-datetime-simple" class="bg-slate-100/80 p-4 rounded-xl border border-slate-200">
                 <div class="flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-slate-800 font-bold">
                     <span class="shrink-0">Le</span>
@@ -84,20 +92,21 @@
                 </div>
             </div>
 
-            <div id="wrap-reservation-motif" class="form-control">
-                <label class="label py-0"><span class="label-text font-bold text-[11px] uppercase text-slate-500">Motif</span></label>
-                <p id="event-motif-hint-fermeture" class="text-[10px] text-slate-500 -mt-1 mb-1">Le motif <strong>Fermeture</strong> est réservé aux administrateurs.</p>
-                <select id="event-motif-select" class="select select-sm w-full font-bold text-sm h-11 bg-slate-50 border border-slate-200 rounded-lg shadow-sm focus:border-slate-300 focus:outline-none focus:ring-0"></select>
-            </div>
-            <div id="wrap-reservation-title" class="form-control">
-                <label class="label py-0" for="event-title-input"><span class="label-text font-bold text-[11px] uppercase text-slate-500">Titre</span></label>
-                <input id="event-title-input" type="text" maxlength="120" class="input input-sm w-full font-bold text-sm h-11 bg-slate-50 border border-slate-200 rounded-lg shadow-sm focus:border-slate-300 focus:outline-none focus:ring-0" />
-            </div>
             <div id="wrap-reservation-inscrits" class="form-control hidden">
-                <label class="label py-0" for="event-inscrits-select"><span class="label-text font-bold text-[11px] uppercase text-slate-500">Inscrits (cours)</span></label>
-                <p class="text-[9px] text-slate-500 -mt-1 mb-1 leading-snug">Maintenez <kbd class="kbd kbd-xs">Ctrl</kbd> ou <kbd class="kbd kbd-xs">⌘</kbd> pour en choisir plusieurs.</p>
-                <select id="event-inscrits-select" multiple size="5" aria-label="Élèves inscrits au cours" class="select select-sm w-full font-bold text-sm min-h-[7.5rem] bg-slate-50 border border-slate-200 rounded-lg shadow-sm focus:border-slate-300 focus:outline-none focus:ring-0 py-1"></select>
+                <label class="label py-0"><span class="label-text font-bold text-[11px] uppercase text-slate-500">Inscrits (cours)</span></label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                        <p class="text-[9px] text-slate-500 mb-1">Disponibles (glisser vers inscrits)</p>
+                        <div id="event-inscrits-available" class="min-h-[6.5rem] max-h-[10rem] overflow-auto rounded-lg border border-slate-200 bg-white p-1.5"></div>
+                    </div>
+                    <div>
+                        <p class="text-[9px] text-slate-500 mb-1">Inscrits (glisser vers disponibles pour retirer)</p>
+                        <div id="event-inscrits-selected" class="min-h-[6.5rem] max-h-[10rem] overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-1.5"></div>
+                    </div>
+                </div>
+                <select id="event-inscrits-select" multiple size="5" aria-label="Élèves inscrits au cours" class="hidden"></select>
             </div>
+            <p id="event-editor-owner" class="text-[11px] font-normal text-slate-600 leading-snug rounded-lg bg-slate-50 px-3 py-2 border border-slate-200"></p>
             </div>
         </div>
 

@@ -197,7 +197,8 @@ export function initMessagesUi(_ignored) {
             resetRulesQuill();
             rulesQuill = createPlanningQuill(rulesMount, {
                 placeholder: 'Saisissez les consignes…',
-                adminFontStepper: getPlanningSessionUser()?.role === 'admin'
+                adminFontStepper: getPlanningSessionUser()?.role === 'admin',
+                disableFontSizeButtons: true
             });
             const raw = String(text ?? '');
             const initial = looksLikeHtml(raw)

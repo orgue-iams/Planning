@@ -13,6 +13,7 @@ import { showToast } from '../utils/toast.js';
 import { normalizeHHmmInput } from '../utils/time-helpers.js';
 
 let bound = false;
+let configInitialSnapshot = '';
 
 function timeDbToInput(t) {
     if (!t) return '08:00';
@@ -34,6 +35,21 @@ async function fillConfigModal() {
     if (mx) mx.value = timeDbToInput(data?.chapel_slot_max);
     const em = document.getElementById('config-planning-error-notify-email');
     if (em) em.value = String(data?.planning_error_notify_email ?? '').trim();
+    configInitialSnapshot = currentConfigSnapshot();
+}
+
+function currentConfigSnapshot() {
+    return JSON.stringify({
+        schoolStart: document.getElementById('config-school-start')?.value || '',
+        schoolEnd: document.getElementById('config-school-end')?.value || '',
+        chapelMin: document.getElementById('config-chapel-min')?.value || '',
+        chapelMax: document.getElementById('config-chapel-max')?.value || '',
+        notifyEmail: document.getElementById('config-planning-error-notify-email')?.value || ''
+    });
+}
+
+function isConfigDirty() {
+    return currentConfigSnapshot() !== configInitialSnapshot;
 }
 
 export function initConfigUi(currentUser) {
@@ -45,18 +61,34 @@ export function initConfigUi(currentUser) {
     const admin = isAdmin(currentUser);
     document.getElementById('config-hint-admin')?.classList.toggle('hidden', !admin);
     document.getElementById('config-hint-readonly')?.classList.toggle('hidden', admin);
-    document.getElementById('config-admin-actions')?.classList.toggle('hidden', !admin);
+    document.getElementById('config-save-btn')?.classList.toggle('hidden', !admin);
     document.getElementById('config-planning-notify-wrap')?.classList.toggle('hidden', !admin);
 
     for (const id of ['config-school-start', 'config-school-end', 'config-chapel-min', 'config-chapel-max']) {
-        document.getElementById(id)?.toggleAttribute('readonly', !admin);
+        const el = document.getElementById(id);
+        el?.toggleAttribute('disabled', !admin);
+        el?.classList.toggle('bg-slate-200', !admin);
+        el?.classList.toggle('text-slate-500', !admin);
+        el?.classList.toggle('cursor-not-allowed', !admin);
     }
-    document.getElementById('config-planning-error-notify-email')?.toggleAttribute('readonly', !admin);
+    const notifyEl = document.getElementById('config-planning-error-notify-email');
+    notifyEl?.toggleAttribute('disabled', !admin);
+    notifyEl?.classList.toggle('bg-slate-200', !admin);
+    notifyEl?.classList.toggle('text-slate-500', !admin);
+    notifyEl?.classList.toggle('cursor-not-allowed', !admin);
 
     document.getElementById('menu-item-config')?.addEventListener('click', (ev) => {
         ev.preventDefault();
         document.getElementById('btn-header-settings')?.blur();
         void fillConfigModal().then(() => document.getElementById('modal_config')?.showModal());
+    });
+
+    document.getElementById('config-close-btn')?.addEventListener('click', () => {
+        if (admin && isConfigDirty()) {
+            const ok = confirm('Fermer sans enregistrer vos modifications ?');
+            if (!ok) return;
+        }
+        document.getElementById('modal_config')?.close();
     });
 
     document.getElementById('config-save-btn')?.addEventListener('click', async () => {
@@ -80,6 +112,8 @@ export function initConfigUi(currentUser) {
         }
         invalidateOrganSchoolSettingsCache();
         showToast('Configuration enregistrée. Rechargez la page pour mettre à jour la grille si besoin.', 'success');
+        configInitialSnapshot = currentConfigSnapshot();
+        document.getElementById('modal_config')?.close();
     });
 }
 

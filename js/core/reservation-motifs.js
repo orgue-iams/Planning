@@ -3,7 +3,13 @@
  * Le type technique (couleur / règles) est dérivé du motif.
  */
 
-export const RESERVATION_MOTIFS = /** @type {const} */ ['Travail', 'Cours', 'Fermeture'];
+export const RESERVATION_MOTIFS = /** @type {const} */ [
+    'Travail',
+    'Cours',
+    'Concert',
+    'Autre',
+    'Fermeture'
+];
 
 /** Libellé affiché dans les listes / titres de secours (la valeur logique reste « Travail »). */
 export function motifDisplayLabel(motif) {
@@ -16,7 +22,7 @@ export function motifDisplayLabel(motif) {
 export function motifToSlotType(motif) {
     const m = String(motif || '').trim();
     if (m === 'Fermeture') return 'fermeture';
-    if (m === 'Cours') return 'cours';
+    if (m === 'Cours' || m === 'Concert') return 'cours';
     return 'reservation';
 }
 
@@ -25,13 +31,15 @@ export function motifToPlanningDbSlotType(motif) {
     const m = String(motif || '').trim();
     if (m === 'Fermeture') return 'fermeture';
     if (m === 'Cours') return 'cours';
+    if (m === 'Concert') return 'concert';
+    if (m === 'Autre') return 'autre';
     return 'travail perso';
 }
 
 /** @param {string} value */
 export function normalizeMotif(value) {
     const s = String(value || '').trim();
-    if (!s || s === 'Autre') return 'Travail';
+    if (!s) return 'Travail';
     if (RESERVATION_MOTIFS.includes(s)) return s;
     return 'Travail';
 }

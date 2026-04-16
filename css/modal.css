@@ -116,7 +116,7 @@
     z-index: 100;
     border: 1px solid #e2e8f0;
     border-radius: 0.75rem 0.75rem 0 0;
-    background: rgb(248 250 252 / 0.98);
+    background: #ffffff;
     backdrop-filter: blur(6px);
     padding: 6px 8px;
 }

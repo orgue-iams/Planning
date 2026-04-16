@@ -71,10 +71,23 @@ export async function planningAdminInvoke(action, payload = {}) {
     if (res.status === 401 && isBackendAuthConfigured()) {
         const supabase = getSupabaseClient();
         if (supabase) {
+            const { data: sess } = await supabase.auth.getSession();
+            const hasRefresh = Boolean(sess?.session?.refresh_token);
+            if (!hasRefresh) {
+                await clearCorruptedLocalAuthSession();
+                throw new Error('Session administrateur expirée. Reconnectez-vous.');
+            }
             const { error: refErr } = await supabase.auth.refreshSession();
-            if (refErr && isInvalidRefreshTokenError(refErr)) await clearCorruptedLocalAuthSession();
+            if (refErr) {
+                if (isInvalidRefreshTokenError(refErr)) {
+                    await clearCorruptedLocalAuthSession();
+                    throw new Error('Session administrateur expirée. Reconnectez-vous.');
+                }
+                throw new Error(refErr.message || 'Impossible de rafraîchir la session.');
+            }
             token = await getAccessToken();
-            if (token) res = await doFetch(token);
+            if (!token) throw new Error('Session administrateur expirée. Reconnectez-vous.');
+            res = await doFetch(token);
         }
     }
 

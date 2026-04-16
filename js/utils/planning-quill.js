@@ -186,7 +186,7 @@ function registerPlanningSizeFormat() {
 
 /**
  * @param {HTMLElement} mountEl conteneur vide (rempli par Quill : barre + zone d’édition)
- * @param {{ placeholder?: string; adminFontStepper?: boolean; compactAnnouncementToolbar?: boolean } | undefined} opts
+ * @param {{ placeholder?: string; adminFontStepper?: boolean; compactAnnouncementToolbar?: boolean; disableFontSizeButtons?: boolean } | undefined} opts
  *   compactAnnouncementToolbar : annonces login — gras / italique / souligné uniquement (pas de tailles ni listes).
  */
 export function createPlanningQuill(mountEl, opts = {}) {
@@ -206,7 +206,7 @@ export function createPlanningQuill(mountEl, opts = {}) {
         placeholder: opts.placeholder ?? '',
         modules: { toolbar }
     });
-    if (!opts.compactAnnouncementToolbar) {
+    if (!opts.compactAnnouncementToolbar && !opts.disableFontSizeButtons) {
         injectPlanningFontSizeButtons(q, opts);
     }
     return q;

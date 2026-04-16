@@ -96,7 +96,62 @@ function ensureReservationMotifInscritsListener() {
     sel.dataset.inscritsMotifBound = '1';
     sel.addEventListener('change', () => {
         updateReservationInscritsWrapVisibility(reservationModalUserRef, reservationModalCanEditRef);
+        const multi = document.getElementById('event-inscrits-select');
+        // Sécurise le cas "Cours -> Travail perso -> Cours" :
+        // on évite de conserver une sélection d’élèves quand le motif n’est plus "Cours".
+        const isCours = String(sel.value || '').trim() === 'Cours';
+        if (!isCours && multi instanceof HTMLSelectElement) {
+            for (const o of multi.options) o.selected = false;
+            renderReservationInscritsDnD(multi, reservationModalCanEditRef);
+        }
     });
+}
+
+function renderReservationInscritsDnD(multi, canEdit) {
+    const availWrap = document.getElementById('event-inscrits-available');
+    const selWrap = document.getElementById('event-inscrits-selected');
+    if (!multi || !availWrap || !selWrap) return;
+    const rows = [];
+    for (const o of multi.options) {
+        rows.push({
+            id: String(o.value || ''),
+            label: String(o.textContent || '').trim(),
+            selected: Boolean(o.selected)
+        });
+    }
+    const mk = (r) =>
+        `<button type="button" class="btn btn-ghost btn-xs h-auto min-h-0 py-1 px-1.5 justify-start text-[10px] w-full ${
+            canEdit ? 'cursor-grab' : 'cursor-default'
+        }" draggable="${canEdit ? 'true' : 'false'}" data-student-id="${escapeHtml(r.id)}">${escapeHtml(r.label)}</button>`;
+    availWrap.innerHTML = rows.filter((r) => !r.selected).map(mk).join('');
+    selWrap.innerHTML = rows.filter((r) => r.selected).map(mk).join('');
+    if (!canEdit) return;
+    const move = (id, toSelected) => {
+        const opt = [...multi.options].find((o) => String(o.value) === id);
+        if (!opt) return;
+        opt.selected = toSelected;
+        renderReservationInscritsDnD(multi, canEdit);
+    };
+    const bindZone = (zone, toSelected) => {
+        zone.querySelectorAll('[data-student-id]').forEach((el) => {
+            el.addEventListener('dragstart', (ev) => {
+                ev.dataTransfer?.setData('text/plain', el.getAttribute('data-student-id') || '');
+            });
+            el.addEventListener('click', () => move(el.getAttribute('data-student-id') || '', toSelected));
+        });
+    };
+    bindZone(availWrap, true);
+    bindZone(selWrap, false);
+    const setDrop = (zone, toSelected) => {
+        zone.addEventListener('dragover', (ev) => ev.preventDefault());
+        zone.addEventListener('drop', (ev) => {
+            ev.preventDefault();
+            const id = ev.dataTransfer?.getData('text/plain') || '';
+            move(id, toSelected);
+        });
+    };
+    setDrop(availWrap, false);
+    setDrop(selWrap, true);
 }
 
 async function prepareReservationInscritsSelect(currentUser, event, canEdit) {
@@ -109,20 +164,31 @@ async function prepareReservationInscritsSelect(currentUser, event, canEdit) {
         return;
     }
     const rows = await fetchPlanningListElevesActifs();
+    const rowsSorted = [...rows].sort((a, b) => {
+        const an = String(a?.nom || '').trim().toLowerCase();
+        const bn = String(b?.nom || '').trim().toLowerCase();
+        if (an !== bn) return an.localeCompare(bn, 'fr');
+        const ap = String(a?.prenom || '').trim().toLowerCase();
+        const bp = String(b?.prenom || '').trim().toLowerCase();
+        return ap.localeCompare(bp, 'fr');
+    });
     multi.innerHTML = '';
     const pre = new Set(
         (event && Array.isArray(event.extendedProps?.inscrits) ? event.extendedProps.inscrits : [])
             .map((e) => String(e).trim().toLowerCase())
             .filter(Boolean)
     );
-    for (const r of rows) {
+    for (const r of rowsSorted) {
         if (!r.user_id) continue;
-        const label = `${r.display_name || r.email} · ${r.email}`;
+        const prenom = String(r.prenom || '').trim();
+        const nom = String(r.nom || '').trim();
+        const label = `${prenom} ${nom}`.trim() || String(r.display_name || r.email || '').trim();
         const opt = new Option(label, r.user_id);
         opt.dataset.email = String(r.email || '').trim().toLowerCase();
         opt.selected = pre.has(opt.dataset.email);
         multi.add(opt);
     }
+    renderReservationInscritsDnD(multi, canEdit);
     updateReservationInscritsWrapVisibility(currentUser, canEdit);
 }
 
@@ -163,8 +229,15 @@ export function ownerInfoFromEvent(event, currentUser) {
     return { ownerEmail, ownerName, ownerRole };
 }
 
-function ownerIdentityLabel(owner) {
+function ownerIdentityLabel(owner, currentUser = null, includeActor = false) {
     const name = owner.ownerName || 'Inconnu';
+    const me = String(currentUser?.email || '')
+        .trim()
+        .toLowerCase();
+    if (includeActor && me && owner.ownerEmail && owner.ownerEmail !== me) {
+        const actor = String(currentUser?.name || '').trim() || me.split('@')[0] || 'inconnu';
+        return `Réservé par ${name}. Modifié par ${actor}`;
+    }
     return `Réservé par ${name}`;
 }
 
@@ -270,10 +343,11 @@ export function fcDragResizePropsForEvent(eventLike, currentUser) {
     if (!eventLike || !canCurrentUserEditEventIgnoringPast(currentUser, eventLike)) {
         return { editable: false, startEditable: false, durationEditable: false };
     }
-    const touch =
+    const coarsePointer =
         typeof window !== 'undefined' &&
-        ('ontouchstart' in window || navigator.maxTouchPoints > 0);
-    return { editable: true, startEditable: true, durationEditable: !touch };
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(pointer: coarse)').matches;
+    return { editable: true, startEditable: true, durationEditable: !coarsePointer };
 }
 
 /** Créneau tout juste ajouté par l’utilisateur connecté (owner = moi). */
@@ -318,6 +392,8 @@ function roleFromOwnerEmail(email) {
 function allowedMotifsForRole(role) {
     const r = normalizeRole(role);
     if (r === 'admin') return [...RESERVATION_MOTIFS];
+    if (r === 'prof') return RESERVATION_MOTIFS.filter((m) => m !== 'Fermeture');
+    if (r === 'eleve') return ['Travail', 'Cours'];
     return RESERVATION_MOTIFS.filter((m) => m !== 'Fermeture');
 }
 
@@ -610,7 +686,7 @@ export async function maybeNotifySlotOwnerAfterThirdPartyEdit({
 // --- 1. RENDU VISUEL DES CRÉNEAUX ---
 export function getEventContent(arg, currentUser) {
     const isMirror = Boolean(arg.isMirror);
-    const title = String(arg.event.title || '').trim() || 'Occupation';
+    const title = String(arg.event.title || '').trim();
     const start = arg.event.start;
     const end = arg.event.end;
 
@@ -869,7 +945,7 @@ function findOverlappingCalendarEvent(calendar, rangeStart, rangeEnd, excludeEve
 }
 
 function overlapToastMessage(conflict) {
-    const t = String(conflict?.title || 'Occupation').trim() || 'Occupation';
+    const t = String(conflict?.title || '').trim() || 'Créneau';
     const r = eventRangeForOverlap(conflict);
     if (!r) return `Ce créneau chevauche une autre réservation : « ${t} ».`;
     const tf = (d) => formatWeekdayDayTimeFr24(d);
@@ -1100,7 +1176,16 @@ export function buildReservationFormFields(currentUser, event) {
     for (const lab of allowed) sel.add(new Option(motifDisplayLabel(lab), lab));
 
     const inferredMotif = event
-        ? slotTypeToMotif(event.extendedProps?.type)
+        ? (() => {
+              const dbType = String(event.extendedProps?.planningDbSlotType || '').trim();
+              if (dbType === 'cours') return 'Cours';
+              if (dbType === 'concert') return 'Concert';
+              if (dbType === 'autre') return 'Autre';
+              if (dbType === 'fermeture') return 'Fermeture';
+              if (dbType === 'travail perso') return 'Travail';
+              // Repli si l’événement ne porte pas planningDbSlotType (cas inattendu).
+              return slotTypeToMotif(event.extendedProps?.type);
+          })()
         : normalizeRole(currentUser?.role) === 'eleve'
           ? 'Cours'
           : defaultMotifForRole(currentUser?.role);
@@ -1147,11 +1232,17 @@ function applyReservationEditorShellForRole(currentUser, event) {
         if (!event && editorOwnerEl) {
             editorOwnerEl.classList.add('hidden');
         } else if (editorOwnerEl) {
-            editorOwnerEl.textContent = ownerIdentityLabel(owner);
+            editorOwnerEl.textContent = ownerIdentityLabel(owner, currentUser, true);
             editorOwnerEl.classList.remove('hidden');
         }
         wrapTitle?.classList.remove('hidden');
-        wrapMotif?.classList.remove('hidden');
+        const ownerIsEleve = owner.ownerRole === 'eleve';
+        const currentRole = normalizeRole(currentUser?.role);
+        if (event && ownerIsEleve && (currentRole === 'admin' || currentRole === 'prof')) {
+            wrapMotif?.classList.add('hidden');
+        } else {
+            wrapMotif?.classList.remove('hidden');
+        }
         if (r === 'admin') {
             hintFerm?.classList.remove('hidden');
         } else {
@@ -1421,7 +1512,7 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     reservationModalUserRef = currentUser;
     reservationModalCanEditRef = canEditEvent;
     const owner = ownerInfoFromEvent(event, currentUser);
-    const ownerText = ownerIdentityLabel(owner);
+    const ownerText = ownerIdentityLabel(owner, currentUser, false);
 
     const wrapRead = document.getElementById('wrap-reservation-readonly');
     const wrapEdit = document.getElementById('wrap-reservation-editor');
@@ -1438,7 +1529,7 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         const desc = document.getElementById('event-readonly-description');
         const ownerEl = document.getElementById('event-readonly-owner');
         const whenEl = document.getElementById('event-readonly-when');
-        if (desc) desc.textContent = (event.title || 'Occupation').trim() || 'Occupation';
+        if (desc) desc.textContent = String(event.title || '').trim() || 'Créneau';
         if (ownerEl) ownerEl.textContent = ownerText;
         if (whenEl) whenEl.textContent = formatOccupationWhenSentence(start, end);
         const irw = document.getElementById('wrap-readonly-inscrits');
@@ -1878,6 +1969,13 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     document.getElementById('modal_reservation').close();
     showToast(liveEventRef ? 'Réservation mise à jour.' : 'Réservation enregistrée.');
     if (liveEventRef) {
+        const localInscritsEmails =
+            dbSlotType === 'cours'
+                ? getReservationInscritsSelection()
+                      .emailsCsv.split(',')
+                      .map((x) => String(x).trim())
+                      .filter(Boolean)
+                : [];
         try {
             if (typeof liveEventRef.setDates === 'function') {
                 liveEventRef.setDates(new Date(startStr), new Date(endStr));
@@ -1887,6 +1985,11 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         }
         if (typeof liveEventRef.setProp === 'function') {
             liveEventRef.setProp('title', title);
+        }
+        if (typeof liveEventRef.setExtendedProp === 'function') {
+            liveEventRef.setExtendedProp('type', slotType);
+            liveEventRef.setExtendedProp('planningDbSlotType', dbSlotType);
+            liveEventRef.setExtendedProp('inscrits', localInscritsEmails);
         }
     }
     const oiBeforeRefetch =
