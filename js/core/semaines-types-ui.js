@@ -326,7 +326,8 @@ function syncReadonlyStudentsText(tr, studentIds, elevesById) {
         return;
     }
     const labels = enrolledLabelsSorted(studentIds, elevesById);
-    el.textContent = labels.length ? labels.join('\n') : '—';
+    const html = labels.length ? labels.map(escapeAttr).join('<br>') : '—';
+    el.innerHTML = html;
 }
 
 function wireStudentsToggle(tr, elevesById) {
@@ -346,7 +347,7 @@ function wireStudentsToggle(tr, elevesById) {
             selected: Boolean(o.selected)
         }));
         const mk = (r) =>
-            `<button type="button" class="btn btn-ghost btn-xs h-auto min-h-0 py-0.5 px-1 text-[9px] w-full justify-start cursor-grab" draggable="true" data-student-id="${escapeAttr(r.id)}">${escapeAttr(r.label)}</button>`;
+            `<button type="button" class="btn btn-ghost btn-xs h-auto min-h-0 py-0.5 px-1 text-[9px] w-full justify-start cursor-grab" draggable="true" data-student-id="${escapeAttr(r.id)}" title="Clic (ou double-clic) pour déplacer">${escapeAttr(r.label)}</button>`;
         avail.innerHTML = opts.filter((x) => !x.selected).map(mk).join('');
         chosen.innerHTML = opts.filter((x) => x.selected).map(mk).join('');
         const move = (id, pick) => {
@@ -364,11 +365,21 @@ function wireStudentsToggle(tr, elevesById) {
         };
         const bind = (zone, pick) => {
             zone.querySelectorAll('[data-student-id]').forEach((el) => {
+                const id = el.getAttribute('data-student-id') || '';
+                /** @type {number | null} */
+                let clickTimer = null;
                 el.addEventListener('dragstart', (ev) => {
                     ev.dataTransfer?.setData('text/plain', el.getAttribute('data-student-id') || '');
                 });
-                // UX demandée : double-clic pour basculer un élève entre listes.
-                el.addEventListener('dblclick', () => move(el.getAttribute('data-student-id') || '', pick));
+                // UX demandée : double-clic (conservé), mais un clic unique marche aussi.
+                el.addEventListener('click', () => {
+                    if (clickTimer) window.clearTimeout(clickTimer);
+                    clickTimer = window.setTimeout(() => move(id, pick), 180);
+                });
+                el.addEventListener('dblclick', () => {
+                    if (clickTimer) window.clearTimeout(clickTimer);
+                    move(id, pick);
+                });
             });
             zone.addEventListener('dragover', (ev) => ev.preventDefault());
             zone.addEventListener('dragenter', () => zone.classList.add('st-dnd-drop-active'));
@@ -522,10 +533,15 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
     let studentsCell = '';
     if (isReadonly) {
         const labels = enrolledLabelsSorted(sid, elevesById);
-        const txt = line?.slot_type === 'reservation' ? '—' : labels.length ? labels.join('\n') : '—';
+        const studentsHtml =
+            line?.slot_type === 'reservation'
+                ? '—'
+                : labels.length
+                  ? labels.map(escapeAttr).join('<br>')
+                  : '—';
         studentsCell = `<td class="st-students-cell align-top">
             <div class="st-students-readonly-wrap flex items-start gap-1 min-w-0">
-                <span class="st-students-readonly-text flex-1 min-w-0 text-[9px] text-slate-700 leading-snug">${escapeAttr(txt)}</span>
+                <span class="st-students-readonly-text flex-1 min-w-0 text-[9px] text-slate-700 leading-snug">${studentsHtml}</span>
             </div>
         </td>`;
     } else {
@@ -555,11 +571,11 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
     tr.innerHTML = `
         ${dragCell}
         <td class="text-[10px] font-bold text-slate-700 align-top">${escapeAttr(ownerLabel)}</td>
-        <td><select class="select select-xs st-type max-w-[5.5rem] text-[10px] font-bold text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${typeSel}</select></td>
-        <td><select class="select select-xs st-dow max-w-[4.5rem] text-[10px] font-bold text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${dowSel}</select></td>
-        <td><select class="select select-xs st-start max-w-[4.5rem] text-[10px] font-bold text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
-        <td><select class="select select-xs st-end max-w-[4.5rem] text-[10px] font-bold text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
-        <td><input type="text" class="input input-xs st-title w-full min-w-[6rem] text-[10px] bg-white border border-slate-200 rounded" value="${title}" ${isReadonly ? 'readonly' : ''} /></td>
+        <td><select class="select select-xs st-type max-w-[5.5rem] text-[9px] font-bold font-sans text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${typeSel}</select></td>
+        <td><select class="select select-xs st-dow max-w-[4.5rem] text-[9px] font-bold font-sans text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${dowSel}</select></td>
+        <td><select class="select select-xs st-start max-w-[4.5rem] text-[9px] font-bold font-sans text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
+        <td><select class="select select-xs st-end max-w-[4.5rem] text-[9px] font-bold font-sans text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
+        <td><input type="text" class="input input-xs st-title w-full min-w-[6rem] text-[9px] font-sans bg-white border border-slate-200 rounded" value="${title}" ${isReadonly ? 'readonly' : ''} /></td>
         ${studentsCell}
         <td>${isReadonly ? '' : '<button type="button" class="btn btn-ghost btn-xs st-del font-black text-error">×</button>'}</td>
     `;
@@ -624,6 +640,7 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
         mul.classList.add('hidden');
         ro?.classList.remove('hidden');
     });
+    return tr;
 }
 
 async function loadEleves() {
@@ -769,14 +786,14 @@ async function openSemainesTypesModal(user) {
 function addEmptyRow(tbody, elevesHtml, user, elevesById, ownerLabels) {
     const oid = String(user.id);
     const ownerLabel = ownerLabels.get(oid) || user.email || oid.slice(0, 8);
-    appendTemplateRow(
+    const tr = appendTemplateRow(
         tbody,
         {
             day_of_week: 1,
             start_time: '08:00:00',
             end_time: '09:00:00',
             slot_type: 'cours',
-            title: '',
+            title: 'Cours',
             studentIds: []
         },
         elevesHtml,
@@ -788,6 +805,17 @@ function addEmptyRow(tbody, elevesHtml, user, elevesById, ownerLabels) {
             elevesById
         }
     );
+    // Fix UX : forcer la ligne nouvellement ajoutée à être visible.
+    requestAnimationFrame(() => {
+        if (!tr) return;
+        try {
+            tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        } catch {
+            tr.scrollIntoView();
+        }
+        tr.classList.add('ring-2', 'ring-sky-500');
+        window.setTimeout(() => tr.classList.remove('ring-2', 'ring-sky-500'), 1200);
+    });
 }
 
 async function runSemainesTypesSaveGabarit() {
