@@ -58,7 +58,7 @@ import { initSemainesTypesUi, resetSemainesTypesUiBindings } from './semaines-ty
 import { initStatisticsUi, resetStatisticsUiBindings } from './statistics-ui.js';
 import { initCoursSeriesScopeUi, resetCoursSeriesScopeUiBindings } from './cours-series-scope-ui.js';
 import { initConfigUi, resetConfigUiBindings } from './config-ui.js';
-import { bindAdminClearWeekButton } from './admin-clear-week.js';
+import { installAdminClearWeekDelegatedClick } from './admin-clear-week.js';
 import { fetchWeekCycleAnchor, clearProfWeekCycleCache } from './week-cycle.js';
 import { fetchOrganSchoolSettings, invalidateOrganSchoolSettingsCache } from './organ-settings.js';
 import { CACHE_NAME } from '../config/cache-name.js';
@@ -312,7 +312,6 @@ function initCalendarAndRevealUi() {
         invalidateCalendarListCache();
         calendar = new FullCalendar.Calendar(calendarEl, getCalendarConfig(handlers, currentUser));
         calendar.render();
-        bindAdminClearWeekButton(() => calendar, () => currentUser);
         const toolbarCtl = initCalendarToolbar(calendar);
         handlers.onDatesSet = () => {
             toolbarCtl?.refreshTitle();
@@ -414,6 +413,7 @@ function wireDialogBackdropClose() {
 
 document.addEventListener('DOMContentLoaded', async () => {
     await loadUIComponents();
+    installAdminClearWeekDelegatedClick(() => calendar, () => currentUser);
 
     const dlgHelp = document.getElementById('modal_help');
     document.getElementById('menu-item-help')?.addEventListener('click', (e) => {

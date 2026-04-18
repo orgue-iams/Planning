@@ -3,11 +3,10 @@
  * puis lignes Postgres (sans dépendre des miroirs en base).
  */
 import { showToast } from '../utils/toast.js';
-import { getAccessToken, isBackendAuthConfigured } from './auth-logic.js';
+import { getAccessToken, isBackendAuthConfigured, isAdmin } from './auth-logic.js';
 import { getPlanningConfig } from './supabase-client.js';
 import { deletePlanningEventRow, fetchPlanningEventRowsInRange } from './planning-events-db.js';
 import { invokeCalendarBridge } from './calendar-bridge.js';
-import { normalizePlanningRole } from './planning-roles.js';
 import { refetchPlanningGrid } from './calendar-logic.js';
 import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
 
@@ -56,20 +55,42 @@ function formatWeekRangeFr(start, endExclusive) {
 
 let clearWeekInFlight = false;
 
+/** Une seule délégation sur document : le bouton existe avant le calendrier async ; évite un bind jamais posé. */
+let adminClearWeekDelegationInstalled = false;
+
 /**
  * @param {() => import('@fullcalendar/core').Calendar | null} getCalendar
  * @param {() => object | null} getCurrentUser
  */
+export function installAdminClearWeekDelegatedClick(getCalendar, getCurrentUser) {
+    if (adminClearWeekDelegationInstalled) return;
+    adminClearWeekDelegationInstalled = true;
+    document.addEventListener(
+        'click',
+        (ev) => {
+            const raw = ev.target;
+            const el =
+                raw instanceof Element ? raw : raw && raw.parentElement instanceof Element ? raw.parentElement : null;
+            if (!el) return;
+            const btn = el.closest('#btn-admin-clear-week');
+            if (!btn) return;
+            ev.preventDefault();
+            void runAdminClearWeek(getCalendar, getCurrentUser).catch((e) => {
+                console.error(e);
+                showToast('Opération interrompue.', 'error');
+            });
+        },
+        true
+    );
+}
+
+/**
+ * @deprecated Préférer installAdminClearWeekDelegatedClick (appelé une fois au boot).
+ * @param {() => import('@fullcalendar/core').Calendar | null} getCalendar
+ * @param {() => object | null} getCurrentUser
+ */
 export function bindAdminClearWeekButton(getCalendar, getCurrentUser) {
-    const btn = document.getElementById('btn-admin-clear-week');
-    if (!btn || btn.dataset.bound === '1') return;
-    btn.dataset.bound = '1';
-    btn.addEventListener('click', () => {
-        void runAdminClearWeek(getCalendar, getCurrentUser).catch((e) => {
-            console.error(e);
-            showToast('Opération interrompue.', 'error');
-        });
-    });
+    installAdminClearWeekDelegatedClick(getCalendar, getCurrentUser);
 }
 
 /**
@@ -78,7 +99,7 @@ export function bindAdminClearWeekButton(getCalendar, getCurrentUser) {
  */
 export async function runAdminClearWeek(getCalendar, getCurrentUser) {
     const user = getCurrentUser?.();
-    if (normalizePlanningRole(user?.role) !== 'admin') {
+    if (!isAdmin(user)) {
         showToast('Réservé aux administrateurs.', 'error');
         return;
     }
