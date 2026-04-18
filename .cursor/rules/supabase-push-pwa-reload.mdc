@@ -9,7 +9,7 @@ alwaysApply: true
 
   `supabase db push --yes`
 
-  (adapter si le projet utilise une autre cible documentée), **sans** renvoyer l’utilisateur vers le terminal pour cette étape si l’environnement le permet.
+  (adapter si le projet utilise une autre cible documentée), **sans** renvoyer l’utilisateur vers le terminal pour cette étape si l’environnement le permet, et **sans** demander dans le chat « confirmez-vous le push » — l’agent exécute dès que la livraison le requiert (voir `.cursor/rules/supabase-no-chat-confirm-migrations.mdc`).
 - Si la commande échoue (projet non lié, session expirée), **rapporter** le message d’erreur et ce qui manque (ex. `supabase link`, `supabase login`).
 
 # CSS Tailwind

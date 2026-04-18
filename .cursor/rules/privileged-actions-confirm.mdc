@@ -7,7 +7,7 @@ alwaysApply: true
 
 L’utilisateur préfère que l’agent **exécute lui-même** les commandes et **n’attende pas** une confirmation dans le chat pour le travail courant (voir `agent-executes-ops.mdc`).
 
-**Sans confirmation préalable dans le chat** : `git` (status, pull, commit, push quand demandé), `npm` / `npx`, builds, tests locaux, `supabase functions deploy` / scripts du repo quand la tâche le demande, requêtes SQL de **diagnostic** via CLI sur base liée, lecture de fichiers.
+**Sans confirmation préalable dans le chat** : `git` (status, pull, commit, push quand demandé), `npm` / `npx`, builds, tests locaux, `supabase functions deploy` / scripts du repo quand la tâche le demande, **`supabase db push`** (migrations, avec `--yes` pour éviter l’invite `[Y/n]`), **`supabase db query`** / scripts `.sql` sur base liée quand la tâche l’exige, requêtes SQL de **diagnostic** via CLI sur base liée, lecture de fichiers.
 
 **Demander une confirmation explicite dans le chat uniquement** avant d’exécuter quelque chose **irréversible ou destructeur** non déjà demandé dans le message, par exemple : `DROP` / `TRUNCATE` / `DELETE` large ou aveugle sur prod, rotation de secrets, ou toute action explicitement hors périmètre de la demande.
 

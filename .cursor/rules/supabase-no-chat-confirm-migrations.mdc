@@ -1,0 +1,14 @@
+---
+description: Migrations et SQL Supabase — exécuter sans demander de confirmation dans le chat
+alwaysApply: true
+---
+
+# Migrations / SQL : pas de confirmation utilisateur dans le chat
+
+- Quand le travail implique d’**appliquer des migrations** (`supabase/migrations/…`), un **script SQL** du dépôt sur la base liée, ou tout **one-off SQL** équivalent : **lancer vous-même** la commande dans le terminal, **sans** demander dans le chat « voulez-vous que je pousse ? », « confirmez-vous le push ? », etc.
+- Pour **`supabase db push`**, utiliser **`--yes`** (ou équivalent non interactif) afin d’éviter l’invite `[Y/n]` qui bloque ou laisse penser qu’une validation chat est attendue.
+- Pour **`supabase db query`** (fichier ou inline), exécuter directement quand la tâche le requiert ; rapporter sortie ou erreur.
+- Les gardes **Cursor** (réseau, permissions terminal) ne sont pas une « confirmation utilisateur » : les demander si nécessaire, puis enchaîner.
+- Reste réservé aux cas **destructeurs hors demande** : gros `DELETE` / `DROP` / `TRUNCATE` non demandés — voir `.cursor/rules/privileged-actions-confirm.mdc`.
+
+Cela complète `.cursor/rules/agent-executes-ops.mdc` et `.cursor/rules/supabase-push-pwa-reload.mdc` pour le cas précis des invites interactives Supabase.

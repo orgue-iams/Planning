@@ -9,6 +9,8 @@ L’environnement de développement est **configuré** pour la CLI Supabase avec
 
 Quand une tâche implique d’**exécuter du SQL** sur la base **hébergée** (seed manuel, requête de vérif, correctif ponctuel) :
 
+- **Ne pas** demander dans le chat une confirmation avant d’exécuter ; lancer la CLI, puis rapporter le résultat (voir `.cursor/rules/supabase-no-chat-confirm-migrations.mdc` pour `db push` / migrations).
+
 1. **Préférer exécuter vous-même** la commande depuis la racine du dépôt Planning (PowerShell : `Set-Location "c:\Developpement\Planning"` puis) :
    - Fichier : `supabase db query -f "chemin/vers/fichier.sql" --linked`
    - Requête inline : `supabase db query --linked "select …"`
