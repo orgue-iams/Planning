@@ -1,6 +1,6 @@
 <dialog id="modal_profile" class="modal">
     <div class="modal-box p-5 w-[96%] max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 shadow-2xl">
-        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest">Profil</h3>
+        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest">Mon profil</h3>
 
         <p class="text-[10px] text-slate-600 mb-3 leading-snug">
             Informations de compte. Les liens d’agenda ci-dessous servent uniquement à
@@ -20,6 +20,30 @@
                         <button type="button" id="profile-email-save" class="btn btn-xs h-8 min-h-0">Enregistrer</button>
                     </div>
                     <p id="profile-email-hint" class="text-[9px] text-slate-500 mt-1 hidden">Vérifiez votre boîte e-mail si une confirmation est demandée par Supabase.</p>
+                </dd>
+            </div>
+            <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-start min-h-[2.75rem] py-2">
+                <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none pt-1">Coordonnées</dt>
+                <dd class="m-0 min-w-0 space-y-2">
+                    <label class="block">
+                        <span class="text-[9px] font-bold text-slate-500">Téléphone</span>
+                        <input
+                            type="tel"
+                            id="profile-phone-input"
+                            class="input input-xs input-bordered w-full text-[11px] h-8 mt-0.5"
+                            autocomplete="tel"
+                            maxlength="40"
+                        />
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="profile-share-email" class="checkbox checkbox-primary checkbox-sm" />
+                        <span class="text-[10px] text-slate-700">Afficher mon e-mail dans l’annuaire « Utilisateurs »</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="profile-share-phone" class="checkbox checkbox-primary checkbox-sm" />
+                        <span class="text-[10px] text-slate-700">Afficher mon téléphone dans l’annuaire « Utilisateurs »</span>
+                    </label>
+                    <button type="button" id="profile-contact-save" class="btn btn-xs w-fit">Enregistrer téléphone et visibilité</button>
                 </dd>
             </div>
             <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2">

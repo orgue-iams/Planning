@@ -23,8 +23,8 @@ function normalizePlanningRole(r: string): (typeof PLANNING_ROLES)[number] {
 function planningFullName(nom: string, prenom: string): string {
     const n = nom.trim();
     const p = prenom.trim();
-    if (n && p) return `${n} ${p}`;
-    return n || p || '';
+    if (n && p) return `${p} ${n}`;
+    return p || n || '';
 }
 
 /** Corps JSON : champs nom + prénom ; repli sur display_name seul (anciens clients). */
@@ -67,6 +67,9 @@ async function profileRowsForUserIds(
             prenom: string;
             display_name: string | null;
             role: string;
+            telephone: string;
+            directory_share_email: boolean;
+            directory_share_phone: boolean;
             calendar_assignment_error: string | null;
             personal_google_calendar_id: string | null;
             personal_calendar_label: string | null;
@@ -81,6 +84,9 @@ async function profileRowsForUserIds(
             prenom: string;
             display_name: string | null;
             role: string;
+            telephone: string;
+            directory_share_email: boolean;
+            directory_share_phone: boolean;
             calendar_assignment_error: string | null;
             personal_google_calendar_id: string | null;
             personal_calendar_label: string | null;
@@ -91,7 +97,9 @@ async function profileRowsForUserIds(
         const slice = ids.slice(i, i + chunk);
         const { data, error } = await admin
             .from('profiles')
-            .select('id,nom,prenom,display_name,role,calendar_assignment_error')
+            .select(
+                'id,nom,prenom,display_name,role,telephone,directory_share_email,directory_share_phone,calendar_assignment_error'
+            )
             .in('id', slice);
         if (error) throw error;
         const { data: poolRows, error: poolErr } = await admin
@@ -117,6 +125,9 @@ async function profileRowsForUserIds(
                 prenom: string | null;
                 display_name: string | null;
                 role: string;
+                telephone: string | null;
+                directory_share_email: boolean | null;
+                directory_share_phone: boolean | null;
                 calendar_assignment_error: string | null;
             };
             map.set(row.id, {
@@ -125,6 +136,9 @@ async function profileRowsForUserIds(
                 prenom: String(row.prenom ?? '').trim(),
                 display_name: row.display_name,
                 role: row.role,
+                telephone: String(row.telephone ?? '').trim(),
+                directory_share_email: row.directory_share_email !== false,
+                directory_share_phone: row.directory_share_phone === true,
                 calendar_assignment_error: row.calendar_assignment_error ?? null,
                 personal_google_calendar_id: calByUser.get(row.id) ?? null,
                 personal_calendar_label: labelByUser.get(row.id) ?? null
@@ -246,6 +260,9 @@ Deno.serve(async (req) => {
                 prenom?: string | null;
                 display_name?: string | null;
                 profile_role?: string | null;
+                telephone?: string | null;
+                directory_share_email?: boolean | null;
+                directory_share_phone?: boolean | null;
                 calendar_assignment_error?: string | null;
                 personal_google_calendar_id?: string | null;
                 personal_calendar_label?: string | null;
@@ -263,6 +280,9 @@ Deno.serve(async (req) => {
                     prenom: string;
                     display_name: string | null;
                     role: string;
+                    telephone: string;
+                    directory_share_email: boolean;
+                    directory_share_phone: boolean;
                     banned_until: string | null;
                     created_at: string | null;
                     calendar_assignment_error: string | null;
@@ -293,6 +313,9 @@ Deno.serve(async (req) => {
                             prenom: p?.prenom ?? '',
                             display_name: p?.display_name ?? null,
                             role: normalizePlanningRole(dbRole),
+                            telephone: p?.telephone ?? '',
+                            directory_share_email: p?.directory_share_email !== false,
+                            directory_share_phone: p?.directory_share_phone === true,
                             banned_until: ban ?? null,
                             created_at: u.created_at ?? null,
                             calendar_assignment_error: p?.calendar_assignment_error ?? null,
@@ -327,6 +350,9 @@ Deno.serve(async (req) => {
                     prenom: row.prenom != null ? String(row.prenom) : '',
                     display_name: row.display_name != null ? String(row.display_name) : null,
                     role: normalizePlanningRole(dbRole),
+                    telephone: row.telephone != null ? String(row.telephone) : '',
+                    directory_share_email: row.directory_share_email !== false,
+                    directory_share_phone: row.directory_share_phone === true,
                     banned_until: row.banned_until != null ? String(row.banned_until) : null,
                     created_at: row.created_at != null ? String(row.created_at) : null,
                     calendar_assignment_error:
@@ -380,11 +406,15 @@ Deno.serve(async (req) => {
                 });
             }
 
+            const telInvite = String(body.telephone ?? '')
+                .trim()
+                .slice(0, 40);
             const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
                 redirectTo,
                 data: {
                     nom,
                     prenom,
+                    telephone: telInvite,
                     display_name: fullName,
                     role: normalizePlanningRole(role)
                 }
@@ -432,6 +462,9 @@ Deno.serve(async (req) => {
             }
 
             const nr = normalizePlanningRole(role);
+            const telCreate = String(body.telephone ?? '')
+                .trim()
+                .slice(0, 40);
             const { data, error } = await admin.auth.admin.createUser({
                 email,
                 password,
@@ -439,6 +472,7 @@ Deno.serve(async (req) => {
                 user_metadata: {
                     nom,
                     prenom,
+                    telephone: telCreate,
                     display_name: fullName,
                     role: nr
                 }
@@ -454,6 +488,7 @@ Deno.serve(async (req) => {
                             id: createdId,
                             nom,
                             prenom,
+                            telephone: telCreate,
                             role: nr,
                             reservation_types: { labels: [fullName], favoriteLabel: fullName },
                             updated_at: new Date().toISOString()
@@ -541,6 +576,11 @@ Deno.serve(async (req) => {
             const userId = String(body.user_id ?? '');
             const nom = String(body.nom ?? '').trim();
             const prenom = String(body.prenom ?? '').trim();
+            const telUpd = Object.prototype.hasOwnProperty.call(body, 'telephone')
+                ? String(body.telephone ?? '')
+                      .trim()
+                      .slice(0, 40)
+                : null;
             if (!userId) {
                 return new Response(JSON.stringify({ error: 'user_id requis' }), {
                     status: 400,
@@ -555,10 +595,10 @@ Deno.serve(async (req) => {
             }
             const fullName = planningFullName(nom, prenom);
 
-            const { error: pErr } = await admin
-                .from('profiles')
-                .update({ nom, prenom, updated_at: new Date().toISOString() })
-                .eq('id', userId);
+            const patch: Record<string, unknown> = { nom, prenom, updated_at: new Date().toISOString() };
+            if (telUpd !== null) patch.telephone = telUpd;
+
+            const { error: pErr } = await admin.from('profiles').update(patch).eq('id', userId);
             if (pErr) throw pErr;
 
             const { data: authUser, error: guErr } = await admin.auth.admin.getUserById(userId);
@@ -640,7 +680,30 @@ Deno.serve(async (req) => {
                 .order('sort_order', { ascending: true })
                 .order('created_at', { ascending: true });
             if (error) throw error;
-            return new Response(JSON.stringify({ ok: true, rows: data ?? [] }), {
+            const raw = (data ?? []) as Array<{
+                id: string;
+                google_calendar_id: string;
+                label: string | null;
+                disabled: boolean | null;
+                sort_order: number | null;
+                assigned_user_id: string | null;
+                assigned_at: string | null;
+                created_at: string | null;
+            }>;
+            const uids = raw.map((r) => r.assigned_user_id).filter((x): x is string => Boolean(x));
+            const pmap = await profileRowsForUserIds(admin, uids);
+            const rows = raw.map((row) => {
+                const uid = row.assigned_user_id;
+                const p = uid ? pmap.get(uid) : undefined;
+                const nom = String(p?.nom ?? '').trim();
+                const prenom = String(p?.prenom ?? '').trim();
+                return {
+                    ...row,
+                    assignee_nom: nom,
+                    assignee_prenom: prenom
+                };
+            });
+            return new Response(JSON.stringify({ ok: true, rows }), {
                 headers: { ...cors, 'Content-Type': 'application/json' }
             });
         }

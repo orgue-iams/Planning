@@ -10,6 +10,7 @@ export async function loadUIComponents() {
         { id: 'app-modals', file: 'components/modal-forgot-password.html', append: true },
         { id: 'app-modals', file: 'components/modal-rules.html', append: true },
         { id: 'app-modals', file: 'components/modal-help.html', append: true },
+        { id: 'app-modals', file: 'components/modal-privacy.html', append: true },
         { id: 'app-modals', file: 'components/modal-broadcast.html', append: true },
         { id: 'app-modals', file: 'components/modal-users-admin.html', append: true },
         { id: 'app-modals', file: 'components/modal-calendar-pool.html', append: true },
@@ -19,6 +20,7 @@ export async function loadUIComponents() {
         { id: 'app-modals', file: 'components/modal-semaines-types.html', append: true },
         { id: 'app-modals', file: 'components/modal-course-students.html', append: true },
         { id: 'app-modals', file: 'components/modal-statistics.html', append: true },
+        { id: 'app-modals', file: 'components/modal-directory-users.html', append: true },
         { id: 'app-modals', file: 'components/modal-cours-series-scope.html', append: true }
     ];
 

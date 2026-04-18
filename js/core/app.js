@@ -56,6 +56,7 @@ import { setPlanningSessionUser, getPlanningSessionUser } from './session-user.j
 import { initProfileUi, resetProfileUiBindings, refreshHeaderWeekStrip } from './profile-ui.js';
 import { initSemainesTypesUi, resetSemainesTypesUiBindings } from './semaines-types-ui.js';
 import { initStatisticsUi, resetStatisticsUiBindings } from './statistics-ui.js';
+import { initDirectoryUsersUi, resetDirectoryUsersUiBindings } from './directory-users-ui.js';
 import { initCoursSeriesScopeUi, resetCoursSeriesScopeUiBindings } from './cours-series-scope-ui.js';
 import { initConfigUi, resetConfigUiBindings } from './config-ui.js';
 import { installAdminClearWeekDelegatedClick } from './admin-clear-week.js';
@@ -89,6 +90,7 @@ function performLogout() {
     resetProfileUiBindings();
     resetSemainesTypesUiBindings();
     resetStatisticsUiBindings();
+    resetDirectoryUsersUiBindings();
     resetCoursSeriesScopeUiBindings();
     resetConfigUiBindings();
     invalidateOrganSchoolSettingsCache();
@@ -114,6 +116,7 @@ function performLogout() {
         'modal_admin_confirm',
         'modal_announcements',
         'modal_help',
+        'modal_privacy',
         'modal_profile',
         'modal_semaines_types',
         'modal_config',
@@ -177,7 +180,8 @@ function refreshHeaderUser(user) {
     const r = String(user.role || '').toLowerCase();
     const staff = isBackendAuthConfigured() && (r === 'prof' || r === 'admin');
     document.getElementById('header-semaines-types-wrap')?.classList.toggle('hidden', !staff);
-    document.getElementById('header-settings-wrap')?.classList.toggle('hidden', !staff);
+    /* Réglages : visible pour tout utilisateur connecté (annuaire « Utilisateurs ») ; entrées admin/prof restent masquées individuellement. */
+    document.getElementById('header-settings-wrap')?.classList.toggle('hidden', !isBackendAuthConfigured());
     document.getElementById('btn-admin-clear-week')?.classList.toggle('hidden', r !== 'admin');
     const showWeekStrip = r !== 'admin' && r !== 'prof';
     shell?.classList.toggle('planning-shell--weekstrip', showWeekStrip);
@@ -352,6 +356,7 @@ function initCalendarAndRevealUi() {
         initProfileUi(currentUser);
         initSemainesTypesUi(currentUser);
         initStatisticsUi();
+        initDirectoryUsersUi();
         initCoursSeriesScopeUi();
         initConfigUi(currentUser);
         initAdminUsersUi(currentUser);
@@ -416,6 +421,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     installAdminClearWeekDelegatedClick(() => calendar, () => currentUser);
 
     const dlgHelp = document.getElementById('modal_help');
+    const dlgPrivacy = document.getElementById('modal_privacy');
+    const openPrivacyModal = () => dlgPrivacy?.showModal();
+    document.getElementById('menu-item-privacy')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('btn-user-menu')?.blur();
+        openPrivacyModal();
+    });
     document.getElementById('menu-item-help')?.addEventListener('click', (e) => {
         e.preventDefault();
         document.getElementById('btn-user-menu')?.blur();
@@ -423,6 +435,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         dlgHelp?.showModal();
     });
     document.getElementById('help-btn-close')?.addEventListener('click', () => dlgHelp?.close());
+    document.getElementById('privacy-btn-close')?.addEventListener('click', () => dlgPrivacy?.close());
+    document.getElementById('login-privacy-link')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        openPrivacyModal();
+    });
 
     const loginV = document.getElementById('login-version-badge');
     const buildLegend = document.getElementById('app-build-badge');

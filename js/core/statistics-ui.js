@@ -47,6 +47,22 @@ function defaultRangeFromSettings() {
     return { from, to };
 }
 
+/** Mois civil en cours (local), du 1er au dernier jour. */
+function defaultCurrentMonthYmdRange() {
+    const now = new Date();
+    const from = new Date(now.getFullYear(), now.getMonth(), 1);
+    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return { from: ymd(from), to: ymd(to) };
+}
+
+function applyDefaultMonthRangeToInputs() {
+    const { from, to } = defaultCurrentMonthYmdRange();
+    const fromIn = document.getElementById('statistics-date-from');
+    const toIn = document.getElementById('statistics-date-to');
+    if (fromIn instanceof HTMLInputElement) fromIn.value = from;
+    if (toIn instanceof HTMLInputElement) toIn.value = to;
+}
+
 /** @param {string} fromYmd @param {string} toYmd */
 function enumerateDaysInclusive(fromYmd, toYmd) {
     const d0 = parseYmd(fromYmd);
@@ -184,30 +200,35 @@ function drawStatisticsChart(p) {
     }
 
     const n = days.length;
-    const stepX = n > 1 ? innerW / (n - 1) : innerW / 2;
     const hues = [217, 142, 28, 280, 12, 185, 300, 55, 330, 95];
 
-    studentOrder.forEach((sid, idx) => {
-        const arr = seriesByStudentId.get(sid) || [];
-        ctx.strokeStyle = `hsl(${hues[idx % hues.length]} 62% 46%)`;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        for (let i = 0; i < n; i++) {
-            const x = padL + (n > 1 ? i * stepX : innerW / 2);
+    const groupW = n > 0 ? innerW / n : innerW;
+    const nb = Math.max(1, studentOrder.length);
+    const innerPad = Math.min(10, groupW * 0.08);
+    const usable = Math.max(groupW - innerPad, 1);
+    const barW = Math.min(16, usable / (nb + (nb > 1 ? 0.35 * (nb - 1) : 0)));
+    const gapBars = nb > 1 ? Math.max(0, (usable - barW * nb) / Math.max(nb - 1, 1)) : 0;
+
+    for (let i = 0; i < n; i++) {
+        const gx = padL + i * groupW + innerPad / 2;
+        studentOrder.forEach((sid, j) => {
+            const arr = seriesByStudentId.get(sid) || [];
             const val = arr[i] || 0;
-            const y = padT + innerH - (val / maxH) * innerH;
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-    });
+            const bh = (val / maxH) * innerH;
+            const x = gx + j * (barW + gapBars);
+            const y = padT + innerH - bh;
+            ctx.fillStyle = `hsl(${hues[j % hues.length]} 62% 48%)`;
+            ctx.fillRect(x, y, Math.max(1.2, barW - 0.5), Math.max(0, bh));
+        });
+    }
 
     ctx.fillStyle = '#64748b';
     ctx.font = '9px system-ui, sans-serif';
     ctx.textAlign = 'center';
     const tickEvery = n > 20 ? Math.ceil(n / 10) : n > 12 ? 2 : 1;
+    const groupWTick = n > 0 ? innerW / n : innerW;
     for (let i = 0; i < n; i += tickEvery) {
-        const x = padL + (n > 1 ? i * stepX : innerW / 2);
+        const x = padL + i * groupWTick + groupWTick / 2;
         const label = days[i].slice(5);
         ctx.fillText(label, x, cssH - 12);
     }
@@ -347,14 +368,6 @@ async function loadStatsIntoDom() {
     }
 
     const elevesRows = await fetchPlanningListElevesActifs();
-    lastEleveLabelsById = new Map(
-        elevesRows.map((r) => {
-            const id = String(r.user_id || '').trim();
-            return [id, eleveDisplayName(r)];
-        })
-    );
-    populateChartElevesSelect(elevesRows, chartSelectFresh);
-    chartSelectFresh = false;
 
     const [orgRes, totRes] = await Promise.all([
         sb.rpc('planning_stats_org_occupation', { p_start: rs, p_end: re }),
@@ -399,13 +412,14 @@ async function loadStatsIntoDom() {
               .map((r) => {
                   const c = Number(r.slot_count) || 0;
                   const h = numHours(r.hours);
+                  const hpw = numHours(r.hours_per_week);
                   sumC += c;
                   sumH += h;
                   const name = String(r.display_name || '').trim() || String(r.student_user_id || '');
-                  return `<tr class="border-t border-slate-100"><td class="p-2">${name}</td><td class="p-2 text-right font-mono">${c}</td><td class="p-2 text-right font-mono">${h.toFixed(1)}</td></tr>`;
+                  return `<tr class="border-t border-slate-100"><td class="p-2">${name}</td><td class="p-2 text-right font-mono">${c}</td><td class="p-2 text-right font-mono">${h.toFixed(1)}</td><td class="p-2 text-right font-mono">${hpw.toFixed(2)}</td></tr>`;
               })
               .join('')
-        : '<tr><td colspan="3" class="p-2 text-slate-500">Aucun élève actif.</td></tr>';
+        : '<tr><td colspan="4" class="p-2 text-slate-500">Aucun élève actif.</td></tr>';
 
     footC.textContent = String(sumC);
     footH.textContent = sumH.toFixed(1);
@@ -413,6 +427,37 @@ async function loadStatsIntoDom() {
     if (statusEl) {
         statusEl.textContent = `Période du ${fromStr} au ${toStr} — ${totRows.length} élève(s) actif(s) listé(s).`;
     }
+
+    const orderIds = totRows.map((r) => String(r.student_user_id || '').trim()).filter(Boolean);
+    const byId = new Map(elevesRows.map((r) => [String(r.user_id || '').trim(), r]));
+    /** @type {typeof elevesRows} */
+    const sortedForChart = [];
+    const seen = new Set();
+    for (const id of orderIds) {
+        const row = byId.get(id);
+        if (row) {
+            sortedForChart.push(row);
+            seen.add(id);
+        }
+    }
+    const rest = elevesRows.filter((r) => !seen.has(String(r.user_id || '').trim()));
+    rest.sort((a, b) => {
+        const an = String(a.nom ?? '').trim().toLowerCase();
+        const bn = String(b.nom ?? '').trim().toLowerCase();
+        if (an !== bn) return an.localeCompare(bn, 'fr');
+        const ap = String(a.prenom ?? '').trim().toLowerCase();
+        const bp = String(b.prenom ?? '').trim().toLowerCase();
+        return ap.localeCompare(bp, 'fr');
+    });
+    const chartRows = [...sortedForChart, ...rest];
+    lastEleveLabelsById = new Map(
+        chartRows.map((r) => {
+            const id = String(r.user_id || '').trim();
+            return [id, eleveDisplayName(r)];
+        })
+    );
+    populateChartElevesSelect(chartRows, chartSelectFresh);
+    chartSelectFresh = false;
 
     await loadChartSeries(rangeStart, rangeEnd, fromStr, toStr);
 }
@@ -439,11 +484,12 @@ export function initStatisticsUi() {
     });
 
     const dlg = document.getElementById('modal_statistics');
-    dlg?.addEventListener('show', () => {
+    dlg?.addEventListener('toggle', () => {
+        if (!(dlg instanceof HTMLDialogElement) || !dlg.open) return;
         chartSelectFresh = true;
         void (async () => {
             await fetchOrganSchoolSettings();
-            applyDefaultDatesToInputs();
+            applyDefaultMonthRangeToInputs();
             await loadStatsIntoDom();
         })();
     });

@@ -6,7 +6,7 @@ import {
     updateCurrentUserEmail,
     updateCurrentUserPasswordSimple
 } from './auth-logic.js';
-import { getPlanningSessionUser } from './session-user.js';
+import { getPlanningSessionUser, setPlanningSessionUser } from './session-user.js';
 import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
 import { googleCalendarEmbedUrl } from '../utils/google-calendar-url.js';
 import { showToast } from '../utils/toast.js';
@@ -128,6 +128,31 @@ async function fillProfileModal(user) {
         emailInput.value = user.email || '';
     }
     document.getElementById('profile-email-hint')?.classList.add('hidden');
+
+    let tel = String(user.telephone ?? '').trim();
+    let shareEmail = user.directory_share_email !== false;
+    let sharePhone = user.directory_share_phone === true;
+    if (isBackendAuthConfigured() && user.id) {
+        const sb = getSupabaseClient();
+        if (sb) {
+            const { data } = await sb
+                .from('profiles')
+                .select('telephone, directory_share_email, directory_share_phone')
+                .eq('id', user.id)
+                .maybeSingle();
+            if (data) {
+                tel = String(data.telephone ?? '').trim();
+                shareEmail = data.directory_share_email !== false;
+                sharePhone = data.directory_share_phone === true;
+            }
+        }
+    }
+    const phoneInput = document.getElementById('profile-phone-input');
+    if (phoneInput instanceof HTMLInputElement) phoneInput.value = tel;
+    const shE = document.getElementById('profile-share-email');
+    if (shE instanceof HTMLInputElement) shE.checked = shareEmail;
+    const shP = document.getElementById('profile-share-phone');
+    if (shP instanceof HTMLInputElement) shP.checked = sharePhone;
     document.getElementById('profile-role-label').textContent = roleLabelFr(user.role);
     const passNew = document.getElementById('profile-pass-new');
     const passConfirm = document.getElementById('profile-pass-confirm');
@@ -256,6 +281,43 @@ export function initProfileUi(currentUser) {
         }
         document.getElementById('profile-email-hint')?.classList.remove('hidden');
         showToast('Demande de changement d’e-mail enregistrée.', 'success');
+    });
+
+    document.getElementById('profile-contact-save')?.addEventListener('click', async () => {
+        const u = getPlanningSessionUser();
+        if (!u?.id || !isBackendAuthConfigured()) {
+            showToast('Session indisponible.', 'error');
+            return;
+        }
+        const sb = getSupabaseClient();
+        if (!sb) {
+            showToast('Session indisponible.', 'error');
+            return;
+        }
+        const phoneEl = document.getElementById('profile-phone-input');
+        const telephone = phoneEl instanceof HTMLInputElement ? phoneEl.value.trim().slice(0, 40) : '';
+        const cE = document.getElementById('profile-share-email');
+        const cP = document.getElementById('profile-share-phone');
+        const directory_share_email = cE instanceof HTMLInputElement ? cE.checked : true;
+        const directory_share_phone = cP instanceof HTMLInputElement ? cP.checked : false;
+        const { error } = await sb
+            .from('profiles')
+            .update({ telephone, directory_share_email, directory_share_phone })
+            .eq('id', u.id);
+        if (error) {
+            showToast(error.message || 'Impossible d’enregistrer.', 'error');
+            return;
+        }
+        const cur = getPlanningSessionUser();
+        if (cur) {
+            setPlanningSessionUser({
+                ...cur,
+                telephone,
+                directory_share_email,
+                directory_share_phone
+            });
+        }
+        showToast('Téléphone et visibilité enregistrés.', 'success');
     });
 
     const passToggle = document.getElementById('profile-pass-show-plain');

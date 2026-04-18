@@ -1,0 +1,16 @@
+<dialog id="modal_directory_users" class="modal">
+    <div class="modal-box p-5 w-[96%] max-w-2xl max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 shadow-2xl">
+        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest">Utilisateurs</h3>
+        <p class="text-[10px] text-slate-600 mb-3 leading-snug">
+            Annuaire interne : prénom et nom, e-mail et téléphone lorsque la personne accepte de les partager (réglages dans
+            <strong>Mon profil</strong>). Les administrateurs voient toutes les coordonnées renseignées.
+        </p>
+        <div id="directory-users-status" class="text-[11px] text-slate-500 mb-3 min-h-[1rem]"></div>
+        <div id="directory-section-admins" class="mb-4"></div>
+        <div id="directory-section-profs" class="mb-4"></div>
+        <div id="directory-section-eleves" class="mb-4"></div>
+        <div class="modal-action mt-4 pt-2 border-t border-slate-100">
+            <button type="button" id="directory-users-close-btn" class="btn btn-primary btn-sm font-black text-[11px]">Fermer</button>
+        </div>
+    </div>
+</dialog>

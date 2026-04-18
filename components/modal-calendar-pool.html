@@ -1,5 +1,5 @@
 <dialog id="modal_calendar_pool" class="modal">
-    <div class="modal-box p-5 w-[96%] max-w-3xl max-h-[90dvh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col">
+    <div class="modal-box p-5 w-[96%] max-w-4xl max-h-[90dvh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col">
         <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest shrink-0">Calendriers des utilisateurs (pool)</h3>
         <p class="text-[10px] text-slate-500 mb-3 leading-snug">Créez d’abord chaque calendrier dans Google Agenda (compte orgue.iams), puis ajoutez-le <strong>un par un</strong> avec son ID (vous pouvez coller l’URL d’intégration : l’ID est extrait du paramètre <code class="text-[8px] bg-slate-100 px-0.5 rounded">src</code>). <strong>Partagez chaque calendrier secondaire</strong> avec l’e-mail du compte de service / OAuth utilisé par calendar-bridge, avec « Modifier les événements » — comme pour l’agenda principal — sinon la synchro miroir renvoie « Not Found ». Les comptes élève / prof / admin reçoivent le prochain créneau libre du pool. Si le pool est vide, le profil affiche <code class="text-[8px] bg-slate-100 px-0.5 rounded">POOL_SATURATED</code>.</p>
 
@@ -19,9 +19,28 @@
             <table class="table table-xs table-pin-rows w-full">
                 <thead>
                     <tr class="bg-slate-100">
-                        <th class="text-[10px]">Libellé</th>
-                        <th class="text-[10px]">ID Google</th>
-                        <th class="text-[10px] w-28">Statut</th>
+                        <th class="text-[10px] align-bottom min-w-[6rem] max-w-[11rem] p-1">
+                            <button
+                                type="button"
+                                id="calendar-pool-sort-label"
+                                class="btn btn-ghost btn-xs h-7 min-h-0 px-1.5 font-bold uppercase tracking-wide text-[9px] text-slate-600 hover:bg-slate-200/80"
+                            >
+                                Libellé
+                            </button>
+                        </th>
+                        <th class="text-[10px] align-bottom w-[1%] whitespace-nowrap p-1 font-bold uppercase tracking-wide text-slate-600">
+                            ID Google
+                        </th>
+                        <th class="text-[10px] align-bottom min-w-[7rem] p-1">
+                            <button
+                                type="button"
+                                id="calendar-pool-sort-assignee"
+                                class="btn btn-ghost btn-xs h-7 min-h-0 px-1.5 font-bold uppercase tracking-wide text-[9px] text-slate-600 hover:bg-slate-200/80"
+                            >
+                                Assigné à
+                            </button>
+                        </th>
+                        <th class="text-[10px] align-bottom w-28">Statut</th>
                     </tr>
                 </thead>
                 <tbody id="calendar-pool-tbody"></tbody>

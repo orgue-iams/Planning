@@ -135,6 +135,10 @@ function rowHasPendingChanges(tr) {
     if (stSel instanceof HTMLSelectElement) {
         if (stSel.value !== String(stSel.getAttribute('data-initial-status') ?? '')) return true;
     }
+    const phoneIn = tr.querySelector('.admin-user-phone');
+    if (phoneIn instanceof HTMLInputElement) {
+        if (phoneIn.value.trim() !== String(phoneIn.getAttribute('data-initial-phone') ?? '').trim()) return true;
+    }
     return false;
 }
 
@@ -185,6 +189,9 @@ function syncAdminRowInitialFromInputs(tr) {
     if (roleSel instanceof HTMLSelectElement) roleSel.setAttribute('data-initial-role', roleSel.value);
     const stSel = tr.querySelector('.admin-status-sel');
     if (stSel instanceof HTMLSelectElement) stSel.setAttribute('data-initial-status', stSel.value);
+    const phoneIn = tr.querySelector('.admin-user-phone');
+    if (phoneIn instanceof HTMLInputElement)
+        phoneIn.setAttribute('data-initial-phone', phoneIn.value.trim());
 }
 
 /** Pour une ligne : appels API séquentiels (même utilisateur — évite courses sur user_metadata). */
@@ -214,8 +221,11 @@ async function persistAdminUserRow(tr) {
         const prenom = prenomIn.value.trim();
         const iniN = String(nomIn.getAttribute('data-initial-nom') ?? '').trim();
         const iniP = String(prenomIn.getAttribute('data-initial-prenom') ?? '').trim();
-        if (nom !== iniN || prenom !== iniP) {
-            await planningAdminInvoke('update_user_nom_prenom', { user_id: uid, nom, prenom });
+        const phoneIn = tr.querySelector('.admin-user-phone');
+        const tel = phoneIn instanceof HTMLInputElement ? phoneIn.value.trim().slice(0, 40) : '';
+        const iniTel = String(phoneIn?.getAttribute?.('data-initial-phone') ?? '').trim();
+        if (nom !== iniN || prenom !== iniP || tel !== iniTel) {
+            await planningAdminInvoke('update_user_nom_prenom', { user_id: uid, nom, prenom, telephone: tel });
         }
     }
 
@@ -356,7 +366,7 @@ function renderUsersTable(users) {
     const list = sortUsersByName(Array.isArray(users) ? users : []);
     if (list.length === 0) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="7" class="text-slate-500 text-center py-4">Aucun compte renvoyé par le serveur. Vérifiez le déploiement de la fonction « planning-admin » ou rechargez la page.</td>`;
+        tr.innerHTML = `<td colspan="8" class="text-slate-500 text-center py-4">Aucun compte renvoyé par le serveur. Vérifiez le déploiement de la fonction « planning-admin » ou rechargez la page.</td>`;
         tb.appendChild(tr);
         return;
     }
@@ -383,6 +393,8 @@ function renderUsersTable(users) {
         const prenomAttr = escapeHtmlAttr(prenomRaw);
         const emailRaw = String(u.email ?? '').trim();
         const emailAttr = escapeHtmlAttr(emailRaw);
+        const phoneRaw = String(u.telephone ?? '').trim();
+        const phoneAttr = escapeHtmlAttr(phoneRaw);
         const viewerId = String(adminPlanningViewerId ?? getPlanningSessionUser()?.id ?? '');
         const emailReadonly = viewerId !== '' && String(u.id) === viewerId;
         const roleNorm = normalizePlanningRole(u.role);
@@ -399,6 +411,11 @@ function renderUsersTable(users) {
                 <input type="text" class="input input-xs input-bordered w-full min-w-0 admin-user-prenom" data-user-id="${escapeAttr(u.id)}" data-initial-prenom="${prenomAttr}" value="${prenomAttr}" autocomplete="given-name" />
             </td>
             <td class="break-all align-middle">${emailInput}</td>
+            <td class="align-middle min-w-[7rem]">
+                <input type="tel" maxlength="40" class="input input-xs input-bordered w-full min-w-0 admin-user-phone" data-user-id="${escapeAttr(
+                    u.id
+                )}" data-initial-phone="${escapeAttr(phoneRaw)}" value="${phoneAttr}" autocomplete="tel" />
+            </td>
             <td class="align-middle">
                 <select class="select select-xs select-bordered admin-role-sel w-full max-w-[9.5rem]" data-user-id="${escapeAttr(u.id)}" data-initial-role="${roleIniAttr}">
                     ${roleSelectOptionsHtml(roleNorm)}
@@ -471,6 +488,8 @@ function resetCreateInviteForm() {
     if (emailEl) emailEl.value = '';
     if (nomEl) nomEl.value = '';
     if (prenomEl) prenomEl.value = '';
+    const telEl = document.getElementById('admin-invite-phone');
+    if (telEl instanceof HTMLInputElement) telEl.value = '';
     if (pwEl) pwEl.value = '';
     setAdminCreatePassVisible(false);
     if (roleSel) roleSel.value = 'eleve';
@@ -593,6 +612,8 @@ export function initAdminUsersUi(currentUser) {
             const nom = nomEl?.value?.trim() || '';
             const prenom = prenomEl?.value?.trim() || '';
             const password = document.getElementById('admin-create-password')?.value || '';
+            const phoneInviteEl = document.getElementById('admin-invite-phone');
+            const telephone = phoneInviteEl instanceof HTMLInputElement ? phoneInviteEl.value.trim().slice(0, 40) : '';
             const role = document.getElementById('admin-invite-role')?.value || 'eleve';
             if (!email) {
                 showToast('Indiquez un e-mail.', 'error');
@@ -615,6 +636,7 @@ export function initAdminUsersUi(currentUser) {
                     email,
                     nom,
                     prenom,
+                    telephone,
                     role,
                     password
                 });
@@ -654,6 +676,8 @@ export function initAdminUsersUi(currentUser) {
             const email = emailEl?.value?.trim();
             const nom = nomEl?.value?.trim() || '';
             const prenom = prenomEl?.value?.trim() || '';
+            const phoneInviteEl2 = document.getElementById('admin-invite-phone');
+            const telephone = phoneInviteEl2 instanceof HTMLInputElement ? phoneInviteEl2.value.trim().slice(0, 40) : '';
             const role = document.getElementById('admin-invite-role')?.value || 'eleve';
             if (!email) {
                 showToast('Indiquez un e-mail.', 'error');
@@ -672,6 +696,7 @@ export function initAdminUsersUi(currentUser) {
                     email,
                     nom,
                     prenom,
+                    telephone,
                     role,
                     redirect_to: redirectBaseUrl()
                 });

@@ -38,6 +38,8 @@ const ASSETS = [
   './components/modal-forgot-password.html',
   './components/modal-rules.html',
   './components/modal-help.html',
+  './components/modal-privacy.html',
+  './components/modal-directory-users.html',
   './components/modal-broadcast.html',
   './js/utils/messaging.js',
   './js/core/messages-ui.js',

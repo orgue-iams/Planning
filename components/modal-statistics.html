@@ -2,7 +2,8 @@
     <div class="modal-box p-5 w-[96%] max-w-4xl max-h-[92dvh] overflow-y-auto rounded-2xl border border-slate-200 shadow-2xl">
         <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest">Statistiques</h3>
         <p class="text-[10px] text-slate-600 mb-3 leading-snug">
-            Données agrégées en base (professeurs et administrateurs). Les heures sont comptées sur la partie de chaque créneau qui tombe dans la période choisie.
+            Données agrégées en base (professeurs et administrateurs). Les heures sont comptées sur la partie de chaque créneau qui tombe dans la période choisie. À l’ouverture, la période proposée est le
+            <strong>mois civil en cours</strong> (bouton « Année scolaire » pour repasser sur les dates de l’établissement).
         </p>
 
         <div class="flex flex-wrap gap-2 items-end mb-4">
@@ -58,6 +59,7 @@
                         <th class="p-2">Élève</th>
                         <th class="p-2 text-right">Créneaux</th>
                         <th class="p-2 text-right">Heures</th>
+                        <th class="p-2 text-right">Moy. / sem. (h)</th>
                     </tr>
                 </thead>
                 <tbody id="statistics-eleves-tbody"></tbody>
@@ -66,6 +68,7 @@
                         <td class="p-2">Total</td>
                         <td class="p-2 text-right font-mono" id="statistics-eleves-foot-count">—</td>
                         <td class="p-2 text-right font-mono" id="statistics-eleves-foot-hours">—</td>
+                        <td class="p-2 text-right font-mono text-slate-500 font-normal">—</td>
                     </tr>
                 </tfoot>
             </table>
@@ -73,7 +76,7 @@
 
         <h4 class="text-[10px] font-black uppercase text-slate-600 tracking-wide mb-1">Évolution du travail perso (par jour)</h4>
         <p class="text-[9px] text-slate-500 mb-2 leading-snug">
-            Fuseau <strong>Europe/Paris</strong> pour l’axe des jours. Sélectionnez un ou plusieurs élèves pour superposer les courbes.
+            Fuseau <strong>Europe/Paris</strong> pour l’axe des jours. Sélectionnez un ou plusieurs élèves : histogramme des heures par jour (barres groupées).
         </p>
         <label for="statistics-chart-eleves" class="text-[9px] font-bold text-slate-500 block mb-1">Élèves affichés sur le graphique</label>
         <select
