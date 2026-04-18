@@ -493,10 +493,27 @@
 }
 
 /* Semaines types : lignes lisibles (petit texte) + rappel couleur type de créneau. */
+#modal_semaines_types #st-gabarit-section .table thead th {
+    font-size: 0.625rem;
+    line-height: 1.25rem;
+    font-weight: 400;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+}
 #modal_semaines_types #st-tbody-a tr td,
 #modal_semaines_types #st-tbody-b tr td {
     font-size: 0.625rem;
     line-height: 1.25rem;
+    font-weight: 400;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+}
+#modal_semaines_types #st-tbody-a .select,
+#modal_semaines_types #st-tbody-b .select,
+#modal_semaines_types #st-tbody-a .input,
+#modal_semaines_types #st-tbody-b .input {
+    font-size: 0.625rem !important;
+    line-height: 1.25rem !important;
+    font-weight: 400 !important;
+    font-family: ui-sans-serif, system-ui, sans-serif !important;
 }
 #modal_semaines_types #st-tbody-a tr.st-row-cours,
 #modal_semaines_types #st-tbody-b tr.st-row-cours {

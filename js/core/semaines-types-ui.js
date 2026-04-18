@@ -330,12 +330,35 @@ function syncReadonlyStudentsText(tr, studentIds, elevesById) {
     el.innerHTML = html;
 }
 
+/** Retire les écouteurs globaux / DnD ouverts par l’éditeur « élèves » (évite fuites + fermetures fantômes). */
+function detachStStudentsEditListeners(tr) {
+    const row = /** @type {any} */ (tr);
+    const praf = row?._stStudentOutsideRaf;
+    if (typeof praf === 'number') {
+        window.cancelAnimationFrame(praf);
+        row._stStudentOutsideRaf = null;
+    }
+    const oh = row?._stStudentOutsideHandler;
+    if (typeof oh === 'function') {
+        document.removeEventListener('pointerdown', oh);
+        row._stStudentOutsideHandler = null;
+    }
+    const fh = row?._stStudentFocusHandler;
+    const dnd = tr.querySelector('.st-students-dnd');
+    if (typeof fh === 'function' && dnd instanceof HTMLElement) {
+        dnd.removeEventListener('focusout', fh);
+        row._stStudentFocusHandler = null;
+    }
+}
+
 function wireStudentsToggle(tr, elevesById) {
     const btn = tr.querySelector('.st-students-toggle');
     const ro = tr.querySelector('.st-students-readonly-wrap');
     const sel = tr.querySelector('.st-students');
     const dnd = tr.querySelector('.st-students-dnd');
     if (!btn || !ro || !sel) return;
+    if (btn.dataset.stStudentsBound === '1') return;
+    btn.dataset.stStudentsBound = '1';
     const renderDnD = () => {
         if (!(dnd instanceof HTMLElement)) return;
         const avail = dnd.querySelector('.st-students-avail');
@@ -347,7 +370,7 @@ function wireStudentsToggle(tr, elevesById) {
             selected: Boolean(o.selected)
         }));
         const mk = (r) =>
-            `<button type="button" class="btn btn-ghost btn-xs h-auto min-h-0 py-0.5 px-1 text-[9px] w-full justify-start cursor-grab" draggable="true" data-student-id="${escapeAttr(r.id)}" title="Clic (ou double-clic) pour déplacer">${escapeAttr(r.label)}</button>`;
+            `<button type="button" class="btn btn-ghost btn-xs h-auto min-h-0 py-0.5 px-1 text-[10px] font-normal font-sans w-full justify-start cursor-grab" draggable="true" data-student-id="${escapeAttr(r.id)}" title="Clic (ou double-clic) pour déplacer">${escapeAttr(r.label)}</button>`;
         avail.innerHTML = opts.filter((x) => !x.selected).map(mk).join('');
         chosen.innerHTML = opts.filter((x) => x.selected).map(mk).join('');
         const move = (id, pick) => {
@@ -393,10 +416,16 @@ function wireStudentsToggle(tr, elevesById) {
         bind(avail, true);
         bind(chosen, false);
     };
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        detachStStudentsEditListeners(tr);
         const typ = tr.querySelector('.st-type')?.value || 'cours';
         if (typ !== 'cours') return;
         const editing = dnd instanceof HTMLElement ? !dnd.classList.contains('hidden') : !sel.classList.contains('hidden');
+        /** @type {((e: PointerEvent) => void) | null} */
+        let outsideHandler = null;
+        /** @type {((e: FocusEvent) => void) | null} */
+        let focusHandler = null;
         const closeEditing = () => {
             const studs = [];
             for (const o of sel.selectedOptions) {
@@ -406,13 +435,10 @@ function wireStudentsToggle(tr, elevesById) {
             sel.classList.add('hidden');
             dnd?.classList.add('hidden');
             ro.classList.remove('hidden');
-            outsideHandler && document.removeEventListener('pointerdown', outsideHandler);
-            focusHandler && tr.removeEventListener('focusout', focusHandler);
+            detachStStudentsEditListeners(tr);
+            outsideHandler = null;
+            focusHandler = null;
         };
-        /** @type {((e: PointerEvent) => void) | null} */
-        let outsideHandler = null;
-        /** @type {((e: FocusEvent) => void) | null} */
-        let focusHandler = null;
         if (editing) {
             closeEditing();
         } else {
@@ -420,16 +446,23 @@ function wireStudentsToggle(tr, elevesById) {
             sel.classList.remove('hidden');
             dnd?.classList.remove('hidden');
             renderDnD();
-            outsideHandler = (e) => {
-                if (!tr.contains(e.target)) closeEditing();
-            };
-            document.addEventListener('pointerdown', outsideHandler);
-            focusHandler = (e) => {
-                const rt = /** @type {any} */ (e.relatedTarget);
-                if (rt && tr.contains(rt)) return;
-                closeEditing();
-            };
-            tr.addEventListener('focusout', focusHandler);
+            /** @type {any} */ (tr)._stStudentOutsideRaf = window.requestAnimationFrame(() => {
+                /** @type {any} */ (tr)._stStudentOutsideRaf = null;
+                outsideHandler = (ev) => {
+                    if (!tr.contains(ev.target)) closeEditing();
+                };
+                document.addEventListener('pointerdown', outsideHandler);
+                /** @type {any} */ (tr)._stStudentOutsideHandler = outsideHandler;
+            });
+            if (dnd instanceof HTMLElement) {
+                focusHandler = (ev) => {
+                    const rt = /** @type {any} */ (ev.relatedTarget);
+                    if (rt && dnd.contains(rt)) return;
+                    closeEditing();
+                };
+                dnd.addEventListener('focusout', focusHandler);
+                /** @type {any} */ (tr)._stStudentFocusHandler = focusHandler;
+            }
         }
     });
 }
@@ -541,23 +574,23 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
                   : '—';
         studentsCell = `<td class="st-students-cell align-top">
             <div class="st-students-readonly-wrap flex items-start gap-1 min-w-0">
-                <span class="st-students-readonly-text flex-1 min-w-0 text-[9px] text-slate-700 leading-snug">${studentsHtml}</span>
+                <span class="st-students-readonly-text flex-1 min-w-0 text-[10px] font-normal font-sans text-slate-700 leading-snug">${studentsHtml}</span>
             </div>
         </td>`;
     } else {
         studentsCell = `<td class="st-students-cell align-top">
             <div class="st-students-readonly-wrap flex items-start gap-1 min-w-0">
-                <span class="st-students-readonly-text flex-1 min-w-0 text-[9px] text-slate-700 leading-snug"></span>
+                <span class="st-students-readonly-text flex-1 min-w-0 text-[10px] font-normal font-sans text-slate-700 leading-snug"></span>
                 <button type="button" class="st-students-toggle btn btn-ghost btn-xs p-0.5 min-h-0 h-auto shrink-0 border-0" title="Modifier les inscrits" aria-label="Modifier les inscrits">${USERS_SVG}</button>
             </div>
             <select multiple class="st-students hidden" size="4">${optHtml}</select>
             <div class="st-students-dnd hidden mt-0.5 space-y-1">
                 <div>
-                    <p class="text-[9px] text-slate-500">Disponibles</p>
+                    <p class="text-[10px] font-normal font-sans text-slate-500">Disponibles</p>
                     <div class="st-students-avail min-h-[6.5rem] max-h-20 overflow-auto border-2 border-dashed border-slate-200 rounded bg-white p-1.5"></div>
                 </div>
                 <div>
-                    <p class="text-[9px] text-slate-500">Inscrits</p>
+                    <p class="text-[10px] font-normal font-sans text-slate-500">Inscrits</p>
                     <div class="st-students-chosen min-h-[6.5rem] max-h-20 overflow-auto border border-slate-200 rounded bg-slate-50 p-1.5"></div>
                 </div>
             </div>
@@ -570,12 +603,12 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
 
     tr.innerHTML = `
         ${dragCell}
-        <td class="text-[10px] font-bold text-slate-700 align-top">${escapeAttr(ownerLabel)}</td>
-        <td><select class="select select-xs st-type max-w-[5.5rem] text-[9px] font-bold font-sans text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${typeSel}</select></td>
-        <td><select class="select select-xs st-dow max-w-[4.5rem] text-[9px] font-bold font-sans text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${dowSel}</select></td>
-        <td><select class="select select-xs st-start max-w-[4.5rem] text-[9px] font-bold font-sans text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
-        <td><select class="select select-xs st-end max-w-[4.5rem] text-[9px] font-bold font-sans text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
-        <td><input type="text" class="input input-xs st-title w-full min-w-[6rem] text-[9px] font-sans bg-white border border-slate-200 rounded" value="${title}" ${isReadonly ? 'readonly' : ''} /></td>
+        <td class="text-[10px] font-normal font-sans text-slate-700 align-top">${escapeAttr(ownerLabel)}</td>
+        <td><select class="select select-xs st-type max-w-[5.5rem] text-[10px] font-normal font-sans text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${typeSel}</select></td>
+        <td><select class="select select-xs st-dow max-w-[4.5rem] text-[10px] font-normal font-sans text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${dowSel}</select></td>
+        <td><select class="select select-xs st-start max-w-[4.5rem] text-[10px] font-normal font-sans text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
+        <td><select class="select select-xs st-end max-w-[4.5rem] text-[10px] font-normal font-sans text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
+        <td><input type="text" class="input input-xs st-title w-full min-w-[6rem] text-[10px] font-normal font-sans text-slate-700 bg-white border border-slate-200 rounded" value="${title}" ${isReadonly ? 'readonly' : ''} /></td>
         ${studentsCell}
         <td>${isReadonly ? '' : '<button type="button" class="btn btn-ghost btn-xs st-del font-black text-error">×</button>'}</td>
     `;
@@ -604,6 +637,7 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
         const dnd = tr.querySelector('.st-students-dnd');
         const ro = tr.querySelector('.st-students-readonly-wrap');
         const btn = tr.querySelector('.st-students-toggle');
+        detachStStudentsEditListeners(tr);
         if (t !== 'cours') {
             if (mul) {
                 mul.classList.add('hidden');
@@ -631,7 +665,9 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
     tr.querySelector('.st-students')?.addEventListener('blur', () => {
         const mul = tr.querySelector('.st-students');
         const ro = tr.querySelector('.st-students-readonly-wrap');
+        const dnd = tr.querySelector('.st-students-dnd');
         if (!mul || mul.classList.contains('hidden')) return;
+        if (dnd instanceof HTMLElement && !dnd.classList.contains('hidden')) return;
         const studs = [];
         for (const o of mul.selectedOptions) {
             if (o.value) studs.push(o.value);
