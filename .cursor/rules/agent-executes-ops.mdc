@@ -5,6 +5,13 @@ alwaysApply: true
 
 # Opérations : toujours par l’agent
 
+## Préférence utilisateur (prioritaire)
+
+- **Ne jamais** conclure en demandant à l’utilisateur d’**exécuter lui-même** des commandes que l’agent peut lancer (outil terminal / sandbox selon les besoins).
+- **Ne pas** demander une **confirmation dans le chat** avant d’enchaîner ces commandes pour une tâche déjà demandée (git, `npm`, `npx`, `supabase`, vérifications, etc.) : **lancer directement**, puis rapporter le résultat ou l’erreur.
+- Les invites **système Cursor** (réseau, accès git, « all ») restent possibles : ce n’est pas l’utilisateur qui tape les commandes, c’est une garde de l’IDE.
+- **Ne pas** compter sur le bouton **Run** des blocs de commande dans le chat : exécuter via l’outil terminal quand c’est possible (voir `.cursor/rules/execute-commands-no-run-prompt.mdc`).
+
 Ne **pas** terminer une réponse par une section du type **« À faire de ton côté »** qui liste des commandes (`git`, `supabase`, `npm`, etc.), des déploiements Edge Functions, ou des vérifications en base / dans des fichiers **sans les avoir exécutées**.
 
 **Supabase :** migrations (`db push` / script du repo) et déploiements Edge — **toujours les lancer** quand la tâche les rend nécessaires et que la CLI est disponible ; ne pas déléguer par défaut à l’utilisateur (voir aussi `.cursor/rules/supabase-edge-auto-deploy.mdc`).

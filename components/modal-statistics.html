@@ -1,0 +1,24 @@
+<dialog id="modal_statistics" class="modal">
+    <div class="modal-box p-5 w-[96%] max-w-3xl max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 shadow-2xl">
+        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest">Statistiques d’utilisation</h3>
+        <p class="text-[10px] text-slate-600 mb-3 leading-snug">
+            Vue prévue : année scolaire en cours ou plage de dates, tableau + chronologie avec infobulles au survol, filtres par élève(s), cumuls et moyenne glissante hebdomadaire, option occupation orgue (cours / travail perso).
+        </p>
+        <div class="rounded-xl border border-amber-200 bg-amber-50/90 p-3 text-[11px] text-amber-950 leading-snug mb-3">
+            <strong>En cours d’implémentation.</strong> Les agrégations côté base (RPC) et les graphiques seront branchés sur une prochaine livraison. Utilisez d’ici là les exports / requêtes admin si besoin.
+        </div>
+        <div class="flex flex-wrap gap-2 items-end opacity-60 pointer-events-none">
+            <div>
+                <label class="text-[9px] font-bold text-slate-500 block">Du</label>
+                <input type="date" disabled class="input input-sm h-9 font-mono text-sm bg-white border border-slate-200 rounded-lg" />
+            </div>
+            <div>
+                <label class="text-[9px] font-bold text-slate-500 block">Au</label>
+                <input type="date" disabled class="input input-sm h-9 font-mono text-sm bg-white border border-slate-200 rounded-lg" />
+            </div>
+        </div>
+        <div class="modal-action mt-4 pt-2 border-t border-slate-100">
+            <button type="button" id="statistics-close-btn" class="btn btn-primary btn-sm font-black text-[11px]">Fermer</button>
+        </div>
+    </div>
+</dialog>

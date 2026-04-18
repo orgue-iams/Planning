@@ -1,0 +1,12 @@
+---
+description: Exécuter les commandes via l’outil terminal — ne pas s’appuyer sur le bouton Run des blocs proposés
+alwaysApply: true
+---
+
+# Commandes : exécution directe, pas de workflow « Run »
+
+- Quand une commande shell (`git`, `npm`, `supabase`, `npx`, etc.) doit être lancée : **utiliser l’exécution terminal intégrée à l’agent** (outil shell / permissions adaptées), **avant** ou **à la place** de proposer un bloc de code cliquable dans le chat.
+- **Éviter** de terminer uniquement par un bloc « code shell » (bash/sh) destiné à ce que l’utilisateur clique sur **Run** dans la fenêtre de dialogue Cursor : ce n’est **pas nécessaire** si l’agent peut lancer la même commande lui-même — **lancer la commande**, puis résumer le résultat.
+- Un bloc de commande peut servir de **trace lisible** *après* exécution ou pour une commande **impossible** à automatiser (interaction humaine obligatoire), pas comme substitut à l’exécution quand l’outil est disponible.
+
+Cela complète `agent-executes-ops.mdc` : même intention, ciblée sur l’UX « Run » du chat.

@@ -28,6 +28,14 @@ import {
     fetchPlanningListElevesActifs,
     replacePlanningEventEnrollment
 } from './planning-events-db.js';
+import { fetchOrganSchoolSettings, getOrganSchoolSettingsCached } from './organ-settings.js';
+import {
+    eleveBookingTooFarInFuture,
+    eleveTravailWouldExceedWeeklyCap,
+    mondayStartLocal,
+    logEleveTravailVoidIfNeeded
+} from './planning-eleve-quota.js';
+import { openCourseStudentsPicker } from './course-students-picker.js';
 
 let saveReservationInFlight = false;
 
@@ -61,7 +69,6 @@ let reservationModalCanEditRef = false;
 
 const MAX_COURS_STUDENTS = 5;
 let reservationInscritsUiBound = false;
-let reservationInscritsOutsideBound = false;
 
 function canManageReservationInscrits(currentUser) {
     const r = normalizeRole(currentUser?.role);
@@ -209,23 +216,29 @@ async function prepareReservationInscritsSelect(currentUser, event, canEdit) {
     if (!reservationInscritsUiBound) {
         reservationInscritsUiBound = true;
         const toggle = document.getElementById('event-inscrits-users-toggle');
-        toggle?.addEventListener('click', () => {
-            const current = wrap.dataset.inscritsEditMode === '1';
-            setReservationInscritsEditMode(!current, reservationModalCanEditRef);
+        toggle?.addEventListener('click', async () => {
+            if (!reservationModalCanEditRef) return;
+            const rowsSorted = [...(await fetchPlanningListElevesActifs())].sort((a, b) => {
+                const an = String(a?.nom || '').trim().toLowerCase();
+                const bn = String(b?.nom || '').trim().toLowerCase();
+                if (an !== bn) return an.localeCompare(bn, 'fr');
+                const ap = String(a?.prenom || '').trim().toLowerCase();
+                const bp = String(b?.prenom || '').trim().toLowerCase();
+                return ap.localeCompare(bp, 'fr');
+            });
+            const selected = [...multi.selectedOptions].map((o) => o.value).filter(Boolean);
+            const picked = await openCourseStudentsPicker({
+                title: 'Inscriptions au cours',
+                maxStudents: MAX_COURS_STUDENTS,
+                eleves: rowsSorted,
+                selectedUserIds: selected
+            });
+            if (!picked) return;
+            for (const o of multi.options) {
+                o.selected = picked.includes(o.value);
+            }
+            renderReservationInscritsDnD(multi, false);
         });
-        if (!reservationInscritsOutsideBound) {
-            reservationInscritsOutsideBound = true;
-            document.addEventListener('pointerdown', (e) => {
-                if (wrap.dataset.inscritsEditMode !== '1') return;
-                if (!wrap.contains(e.target)) setReservationInscritsEditMode(false, reservationModalCanEditRef);
-            });
-            wrap.addEventListener('focusout', (e) => {
-                if (wrap.dataset.inscritsEditMode !== '1') return;
-                const rt = /** @type {any} */ (e.relatedTarget);
-                if (rt && wrap.contains(rt)) return;
-                setReservationInscritsEditMode(false, reservationModalCanEditRef);
-            });
-        }
     }
     const rows = await fetchPlanningListElevesActifs();
     const rowsSorted = [...rows].sort((a, b) => {
@@ -1411,6 +1424,22 @@ async function finalizeQuickReservationInBackground(
             return;
         }
         const dbSlotType = motifToPlanningDbSlotType(motif);
+        if (normalizeRole(currentUser.role) === 'eleve' && dbSlotType === 'travail perso') {
+            await fetchOrganSchoolSettings();
+            const setQ = getOrganSchoolSettingsCached();
+            if (eleveBookingTooFarInFuture(setQ, rangeStart)) {
+                if (created) created.remove();
+                showToast('Cette plage dépasse la fenêtre de réservation autorisée pour les élèves.', 'error');
+                return;
+            }
+            const addMin = Math.max(1, Math.round((rangeEnd.getTime() - rangeStart.getTime()) / 60000));
+            const cap = await eleveTravailWouldExceedWeeklyCap(setQ, addMin, mondayStartLocal(rangeStart), null);
+            if (!cap.ok) {
+                if (created) created.remove();
+                showToast(cap.message || 'Quota hebdomadaire dépassé.', 'error');
+                return;
+            }
+        }
         const bridgeType = planningDbSlotTypeToBridgeType(dbSlotType);
         const ur = await upsertPlanningEventRow({
             id: null,
@@ -2060,6 +2089,29 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         showToast('Pour un cours, sélectionnez au moins un élève inscrit.', 'error');
         return;
     }
+    const rEleveChk = normalizeRole(currentUser?.role);
+    if (rEleveChk === 'eleve' && dbSlotType === 'travail perso') {
+        await fetchOrganSchoolSettings();
+        const setQ = getOrganSchoolSettingsCached();
+        if (eleveBookingTooFarInFuture(setQ, new Date(startStr))) {
+            showToast('Cette date dépasse la fenêtre de réservation autorisée pour les élèves.', 'error');
+            return;
+        }
+        const addMin = Math.max(1, Math.round((endMs - startMs) / 60000));
+        const wMon = mondayStartLocal(new Date(startStr));
+        const cap = await eleveTravailWouldExceedWeeklyCap(
+            setQ,
+            addMin,
+            wMon,
+            liveEventRef
+                ? String(liveEventRef.extendedProps?.planningCanonicalId || '').trim() || null
+                : null
+        );
+        if (!cap.ok) {
+            showToast(cap.message || 'Quota hebdomadaire dépassé.', 'error');
+            return;
+        }
+    }
     const bridgeType = planningDbSlotTypeToBridgeType(dbSlotType);
     const startIso = new Date(startStr).toISOString();
     const endIso = new Date(endStr).toISOString();
@@ -2183,6 +2235,22 @@ export async function deleteReservation(calendar, currentEventRef, currentUser) 
         return;
     }
 
+    const dbTypeDel = planningDbSlotTypeForEventUpdate(liveRef);
+    const rMeDel = normalizeRole(currentUser.role);
+    /** @type {Record<string, unknown> | null} */
+    let settingsForVoid = null;
+    if (rMeDel === 'eleve' && dbTypeDel === 'travail perso') {
+        await fetchOrganSchoolSettings();
+        settingsForVoid = getOrganSchoolSettingsCached();
+        if (settingsForVoid?.eleve_forbid_delete_after_slot_start && liveRef.start) {
+            const st = liveRef.start instanceof Date ? liveRef.start : new Date(liveRef.start);
+            if (Number.isFinite(st.getTime()) && Date.now() >= st.getTime()) {
+                showToast('Vous ne pouvez plus annuler ce créneau une fois l’heure de début passée.', 'error');
+                return;
+            }
+        }
+    }
+
     const oi = ownerInfoFromEvent(liveRef, currentUser);
     const titleDel = String(liveRef.title || '').trim() || 'Créneau';
     const startDel = liveRef.start;
@@ -2212,6 +2280,17 @@ export async function deleteReservation(calendar, currentEventRef, currentUser) 
     if (!delRow.ok) {
         showToast(delRow.error || 'Suppression base impossible.', 'error');
         return;
+    }
+    if (
+        rMeDel === 'eleve' &&
+        dbTypeDel === 'travail perso' &&
+        settingsForVoid &&
+        liveRef.start &&
+        liveRef.end
+    ) {
+        const s0 = liveRef.start instanceof Date ? liveRef.start : new Date(liveRef.start);
+        const e0 = liveRef.end instanceof Date ? liveRef.end : new Date(liveRef.end);
+        await logEleveTravailVoidIfNeeded(settingsForVoid, { slotStart: s0, slotEnd: e0 });
     }
     liveRef.remove();
     invalidateCalendarListCache();

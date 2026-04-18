@@ -28,7 +28,15 @@ export async function fetchOrganSchoolSettings() {
             school_year_end: null,
             chapel_slot_min: '08:00:00',
             chapel_slot_max: '22:00:00',
-            planning_error_notify_email: ''
+            planning_error_notify_email: '',
+            eleve_weekly_travail_cap_enabled: false,
+            eleve_weekly_travail_cap_hours: null,
+            eleve_booking_horizon_enabled: false,
+            eleve_booking_horizon_amount: null,
+            eleve_booking_horizon_unit: 'days',
+            eleve_count_voided_travail_toward_cap: true,
+            eleve_forbid_delete_after_slot_start: true,
+            eleve_booking_tolerance_days: 0
         };
         return cache;
     }
@@ -57,13 +65,26 @@ export function getOrganSchoolSettingsCached() {
  *   school_year_end: string | null,
  *   chapel_slot_min: string,
  *   chapel_slot_max: string,
- *   planning_error_notify_email?: string | null
+ *   planning_error_notify_email?: string | null,
+ *   eleve_weekly_travail_cap_enabled?: boolean,
+ *   eleve_weekly_travail_cap_hours?: number | string | null,
+ *   eleve_booking_horizon_enabled?: boolean,
+ *   eleve_booking_horizon_amount?: number | string | null,
+ *   eleve_booking_horizon_unit?: string,
+ *   eleve_count_voided_travail_toward_cap?: boolean,
+ *   eleve_forbid_delete_after_slot_start?: boolean,
+ *   eleve_booking_tolerance_days?: number | string | null
  * }} row
  */
 export async function saveOrganSchoolSettingsAdmin(row) {
     const sb = getSupabaseClient();
     if (!sb) return { ok: false, error: 'Session indisponible.' };
     const notify = row.planning_error_notify_email != null ? String(row.planning_error_notify_email).trim() : null;
+    const capH = row.eleve_weekly_travail_cap_hours;
+    const capHours =
+        capH === '' || capH === null || capH === undefined
+            ? null
+            : Math.min(10, Math.max(1, parseInt(String(capH), 10) || 0)) || null;
     const { error } = await sb
         .from('organ_school_settings')
         .update({
@@ -72,6 +93,20 @@ export async function saveOrganSchoolSettingsAdmin(row) {
             chapel_slot_min: row.chapel_slot_min,
             chapel_slot_max: row.chapel_slot_max,
             planning_error_notify_email: notify || null,
+            eleve_weekly_travail_cap_enabled: Boolean(row.eleve_weekly_travail_cap_enabled),
+            eleve_weekly_travail_cap_hours: row.eleve_weekly_travail_cap_enabled ? capHours : null,
+            eleve_booking_horizon_enabled: Boolean(row.eleve_booking_horizon_enabled),
+            eleve_booking_horizon_amount: row.eleve_booking_horizon_enabled
+                ? Math.max(0, parseInt(String(row.eleve_booking_horizon_amount || '0'), 10) || 0)
+                : null,
+            eleve_booking_horizon_unit:
+                String(row.eleve_booking_horizon_unit || 'days') === 'weeks' ? 'weeks' : 'days',
+            eleve_count_voided_travail_toward_cap: Boolean(row.eleve_count_voided_travail_toward_cap),
+            eleve_forbid_delete_after_slot_start: Boolean(row.eleve_forbid_delete_after_slot_start),
+            eleve_booking_tolerance_days: Math.max(
+                0,
+                parseInt(String(row.eleve_booking_tolerance_days ?? '0'), 10) || 0
+            ),
             updated_at: new Date().toISOString()
         })
         .eq('id', 1);

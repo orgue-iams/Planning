@@ -18,13 +18,17 @@
                 <span id="user-display-name" class="text-[10px] sm:text-[11px] font-black text-slate-800 truncate max-w-[6.5rem] sm:max-w-[12rem] max-sm:max-w-[4.25rem] max-sm:text-[8px] max-sm:leading-tight">Invité</span>
                 <span id="user-display-role" class="text-[9px] font-bold text-slate-500 uppercase tracking-wide truncate max-w-[6.5rem] sm:max-w-[12rem] hidden"></span>
             </div>
-            <!-- Prof / admin : semaines types (icône calendrier, à gauche des réglages) -->
-            <div id="header-semaines-types-wrap" class="hidden shrink-0">
-                <button type="button" id="btn-header-semaines-types" class="btn btn-ghost btn-square btn-xs sm:btn-sm border border-transparent hover:border-slate-200 max-sm:!h-7 max-sm:!w-7 max-sm:!min-h-0" aria-label="Semaines types A / B" title="Semaines types A / B">
+            <!-- Prof / admin : menu Agenda (semaines types, statistiques) -->
+            <div id="header-semaines-types-wrap" class="hidden shrink-0 dropdown dropdown-end">
+                <div tabindex="0" role="button" id="btn-header-agenda-menu" class="btn btn-ghost btn-square btn-xs sm:btn-sm border border-transparent hover:border-slate-200 max-sm:!h-7 max-sm:!w-7 max-sm:!min-h-0" aria-label="Agenda" aria-haspopup="menu" title="Agenda">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-5 sm:w-5 max-sm:h-4 max-sm:w-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                </button>
+                </div>
+                <ul tabindex="0" class="dropdown-content menu z-[100] mt-1 w-56 rounded-box border border-slate-200 bg-base-100 p-2 shadow-lg">
+                    <li><a href="#" id="menu-item-semaines-types" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Semaines types A / B</a></li>
+                    <li><a href="#" id="menu-item-statistics" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Statistiques</a></li>
+                </ul>
             </div>
             <!-- Prof / admin : réglages (pool, comptes, config, annonces) -->
             <div id="header-settings-wrap" class="hidden dropdown dropdown-end shrink-0">

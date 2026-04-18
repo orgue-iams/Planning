@@ -18,6 +18,7 @@ import {
     runTemplateGoogleBackgroundSync
 } from './template-apply-engine.js';
 import { saveProfWeekCycleFromApply } from './week-cycle.js';
+import { openCourseStudentsPicker } from './course-students-picker.js';
 
 const DOW_OPTS = [
     { v: 1, t: 'Lun' },
@@ -330,140 +331,33 @@ function syncReadonlyStudentsText(tr, studentIds, elevesById) {
     el.innerHTML = html;
 }
 
-/** Retire les écouteurs globaux / DnD ouverts par l’éditeur « élèves » (évite fuites + fermetures fantômes). */
-function detachStStudentsEditListeners(tr) {
-    const row = /** @type {any} */ (tr);
-    const praf = row?._stStudentOutsideRaf;
-    if (typeof praf === 'number') {
-        window.cancelAnimationFrame(praf);
-        row._stStudentOutsideRaf = null;
-    }
-    const oh = row?._stStudentOutsideHandler;
-    if (typeof oh === 'function') {
-        document.removeEventListener('pointerdown', oh);
-        row._stStudentOutsideHandler = null;
-    }
-    const fh = row?._stStudentFocusHandler;
-    const dnd = tr.querySelector('.st-students-dnd');
-    if (typeof fh === 'function' && dnd instanceof HTMLElement) {
-        dnd.removeEventListener('focusout', fh);
-        row._stStudentFocusHandler = null;
-    }
-}
+/** Compat : anciennes lignes pouvaient attacher des écouteurs inline ; nettoyage léger. */
+function detachStStudentsEditListeners(_tr) {}
 
-function wireStudentsToggle(tr, elevesById) {
+/** Bouton « élèves » : modale deux colonnes (réutilisable avec la réservation cours). */
+function wireStudentsPickerButton(tr, elevesById) {
     const btn = tr.querySelector('.st-students-toggle');
-    const ro = tr.querySelector('.st-students-readonly-wrap');
     const sel = tr.querySelector('.st-students');
-    const dnd = tr.querySelector('.st-students-dnd');
-    if (!btn || !ro || !sel) return;
+    if (!btn || !sel) return;
     if (btn.dataset.stStudentsBound === '1') return;
     btn.dataset.stStudentsBound = '1';
-    const renderDnD = () => {
-        if (!(dnd instanceof HTMLElement)) return;
-        const avail = dnd.querySelector('.st-students-avail');
-        const chosen = dnd.querySelector('.st-students-chosen');
-        if (!(avail instanceof HTMLElement) || !(chosen instanceof HTMLElement)) return;
-        const opts = [...sel.options].map((o) => ({
-            id: String(o.value || ''),
-            label: String(o.textContent || '').trim(),
-            selected: Boolean(o.selected)
-        }));
-        const mk = (r) =>
-            `<button type="button" class="btn btn-ghost btn-xs h-auto min-h-0 py-0.5 px-1 text-[10px] font-normal font-sans w-full justify-start cursor-grab" draggable="true" data-student-id="${escapeAttr(r.id)}" title="Clic (ou double-clic) pour déplacer">${escapeAttr(r.label)}</button>`;
-        avail.innerHTML = opts.filter((x) => !x.selected).map(mk).join('');
-        chosen.innerHTML = opts.filter((x) => x.selected).map(mk).join('');
-        const move = (id, pick) => {
-            const o = [...sel.options].find((x) => String(x.value) === id);
-            if (!o) return;
-            if (pick && !o.selected) {
-                const chosenCount = sel.selectedOptions.length;
-                if (chosenCount >= 5) {
-                    showToast('Maximum 5 élèves pour un créneau Cours.', 'error');
-                    return;
-                }
-            }
-            o.selected = pick;
-            renderDnD();
-        };
-        const bind = (zone, pick) => {
-            zone.querySelectorAll('[data-student-id]').forEach((el) => {
-                const id = el.getAttribute('data-student-id') || '';
-                /** @type {number | null} */
-                let clickTimer = null;
-                el.addEventListener('dragstart', (ev) => {
-                    ev.dataTransfer?.setData('text/plain', el.getAttribute('data-student-id') || '');
-                });
-                // UX demandée : double-clic (conservé), mais un clic unique marche aussi.
-                el.addEventListener('click', () => {
-                    if (clickTimer) window.clearTimeout(clickTimer);
-                    clickTimer = window.setTimeout(() => move(id, pick), 180);
-                });
-                el.addEventListener('dblclick', () => {
-                    if (clickTimer) window.clearTimeout(clickTimer);
-                    move(id, pick);
-                });
-            });
-            zone.addEventListener('dragover', (ev) => ev.preventDefault());
-            zone.addEventListener('dragenter', () => zone.classList.add('st-dnd-drop-active'));
-            zone.addEventListener('dragleave', () => zone.classList.remove('st-dnd-drop-active'));
-            zone.addEventListener('drop', (ev) => {
-                ev.preventDefault();
-                zone.classList.remove('st-dnd-drop-active');
-                move(ev.dataTransfer?.getData('text/plain') || '', pick);
-            });
-        };
-        bind(avail, true);
-        bind(chosen, false);
-    };
-    btn.addEventListener('click', (e) => {
+    const elevesList = [...elevesById.values()];
+    btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        detachStStudentsEditListeners(tr);
         const typ = tr.querySelector('.st-type')?.value || 'cours';
         if (typ !== 'cours') return;
-        const editing = dnd instanceof HTMLElement ? !dnd.classList.contains('hidden') : !sel.classList.contains('hidden');
-        /** @type {((e: PointerEvent) => void) | null} */
-        let outsideHandler = null;
-        /** @type {((e: FocusEvent) => void) | null} */
-        let focusHandler = null;
-        const closeEditing = () => {
-            const studs = [];
-            for (const o of sel.selectedOptions) {
-                if (o.value) studs.push(o.value);
-            }
-            syncReadonlyStudentsText(tr, studs, elevesById);
-            sel.classList.add('hidden');
-            dnd?.classList.add('hidden');
-            ro.classList.remove('hidden');
-            detachStStudentsEditListeners(tr);
-            outsideHandler = null;
-            focusHandler = null;
-        };
-        if (editing) {
-            closeEditing();
-        } else {
-            ro.classList.add('hidden');
-            sel.classList.remove('hidden');
-            dnd?.classList.remove('hidden');
-            renderDnD();
-            /** @type {any} */ (tr)._stStudentOutsideRaf = window.requestAnimationFrame(() => {
-                /** @type {any} */ (tr)._stStudentOutsideRaf = null;
-                outsideHandler = (ev) => {
-                    if (!tr.contains(ev.target)) closeEditing();
-                };
-                document.addEventListener('pointerdown', outsideHandler);
-                /** @type {any} */ (tr)._stStudentOutsideHandler = outsideHandler;
-            });
-            if (dnd instanceof HTMLElement) {
-                focusHandler = (ev) => {
-                    const rt = /** @type {any} */ (ev.relatedTarget);
-                    if (rt && dnd.contains(rt)) return;
-                    closeEditing();
-                };
-                dnd.addEventListener('focusout', focusHandler);
-                /** @type {any} */ (tr)._stStudentFocusHandler = focusHandler;
-            }
+        const selected = [...sel.selectedOptions].map((o) => o.value).filter(Boolean);
+        const picked = await openCourseStudentsPicker({
+            title: 'Inscriptions au cours (semaine type)',
+            maxStudents: 5,
+            eleves: elevesList,
+            selectedUserIds: selected
+        });
+        if (!picked) return;
+        for (const o of sel.options) {
+            o.selected = picked.includes(o.value);
         }
+        syncReadonlyStudentsText(tr, picked, elevesById);
     });
 }
 
@@ -551,7 +445,16 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
     tr.setAttribute('data-line-id', line?.id || '');
     tr.setAttribute('data-owner-id', lineOwnerId);
     tr.setAttribute('data-st-editable', isReadonly ? '0' : '1');
-    tr.classList.add(line?.slot_type === 'cours' ? 'st-row-cours' : 'st-row-travail');
+    const otherProfCours =
+        line?.slot_type === 'cours' && String(lineOwnerId) !== String(currentUserId);
+    if (otherProfCours) {
+        tr.classList.add('st-row-other-prof', 'st-row-travail');
+    } else {
+        tr.classList.add(line?.slot_type === 'cours' ? 'st-row-cours' : 'st-row-travail');
+    }
+    if (isReadonly) {
+        tr.style.pointerEvents = 'none';
+    }
 
     const dowSel = DOW_OPTS.map(
         (o) => `<option value="${o.v}" ${line?.day_of_week === o.v ? 'selected' : ''}>${o.t}</option>`
@@ -583,17 +486,7 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
                 <span class="st-students-readonly-text flex-1 min-w-0 text-[10px] font-normal font-sans text-slate-700 leading-snug"></span>
                 <button type="button" class="st-students-toggle btn btn-ghost btn-xs p-0.5 min-h-0 h-auto shrink-0 border-0" title="Modifier les inscrits" aria-label="Modifier les inscrits">${USERS_SVG}</button>
             </div>
-            <select multiple class="st-students hidden" size="4">${optHtml}</select>
-            <div class="st-students-dnd hidden mt-0.5 space-y-1">
-                <div>
-                    <p class="text-[10px] font-normal font-sans text-slate-500">Disponibles</p>
-                    <div class="st-students-avail min-h-[6.5rem] max-h-20 overflow-auto border-2 border-dashed border-slate-200 rounded bg-white p-1.5"></div>
-                </div>
-                <div>
-                    <p class="text-[10px] font-normal font-sans text-slate-500">Inscrits</p>
-                    <div class="st-students-chosen min-h-[6.5rem] max-h-20 overflow-auto border border-slate-200 rounded bg-slate-50 p-1.5"></div>
-                </div>
-            </div>
+            <select multiple class="st-students hidden" size="1">${optHtml}</select>
         </td>`;
     }
 
@@ -603,7 +496,7 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
 
     tr.innerHTML = `
         ${dragCell}
-        <td class="text-[10px] font-normal font-sans text-slate-700 align-top">${escapeAttr(ownerLabel)}</td>
+        <td class="text-[10px] font-bold font-sans text-slate-800 align-top">${escapeAttr(ownerLabel)}</td>
         <td><select class="select select-xs st-type max-w-[5.5rem] text-[10px] font-normal font-sans text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${typeSel}</select></td>
         <td><select class="select select-xs st-dow max-w-[4.5rem] text-[10px] font-normal font-sans text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${dowSel}</select></td>
         <td><select class="select select-xs st-start max-w-[4.5rem] text-[10px] font-normal font-sans text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
@@ -628,13 +521,12 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
     }
     if (!isReadonly) {
         syncReadonlyStudentsText(tr, sid, elevesById);
-        wireStudentsToggle(tr, elevesById);
+        wireStudentsPickerButton(tr, elevesById);
     }
     tr.querySelector('.st-del')?.addEventListener('click', () => tr.remove());
     tr.querySelector('.st-type')?.addEventListener('change', () => {
         const t = tr.querySelector('.st-type')?.value;
         const mul = tr.querySelector('.st-students');
-        const dnd = tr.querySelector('.st-students-dnd');
         const ro = tr.querySelector('.st-students-readonly-wrap');
         const btn = tr.querySelector('.st-students-toggle');
         detachStStudentsEditListeners(tr);
@@ -643,7 +535,6 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
                 mul.classList.add('hidden');
                 for (const o of mul.options) o.selected = false;
             }
-            dnd?.classList.add('hidden');
             ro?.classList.remove('hidden');
             if (ro) tr.querySelector('.st-students-readonly-text').textContent = '—';
             ro?.classList.toggle('opacity-40', true);
@@ -659,22 +550,8 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
             }
             syncReadonlyStudentsText(tr, cur, elevesById);
         }
-        tr.classList.toggle('st-row-cours', t === 'cours');
-        tr.classList.toggle('st-row-travail', t !== 'cours');
-    });
-    tr.querySelector('.st-students')?.addEventListener('blur', () => {
-        const mul = tr.querySelector('.st-students');
-        const ro = tr.querySelector('.st-students-readonly-wrap');
-        const dnd = tr.querySelector('.st-students-dnd');
-        if (!mul || mul.classList.contains('hidden')) return;
-        if (dnd instanceof HTMLElement && !dnd.classList.contains('hidden')) return;
-        const studs = [];
-        for (const o of mul.selectedOptions) {
-            if (o.value) studs.push(o.value);
-        }
-        syncReadonlyStudentsText(tr, studs, elevesById);
-        mul.classList.add('hidden');
-        ro?.classList.remove('hidden');
+        tr.classList.remove('st-row-cours', 'st-row-travail', 'st-row-other-prof');
+        tr.classList.add(t === 'cours' ? 'st-row-cours' : 'st-row-travail');
     });
     return tr;
 }
@@ -1374,11 +1251,11 @@ export function initSemainesTypesUi(currentUser) {
     stAbort = new AbortController();
     const { signal } = stAbort;
 
-    document.getElementById('btn-header-semaines-types')?.addEventListener(
+    document.getElementById('menu-item-semaines-types')?.addEventListener(
         'click',
         (e) => {
             e.preventDefault();
-            document.getElementById('btn-header-semaines-types')?.blur();
+            document.getElementById('btn-header-agenda-menu')?.blur();
             const u = getPlanningSessionUser();
             if (!u?.id) return;
             void openSemainesTypesModal(u);

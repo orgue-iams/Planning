@@ -515,11 +515,23 @@
     font-weight: 400 !important;
     font-family: ui-sans-serif, system-ui, sans-serif !important;
 }
-#modal_semaines_types #st-tbody-a tr.st-row-cours,
-#modal_semaines_types #st-tbody-b tr.st-row-cours {
+#modal_semaines_types #st-tbody-a tr.st-row-cours:not(.st-row-other-prof),
+#modal_semaines_types #st-tbody-b tr.st-row-cours:not(.st-row-other-prof) {
     background: rgb(254 243 199 / 0.45);
 }
 #modal_semaines_types #st-tbody-a tr.st-row-travail,
 #modal_semaines_types #st-tbody-b tr.st-row-travail {
     background: rgb(219 234 254 / 0.38);
+}
+#modal_semaines_types #st-tbody-a tr.st-row-other-prof,
+#modal_semaines_types #st-tbody-b tr.st-row-other-prof {
+    background: rgb(148 163 184 / 0.4);
+}
+#modal_semaines_types #st-tbody-a tr.st-row-other-prof td,
+#modal_semaines_types #st-tbody-b tr.st-row-other-prof td {
+    color: rgb(51 65 85);
+}
+#modal_semaines_types #st-tbody-a tr[data-st-editable='0'],
+#modal_semaines_types #st-tbody-b tr[data-st-editable='0'] {
+    user-select: none;
 }

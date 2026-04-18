@@ -70,7 +70,10 @@ export function mapPlanningDbRowToFcEvent(row, _currentUser) {
             ownerDisplayName: owner ? owner.split('@')[0] : '',
             ownerRole: '',
             type: typ,
-            inscrits: normalizeInscritsFromRpc(row)
+            inscrits: normalizeInscritsFromRpc(row),
+            planningSourceTemplateLineId: row.source_template_line_id
+                ? String(row.source_template_line_id)
+                : ''
         }
     };
 }

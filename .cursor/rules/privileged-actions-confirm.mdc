@@ -1,15 +1,14 @@
 ---
-description: Opérations sensibles (SQL, prod, secrets) — autonomie possible après confirmation explicite
+description: Opérations à très haut risque — confirmation seulement pour cas limités (pas le quotidien git/npm/supabase)
 alwaysApply: true
 ---
 
-# Confirmation avant actions à risque
+# Confirmation : cas rares seulement
 
-L’utilisateur souhaite que l’assistant puisse être **autonome** (ex. lancer des requêtes SQL via `psql`/CLI, déploiements critiques, commandes touchant la **production** ou des **secrets**), mais pour des raisons de **sécurité** :
+L’utilisateur préfère que l’agent **exécute lui-même** les commandes et **n’attende pas** une confirmation dans le chat pour le travail courant (voir `agent-executes-ops.mdc`).
 
-1. **Avant** d’exécuter ce type d’action, **demander une confirmation explicite** à l’utilisateur (résumé court de ce qui sera fait, commande ou requête concernée, périmètre prod/staging).
-2. N’exécuter **qu’après** accord clair (« oui », « valide », « go », etc.).
-3. Ne **jamais** demander de coller des mots de passe ou clés **complets** dans le chat sans nécessité ; préférer variables d’environnement locales ou champs masqués déjà configurés par l’utilisateur.
-4. Les actions **non sensibles** (lint, tests locaux, lecture de fichiers, déploiement Edge déjà convenu dans les autres règles) ne nécessitent pas systématiquement une double confirmation sauf si l’utilisateur le demande dans le message.
+**Sans confirmation préalable dans le chat** : `git` (status, pull, commit, push quand demandé), `npm` / `npx`, builds, tests locaux, `supabase functions deploy` / scripts du repo quand la tâche le demande, requêtes SQL de **diagnostic** via CLI sur base liée, lecture de fichiers.
 
-Exemples d’actions soumises à confirmation : `psql` / SQL sur la base distante, `supabase db push` sur prod, suppression de données, rotation de secrets, requêtes `auth.*` ou `DROP`/`DELETE` larges.
+**Demander une confirmation explicite dans le chat uniquement** avant d’exécuter quelque chose **irréversible ou destructeur** non déjà demandé dans le message, par exemple : `DROP` / `TRUNCATE` / `DELETE` large ou aveugle sur prod, rotation de secrets, ou toute action explicitement hors périmètre de la demande.
+
+Ne **jamais** demander de coller des mots de passe ou clés **complets** dans le chat ; préférer variables d’environnement locales ou configuration déjà présente sur la machine.

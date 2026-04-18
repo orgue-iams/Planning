@@ -1,5 +1,5 @@
 /**
- * Modale Configuration (année scolaire + plage chapelle). Admin : écriture ; prof : lecture seule.
+ * Modale Configuration (année scolaire + plage chapelle + règles élèves). Admin : écriture ; prof : lecture seule.
  */
 import { isAdmin } from './auth-logic.js';
 import { isBackendAuthConfigured } from './supabase-client.js';
@@ -14,6 +14,17 @@ import { normalizeHHmmInput } from '../utils/time-helpers.js';
 
 let bound = false;
 let configInitialSnapshot = '';
+
+const ELEVE_FIELD_IDS = [
+    'config-eleve-cap-enabled',
+    'config-eleve-cap-hours',
+    'config-eleve-horizon-enabled',
+    'config-eleve-horizon-amount',
+    'config-eleve-horizon-unit',
+    'config-eleve-void-toward-cap',
+    'config-eleve-no-delete-after-start',
+    'config-eleve-tolerance-days'
+];
 
 function timeDbToInput(t) {
     if (!t) return '08:00';
@@ -35,17 +46,41 @@ async function fillConfigModal() {
     if (mx) mx.value = timeDbToInput(data?.chapel_slot_max);
     const em = document.getElementById('config-planning-error-notify-email');
     if (em) em.value = String(data?.planning_error_notify_email ?? '').trim();
+
+    const capEn = document.getElementById('config-eleve-cap-enabled');
+    if (capEn) capEn.checked = Boolean(data?.eleve_weekly_travail_cap_enabled);
+    const capH = document.getElementById('config-eleve-cap-hours');
+    if (capH) capH.value = String(data?.eleve_weekly_travail_cap_hours ?? '2');
+    const hzEn = document.getElementById('config-eleve-horizon-enabled');
+    if (hzEn) hzEn.checked = Boolean(data?.eleve_booking_horizon_enabled);
+    const hzA = document.getElementById('config-eleve-horizon-amount');
+    if (hzA) hzA.value = String(data?.eleve_booking_horizon_amount ?? '14');
+    const hzU = document.getElementById('config-eleve-horizon-unit');
+    if (hzU) hzU.value = data?.eleve_booking_horizon_unit === 'weeks' ? 'weeks' : 'days';
+    const vTow = document.getElementById('config-eleve-void-toward-cap');
+    if (vTow) vTow.checked = data?.eleve_count_voided_travail_toward_cap !== false;
+    const noDel = document.getElementById('config-eleve-no-delete-after-start');
+    if (noDel) noDel.checked = data?.eleve_forbid_delete_after_slot_start !== false;
+    const tol = document.getElementById('config-eleve-tolerance-days');
+    if (tol) tol.value = String(data?.eleve_booking_tolerance_days ?? '0');
+
     configInitialSnapshot = currentConfigSnapshot();
 }
 
 function currentConfigSnapshot() {
-    return JSON.stringify({
+    const base = {
         schoolStart: document.getElementById('config-school-start')?.value || '',
         schoolEnd: document.getElementById('config-school-end')?.value || '',
         chapelMin: document.getElementById('config-chapel-min')?.value || '',
         chapelMax: document.getElementById('config-chapel-max')?.value || '',
         notifyEmail: document.getElementById('config-planning-error-notify-email')?.value || ''
-    });
+    };
+    for (const id of ELEVE_FIELD_IDS) {
+        const el = document.getElementById(id);
+        if (el instanceof HTMLInputElement && el.type === 'checkbox') base[id] = el.checked ? '1' : '0';
+        else if (el) base[id] = el.value || '';
+    }
+    return JSON.stringify(base);
 }
 
 function isConfigDirty() {
@@ -77,6 +112,14 @@ export function initConfigUi(currentUser) {
     notifyEl?.classList.toggle('text-slate-500', !admin);
     notifyEl?.classList.toggle('cursor-not-allowed', !admin);
 
+    for (const id of ELEVE_FIELD_IDS) {
+        const el = document.getElementById(id);
+        el?.toggleAttribute('disabled', !admin);
+        el?.classList.toggle('bg-slate-200', !admin && !(el instanceof HTMLInputElement && el.type === 'checkbox'));
+        el?.classList.toggle('text-slate-500', !admin);
+        el?.classList.toggle('cursor-not-allowed', !admin);
+    }
+
     document.getElementById('menu-item-config')?.addEventListener('click', (ev) => {
         ev.preventDefault();
         document.getElementById('btn-header-settings')?.blur();
@@ -99,12 +142,23 @@ export function initConfigUi(currentUser) {
             showToast('Heures chapelle invalides : format 24 h (ex. 08:00, 22:00).', 'error');
             return;
         }
+        const capOn = document.getElementById('config-eleve-cap-enabled')?.checked;
+        const hzOn = document.getElementById('config-eleve-horizon-enabled')?.checked;
         const r = await saveOrganSchoolSettingsAdmin({
             school_year_start: document.getElementById('config-school-start')?.value || null,
             school_year_end: document.getElementById('config-school-end')?.value || null,
             chapel_slot_min: `${mn}:00`,
             chapel_slot_max: `${mx}:00`,
-            planning_error_notify_email: document.getElementById('config-planning-error-notify-email')?.value ?? ''
+            planning_error_notify_email: document.getElementById('config-planning-error-notify-email')?.value ?? '',
+            eleve_weekly_travail_cap_enabled: capOn,
+            eleve_weekly_travail_cap_hours: document.getElementById('config-eleve-cap-hours')?.value,
+            eleve_booking_horizon_enabled: hzOn,
+            eleve_booking_horizon_amount: document.getElementById('config-eleve-horizon-amount')?.value,
+            eleve_booking_horizon_unit: document.getElementById('config-eleve-horizon-unit')?.value,
+            eleve_count_voided_travail_toward_cap: document.getElementById('config-eleve-void-toward-cap')?.checked,
+            eleve_forbid_delete_after_slot_start: document.getElementById('config-eleve-no-delete-after-start')
+                ?.checked,
+            eleve_booking_tolerance_days: document.getElementById('config-eleve-tolerance-days')?.value
         });
         if (!r.ok) {
             showToast(r.error || 'Erreur.', 'error');

@@ -1,0 +1,22 @@
+<dialog id="modal_course_students" class="modal">
+    <div class="modal-box p-5 w-[96%] max-w-2xl max-h-[90dvh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col">
+        <h3 id="csp-title" class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest shrink-0">Inscriptions au cours</h3>
+        <p class="text-[10px] text-slate-500 mb-3 shrink-0 leading-snug">
+            <strong>Inscrits</strong> à gauche, <strong>disponibles</strong> à droite. Clic sur un nom pour le déplacer d’une colonne à l’autre (max <span id="csp-max-label">5</span> inscrits).
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 min-h-0 overflow-hidden">
+            <div class="flex flex-col min-h-0 rounded-xl border border-slate-200 bg-slate-50/90 p-2">
+                <p class="text-[10px] font-bold text-slate-600 mb-1 shrink-0">Inscrits</p>
+                <div id="csp-list-in" class="flex-1 min-h-[12rem] max-h-[50vh] overflow-y-auto rounded-lg border border-slate-200 bg-white p-1.5 space-y-0.5"></div>
+            </div>
+            <div class="flex flex-col min-h-0 rounded-xl border border-slate-200 bg-white p-2">
+                <p class="text-[10px] font-bold text-slate-600 mb-1 shrink-0">Non inscrits à ce cours</p>
+                <div id="csp-list-out" class="flex-1 min-h-[12rem] max-h-[50vh] overflow-y-auto rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50 p-1.5 space-y-0.5"></div>
+            </div>
+        </div>
+        <div class="modal-action mt-4 pt-3 border-t border-slate-100 shrink-0 flex justify-end gap-2">
+            <button type="button" id="csp-btn-cancel" class="btn btn-ghost btn-sm font-black text-[11px]">Annuler</button>
+            <button type="button" id="csp-btn-ok" class="btn btn-primary btn-sm font-black text-[11px]">Valider</button>
+        </div>
+    </div>
+</dialog>

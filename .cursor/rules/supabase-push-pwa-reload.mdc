@@ -1,0 +1,22 @@
+---
+description: Après migration SQL, push Supabase + build CSS ; après SW/cache, rappeler double rechargement
+alwaysApply: true
+---
+
+# Migrations (`supabase/migrations/`)
+
+- Quand une nouvelle migration est ajoutée ou modifiée et que la livraison doit aller sur le projet distant : **exécuter** depuis la racine du repo `Planning` :
+
+  `supabase db push --yes`
+
+  (adapter si le projet utilise une autre cible documentée), **sans** renvoyer l’utilisateur vers le terminal pour cette étape si l’environnement le permet.
+- Si la commande échoue (projet non lié, session expirée), **rapporter** le message d’erreur et ce qui manque (ex. `supabase link`, `supabase login`).
+
+# CSS Tailwind
+
+- Respecter aussi `.cursor/rules/tailwind-build-before-deploy.mdc` : après changement des classes / de `css/tailwind.input.css`, lancer **`npm run build:css`** dans `Planning`.
+
+# Service worker / cache (`sw.js`, `CACHE_NAME`, liste `ASSETS`)
+
+- Après modification du SW ou du nom de cache : lancer **`npm run build:css`** si des classes Tailwind ont aussi changé dans la même livraison.
+- **Rappel utilisateur** (l’agent ne contrôle pas le navigateur) : pour valider le nouveau SW, **recharger la page deux fois** ou forcer la mise à jour du cache pour l’origine du site (sinon l’ancien bundle peut rester servi).
