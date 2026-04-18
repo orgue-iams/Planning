@@ -2,20 +2,51 @@
     <div class="modal-box p-5 w-[96%] max-w-3xl max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 shadow-2xl">
         <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest">Statistiques d’utilisation</h3>
         <p class="text-[10px] text-slate-600 mb-3 leading-snug">
-            Vue prévue : année scolaire en cours ou plage de dates, tableau + chronologie avec infobulles au survol, filtres par élève(s), cumuls et moyenne glissante hebdomadaire, option occupation orgue (cours / travail perso).
+            Cumuls sur la période choisie (créneaux issus de la base). Les heures sont des durées réelles (début → fin).
         </p>
-        <div class="rounded-xl border border-amber-200 bg-amber-50/90 p-3 text-[11px] text-amber-950 leading-snug mb-3">
-            <strong>En cours d’implémentation.</strong> Les agrégations côté base (RPC) et les graphiques seront branchés sur une prochaine livraison. Utilisez d’ici là les exports / requêtes admin si besoin.
+        <div class="flex flex-wrap gap-2 items-end mb-3">
+            <div>
+                <label for="statistics-date-from" class="text-[9px] font-bold text-slate-500 block">Du</label>
+                <input
+                    type="date"
+                    id="statistics-date-from"
+                    class="input input-sm h-9 font-mono text-sm bg-white border border-slate-200 rounded-lg"
+                />
+            </div>
+            <div>
+                <label for="statistics-date-to" class="text-[9px] font-bold text-slate-500 block">Au</label>
+                <input
+                    type="date"
+                    id="statistics-date-to"
+                    class="input input-sm h-9 font-mono text-sm bg-white border border-slate-200 rounded-lg"
+                />
+            </div>
+            <button type="button" id="statistics-apply-range" class="btn btn-primary btn-sm font-black text-[11px] h-9">
+                Actualiser
+            </button>
+            <button type="button" id="statistics-school-year-btn" class="btn btn-ghost btn-sm font-black text-[11px] h-9">
+                Année scolaire
+            </button>
         </div>
-        <div class="flex flex-wrap gap-2 items-end opacity-60 pointer-events-none">
-            <div>
-                <label class="text-[9px] font-bold text-slate-500 block">Du</label>
-                <input type="date" disabled class="input input-sm h-9 font-mono text-sm bg-white border border-slate-200 rounded-lg" />
-            </div>
-            <div>
-                <label class="text-[9px] font-bold text-slate-500 block">Au</label>
-                <input type="date" disabled class="input input-sm h-9 font-mono text-sm bg-white border border-slate-200 rounded-lg" />
-            </div>
+        <div id="statistics-status" class="text-[11px] text-slate-500 mb-2 min-h-[1rem]"></div>
+        <div class="overflow-x-auto rounded-xl border border-slate-200">
+            <table class="w-full text-left text-[11px]">
+                <thead class="bg-slate-50 text-slate-600 font-bold uppercase tracking-wide">
+                    <tr>
+                        <th class="p-2">Type</th>
+                        <th class="p-2 text-right">Créneaux</th>
+                        <th class="p-2 text-right">Heures</th>
+                    </tr>
+                </thead>
+                <tbody id="statistics-tbody"></tbody>
+                <tfoot class="bg-slate-50 font-bold text-slate-800">
+                    <tr>
+                        <td class="p-2">Total</td>
+                        <td class="p-2 text-right" id="statistics-foot-count">—</td>
+                        <td class="p-2 text-right" id="statistics-foot-hours">—</td>
+                    </tr>
+                </tfoot>
+            </table>
         </div>
         <div class="modal-action mt-4 pt-2 border-t border-slate-100">
             <button type="button" id="statistics-close-btn" class="btn btn-primary btn-sm font-black text-[11px]">Fermer</button>

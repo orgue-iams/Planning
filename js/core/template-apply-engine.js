@@ -582,6 +582,9 @@ export async function executeTemplateDatabasePhase(analysis, ctx) {
         const titleC = String(g.line?.title || 'Cours').trim() || 'Cours';
         const startIso = g.start.toISOString();
         const endIso = g.end.toISOString();
+        const lineId = g.line?.id != null ? String(g.line.id).trim() : '';
+        const wk = String(g.line?.week_type || '').trim().toUpperCase();
+        const gabaritWeekType = wk === 'A' || wk === 'B' ? wk : null;
         const ur = await upsertPlanningEventRow({
             id: null,
             startIso,
@@ -589,7 +592,9 @@ export async function executeTemplateDatabasePhase(analysis, ctx) {
             title: titleC,
             dbSlotType: 'cours',
             ownerEmail: profEmail,
-            ownerUserId: profUid
+            ownerUserId: profUid,
+            ...(lineId ? { sourceTemplateLineId: lineId } : {}),
+            ...(gabaritWeekType ? { gabaritWeekType } : {})
         });
         if (!ur.ok || !ur.id) return { ok: false, error: ur.error || 'Insertion cours base' };
         const userIds = [];
@@ -621,6 +626,7 @@ export async function executeTemplateDatabasePhase(analysis, ctx) {
         const titleT = String(tr.line?.title || 'Travail').trim() || 'Travail personnel';
         const startIso = tr.start.toISOString();
         const endIso = tr.end.toISOString();
+        const lineIdT = tr.line?.id != null ? String(tr.line.id).trim() : '';
         const ur = await upsertPlanningEventRow({
             id: null,
             startIso,
@@ -628,7 +634,8 @@ export async function executeTemplateDatabasePhase(analysis, ctx) {
             title: titleT,
             dbSlotType: 'travail perso',
             ownerEmail: profEmail,
-            ownerUserId: profUid
+            ownerUserId: profUid,
+            ...(lineIdT ? { sourceTemplateLineId: lineIdT } : {})
         });
         if (!ur.ok || !ur.id) return { ok: false, error: ur.error || 'Insertion travail base' };
         const enrT = await replacePlanningEventEnrollment(ur.id, []);

@@ -1,0 +1,31 @@
+<dialog id="modal_cours_series_scope" class="modal">
+    <div class="modal-box p-5 w-[96%] max-w-lg rounded-2xl border border-slate-200 shadow-2xl">
+        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest">Série de cours (gabarit)</h3>
+        <p class="text-[11px] text-slate-600 mb-3 leading-snug">
+            Ce créneau est lié aux semaines types. Vous avez modifié l’horaire ou le titre. Souhaitez-vous appliquer ce changement à d’autres occurrences ?
+        </p>
+        <div class="space-y-2 text-[11px] text-slate-800">
+            <label class="flex gap-2 items-start cursor-pointer">
+                <input type="radio" name="cours-series-scope" value="single" class="mt-0.5" checked />
+                <span><strong>Cette occurrence uniquement</strong> — les autres cours de la même ligne gabarit restent inchangés.</span>
+            </label>
+            <label class="flex gap-2 items-start cursor-pointer">
+                <input type="radio" name="cours-series-scope" value="future" class="mt-0.5" />
+                <span
+                    ><strong>Cette occurrence et les suivantes</strong> — tous les cours de la même ligne gabarit à partir de
+                    celui-ci, jusqu’à la fin d’année scolaire configurée (ou ~12 mois si la date de fin n’est pas renseignée). Le
+                    même décalage horaire et le nouveau titre s’appliquent ; seules les inscriptions du cours en cours
+                    d’édition sont modifiées.</span
+                >
+            </label>
+        </div>
+        <div class="modal-action mt-4 pt-3 border-t border-slate-100 flex justify-end gap-2">
+            <button type="button" id="cours-series-scope-cancel" class="btn btn-ghost btn-sm font-black text-[11px]">
+                Annuler
+            </button>
+            <button type="button" id="cours-series-scope-ok" class="btn btn-primary btn-sm font-black text-[11px]">
+                Continuer
+            </button>
+        </div>
+    </div>
+</dialog>

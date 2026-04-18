@@ -56,6 +56,7 @@ import { setPlanningSessionUser, getPlanningSessionUser } from './session-user.j
 import { initProfileUi, resetProfileUiBindings, refreshHeaderWeekStrip } from './profile-ui.js';
 import { initSemainesTypesUi, resetSemainesTypesUiBindings } from './semaines-types-ui.js';
 import { initStatisticsUi, resetStatisticsUiBindings } from './statistics-ui.js';
+import { initCoursSeriesScopeUi, resetCoursSeriesScopeUiBindings } from './cours-series-scope-ui.js';
 import { initConfigUi, resetConfigUiBindings } from './config-ui.js';
 import { bindAdminClearWeekButton } from './admin-clear-week.js';
 import { fetchWeekCycleAnchor, clearProfWeekCycleCache } from './week-cycle.js';
@@ -88,6 +89,7 @@ function performLogout() {
     resetProfileUiBindings();
     resetSemainesTypesUiBindings();
     resetStatisticsUiBindings();
+    resetCoursSeriesScopeUiBindings();
     resetConfigUiBindings();
     invalidateOrganSchoolSettingsCache();
     invalidateCalendarListCache();
@@ -116,7 +118,8 @@ function performLogout() {
         'modal_semaines_types',
         'modal_config',
         'modal_course_students',
-        'modal_statistics'
+        'modal_statistics',
+        'modal_cours_series_scope'
     ].forEach((id) => document.getElementById(id)?.close());
     const loginDlg = document.getElementById('modal_login');
     void applyLoginBanner();
@@ -350,6 +353,7 @@ function initCalendarAndRevealUi() {
         initProfileUi(currentUser);
         initSemainesTypesUi(currentUser);
         initStatisticsUi();
+        initCoursSeriesScopeUi();
         initConfigUi(currentUser);
         initAdminUsersUi(currentUser);
         initAdminCalendarPoolUi(currentUser);

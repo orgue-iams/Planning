@@ -73,7 +73,11 @@ export function mapPlanningDbRowToFcEvent(row, _currentUser) {
             inscrits: normalizeInscritsFromRpc(row),
             planningSourceTemplateLineId: row.source_template_line_id
                 ? String(row.source_template_line_id)
-                : ''
+                : '',
+            planningGabaritWeekType: (() => {
+                const w = String(row.gabarit_week_type || '').trim().toUpperCase();
+                return w === 'A' || w === 'B' ? w : '';
+            })()
         }
     };
 }
@@ -162,7 +166,9 @@ export async function planningUserIdForEmail(email) {
  *   title: string,
  *   dbSlotType: string,
  *   ownerEmail: string,
- *   ownerUserId: string
+ *   ownerUserId: string,
+ *   sourceTemplateLineId?: string | null,
+ *   gabaritWeekType?: 'A' | 'B' | '' | null
  * }} p
  */
 export async function upsertPlanningEventRow(p) {
@@ -180,9 +186,25 @@ export async function upsertPlanningEventRow(p) {
         owner_user_id: p.ownerUserId,
         updated_at: new Date().toISOString()
     };
+    const tplId = p.sourceTemplateLineId !== undefined ? String(p.sourceTemplateLineId || '').trim() : undefined;
+    if (tplId !== undefined) {
+        row.source_template_line_id = tplId || null;
+    }
+    if (p.gabaritWeekType !== undefined) {
+        const g = String(p.gabaritWeekType || '').trim().toUpperCase();
+        row.gabarit_week_type = g === 'A' || g === 'B' ? g : null;
+    }
     const existingId = p.id ? String(p.id).trim() : '';
     if (existingId) {
-        const { data, error } = await sb.from('planning_event').update(row).eq('id', existingId).select('id').maybeSingle();
+        const updateRow = { ...row };
+        if (tplId === undefined) delete updateRow.source_template_line_id;
+        if (p.gabaritWeekType === undefined) delete updateRow.gabarit_week_type;
+        const { data, error } = await sb
+            .from('planning_event')
+            .update(updateRow)
+            .eq('id', existingId)
+            .select('id')
+            .maybeSingle();
         if (error) return { ok: false, error: error.message, id: null };
         return { ok: true, error: null, id: data?.id ? String(data.id) : existingId };
     }
@@ -287,5 +309,36 @@ export async function fetchPlanningMirrorTargetsForDelete(eventId, options = {})
             calendarId: String(r.google_calendar_id).trim(),
             googleEventId: String(r.google_event_id).trim()
         }));
+}
+
+/**
+ * Identifiants Google « main » et « pool_owner » pour un créneau (sync ok).
+ * @param {string} eventId
+ * @returns {Promise<{ mainGoogleEventId: string, poolGoogleEventId: string }>}
+ */
+export async function fetchPlanningMainPoolGoogleIdsForEvent(eventId) {
+    const sb = getSupabaseClient();
+    if (!sb || !isBackendAuthConfigured()) return { mainGoogleEventId: '', poolGoogleEventId: '' };
+    const id = String(eventId || '').trim();
+    if (!id) return { mainGoogleEventId: '', poolGoogleEventId: '' };
+    const { data, error } = await sb
+        .from('planning_event_google_mirror')
+        .select('target,google_event_id,sync_status')
+        .eq('event_id', id)
+        .in('target', ['main', 'pool_owner']);
+    if (error) {
+        console.warn('[planning-events-db] fetchPlanningMainPoolGoogleIdsForEvent', error.message);
+        return { mainGoogleEventId: '', poolGoogleEventId: '' };
+    }
+    let mainGoogleEventId = '';
+    let poolGoogleEventId = '';
+    for (const r of Array.isArray(data) ? data : []) {
+        if (String(r?.sync_status || '') !== 'ok') continue;
+        const ge = String(r?.google_event_id || '').trim();
+        if (!ge) continue;
+        if (r.target === 'main') mainGoogleEventId = ge;
+        if (r.target === 'pool_owner') poolGoogleEventId = ge;
+    }
+    return { mainGoogleEventId, poolGoogleEventId };
 }
 

@@ -24,6 +24,8 @@ import {
     upsertPlanningEventRow,
     deletePlanningEventRow,
     fetchPlanningMirrorTargetsForDelete,
+    fetchPlanningEventRowsInRange,
+    fetchPlanningMainPoolGoogleIdsForEvent,
     planningUserIdForEmail,
     fetchPlanningListElevesActifs,
     replacePlanningEventEnrollment
@@ -36,6 +38,7 @@ import {
     logEleveTravailVoidIfNeeded
 } from './planning-eleve-quota.js';
 import { openCourseStudentsPicker } from './course-students-picker.js';
+import { openCoursSeriesScopeModal } from './cours-series-scope-ui.js';
 
 let saveReservationInFlight = false;
 
@@ -844,6 +847,11 @@ export function getEventContent(arg, currentUser) {
         timeLine = `${formatShortDay(start)} ${formatTime(start)} → ${formatShortDay(endDisplay)} ${formatTime(endDisplay)}`;
     } else {
         timeLine = `${formatTime(start)} – ${formatTime(endDisplay)}`;
+    }
+
+    const gw = String(arg.event.extendedProps?.planningGabaritWeekType || '').trim().toUpperCase();
+    if (type === 'cours' && (gw === 'A' || gw === 'B')) {
+        timeLine = `${timeLine} (${gw})`;
     }
 
     const showTitleRow = Boolean(title) && (!sameCalendarDay || durationMin > 30);
@@ -1856,6 +1864,173 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     });
 }
 
+function inscritsEmailsCsvFromRpcRow(row) {
+    const raw = row?.inscrits_emails;
+    if (!Array.isArray(raw)) return '';
+    const set = new Set(raw.map((x) => String(x).trim().toLowerCase()).filter(Boolean));
+    return [...set].join(',');
+}
+
+/**
+ * Décale tous les cours partageant la même ligne gabarit à partir de l’occurrence en cours (inclus).
+ * @returns {Promise<boolean>} true = enregistrement terminé (succès ou erreur affichée), ne pas poursuivre la voie « créneau seul ».
+ */
+async function applyCoursTemplateLineSeriesIfNeeded(p) {
+    const {
+        calendar,
+        currentUser,
+        liveEventRef,
+        canonicalExisting,
+        ownerUid,
+        slotOwnerEmail,
+        ownerForBridge,
+        bridgeType,
+        prevSnapshot,
+        title,
+        startIso,
+        endIso,
+        startStr,
+        endStr,
+        templateLineId,
+        slotType
+    } = p;
+
+    await fetchOrganSchoolSettings();
+    const settings = getOrganSchoolSettingsCached();
+    const prevStartMs = new Date(prevSnapshot.startStr).getTime();
+    const rangeStart = new Date(prevStartMs);
+    rangeStart.setDate(rangeStart.getDate() - 1);
+    rangeStart.setHours(0, 0, 0, 0);
+
+    let rangeEnd;
+    const ymdEnd = settings?.school_year_end ? String(settings.school_year_end).slice(0, 10) : '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(ymdEnd)) {
+        rangeEnd = new Date(`${ymdEnd}T23:59:59`);
+    } else {
+        rangeEnd = new Date(prevStartMs);
+        rangeEnd.setFullYear(rangeEnd.getFullYear() + 1);
+    }
+
+    const rows = await fetchPlanningEventRowsInRange(rangeStart, rangeEnd);
+    const ownerUidStr = String(ownerUid).trim();
+    const tpl = String(templateLineId).trim();
+    const siblings = rows
+        .filter((r) => {
+            if (String(r.slot_type || '') !== 'cours') return false;
+            if (String(r.owner_user_id || '') !== ownerUidStr) return false;
+            if (String(r.source_template_line_id || '') !== tpl) return false;
+            const t = new Date(r.start_at).getTime();
+            return t >= prevStartMs && t <= rangeEnd.getTime();
+        })
+        .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
+
+    if (siblings.length === 0) return false;
+
+    const titleTrim = String(title || '').trim();
+    const prevTitle = String(prevSnapshot.title || '').trim();
+    const titleChanged = prevTitle !== titleTrim;
+    const dS = new Date(startIso).getTime() - new Date(prevSnapshot.startStr).getTime();
+    const dE = new Date(endIso).getTime() - new Date(prevSnapshot.endStr).getTime();
+
+    const ownerEmailLower = String(slotOwnerEmail || currentUser.email || '').trim().toLowerCase();
+
+    for (const row of siblings) {
+        const rid = String(row.id || '').trim();
+        if (!rid) continue;
+        const ns = new Date(new Date(row.start_at).getTime() + dS).toISOString();
+        const ne = new Date(new Date(row.end_at).getTime() + dE).toISOString();
+        const nextTitle = titleChanged ? titleTrim : String(row.title || '').trim() || 'Cours';
+        const ur = await upsertPlanningEventRow({
+            id: rid,
+            startIso: ns,
+            endIso: ne,
+            title: nextTitle,
+            dbSlotType: 'cours',
+            ownerEmail: ownerEmailLower,
+            ownerUserId: ownerUidStr
+        });
+        if (!ur.ok) {
+            showToast(ur.error || 'Enregistrement série impossible.', 'error');
+            return true;
+        }
+    }
+
+    const enrollSync = await syncPlanningEnrollmentAfterSave(canonicalExisting, 'cours');
+    if (!enrollSync.ok) {
+        showToast(enrollSync.error || 'Enregistrement des inscriptions impossible.', 'error');
+        return true;
+    }
+
+    /** @type {Record<string, unknown>[]} */
+    const bridgeEvents = [];
+    for (const row of siblings) {
+        const rid = String(row.id || '').trim();
+        const ns = new Date(new Date(row.start_at).getTime() + dS).toISOString();
+        const ne = new Date(new Date(row.end_at).getTime() + dE).toISOString();
+        const nextTitle = titleChanged ? titleTrim : String(row.title || '').trim() || 'Cours';
+        const mirrors = await fetchPlanningMainPoolGoogleIdsForEvent(rid);
+        const emailsCsv =
+            rid === canonicalExisting
+                ? enrollSync.emailsCsv || ''
+                : inscritsEmailsCsvFromRpcRow(row);
+        bridgeEvents.push({
+            planningEventId: rid,
+            ...(mirrors.mainGoogleEventId ? { googleEventId: mirrors.mainGoogleEventId } : {}),
+            title: nextTitle,
+            start: ns,
+            end: ne,
+            type: bridgeType,
+            owner: ownerForBridge || currentUser.email,
+            ...(mirrors.poolGoogleEventId ? { poolGoogleEventId: mirrors.poolGoogleEventId } : {}),
+            ...(emailsCsv ? { inscrits: emailsCsv } : {})
+        });
+    }
+
+    document.getElementById('modal_reservation').close();
+    const n = siblings.length;
+    showToast(n > 1 ? `${n} cours mis à jour (série gabarit).` : 'Cours mis à jour.');
+
+    if (liveEventRef) {
+        const localInscritsEmails = getReservationInscritsSelection()
+            .emailsCsv.split(',')
+            .map((x) => String(x).trim())
+            .filter(Boolean);
+        try {
+            if (typeof liveEventRef.setDates === 'function') {
+                liveEventRef.setDates(new Date(startStr), new Date(endStr));
+            }
+        } catch (e) {
+            console.warn('[calendar-logic] setDates série gabarit', e);
+        }
+        if (typeof liveEventRef.setProp === 'function') {
+            liveEventRef.setProp('title', titleTrim);
+        }
+        if (typeof liveEventRef.setExtendedProp === 'function') {
+            liveEventRef.setExtendedProp('type', slotType);
+            liveEventRef.setExtendedProp('planningDbSlotType', 'cours');
+            liveEventRef.setExtendedProp('inscrits', localInscritsEmails);
+        }
+    }
+
+    void (async () => {
+        try {
+            const syncMulti = await trySyncGoogleCalendar(bridgeEvents);
+            if (calendarBridgeWanted() && !syncMulti.ok && !syncMulti.skipped) {
+                showToast(`Synchronisation agenda : ${syncMulti.error || 'échec'}`, 'error');
+            }
+        } catch (e) {
+            console.error(e);
+        }
+        try {
+            await refetchPlanningGrid(calendar);
+        } catch (e) {
+            console.error(e);
+        }
+    })();
+
+    return true;
+}
+
 /** Synchronisation Google ; pas de toast ici (l’appelant décide après fermeture modale / ordre des messages). */
 async function trySyncGoogleCalendar(eventsPayload) {
     if (!isBackendAuthConfigured()) return { ok: true, skipped: true, data: null };
@@ -2118,6 +2293,52 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     const canonicalExisting = liveEventRef
         ? String(liveEventRef.extendedProps?.planningCanonicalId || '').trim()
         : '';
+
+    const tplLineId =
+        liveEventRef && canonicalExisting
+            ? String(liveEventRef.extendedProps?.planningSourceTemplateLineId || '').trim()
+            : '';
+    const titleTrimForSeries = String(title || '').trim();
+    const prevTitleForSeries = prevSnapshot ? String(prevSnapshot.title || '').trim() : '';
+    const timeOrTitleChangedForSeries =
+        Boolean(prevSnapshot) &&
+        (prevTitleForSeries !== titleTrimForSeries ||
+            prevSnapshot.startStr !== startIso ||
+            prevSnapshot.endStr !== endIso);
+
+    if (
+        liveEventRef &&
+        canonicalExisting &&
+        dbSlotType === 'cours' &&
+        tplLineId &&
+        isPrivilegedUser(currentUser) &&
+        timeOrTitleChangedForSeries
+    ) {
+        const scope = await openCoursSeriesScopeModal();
+        if (scope === null) return;
+        if (scope === 'future') {
+            const seriesDone = await applyCoursTemplateLineSeriesIfNeeded({
+                calendar,
+                currentUser,
+                liveEventRef,
+                canonicalExisting,
+                ownerUid,
+                slotOwnerEmail: slotOwnerEmail || currentUser.email,
+                ownerForBridge,
+                bridgeType,
+                prevSnapshot,
+                title,
+                startIso,
+                endIso,
+                startStr,
+                endStr,
+                templateLineId: tplLineId,
+                slotType
+            });
+            if (seriesDone) return;
+        }
+    }
+
     const ur = await upsertPlanningEventRow({
         id: canonicalExisting || null,
         startIso,
