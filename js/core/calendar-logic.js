@@ -106,9 +106,8 @@ function updateReservationInscritsWrapVisibility(currentUser, canEdit) {
     if (toggle instanceof HTMLButtonElement) {
         toggle.disabled = !canEdit || !show;
     }
-    // UX : même si on peut modifier, on n'affiche la liste "Disponibles"
-    // qu'après clic sur l'icône utilisateurs.
-    setReservationInscritsEditMode(false, canEdit);
+    // Deux colonnes + glisser-déposer dès que le motif est « Cours » et le créneau est éditable.
+    setReservationInscritsEditMode(Boolean(show && canEdit), canEdit);
 }
 
 /**
@@ -143,9 +142,57 @@ function ensureReservationMotifInscritsListener() {
         const isCours = String(sel.value || '').trim() === 'Cours';
         if (!isCours && multi instanceof HTMLSelectElement) {
             for (const o of multi.options) o.selected = false;
-            setReservationInscritsEditMode(false, reservationModalCanEditRef);
         }
     });
+}
+
+/**
+ * @param {string} id user_id
+ * @param {boolean} toSelected true = inscrire au cours
+ */
+function reservationInscritsMoveStudent(id, toSelected) {
+    const wrap = document.getElementById('wrap-reservation-inscrits');
+    const multi = document.getElementById('event-inscrits-select');
+    if (!wrap || !multi || wrap.dataset.inscritsEditMode !== '1') return;
+    const sid = String(id || '').trim();
+    if (!sid) return;
+    const opt = [...multi.options].find((o) => String(o.value) === sid);
+    if (!opt) return;
+    if (toSelected && !opt.selected) {
+        const chosenCount = [...multi.options].filter((o) => o.selected).length;
+        if (chosenCount >= MAX_COURS_STUDENTS) {
+            showToast(`Maximum ${MAX_COURS_STUDENTS} élèves pour un créneau Cours.`, 'error');
+            return;
+        }
+    }
+    opt.selected = toSelected;
+    renderReservationInscritsDnD(multi, true);
+}
+
+/** Zones de drop : une seule paire d’écouteurs (évite les empilements à chaque re-render). */
+function ensureReservationInscritsDropZonesBound() {
+    const avail = document.getElementById('event-inscrits-available');
+    const sel = document.getElementById('event-inscrits-selected');
+    if (!avail || !sel || avail.dataset.reservationDndDropBound === '1') return;
+    avail.dataset.reservationDndDropBound = '1';
+    sel.dataset.reservationDndDropBound = '1';
+
+    const wire = (zone, toSelected) => {
+        zone.addEventListener('dragenter', () => zone.classList.add('st-dnd-drop-active'));
+        zone.addEventListener('dragleave', () => zone.classList.remove('st-dnd-drop-active'));
+        zone.addEventListener('dragover', (ev) => {
+            ev.preventDefault();
+            if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+        });
+        zone.addEventListener('drop', (ev) => {
+            ev.preventDefault();
+            zone.classList.remove('st-dnd-drop-active');
+            const raw = ev.dataTransfer?.getData('text/plain') || '';
+            reservationInscritsMoveStudent(raw, toSelected);
+        });
+    };
+    wire(avail, false);
+    wire(sel, true);
 }
 
 function renderReservationInscritsDnD(multi, canEdit) {
@@ -167,43 +214,22 @@ function renderReservationInscritsDnD(multi, canEdit) {
     availWrap.innerHTML = rows.filter((r) => !r.selected).map(mk).join('');
     selWrap.innerHTML = rows.filter((r) => r.selected).map(mk).join('');
     if (!canEdit) return;
-    const move = (id, toSelected) => {
-        const opt = [...multi.options].find((o) => String(o.value) === id);
-        if (!opt) return;
-        if (toSelected && !opt.selected) {
-            const chosenCount = [...multi.options].filter((o) => o.selected).length;
-            if (chosenCount >= MAX_COURS_STUDENTS) {
-                showToast(`Maximum ${MAX_COURS_STUDENTS} élèves pour un créneau Cours.`, 'error');
-                return;
-            }
-        }
-        opt.selected = toSelected;
-        renderReservationInscritsDnD(multi, canEdit);
-    };
-    const bindZone = (zone, toSelected) => {
+    const bindZone = (zone, dblClickToSelected) => {
         zone.querySelectorAll('[data-student-id]').forEach((el) => {
             el.addEventListener('dragstart', (ev) => {
-                ev.dataTransfer?.setData('text/plain', el.getAttribute('data-student-id') || '');
+                const dt = ev.dataTransfer;
+                if (dt) {
+                    dt.setData('text/plain', el.getAttribute('data-student-id') || '');
+                    dt.effectAllowed = 'move';
+                }
             });
-            // UX demandée : double-clic pour basculer un élève entre listes.
-            el.addEventListener('dblclick', () => move(el.getAttribute('data-student-id') || '', toSelected));
+            el.addEventListener('dblclick', () =>
+                reservationInscritsMoveStudent(el.getAttribute('data-student-id') || '', dblClickToSelected)
+            );
         });
     };
     bindZone(availWrap, true);
     bindZone(selWrap, false);
-    const setDrop = (zone, toSelected) => {
-        zone.addEventListener('dragenter', () => zone.classList.add('st-dnd-drop-active'));
-        zone.addEventListener('dragleave', () => zone.classList.remove('st-dnd-drop-active'));
-        zone.addEventListener('dragover', (ev) => ev.preventDefault());
-        zone.addEventListener('drop', (ev) => {
-            ev.preventDefault();
-            zone.classList.remove('st-dnd-drop-active');
-            const id = ev.dataTransfer?.getData('text/plain') || '';
-            move(id, toSelected);
-        });
-    };
-    setDrop(availWrap, false);
-    setDrop(selWrap, true);
 }
 
 async function prepareReservationInscritsSelect(currentUser, event, canEdit) {
@@ -240,7 +266,8 @@ async function prepareReservationInscritsSelect(currentUser, event, canEdit) {
             for (const o of multi.options) {
                 o.selected = picked.includes(o.value);
             }
-            renderReservationInscritsDnD(multi, false);
+            const wrapR = document.getElementById('wrap-reservation-inscrits');
+            renderReservationInscritsDnD(multi, wrapR?.dataset.inscritsEditMode === '1');
         });
     }
     const rows = await fetchPlanningListElevesActifs();
@@ -268,8 +295,7 @@ async function prepareReservationInscritsSelect(currentUser, event, canEdit) {
         opt.selected = pre.has(opt.dataset.email);
         multi.add(opt);
     }
-    // UX : à l'ouverture, on affiche seulement les inscrits (read-only).
-    setReservationInscritsEditMode(false, canEdit);
+    ensureReservationInscritsDropZonesBound();
     updateReservationInscritsWrapVisibility(currentUser, canEdit);
 }
 
