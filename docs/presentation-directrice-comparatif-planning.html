@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Présentation Direction — Comparatif Planning Orgue</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #ffffff;
+      --text: #0f172a;
+      --muted: #475569;
+      --accent: #2563eb;
+      --ok: #0f766e;
+      --warn: #b45309;
+      --danger: #b91c1c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Inter", "Segoe UI", Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .deck {
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .slide {
+      display: none;
+      width: min(1200px, 96vw);
+      height: min(675px, 92vh); /* 16:9 approx */
+      background: var(--panel);
+      border-radius: 18px;
+      padding: 2.2rem 2.6rem;
+      box-shadow: 0 20px 50px rgba(2, 6, 23, .4);
+      overflow: auto;
+    }
+    .slide.active { display: block; }
+    .kicker {
+      color: var(--accent);
+      font-weight: 800;
+      font-size: .9rem;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    h1, h2 {
+      margin: .25rem 0 1rem;
+      line-height: 1.2;
+    }
+    h1 { font-size: 2rem; }
+    h2 { font-size: 1.6rem; }
+    p, li { font-size: 1.04rem; line-height: 1.45; }
+    ul { margin-top: .5rem; }
+    .cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem 1.3rem;
+      align-items: start;
+    }
+    .card {
+      border: 1px solid #dbe1ea;
+      border-radius: 12px;
+      padding: .8rem 1rem;
+      background: #fbfdff;
+    }
+    .card h3 {
+      margin: .1rem 0 .5rem;
+      font-size: 1rem;
+      color: #1e293b;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+    .tag {
+      display: inline-block;
+      padding: .2rem .5rem;
+      border-radius: 99px;
+      font-weight: 700;
+      font-size: .8rem;
+      margin-right: .35rem;
+      background: #eff6ff;
+      color: #1d4ed8;
+    }
+    .tag.ok { background: #ecfeff; color: var(--ok); }
+    .tag.warn { background: #fffbeb; color: var(--warn); }
+    .tag.danger { background: #fef2f2; color: var(--danger); }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: .95rem;
+      margin-top: .6rem;
+    }
+    th, td {
+      border: 1px solid #d9e1ec;
+      padding: .45rem .5rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f8fafc;
+      font-size: .85rem;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+      color: #334155;
+    }
+    .small { color: var(--muted); font-size: .9rem; }
+    .star-good { color: #059669; font-weight: 800; }
+    .star-mid { color: #b45309; font-weight: 800; }
+    .star-low { color: #b91c1c; font-weight: 800; }
+    .footer {
+      position: fixed;
+      bottom: 1rem;
+      left: 1rem;
+      right: 1rem;
+      display: flex;
+      justify-content: space-between;
+      color: #cbd5e1;
+      font-size: .85rem;
+      pointer-events: none;
+    }
+    .kbd {
+      border: 1px solid #94a3b8;
+      padding: .1rem .3rem;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .8rem;
+    }
+  </style>
+</head>
+<body>
+  <main class="deck">
+    <section class="slide active">
+      <div class="kicker">Orgue IAMS · Présentation Direction</div>
+      <h1>Comparatif Planning<br>Ancien site vs Nouveau prototype</h1>
+      <p><strong>Objectif de cette présentation :</strong> montrer les améliorations concrètes déjà actives, rassurer sur la sécurité et préparer une validation SI sereine.</p>
+      <div class="card">
+        <p><span class="tag ok">Contexte</span> Le nouveau planning conserve les usages essentiels et corrige les points devenus fragiles avec l’obsolescence de l’ancien site.</p>
+        <p><span class="tag">Important</span> Le prototype est fonctionnel aujourd’hui, et ses réglages restent adaptables selon les retours de la Direction et du SI.</p>
+      </div>
+      <p class="small">Navigation : <span class="kbd">←</span> <span class="kbd">→</span> ou <span class="kbd">Espace</span></p>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">1 · Fonctionnel utilisateur</div>
+      <h2>Ce qui change au quotidien</h2>
+      <div class="cols">
+        <div class="card">
+          <h3>Nouveau planning</h3>
+          <ul>
+            <li>Édition des créneaux plus fluide (déplacement/redimensionnement).</li>
+            <li>Expérience mobile/tablette proche d’un agenda moderne.</li>
+            <li>Types de créneaux clairs : Travail, Cours, Concert, Autre, Fermeture.</li>
+            <li>Consultation Google Calendar (planning global + planning personnel).</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Ancien planning</h3>
+          <ul>
+            <li>Vue semaine surtout, ergonomie web classique (non mobile).</li>
+            <li>Fonctions historiques dégradées avec le temps (titres, mails, stats).</li>
+            <li>Pas d’intégration Google calendar structurée pour la consultation.</li>
+            <li>Maintenance devenue difficile en pratique.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">2 · Pédagogie</div>
+      <h2>Cours, élèves inscrits, semaines A/B</h2>
+      <div class="cols">
+        <div class="card">
+          <h3>Nouveau planning</h3>
+          <ul>
+            <li>Type <strong>Cours</strong> distinct des réservations simples.</li>
+            <li>Association cours ↔ élèves : meilleure lisibilité pédagogique.</li>
+            <li>Gestion des semaines A/B pour réduire les confusions.</li>
+            <li>Suivi plus fin des activités (cours et travail perso).</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Ancien planning</h3>
+          <ul>
+            <li>Pas de structure cours/élèves.</li>
+            <li>Intitulés parfois insuffisants (ex. “Cour”).</li>
+            <li>Pas de logique semaine A/B.</li>
+            <li>Risque d’erreurs d’interprétation côté élèves.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="small">Impact direction : amélioration de la clarté organisationnelle sans alourdir l’usage.</p>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">3 · Équité de réservation</div>
+      <h2>Règles actives et paramétrables</h2>
+      <div class="card">
+        <p><span class="tag ok">Actif maintenant</span> Quota élève travail perso : <strong>2h/semaine</strong> (modifiable)</p>
+        <p><span class="tag ok">Actif maintenant</span> Fenêtre max de réservation élève : <strong>15 jours</strong> (modifiable)</p>
+        <p><span class="tag ok">Actif maintenant</span> Contrôle de suppression pour limiter les abus</p>
+        <p><span class="tag ok">Actif maintenant</span> Anti-chevauchement des réservations</p>
+      </div>
+      <p>Dans l’ancien site, ces règles étaient surtout orales : le nouveau les rend applicables, contrôlables et ajustables.</p>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">4 · Sécurité (message simple)</div>
+      <h2>Pourquoi le nouveau socle est plus sûr</h2>
+      <ul>
+        <li><strong>HTTPS :</strong> présent avant et maintenant (base commune).</li>
+        <li><strong>Authentification modernisée :</strong> session/token, moins de logique “maison” fragile.</li>
+        <li><strong>Droits renforcés :</strong> contrôles côté serveur + politiques d’accès en base.</li>
+        <li><strong>Administration encadrée :</strong> rôles, suspension, gestion mots de passe.</li>
+        <li><strong>Gouvernance :</strong> versionning GitHub, suivi des corrections/évolutions.</li>
+      </ul>
+      <div class="card">
+        <p><span class="tag warn">À cadrer avec le SI</span> Politique de mot de passe, seuils d’échec, durées de session, conformité RGPD détaillée.</p>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">5 · Statistiques</div>
+      <h2>Indicateurs déjà en place</h2>
+      <ul>
+        <li>Occupation globale sur période : Cours / Travail perso (élèves) / Concert / Total</li>
+        <li>Par élève : nombre de créneaux, heures, moyenne heures/semaine</li>
+        <li>Graphique journalier des heures de travail perso</li>
+      </ul>
+      <p><span class="tag">Évolutif</span> D’autres indicateurs peuvent être ajoutés selon les besoins de pilotage direction/SI.</p>
+      <p class="small">Ancien site : module stats historique devenu non fonctionnel (API obsolètes).</p>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">6 · Comparatif synthétique</div>
+      <h2>Tableau à étoiles (lecture direction)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Domaine</th>
+            <th>Ancien</th>
+            <th>Nouveau</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Authentification / mots de passe</td><td class="star-mid">★★☆☆☆</td><td class="star-good">★★★★☆</td></tr>
+          <tr><td>Gestion créneaux & ergonomie</td><td class="star-mid">★★☆☆☆</td><td class="star-good">★★★★★</td></tr>
+          <tr><td>Mobile / tablette</td><td class="star-low">★☆☆☆☆</td><td class="star-good">★★★★☆</td></tr>
+          <tr><td>Cours + élèves + semaines A/B</td><td class="star-low">★☆☆☆☆</td><td class="star-good">★★★★★</td></tr>
+          <tr><td>Communication (règles/annonces)</td><td class="star-mid">★★☆☆☆</td><td class="star-good">★★★★☆</td></tr>
+          <tr><td>Notifications e-mail</td><td class="star-low">★☆☆☆☆</td><td class="star-mid">★★★☆☆</td></tr>
+          <tr><td>Visibilité Google (global + perso)</td><td class="star-low">★☆☆☆☆</td><td class="star-good">★★★★★</td></tr>
+          <tr><td>Équité des réservations</td><td class="star-mid">★★☆☆☆</td><td class="star-good">★★★★★</td></tr>
+          <tr><td>Admin utilisateurs</td><td class="star-mid">★★★☆☆</td><td class="star-good">★★★★☆</td></tr>
+          <tr><td>Maintenance / gouvernance</td><td class="star-low">★☆☆☆☆</td><td class="star-good">★★★★★</td></tr>
+          <tr><td>Statistiques</td><td class="star-mid">★★☆☆☆</td><td class="star-good">★★★★☆</td></tr>
+          <tr><td>Sécurité globale</td><td class="star-mid">★★☆☆☆</td><td class="star-good">★★★★☆</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">7 · Conclusion</div>
+      <h2>Message proposé pour validation de principe</h2>
+      <div class="card">
+        <p><strong>Le nouveau planning est opérationnel, plus lisible, plus pilotable et plus sécurisé que l’ancien.</strong></p>
+        <p>Il constitue une base sérieuse pour une validation SI (sécurité, RGPD, exploitation), avec une gouvernance claire des évolutions.</p>
+      </div>
+      <ul>
+        <li>Décision attendue : accord de principe pour passage en revue SI.</li>
+        <li>Étape suivante : cadrage technique et sécurité avec le SI.</li>
+      </ul>
+    </section>
+  </main>
+
+  <div class="footer">
+    <div>Présentation Direction — Planning Orgue IAMS</div>
+    <div id="counter">1 / 8</div>
+  </div>
+
+  <script>
+    (function () {
+      const slides = [...document.querySelectorAll('.slide')];
+      const counter = document.getElementById('counter');
+      let i = 0;
+      function show(idx) {
+        i = Math.max(0, Math.min(slides.length - 1, idx));
+        slides.forEach((s, k) => s.classList.toggle('active', k === i));
+        counter.textContent = `${i + 1} / ${slides.length}`;
+      }
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') show(i + 1);
+        if (e.key === 'ArrowLeft' || e.key === 'PageUp') show(i - 1);
+      });
+      show(0);
+    })();
+  </script>
+</body>
+</html>
