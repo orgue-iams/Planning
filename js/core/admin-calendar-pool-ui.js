@@ -6,6 +6,7 @@ import { isBackendAuthConfigured } from './supabase-client.js';
 import { planningAdminInvoke } from './admin-api.js';
 import { showToast } from '../utils/toast.js';
 import { normalizeGoogleCalendarId } from '../utils/google-calendar-id.js';
+import { googleCalendarEmbedUrl } from '../utils/google-calendar-url.js';
 import { formatProfileFullName } from '../utils/profile-full-name.js';
 
 function escapeTd(s) {
@@ -18,8 +19,8 @@ function escapeAttr(s) {
     return String(s ?? '').replace(/"/g, '&quot;');
 }
 
-const POOL_COPY_SVG =
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="w-3.5 h-3.5 shrink-0 opacity-80" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9 9 0 019 9zM18.75 10.5h-6.75a1.125 1.125 0 00-1.125 1.125v6.75" /></svg>';
+const POOL_COPY_URL_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4 shrink-0" aria-hidden="true"><path d="M7.5 3A1.5 1.5 0 0 0 6 4.5v11A1.5 1.5 0 0 0 7.5 17H9V4.5A1.5 1.5 0 0 1 10.5 3h-3Z"/><path d="M10.5 4.5A1.5 1.5 0 0 1 12 3h4.379a1.5 1.5 0 0 1 1.06.44l2.121 2.121a1.5 1.5 0 0 1 .44 1.06V19.5A1.5 1.5 0 0 1 18.5 21h-6A1.5 1.5 0 0 1 11 19.5v-15Z"/></svg>';
 
 /** @type {{ key: 'label' | 'assignee_nom', dir: 'asc' | 'desc' }} */
 let poolSort = { key: 'label', dir: 'asc' };
@@ -93,7 +94,8 @@ function renderPoolTableRows(rows) {
         const st = free
             ? '<span class="text-emerald-700 font-medium text-[10px]">Libre</span>'
             : '<span class="text-amber-800 font-medium text-[10px]">Assigné</span>';
-        const gid = String(r.google_calendar_id ?? '');
+        const gid = String(r.google_calendar_id ?? '').trim();
+        const calUrl = googleCalendarEmbedUrl(gid);
         const nom = String(r.assignee_nom ?? '').trim();
         const prenom = String(r.assignee_prenom ?? '').trim();
         const assignee = free ? '—' : formatProfileFullName(nom, prenom) || '—';
@@ -101,8 +103,12 @@ function renderPoolTableRows(rows) {
             <td class="text-[10px] max-w-[11rem] truncate align-middle" title="${escapeAttr(r.label || '')}">${escapeTd(r.label || '—')}</td>
             <td class="align-middle p-1 min-w-0 max-w-[9.5rem] sm:max-w-[10.5rem]">
                 <div class="flex items-center gap-0.5 min-w-0">
-                    <span class="text-[9px] font-mono truncate flex-1 min-w-0" title="${escapeAttr(gid)}">${escapeTd(gid)}</span>
-                    <button type="button" class="btn btn-ghost btn-xs btn-square h-7 w-7 min-h-7 min-w-7 p-0 shrink-0 calendar-pool-copy-id border-0 text-slate-600 hover:bg-slate-200/90" data-calendar-id="${escapeAttr(gid)}" title="Copier l’ID" aria-label="Copier l’ID Google">${POOL_COPY_SVG}</button>
+                    <span class="text-[9px] truncate flex-1 min-w-0" title="${escapeAttr(calUrl)}">${escapeTd(calUrl || '—')}</span>
+                    ${
+                        calUrl
+                            ? `<button type="button" class="btn btn-ghost btn-xs btn-square h-7 w-7 min-h-7 min-w-7 p-0 shrink-0 calendar-pool-copy-url border border-slate-200 text-slate-700 hover:bg-slate-200/90 hover:text-slate-900" data-calendar-url="${escapeAttr(calUrl)}" title="Copier dans le presse-papiers" aria-label="Copier l’URL du calendrier">${POOL_COPY_URL_SVG}</button>`
+                            : ''
+                    }
                 </div>
             </td>
             <td class="text-[10px] align-middle">${escapeTd(assignee)}</td>
@@ -161,16 +167,16 @@ export function initAdminCalendarPoolUi(currentUser) {
 
     document.getElementById('modal_calendar_pool')?.addEventListener('click', async (ev) => {
         const t = ev.target;
-        const btn = t instanceof Element ? t.closest('.calendar-pool-copy-id') : null;
+        const btn = t instanceof Element ? t.closest('.calendar-pool-copy-url') : null;
         if (!(btn instanceof HTMLButtonElement)) return;
-        const cid = btn.getAttribute('data-calendar-id')?.trim();
-        if (!cid) {
-            showToast('Aucun ID à copier.', 'error');
+        const url = btn.getAttribute('data-calendar-url')?.trim();
+        if (!url) {
+            showToast('Aucune URL à copier.', 'error');
             return;
         }
         try {
-            await navigator.clipboard.writeText(cid);
-            showToast('ID Google copié.');
+            await navigator.clipboard.writeText(url);
+            showToast('URL de l’agenda copiée.');
         } catch {
             showToast('Copie impossible.', 'error');
         }
