@@ -135,11 +135,11 @@
   <main class="deck">
     <section class="slide active">
       <div class="kicker">Orgue IAMS · Présentation Direction</div>
-      <h1>Comparatif Planning<br>Ancien site vs Nouveau prototype</h1>
-      <p><strong>Objectif de cette présentation :</strong> montrer les améliorations concrètes déjà actives, rassurer sur la sécurité et préparer une validation SI sereine.</p>
+      <h1>Comparatif planning<br>Ancien site vs Nouveau prototype</h1>
+      <p><strong>Objectif :</strong> montrer des résultats déjà actifs, rassurer sur la sécurité, puis préparer une revue SI constructive.</p>
       <div class="card">
-        <p><span class="tag ok">Contexte</span> Le nouveau planning conserve les usages essentiels et corrige les points devenus fragiles avec l’obsolescence de l’ancien site.</p>
-        <p><span class="tag">Important</span> Le prototype est fonctionnel aujourd’hui, et ses réglages restent adaptables selon les retours de la Direction et du SI.</p>
+        <p><span class="tag ok">Contexte</span> Le nouveau planning conserve l’essentiel et corrige les fragilités apparues avec l’obsolescence de l’ancien site.</p>
+        <p><span class="tag">Important</span> Le prototype est déjà fonctionnel, et ses réglages restent adaptables selon les retours Direction/SI.</p>
       </div>
       <p class="small">Navigation : <span class="kbd">←</span> <span class="kbd">→</span> ou <span class="kbd">Espace</span></p>
     </section>
@@ -148,7 +148,7 @@
       <div class="kicker">1 · Vue d’ensemble</div>
       <h2>Architecture générale du planning</h2>
       <div class="card">
-        <p><strong>Schéma simple :</strong> navigateur utilisateur → application planning (web) → services backend sécurisés.</p>
+        <p><strong>Schéma simple :</strong> navigateur utilisateur → application planning → services backend sécurisés.</p>
       </div>
       <table>
         <thead>
@@ -172,7 +172,7 @@
           </tr>
         </tbody>
       </table>
-      <p class="small">Point clé : l’application est la référence métier ; les agendas Google servent principalement à la consultation.</p>
+      <p class="small">Point clé : la référence métier reste l’application ; Google sert à la consultation.</p>
     </section>
 
     <section class="slide">
@@ -198,7 +198,7 @@
           </ul>
         </div>
       </div>
-      <p class="small">Ces choix peuvent évoluer après revue SI, sans remettre en cause les besoins fonctionnels.</p>
+      <p class="small">Ces choix sont présentés pour validation SI ; les besoins métier restent stables.</p>
     </section>
 
     <section class="slide">
@@ -216,7 +216,7 @@
           <tr>
             <td>Site web planning (front)</td>
             <td>GitHub Pages</td>
-            <td>Site statique public (HTTPS), facile à démontrer.</td>
+            <td>Site statique public (HTTPS), pratique pour la démonstration.</td>
           </tr>
           <tr>
             <td>Base de données</td>
@@ -231,7 +231,7 @@
         </tbody>
       </table>
       <div class="card">
-        <p><span class="tag warn">Suite logique</span> Le SI pourra valider ou ajuster cette cible d’hébergement selon ses standards de sécurité, RGPD et exploitation.</p>
+        <p><span class="tag warn">Suite logique</span> Le SI validera ou ajustera cette cible selon ses standards sécurité, RGPD et exploitation.</p>
       </div>
     </section>
 
@@ -283,7 +283,7 @@
           </ul>
         </div>
       </div>
-      <p class="small">Impact direction : amélioration de la clarté organisationnelle sans alourdir l’usage.</p>
+      <p class="small">Impact direction : plus de clarté pédagogique sans complexifier l’usage.</p>
     </section>
 
     <section class="slide">
@@ -295,21 +295,22 @@
         <p><span class="tag ok">Actif maintenant</span> Contrôle de suppression pour limiter les abus</p>
         <p><span class="tag ok">Actif maintenant</span> Anti-chevauchement des réservations</p>
       </div>
-      <p>Dans l’ancien site, ces règles étaient surtout orales : le nouveau les rend applicables, contrôlables et ajustables.</p>
+      <p>Avant, ces règles étaient surtout orales. Le nouveau les rend concrètes, contrôlables et ajustables.</p>
     </section>
 
     <section class="slide">
       <div class="kicker">6 · Sécurité (message simple)</div>
       <h2>Pourquoi le nouveau socle est plus sûr</h2>
       <ul>
-        <li><strong>HTTPS :</strong> présent avant et maintenant (base commune).</li>
-        <li><strong>Authentification modernisée :</strong> session/token, moins de logique “maison” fragile.</li>
-        <li><strong>Droits renforcés :</strong> contrôles côté serveur + politiques d’accès en base.</li>
-        <li><strong>Administration encadrée :</strong> rôles, suspension, gestion mots de passe.</li>
-        <li><strong>Gouvernance :</strong> versionning GitHub, suivi des corrections/évolutions.</li>
+        <li><strong>HTTPS :</strong> maintenu (comme avant).</li>
+        <li><strong>Authentification modernisée :</strong> session/token, moins de logique fragile “faite maison”.</li>
+        <li><strong>Droits renforcés :</strong> contrôles côté serveur et côté base.</li>
+        <li><strong>Administration encadrée :</strong> rôles, suspension, gestion des mots de passe.</li>
+        <li><strong>Gouvernance :</strong> versionning GitHub et suivi clair des corrections/évolutions.</li>
       </ul>
       <div class="card">
         <p><span class="tag warn">À cadrer avec le SI</span> Politique de mot de passe, seuils d’échec, durées de session, conformité RGPD détaillée.</p>
+        <p><span class="tag ok">Message clé</span> Le niveau de risque est déjà réduit par rapport à l’ancien socle, avec une base saine pour un cadrage SI complet.</p>
       </div>
     </section>
 
@@ -358,11 +359,11 @@
       <h2>Message proposé pour validation de principe</h2>
       <div class="card">
         <p><strong>Le nouveau planning est opérationnel, plus lisible, plus pilotable et plus sécurisé que l’ancien.</strong></p>
-        <p>Il constitue une base sérieuse pour une validation SI (sécurité, RGPD, exploitation), avec une gouvernance claire des évolutions.</p>
+        <p>Il offre une base sérieuse pour la revue SI (sécurité, RGPD, exploitation) avec une gouvernance claire des évolutions.</p>
       </div>
       <ul>
         <li>Décision attendue : accord de principe pour passage en revue SI.</li>
-        <li>Étape suivante : cadrage technique et sécurité avec le SI.</li>
+        <li>Étape suivante : cadrage technique/sécurité avec le SI.</li>
       </ul>
     </section>
   </main>
