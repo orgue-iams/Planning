@@ -145,6 +145,97 @@
     </section>
 
     <section class="slide">
+      <div class="kicker">1 · Vue d’ensemble</div>
+      <h2>Architecture générale du planning</h2>
+      <div class="card">
+        <p><strong>Schéma simple :</strong> navigateur utilisateur → application planning (web) → services backend sécurisés.</p>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Bloc</th>
+            <th>Rôle</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Application web (planning)</td>
+            <td>Interface utilisateur : consultation, réservation, édition, administration.</td>
+          </tr>
+          <tr>
+            <td>Backend Supabase</td>
+            <td>Authentification, base de données, contrôle d’accès, fonctions serveur.</td>
+          </tr>
+          <tr>
+            <td>Intégrations externes</td>
+            <td>Consultation via Google Calendar et notifications e-mail selon paramétrage.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="small">Point clé : l’application est la référence métier ; les agendas Google servent principalement à la consultation.</p>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">2 · Technologies</div>
+      <h2>Technos mises en oeuvre (prototype actuel)</h2>
+      <div class="cols">
+        <div class="card">
+          <h3>Front</h3>
+          <ul>
+            <li>HTML / CSS / JavaScript (modules ES)</li>
+            <li>FullCalendar (grille planning)</li>
+            <li>Tailwind CSS + DaisyUI (interface)</li>
+            <li>PWA (usage web fluide, mobile/tablette)</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Backend</h3>
+          <ul>
+            <li>Supabase Auth (sessions et rôles)</li>
+            <li>PostgreSQL (données planning et profils)</li>
+            <li>Edge Functions Supabase (logique serveur)</li>
+            <li>Intégrations : Google Calendar, e-mail</li>
+          </ul>
+        </div>
+      </div>
+      <p class="small">Ces choix peuvent évoluer après revue SI, sans remettre en cause les besoins fonctionnels.</p>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">3 · Hébergement actuel</div>
+      <h2>Où tourne le prototype aujourd’hui</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Composant</th>
+            <th>Hébergement actuel</th>
+            <th>Remarque</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Site web planning (front)</td>
+            <td>GitHub Pages</td>
+            <td>Site statique public (HTTPS), facile à démontrer.</td>
+          </tr>
+          <tr>
+            <td>Base de données</td>
+            <td>Supabase (PostgreSQL)</td>
+            <td>Données utilisateurs, créneaux, règles, statistiques.</td>
+          </tr>
+          <tr>
+            <td>Fonctions serveur</td>
+            <td>Supabase Edge Functions</td>
+            <td>Actions administratives, logique métier, intégrations.</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="card">
+        <p><span class="tag warn">Suite logique</span> Le SI pourra valider ou ajuster cette cible d’hébergement selon ses standards de sécurité, RGPD et exploitation.</p>
+      </div>
+    </section>
+
+    <section class="slide">
       <div class="kicker">1 · Fonctionnel utilisateur</div>
       <h2>Ce qui change au quotidien</h2>
       <div class="cols">
@@ -170,7 +261,7 @@
     </section>
 
     <section class="slide">
-      <div class="kicker">2 · Pédagogie</div>
+      <div class="kicker">4 · Pédagogie</div>
       <h2>Cours, élèves inscrits, semaines A/B</h2>
       <div class="cols">
         <div class="card">
@@ -196,7 +287,7 @@
     </section>
 
     <section class="slide">
-      <div class="kicker">3 · Équité de réservation</div>
+      <div class="kicker">5 · Équité de réservation</div>
       <h2>Règles actives et paramétrables</h2>
       <div class="card">
         <p><span class="tag ok">Actif maintenant</span> Quota élève travail perso : <strong>2h/semaine</strong> (modifiable)</p>
@@ -208,7 +299,7 @@
     </section>
 
     <section class="slide">
-      <div class="kicker">4 · Sécurité (message simple)</div>
+      <div class="kicker">6 · Sécurité (message simple)</div>
       <h2>Pourquoi le nouveau socle est plus sûr</h2>
       <ul>
         <li><strong>HTTPS :</strong> présent avant et maintenant (base commune).</li>
@@ -223,7 +314,7 @@
     </section>
 
     <section class="slide">
-      <div class="kicker">5 · Statistiques</div>
+      <div class="kicker">7 · Statistiques</div>
       <h2>Indicateurs déjà en place</h2>
       <ul>
         <li>Occupation globale sur période : Cours / Travail perso (élèves) / Concert / Total</li>
@@ -235,7 +326,7 @@
     </section>
 
     <section class="slide">
-      <div class="kicker">6 · Comparatif synthétique</div>
+      <div class="kicker">8 · Comparatif synthétique</div>
       <h2>Tableau à étoiles (lecture direction)</h2>
       <table>
         <thead>
@@ -263,7 +354,7 @@
     </section>
 
     <section class="slide">
-      <div class="kicker">7 · Conclusion</div>
+      <div class="kicker">9 · Conclusion</div>
       <h2>Message proposé pour validation de principe</h2>
       <div class="card">
         <p><strong>Le nouveau planning est opérationnel, plus lisible, plus pilotable et plus sécurisé que l’ancien.</strong></p>
@@ -278,7 +369,7 @@
 
   <div class="footer">
     <div>Présentation Direction — Planning Orgue IAMS</div>
-    <div id="counter">1 / 8</div>
+    <div id="counter">1 / 11</div>
   </div>
 
   <script>
