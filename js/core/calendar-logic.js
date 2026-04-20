@@ -823,6 +823,16 @@ export async function maybeNotifySlotOwnerAfterThirdPartyEdit({
     }
 }
 
+/**
+ * Variante non bloquante : utilisée après une action déjà validée en base.
+ * L'échec mail ne doit jamais annuler le changement métier.
+ */
+function notifySlotOwnerAfterThirdPartyEditNonBlocking(payload) {
+    void maybeNotifySlotOwnerAfterThirdPartyEdit(payload).catch((err) => {
+        console.warn('[slot-notify] non bloquant', err);
+    });
+}
+
 // --- 1. RENDU VISUEL DES CRÉNEAUX ---
 export function getEventContent(arg, currentUser) {
     const isMirror = Boolean(arg.isMirror);
@@ -1072,6 +1082,22 @@ function isSameFcEvent(a, b) {
     return Boolean(ida && idb && ida === idb);
 }
 
+function isSameLogicalEventByOwnerAndRange(a, b) {
+    if (!a || !b) return false;
+    const ra = eventRangeForOverlap(a);
+    const rb = eventRangeForOverlap(b);
+    if (!ra || !rb) return false;
+    if (ra.start.getTime() !== rb.start.getTime()) return false;
+    if (ra.end.getTime() !== rb.end.getTime()) return false;
+    const oa = String(a.extendedProps?.owner || '')
+        .trim()
+        .toLowerCase();
+    const ob = String(b.extendedProps?.owner || '')
+        .trim()
+        .toLowerCase();
+    return Boolean(oa && ob && oa === ob);
+}
+
 /**
  * Premier événement qui chevauche [rangeStart, rangeEnd), hors `excludeEvent` (édition).
  * @returns {import('@fullcalendar/core').EventApi | null}
@@ -1087,6 +1113,7 @@ function findOverlappingCalendarEvent(calendar, rangeStart, rangeEnd, excludeEve
     }
     for (const ev of calendar.getEvents()) {
         if (isSameFcEvent(ev, resolvedExclude)) continue;
+        if (resolvedExclude && isSameLogicalEventByOwnerAndRange(ev, resolvedExclude)) continue;
         const r = eventRangeForOverlap(ev);
         if (!r) continue;
         if (calendarRangesOverlap(rs, re, r.start, r.end)) {
@@ -1156,7 +1183,7 @@ export async function handleEventResize(info, currentUser) {
         (previousStartIso !== newStartIso || previousEndIso !== newEndIso);
 
     if (oi.ownerEmail && oi.ownerEmail !== me && rangeChanged) {
-        await maybeNotifySlotOwnerAfterThirdPartyEdit({
+        notifySlotOwnerAfterThirdPartyEditNonBlocking({
             currentUser,
             action: 'modified',
             targetOwnerEmail: oi.ownerEmail,
@@ -2431,7 +2458,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         const actor = String(currentUser.email).trim().toLowerCase();
         const ownerLower = String(ownerForBridge || '').trim().toLowerCase();
         if (changed && ownerLower && ownerLower !== actor) {
-            await maybeNotifySlotOwnerAfterThirdPartyEdit({
+            notifySlotOwnerAfterThirdPartyEditNonBlocking({
                 currentUser,
                 action: 'modified',
                 targetOwnerEmail: oiBeforeRefetch.ownerEmail,
@@ -2548,7 +2575,7 @@ export async function deleteReservation(calendar, currentEventRef, currentUser) 
     showToast('Créneau supprimé.');
     const meDb = String(currentUser.email).trim().toLowerCase();
     if (oi.ownerEmail && oi.ownerEmail !== meDb && startDel && endDel) {
-        await maybeNotifySlotOwnerAfterThirdPartyEdit({
+        notifySlotOwnerAfterThirdPartyEditNonBlocking({
             currentUser,
             action: 'deleted',
             targetOwnerEmail: oi.ownerEmail,

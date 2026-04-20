@@ -277,7 +277,7 @@ function initCalendarAndRevealUi() {
                 info.oldEvent?.start &&
                 info.oldEvent?.end
             ) {
-                await maybeNotifySlotOwnerAfterThirdPartyEdit({
+                void maybeNotifySlotOwnerAfterThirdPartyEdit({
                     currentUser,
                     action: 'moved',
                     targetOwnerEmail: oi.ownerEmail,
@@ -287,7 +287,7 @@ function initCalendarAndRevealUi() {
                     slotEnd: info.event.end,
                     previousStartIso: info.oldEvent.start.toISOString(),
                     previousEndIso: info.oldEvent.end.toISOString()
-                });
+                }).catch((err) => console.warn('[slot-notify] drop non bloquant', err));
             }
             await refetchPlanningGrid(info.view.calendar);
         },
