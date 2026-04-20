@@ -215,18 +215,21 @@ type GCalEvent = {
 /**
  * Couleur d’événement Google Calendar (palette fixe 1–11).
  * Aligné sur les teintes saturées de la grille Planning (events.css --slot-bg-strong) :
- * - Fermeture : orange (#ff790a → proche Tangerine)
+ * - Fermeture : orange (#ff790a → Tangerine)
  * - Cours : jaune (#f6e36a → Banana)
- * - Travail (reservation) : toujours bleu « Autres » (#68a1e5 → Peacock), sans distinguer propriétaire
+ * - Travail perso : vert « mien » (#61c71b) / bleu « autres » (#68a1e5)
  * @see https://developers.google.com/calendar/api/v3/reference/events#resource
  */
-function googleColorIdForPlanningType(type: string): string {
+function googleColorIdForPlanningType(type: string, opts?: { reservationMine?: boolean }): string {
     const t = String(type || '').trim().toLowerCase();
     if (t === 'fermeture') return '6'; /* Tangerine — orange */
     if (t === 'cours' || t === 'maintenance') return '5'; /* Banana — jaune */
     if (t === 'concert') return '11'; /* Dark purple — Concert */
     if (t === 'autre') return '1'; /* Lavender — Autre */
-    /* reservation et défaut = Travail → bleu (même teinte côté app que « travail other / Autres ») */
+    if (t === 'reservation' || t === 'travail perso') {
+        return opts?.reservationMine ? '2' /* Sage — vert */ : '7'; /* Peacock — bleu */
+    }
+    /* défaut = Travail « autres » */
     return '7'; /* Peacock — bleu */
 }
 
@@ -304,10 +307,19 @@ type EventPayloadInput = {
 /** Sur l’événement « miroir » du calendrier pool, ne pas recopier planningPoolEventId (réservé au principal). */
 function googleEventResource(
     ev: EventPayloadInput,
-    opts?: { forPoolCalendarWrite?: boolean }
+    opts?: { forPoolCalendarWrite?: boolean; actorEmail?: string }
 ): Record<string, unknown> {
     const tz = timeZone();
-    const colorId = googleColorIdForPlanningType(ev.type);
+    const ownerNorm = String(ev.owner || '')
+        .trim()
+        .toLowerCase();
+    const actorNorm = String(opts?.actorEmail || '')
+        .trim()
+        .toLowerCase();
+    const reservationMine = opts?.forPoolCalendarWrite
+        ? Boolean(ownerNorm)
+        : Boolean(ownerNorm && actorNorm && ownerNorm === actorNorm);
+    const colorId = googleColorIdForPlanningType(ev.type, { reservationMine });
     const insc = (ev.inscrits ?? '').trim();
     const descParts = [`type=${ev.type || ''}`, `owner=${ev.owner || ''}`];
     if (insc) descParts.push(`inscrits=${insc}`);
@@ -1176,7 +1188,9 @@ async function upsertSingleCalendarEvent(
         ...(poolLinkForMain ? { poolGoogleEventId: poolLinkForMain } : {}),
         ...(planningIdMerge ? { planningEventId: planningIdMerge } : {})
     };
-    const payload = googleEventResource(mainPayloadBase);
+    const payload = googleEventResource(mainPayloadBase, {
+        actorEmail: calendarUser.email || ''
+    });
 
     let mainOutId = '';
     const mainCandidates = dedupeGoogleEventIds([mid.main, ev.googleEventId]);
