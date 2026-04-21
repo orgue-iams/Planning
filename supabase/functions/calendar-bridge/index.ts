@@ -213,11 +213,8 @@ type GCalEvent = {
 };
 
 /**
- * Couleur d’événement Google Calendar (palette fixe 1–11).
- * Aligné sur les teintes saturées de la grille Planning (events.css --slot-bg-strong) :
- * - Fermeture : orange (#ff790a → Tangerine)
- * - Cours : jaune (#f6e36a → Banana)
- * - Travail perso : vert « mien » (#61c71b) / bleu « autres » (#68a1e5)
+ * Couleurs Google Calendar pour refléter fidèlement la grille Planning.
+ * On renseigne à la fois colorId (palette Google) et couleurs RGB explicites.
  * @see https://developers.google.com/calendar/api/v3/reference/events#resource
  */
 function googleColorIdForPlanningType(type: string, opts?: { reservationMine?: boolean }): string {
@@ -231,6 +228,24 @@ function googleColorIdForPlanningType(type: string, opts?: { reservationMine?: b
     }
     /* défaut = Travail « autres » */
     return '7'; /* Peacock — bleu */
+}
+
+function googleRgbColorsForPlanningType(
+    type: string,
+    opts?: { reservationMine?: boolean }
+): { backgroundColor: string; foregroundColor: string } {
+    const t = String(type || '').trim().toLowerCase();
+    if (t === 'fermeture') return { backgroundColor: '#ff790a', foregroundColor: '#1e293b' };
+    if (t === 'cours' || t === 'maintenance')
+        return { backgroundColor: '#f6e36a', foregroundColor: '#3f3f1e' };
+    if (t === 'concert') return { backgroundColor: '#a855f7', foregroundColor: '#ffffff' };
+    if (t === 'autre') return { backgroundColor: '#0d9488', foregroundColor: '#ffffff' };
+    if (t === 'reservation' || t === 'travail perso') {
+        return opts?.reservationMine
+            ? { backgroundColor: '#61c71b', foregroundColor: '#0f2910' }
+            : { backgroundColor: '#68a1e5', foregroundColor: '#0f172a' };
+    }
+    return { backgroundColor: '#68a1e5', foregroundColor: '#0f172a' };
 }
 
 function parseInscritsCsv(raw: string | undefined): string[] {
@@ -320,6 +335,9 @@ function googleEventResource(
         ? Boolean(ownerNorm)
         : Boolean(ownerNorm && actorNorm && ownerNorm === actorNorm);
     const colorId = googleColorIdForPlanningType(ev.type, { reservationMine });
+    const { backgroundColor, foregroundColor } = googleRgbColorsForPlanningType(ev.type, {
+        reservationMine
+    });
     const insc = (ev.inscrits ?? '').trim();
     const descParts = [`type=${ev.type || ''}`, `owner=${ev.owner || ''}`];
     if (insc) descParts.push(`inscrits=${insc}`);
@@ -340,6 +358,8 @@ function googleEventResource(
         start: { dateTime: ev.start, timeZone: tz },
         end: { dateTime: ev.end, timeZone: tz },
         colorId,
+        backgroundColor,
+        foregroundColor,
         extendedProperties: { private: priv }
     };
 }
@@ -516,10 +536,14 @@ async function createOrUpdatePoolCalendarEventCopy(
 
     for (const poolOutId of candidates) {
         const encEid = encodeURIComponent(poolOutId);
-        const patchP = await gcalFetch(accessToken, `/calendars/${encPool}/events/${encEid}`, {
+        const patchP = await gcalFetch(
+            accessToken,
+            `/calendars/${encPool}/events/${encEid}?colorRgbFormat=true`,
+            {
             method: 'PATCH',
             body: JSON.stringify(poolPayload)
-        });
+            }
+        );
         if (patchP.ok) return poolOutId;
         if (patchP.status !== 404) {
             console.error('[calendar-bridge] PATCH miroir pool:', patchP.status, await patchP.text());
@@ -532,10 +556,14 @@ async function createOrUpdatePoolCalendarEventCopy(
         if (found.length > 0) {
             const keep = found[0];
             const encKeep = encodeURIComponent(keep);
-            const patchK = await gcalFetch(accessToken, `/calendars/${encPool}/events/${encKeep}`, {
-                method: 'PATCH',
-                body: JSON.stringify(poolPayload)
-            });
+            const patchK = await gcalFetch(
+                accessToken,
+                `/calendars/${encPool}/events/${encKeep}?colorRgbFormat=true`,
+                {
+                    method: 'PATCH',
+                    body: JSON.stringify(poolPayload)
+                }
+            );
             if (patchK.ok) {
                 for (const extra of found.slice(1)) {
                     await deleteGoogleCalendarEventQuiet(accessToken, poolCal, extra);
@@ -550,7 +578,7 @@ async function createOrUpdatePoolCalendarEventCopy(
         }
     }
 
-    const insP = await gcalFetch(accessToken, `/calendars/${encPool}/events`, {
+    const insP = await gcalFetch(accessToken, `/calendars/${encPool}/events?colorRgbFormat=true`, {
         method: 'POST',
         body: JSON.stringify(poolPayload)
     });
@@ -1199,10 +1227,14 @@ async function upsertSingleCalendarEvent(
         const encEid = encodeURIComponent(tryGid);
         for (let attempt = 0; attempt < 5; attempt++) {
             if (attempt > 0) await sleepMs(Math.min(2500, 350 * 2 ** (attempt - 1)));
-            const patch = await gcalFetch(accessToken, `/calendars/${calIdUpsert}/events/${encEid}`, {
-                method: 'PATCH',
-                body: JSON.stringify(payload)
-            });
+            const patch = await gcalFetch(
+                accessToken,
+                `/calendars/${calIdUpsert}/events/${encEid}?colorRgbFormat=true`,
+                {
+                    method: 'PATCH',
+                    body: JSON.stringify(payload)
+                }
+            );
             const pt = await patch.text();
             if (patch.ok) {
                 mainOutId = tryGid;
@@ -1226,10 +1258,14 @@ async function upsertSingleCalendarEvent(
             const encEid = encodeURIComponent(keep);
             for (let attempt = 0; attempt < 5; attempt++) {
                 if (attempt > 0) await sleepMs(Math.min(2500, 350 * 2 ** (attempt - 1)));
-                const patch = await gcalFetch(accessToken, `/calendars/${calIdUpsert}/events/${encEid}`, {
-                    method: 'PATCH',
-                    body: JSON.stringify(payload)
-                });
+                const patch = await gcalFetch(
+                    accessToken,
+                    `/calendars/${calIdUpsert}/events/${encEid}?colorRgbFormat=true`,
+                    {
+                        method: 'PATCH',
+                        body: JSON.stringify(payload)
+                    }
+                );
                 const pt = await patch.text();
                 if (patch.ok) {
                     mainOutId = keep;
@@ -1251,10 +1287,14 @@ async function upsertSingleCalendarEvent(
         let lastErr = '';
         for (let attempt = 0; attempt < 6; attempt++) {
             if (attempt > 0) await sleepMs(Math.min(3000, 400 * 2 ** (attempt - 1)));
-            const ins = await gcalFetch(accessToken, `/calendars/${calIdUpsert}/events`, {
+            const ins = await gcalFetch(
+                accessToken,
+                `/calendars/${calIdUpsert}/events?colorRgbFormat=true`,
+                {
                 method: 'POST',
                 body: JSON.stringify(payload)
-            });
+                }
+            );
             const raw = await ins.text();
             let created: GCalEvent & { error?: { message?: string } };
             try {
