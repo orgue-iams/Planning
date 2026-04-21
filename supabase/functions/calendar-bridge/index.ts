@@ -207,6 +207,9 @@ type GCalEvent = {
     id?: string;
     summary?: string;
     description?: string;
+    colorId?: string;
+    backgroundColor?: string;
+    foregroundColor?: string;
     start?: { dateTime?: string; date?: string; timeZone?: string };
     end?: { dateTime?: string; date?: string; timeZone?: string };
     extendedProperties?: { private?: Record<string, string> };
@@ -254,6 +257,26 @@ function parseInscritsCsv(raw: string | undefined): string[] {
         .split(/[,;]/)
         .map((s) => s.trim().toLowerCase())
         .filter(Boolean);
+}
+
+function parseGoogleEventColorMeta(raw: string): {
+    colorId: string;
+    backgroundColor: string;
+    foregroundColor: string;
+} {
+    if (!raw || !raw.trim()) {
+        return { colorId: '', backgroundColor: '', foregroundColor: '' };
+    }
+    try {
+        const j = JSON.parse(raw) as GCalEvent;
+        return {
+            colorId: String(j.colorId || '').trim(),
+            backgroundColor: String(j.backgroundColor || '').trim(),
+            foregroundColor: String(j.foregroundColor || '').trim()
+        };
+    } catch {
+        return { colorId: '', backgroundColor: '', foregroundColor: '' };
+    }
 }
 
 function parseDescription(desc: string | undefined): { type: string; owner: string; inscrits: string[] } {
@@ -530,6 +553,9 @@ async function createOrUpdatePoolCalendarEventCopy(
         { ...baseFields, poolGoogleEventId: undefined },
         { forPoolCalendarWrite: true }
     );
+    const reqColorId = String(poolPayload.colorId ?? '').trim();
+    const reqBg = String(poolPayload.backgroundColor ?? '').trim();
+    const reqFg = String(poolPayload.foregroundColor ?? '').trim();
     const encPool = encodeURIComponent(poolCal);
     const candidates = dedupeGoogleEventIds(poolEventIdCandidates);
     const planningUuid = String(baseFields.planningEventId ?? '').trim();
@@ -565,6 +591,14 @@ async function createOrUpdatePoolCalendarEventCopy(
                 }
             );
             if (patchK.ok) {
+                const eff = parseGoogleEventColorMeta(await patchK.text());
+                console.log('[calendar-bridge] pool PATCH color', {
+                    planningEventId: String(baseFields.planningEventId || '').trim(),
+                    type: String(baseFields.type || '').trim(),
+                    owner: String(baseFields.owner || '').trim().toLowerCase(),
+                    requested: { colorId: reqColorId, backgroundColor: reqBg, foregroundColor: reqFg },
+                    effective: eff
+                });
                 for (const extra of found.slice(1)) {
                     await deleteGoogleCalendarEventQuiet(accessToken, poolCal, extra);
                 }
@@ -596,6 +630,17 @@ async function createOrUpdatePoolCalendarEventCopy(
         console.error('[calendar-bridge] POST miroir pool:', msg + hint404 + hintWriter);
         return '';
     }
+    console.log('[calendar-bridge] pool POST color', {
+        planningEventId: String(baseFields.planningEventId || '').trim(),
+        type: String(baseFields.type || '').trim(),
+        owner: String(baseFields.owner || '').trim().toLowerCase(),
+        requested: { colorId: reqColorId, backgroundColor: reqBg, foregroundColor: reqFg },
+        effective: {
+            colorId: String(created.colorId || '').trim(),
+            backgroundColor: String(created.backgroundColor || '').trim(),
+            foregroundColor: String(created.foregroundColor || '').trim()
+        }
+    });
     return created.id || '';
 }
 
@@ -1219,6 +1264,9 @@ async function upsertSingleCalendarEvent(
     const payload = googleEventResource(mainPayloadBase, {
         actorEmail: calendarUser.email || ''
     });
+    const reqColorId = String(payload.colorId ?? '').trim();
+    const reqBg = String(payload.backgroundColor ?? '').trim();
+    const reqFg = String(payload.foregroundColor ?? '').trim();
 
     let mainOutId = '';
     const mainCandidates = dedupeGoogleEventIds([mid.main, ev.googleEventId]);
@@ -1237,6 +1285,15 @@ async function upsertSingleCalendarEvent(
             );
             const pt = await patch.text();
             if (patch.ok) {
+                const eff = parseGoogleEventColorMeta(pt);
+                console.log('[calendar-bridge] main PATCH color', {
+                    planningEventId: planningIdMerge,
+                    googleEventId: tryGid,
+                    type: String(ev.type || '').trim(),
+                    owner: String(ev.owner || '').trim().toLowerCase(),
+                    requested: { colorId: reqColorId, backgroundColor: reqBg, foregroundColor: reqFg },
+                    effective: eff
+                });
                 mainOutId = tryGid;
                 break;
             }
@@ -1268,6 +1325,15 @@ async function upsertSingleCalendarEvent(
                 );
                 const pt = await patch.text();
                 if (patch.ok) {
+                    const eff = parseGoogleEventColorMeta(pt);
+                    console.log('[calendar-bridge] main PATCH(found) color', {
+                        planningEventId: planningIdMerge,
+                        googleEventId: keep,
+                        type: String(ev.type || '').trim(),
+                        owner: String(ev.owner || '').trim().toLowerCase(),
+                        requested: { colorId: reqColorId, backgroundColor: reqBg, foregroundColor: reqFg },
+                        effective: eff
+                    });
                     mainOutId = keep;
                     break;
                 }
@@ -1303,6 +1369,18 @@ async function upsertSingleCalendarEvent(
                 throw new Error(raw.slice(0, 200) || `POST HTTP ${ins.status}`);
             }
             if (ins.ok && created.id) {
+                console.log('[calendar-bridge] main POST color', {
+                    planningEventId: planningIdMerge,
+                    googleEventId: String(created.id || '').trim(),
+                    type: String(ev.type || '').trim(),
+                    owner: String(ev.owner || '').trim().toLowerCase(),
+                    requested: { colorId: reqColorId, backgroundColor: reqBg, foregroundColor: reqFg },
+                    effective: {
+                        colorId: String(created.colorId || '').trim(),
+                        backgroundColor: String(created.backgroundColor || '').trim(),
+                        foregroundColor: String(created.foregroundColor || '').trim()
+                    }
+                });
                 mainOutId = created.id || '';
                 break;
             }
