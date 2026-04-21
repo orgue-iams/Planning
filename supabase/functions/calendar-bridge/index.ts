@@ -1007,18 +1007,55 @@ async function persistPlanningMirrorRows(
             updated_at: now
         });
     }
-    const res = await fetch(`${base}/rest/v1/planning_event_google_mirror?on_conflict=event_id,target`, {
-        method: 'POST',
-        headers: {
-            apikey: serviceKey,
-            Authorization: `Bearer ${serviceKey}`,
-            'Content-Type': 'application/json',
-            Prefer: 'resolution=merge-duplicates'
-        },
-        body: JSON.stringify(rows)
-    });
-    if (!res.ok) {
-        console.error('[calendar-bridge] persist planning_event_google_mirror (main/owner):', res.status, await res.text());
+    const upsertMirrorRow = async (
+        row: Record<string, unknown>,
+        filterQuery: string,
+        logTag: string
+    ): Promise<void> => {
+        const patchRes = await fetch(`${base}/rest/v1/planning_event_google_mirror?${filterQuery}`, {
+            method: 'PATCH',
+            headers: {
+                apikey: serviceKey,
+                Authorization: `Bearer ${serviceKey}`,
+                'Content-Type': 'application/json',
+                Prefer: 'return=representation'
+            },
+            body: JSON.stringify(row)
+        });
+        if (!patchRes.ok) {
+            console.error(`[calendar-bridge] mirror PATCH (${logTag}):`, patchRes.status, await patchRes.text());
+            return;
+        }
+        const patchText = await patchRes.text();
+        let updatedCount = 0;
+        try {
+            const parsed = JSON.parse(patchText) as unknown;
+            if (Array.isArray(parsed)) updatedCount = parsed.length;
+        } catch {
+            /* réponse vide/non JSON : considérer 0 ligne modifiée */
+        }
+        if (updatedCount > 0) return;
+
+        const insRes = await fetch(`${base}/rest/v1/planning_event_google_mirror`, {
+            method: 'POST',
+            headers: {
+                apikey: serviceKey,
+                Authorization: `Bearer ${serviceKey}`,
+                'Content-Type': 'application/json',
+                Prefer: 'return=minimal'
+            },
+            body: JSON.stringify(row)
+        });
+        if (!insRes.ok) {
+            console.error(`[calendar-bridge] mirror INSERT (${logTag}):`, insRes.status, await insRes.text());
+        }
+    };
+
+    for (const row of rows) {
+        const target = String(row.target || '').trim();
+        if (!target) continue;
+        const filter = `event_id=eq.${encodeURIComponent(planningEventId)}&target=eq.${encodeURIComponent(target)}`;
+        await upsertMirrorRow(row, filter, `main-owner:${target}`);
     }
 
     if (poolStudents.length === 0) return;
@@ -1034,21 +1071,14 @@ async function persistPlanningMirrorRows(
         sync_generation: gen,
         updated_at: now
     }));
-    const resSt = await fetch(
-        `${base}/rest/v1/planning_event_google_mirror?on_conflict=event_id,target_user_id`,
-        {
-            method: 'POST',
-            headers: {
-                apikey: serviceKey,
-                Authorization: `Bearer ${serviceKey}`,
-                'Content-Type': 'application/json',
-                Prefer: 'resolution=merge-duplicates'
-            },
-            body: JSON.stringify(studentRows)
-        }
-    );
-    if (!resSt.ok) {
-        console.error('[calendar-bridge] persist planning_event_google_mirror (élèves):', resSt.status, await resSt.text());
+    for (const row of studentRows) {
+        const targetUserId = String(row.target_user_id || '').trim();
+        if (!targetUserId) continue;
+        const filter =
+            `event_id=eq.${encodeURIComponent(planningEventId)}` +
+            `&target=eq.${encodeURIComponent('pool_student')}` +
+            `&target_user_id=eq.${encodeURIComponent(targetUserId)}`;
+        await upsertMirrorRow(row, filter, `pool-student:${targetUserId.slice(0, 8)}`);
     }
 }
 
