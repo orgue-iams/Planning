@@ -1326,6 +1326,22 @@ function floorEndToSelectGrid(start, rawEnd, hardCap) {
 
 const DEFAULT_NEW_RESERVATION_DURATION_MS = 60 * 60 * 1000;
 
+function generateUuidV4() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    const bytes = new Uint8Array(16);
+    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+        crypto.getRandomValues(bytes);
+    } else {
+        for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+    }
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const h = [...bytes].map((b) => b.toString(16).padStart(2, '0'));
+    return `${h.slice(0, 4).join('')}-${h.slice(4, 6).join('')}-${h.slice(6, 8).join('')}-${h.slice(8, 10).join('')}-${h.slice(10, 16).join('')}`;
+}
+
 /**
  * Clic grille / mois (8h) : fin proposée = 1h si libre, sinon réduction jusqu’au prochain créneau occupé,
  * arrondie à la grille des listes déroulantes.
@@ -1470,12 +1486,33 @@ async function finalizeQuickReservationInBackground(
     rangeStart,
     rangeEnd,
     title,
-    motif
+    motif,
+    quickCanonicalId = ''
 ) {
     try {
         if (!isBackendAuthConfigured()) {
             if (created) created.remove();
             showToast('Connexion requise pour enregistrer.', 'error');
+            return;
+        }
+        const liveStart =
+            created?.start instanceof Date && Number.isFinite(created.start.getTime())
+                ? new Date(created.start)
+                : rangeStart;
+        const liveEnd =
+            created?.end instanceof Date && Number.isFinite(created.end.getTime())
+                ? new Date(created.end)
+                : rangeEnd;
+        const liveTitle = String(created?.title || '').trim() || String(title || '').trim() || 'Créneau';
+        const liveCanonicalId = String(
+            created?.extendedProps?.planningCanonicalId || quickCanonicalId || ''
+        ).trim();
+        const liveDbSlotType = created
+            ? planningDbSlotTypeForEventUpdate(created)
+            : motifToPlanningDbSlotType(motif);
+        if (!liveStart || !liveEnd || liveEnd.getTime() <= liveStart.getTime()) {
+            if (created) created.remove();
+            showToast('Plage horaire invalide pour enregistrement.', 'error');
             return;
         }
         const ownerUid = await planningUserIdForEmail(currentUser.email);
@@ -1484,30 +1521,34 @@ async function finalizeQuickReservationInBackground(
             showToast('Compte indisponible pour enregistrer.', 'error');
             return;
         }
-        const dbSlotType = motifToPlanningDbSlotType(motif);
-        if (normalizeRole(currentUser.role) === 'eleve' && dbSlotType === 'travail perso') {
+        if (normalizeRole(currentUser.role) === 'eleve' && liveDbSlotType === 'travail perso') {
             await fetchOrganSchoolSettings();
             const setQ = getOrganSchoolSettingsCached();
-            if (eleveBookingTooFarInFuture(setQ, rangeStart)) {
+            if (eleveBookingTooFarInFuture(setQ, liveStart)) {
                 if (created) created.remove();
                 showToast('Cette plage dépasse la fenêtre de réservation autorisée pour les élèves.', 'error');
                 return;
             }
-            const addMin = Math.max(1, Math.round((rangeEnd.getTime() - rangeStart.getTime()) / 60000));
-            const cap = await eleveTravailWouldExceedWeeklyCap(setQ, addMin, mondayStartLocal(rangeStart), null);
+            const addMin = Math.max(1, Math.round((liveEnd.getTime() - liveStart.getTime()) / 60000));
+            const cap = await eleveTravailWouldExceedWeeklyCap(
+                setQ,
+                addMin,
+                mondayStartLocal(liveStart),
+                liveCanonicalId || null
+            );
             if (!cap.ok) {
                 if (created) created.remove();
                 showToast(cap.message || 'Quota hebdomadaire dépassé.', 'error');
                 return;
             }
         }
-        const bridgeType = planningDbSlotTypeToBridgeType(dbSlotType);
+        const bridgeType = planningDbSlotTypeToBridgeType(liveDbSlotType);
         const ur = await upsertPlanningEventRow({
-            id: null,
-            startIso: rangeStart.toISOString(),
-            endIso: rangeEnd.toISOString(),
-            title,
-            dbSlotType,
+            id: liveCanonicalId || null,
+            startIso: liveStart.toISOString(),
+            endIso: liveEnd.toISOString(),
+            title: liveTitle,
+            dbSlotType: liveDbSlotType,
             ownerEmail: currentUser.email,
             ownerUserId: ownerUid
         });
@@ -1517,7 +1558,7 @@ async function finalizeQuickReservationInBackground(
             return;
         }
         let quickInscritsCsv = '';
-        if (dbSlotType === 'cours') {
+        if (liveDbSlotType === 'cours') {
             let qIds = [];
             if (normalizeRole(currentUser.role) === 'eleve') {
                 const selfId = await planningUserIdForEmail(currentUser.email);
@@ -1540,9 +1581,9 @@ async function finalizeQuickReservationInBackground(
         const syncDb = await trySyncGoogleCalendar([
             {
                 planningEventId: ur.id,
-                title,
-                start: rangeStart.toISOString(),
-                end: rangeEnd.toISOString(),
+                title: liveTitle,
+                start: liveStart.toISOString(),
+                end: liveEnd.toISOString(),
                 type: bridgeType,
                 owner: currentUser.email,
                 ...(quickInscritsCsv ? { inscrits: quickInscritsCsv } : {})
@@ -1552,6 +1593,11 @@ async function finalizeQuickReservationInBackground(
             if (created) created.remove();
             showToast(`Synchronisation agenda : ${syncDb.error || 'échec'}`, 'error');
             return;
+        }
+        if (created && typeof created.setExtendedProp === 'function') {
+            created.setExtendedProp('planningCanonicalId', ur.id);
+            created.setExtendedProp('planningDbSlotType', liveDbSlotType);
+            created.setExtendedProp('planningRowSource', 'supabase');
         }
         if (created) created.remove();
         await refetchPlanningGrid(calendar);
@@ -1569,13 +1615,16 @@ async function finalizeQuickReservationInBackground(
  */
 function commitQuickReservation(calendar, currentUser, rangeStart, rangeEnd, title, motif) {
     let created = /** @type {import('@fullcalendar/core').EventApi | null} */ (null);
+    const quickCanonicalId = generateUuidV4();
     const add = () => {
         created = calendar.addEvent({
+            id: quickCanonicalId,
             title,
             start: rangeStart,
             end: rangeEnd,
             allDay: false,
             extendedProps: {
+                planningCanonicalId: quickCanonicalId,
                 owner: currentUser.email,
                 ownerDisplayName: currentUser.name || currentUser.email.split('@')[0],
                 ownerRole: normalizeRole(currentUser.role) || 'eleve',
@@ -1598,7 +1647,8 @@ function commitQuickReservation(calendar, currentUser, rangeStart, rangeEnd, tit
         rangeStart,
         rangeEnd,
         title,
-        motif
+        motif,
+        quickCanonicalId
     );
 }
 
