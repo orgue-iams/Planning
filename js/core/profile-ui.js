@@ -211,11 +211,6 @@ async function fillProfileModal(user) {
     const isEleve = String(user.role).toLowerCase() === 'eleve';
     document.getElementById('profile-cours-section')?.classList.toggle('hidden', !isEleve);
 
-    const hint = document.getElementById('profile-cours-hint');
-    if (hint) {
-        hint.classList.toggle('hidden', !isEleve);
-    }
-
     const { mainGoogleCalendarId, mainGoogleCalendarLabel } = getPlanningConfig();
     const mainUrl = googleCalendarEmbedUrl(mainGoogleCalendarId);
     const rowMain = document.getElementById('profile-row-main-cal');

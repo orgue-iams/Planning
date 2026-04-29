@@ -1,4 +1,4 @@
-import { getAccessToken } from './auth-logic.js';
+import { getAccessToken, notifySessionInvalid } from './auth-logic.js';
 import {
     getPlanningConfig,
     getSupabaseClient,
@@ -54,7 +54,10 @@ export async function planningAdminInvoke(action, payload = {}) {
         throw new Error('Supabase non configuré');
     }
     let token = await getAccessToken();
-    if (!token) throw new Error('Session expirée');
+    if (!token) {
+        notifySessionInvalid('Session expirée. Reconnectez-vous.');
+        throw new Error('Session expirée');
+    }
 
     const doFetch = async (bearer) =>
         fetch(`${supabaseUrl}/functions/v1/planning-admin`, {
@@ -75,18 +78,26 @@ export async function planningAdminInvoke(action, payload = {}) {
             const hasRefresh = Boolean(sess?.session?.refresh_token);
             if (!hasRefresh) {
                 await clearCorruptedLocalAuthSession();
-                throw new Error('Session administrateur expirée. Reconnectez-vous.');
+                const msg = 'Session administrateur expirée. Reconnectez-vous.';
+                notifySessionInvalid(msg);
+                throw new Error(msg);
             }
             const { error: refErr } = await supabase.auth.refreshSession();
             if (refErr) {
                 if (isInvalidRefreshTokenError(refErr)) {
                     await clearCorruptedLocalAuthSession();
-                    throw new Error('Session administrateur expirée. Reconnectez-vous.');
+                    const msg = 'Session administrateur expirée. Reconnectez-vous.';
+                    notifySessionInvalid(msg);
+                    throw new Error(msg);
                 }
                 throw new Error(refErr.message || 'Impossible de rafraîchir la session.');
             }
             token = await getAccessToken();
-            if (!token) throw new Error('Session administrateur expirée. Reconnectez-vous.');
+            if (!token) {
+                const msg = 'Session administrateur expirée. Reconnectez-vous.';
+                notifySessionInvalid(msg);
+                throw new Error(msg);
+            }
             res = await doFetch(token);
         }
     }
@@ -94,6 +105,10 @@ export async function planningAdminInvoke(action, payload = {}) {
     const text = await res.text();
     const json = parseFunctionsBody(text);
     if (!res.ok) {
+        if (res.status === 401) {
+            const msg = errorMessageFromResponse(res, text, json) || 'Session expirée. Reconnectez-vous.';
+            notifySessionInvalid(msg);
+        }
         throw new Error(errorMessageFromResponse(res, text, json));
     }
     return json;

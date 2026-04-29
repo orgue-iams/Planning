@@ -61,6 +61,8 @@ export function mapPlanningDbRowToFcEvent(row, _currentUser) {
         extendedProps: {
             planningRowSource: 'supabase',
             planningCanonicalId: row.id,
+            createdByUserId: String(row.created_by_user_id ?? row.owner_user_id ?? '').trim(),
+            lastModifiedByUserId: String(row.last_modified_by_user_id ?? row.owner_user_id ?? '').trim(),
             /** Colonne `slot_type` brute (déplacement / redimensionnement sans ambiguïté concert/autre). */
             planningDbSlotType: row.slot_type,
             ownerUserId: String(row.owner_user_id ?? '').trim(),

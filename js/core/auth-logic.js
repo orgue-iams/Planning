@@ -412,15 +412,93 @@ export function checkUrlToken() {
 }
 
 let logoutImpl = () => window.location.reload();
+/** Distinguish déconnexion explicite vs expiration (onAuth SIGNED_OUT). */
+let _userInitiatedLogout = false;
+let _sessionLostHandler = /** @type {((message: string) => void) | null} */ (null);
 
 export function setLogoutHandler(fn) {
     if (typeof fn === 'function') logoutImpl = fn;
 }
 
+export function setSessionLostHandler(fn) {
+    _sessionLostHandler = typeof fn === 'function' ? fn : null;
+}
+
+/**
+ * Perte de session détectée par appel (403/JWT) : toast + retour login si le handler app est enregistré.
+ */
+export function notifySessionInvalid(message) {
+    const m =
+        String(message || '').trim() || 'Votre session a expiré. Reconnectez-vous.';
+    if (_sessionLostHandler) {
+        _sessionLostHandler(m);
+    } else {
+        showToast(m, 'error', 10000);
+    }
+}
+
+/**
+ * Vrai si le texte d’erreur ressemble à une fin de session côté Supabase/GoTrue.
+ */
+export function isLikelySessionErrorMessage(err) {
+    const s = String(
+        (err && typeof err === 'object' && 'message' in err
+            ? /** @type {{ message?: string }} */ (err).message
+            : err) || ''
+    ).toLowerCase();
+    if (!s) return false;
+    return (
+        s.includes('jwt') ||
+        s.includes('expired') ||
+        s.includes('session') ||
+        s.includes('reconnect') ||
+        s.includes('unauthorized') ||
+        s.includes('not authorized') ||
+        s.includes('login required') ||
+        s.includes('invalid') && s.includes('token')
+    );
+}
+
+function markUserInitiatedLogout() {
+    _userInitiatedLogout = true;
+}
+
+/** À appeler une fois au boot (après setSessionLostHandler) si Supabase est configuré. */
+export function initSessionLostListeners() {
+    if (typeof window === 'undefined' || !isBackendAuthConfigured()) return;
+    const sb = getSupabaseClient();
+    if (!sb) return;
+    const {
+        data: { subscription }
+    } = sb.auth.onAuthStateChange((event) => {
+        if (event === 'SIGNED_OUT' && !_userInitiatedLogout && _sessionLostHandler) {
+            _sessionLostHandler('Votre session a expiré. Vous avez été déconnecté.');
+        }
+        if (event === 'SIGNED_IN') {
+            _userInitiatedLogout = false;
+        }
+    });
+    if (typeof subscription !== 'undefined') {
+        window.addEventListener(
+            'pagehide',
+            () => {
+                try {
+                    subscription.unsubscribe();
+                } catch {
+                    /* */
+                }
+            },
+            { once: true }
+        );
+    }
+}
+
 export async function logout() {
+    markUserInitiatedLogout();
     clearSupabasePasswordRecoveryPending();
     if (isBackendAuthConfigured()) {
         await getSupabaseClient()?.auth.signOut();
     }
+    _userInitiatedLogout = false;
     logoutImpl();
 }

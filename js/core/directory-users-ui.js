@@ -2,6 +2,7 @@
  * Annuaire interne : tous les rôles connectés — RPC planning_directory_users.
  */
 import { getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
+import { isLikelySessionErrorMessage, notifySessionInvalid } from './auth-logic.js';
 import { getPlanningSessionUser } from './session-user.js';
 import { showToast } from '../utils/toast.js';
 import { isAdmin } from './auth-logic.js';
@@ -108,7 +109,13 @@ async function loadDirectoryIntoModal() {
 
     const { data, error } = await sb.rpc('planning_directory_users');
     if (error) {
-        if (status) status.textContent = error.message || 'Erreur annuaire.';
+        if (isLikelySessionErrorMessage(error)) {
+            notifySessionInvalid(
+                String(error.message || 'Session expirée. Reconnectez-vous.')
+            );
+        } else if (status) {
+            status.textContent = error.message || 'Erreur annuaire.';
+        }
         renderDirectorySection(secAdm, 'Administrateurs', []);
         renderDirectorySection(secProf, 'Professeurs', []);
         renderDirectorySection(secElv, 'Élèves', []);
@@ -213,7 +220,10 @@ async function loadAdminDirectoryIntoModal() {
         renderAdminDirectoryTable(users);
         if (status) status.textContent = `${users.length} utilisateur(s).`;
     } catch (e) {
-        if (status) status.textContent = String(e?.message || e || 'Erreur chargement comptes.');
+        /* planningAdminInvoke notifie déjà en cas de session expirée. */
+        if (!isLikelySessionErrorMessage(e) && status) {
+            status.textContent = String(e?.message || e || 'Erreur chargement comptes.');
+        }
     }
 }
 

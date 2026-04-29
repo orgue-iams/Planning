@@ -33,6 +33,8 @@ import {
     updatePassword,
     setPasswordModalMode,
     setLogoutHandler,
+    setSessionLostHandler,
+    initSessionLostListeners,
     tryRestoreSession,
     getRememberMePreference,
     isPrivilegedUser,
@@ -289,6 +291,7 @@ function initCalendarAndRevealUi() {
                     action: 'moved',
                     targetOwnerEmail: oi.ownerEmail,
                     targetOwnerDisplayName: oi.ownerName,
+                    targetOwnerUserId: oi.ownerUserId,
                     slotTitle: info.event.title,
                     slotStart: info.event.start,
                     slotEnd: info.event.end,
@@ -494,6 +497,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         buildLegend.title = CACHE_NAME;
     }
     setLogoutHandler(performLogout);
+    setSessionLostHandler((msg) => {
+        showToast(String(msg || 'Votre session a expiré. Reconnectez-vous.'), 'error', 10000);
+        performLogout();
+    });
+    initSessionLostListeners();
     wireDialogBackdropClose();
     wireHeaderHoverMenus();
     document.getElementById('modal_reservation')?.addEventListener('cancel', (e) => {

@@ -231,6 +231,7 @@ export function initAdminUsersUi(currentUser) {
         void saveEditedUser().catch((e) => showToast(e?.message || String(e), 'error'))
     );
     document.getElementById('admin-user-edit-close')?.addEventListener('click', tryCloseEditModal);
+    document.getElementById('admin-user-modal-cancel')?.addEventListener('click', tryCloseEditModal);
 
     const dlg = document.getElementById('modal_users_admin');
     dlg?.addEventListener('cancel', (e) => {

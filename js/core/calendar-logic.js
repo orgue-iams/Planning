@@ -796,15 +796,30 @@ export async function syncReservationEventToGoogle(calendarEvent, calendar = nul
     return { ok: true, skipped: false };
 }
 
+function buildSlotOwnerNotifyLabel(targetEmail, resolvedDisplayName) {
+    const em = String(targetEmail || '')
+        .trim()
+        .toLowerCase();
+    if (!em) return 'le destinataire';
+    const name = String(resolvedDisplayName || '').trim();
+    const at = em.indexOf('@');
+    const local = at > 0 ? em.slice(0, at) : em;
+    const n = name.toLowerCase();
+    const looksLikeTrivial = !name || n === em || n === local;
+    return looksLikeTrivial ? em : `${name} (${em})`;
+}
+
 /**
  * E-mail au propriétaire du créneau si un autre utilisateur vient d’agir ; toast pour l’acteur.
  * @param {'deleted'|'moved'|'modified'} action
+ * @param {string} [params.targetOwnerUserId] — pour libellé « Prénom Nom » via `planning_profiles_label_for_ids`
  */
 export async function maybeNotifySlotOwnerAfterThirdPartyEdit({
     currentUser,
     action,
     targetOwnerEmail,
     targetOwnerDisplayName,
+    targetOwnerUserId,
     slotTitle,
     slotStart,
     slotEnd,
@@ -819,8 +834,15 @@ export async function maybeNotifySlotOwnerAfterThirdPartyEdit({
         .trim()
         .toLowerCase();
     if (!actor || !owner || owner === actor) return;
-    const ownerDisplay = String(targetOwnerDisplayName ?? '').trim();
-    const ownerLabel = ownerDisplay && ownerDisplay !== owner ? `${ownerDisplay} (${owner})` : owner;
+
+    let display = String(targetOwnerDisplayName ?? '').trim();
+    const uid = String(targetOwnerUserId ?? '').trim();
+    if (uid) {
+        const m = await fetchProfileLabelsForUserIds([uid]);
+        const lab = m.get(uid);
+        if (lab) display = String(lab).trim() || display;
+    }
+    const ownerLabel = buildSlotOwnerNotifyLabel(owner, display);
 
     let r;
     try {
@@ -849,9 +871,21 @@ export async function maybeNotifySlotOwnerAfterThirdPartyEdit({
     if (r.emailSent) {
         showToast(`Un e-mail a été envoyé à ${label} pour l’informer du changement.`, 'success');
     } else {
+        const errCode = String(r.error || '');
+        const detail = String(/** @type {{ detail?: string }} */ (r).detail || '').trim();
+        let hint = '';
+        if (errCode === 'EMAIL_NOT_CONFIGURED') {
+            hint = ' Messagerie non configurée côté serveur (Brevo / expéditeur).';
+        } else if (errCode === 'BREVO_SEND_FAILED' && detail) {
+            hint = ` Voir console (F12) pour le détail Brevo.`;
+            console.warn('[slot-notify] Brevo', detail);
+        } else if (errCode && errCode !== 'undefined') {
+            hint = ` (${errCode})`;
+        }
         showToast(
-            `L’e-mail n’a pas pu être envoyé à ${label}. Merci de le ou la prévenir directement.`,
-            'error'
+            `L’e-mail n’a pas pu être envoyé à ${label}.${hint} Merci de le ou la prévenir directement.`,
+            'error',
+            12000
         );
     }
 }
@@ -1221,6 +1255,7 @@ export async function handleEventResize(info, currentUser) {
             action: 'modified',
             targetOwnerEmail: oi.ownerEmail,
             targetOwnerDisplayName: oi.ownerName,
+            targetOwnerUserId: oi.ownerUserId,
             slotTitle: info.event.title,
             slotStart: info.event.start,
             slotEnd: info.event.end,
@@ -1450,18 +1485,26 @@ function syncReservationModalTimeOptions(calendar, eventRef) {
     setSelectOptions(endEl, endChoices, preferredEnd);
 }
 
-function formatWeekdayFrFromYmd(ymd) {
+/** Jour + date courte (ligne unique dans le sélecteur de jour). */
+function formatReservationDateLineFr(ymd) {
     const d = new Date(`${ymd}T12:00:00`);
     if (Number.isNaN(d.getTime())) return '';
-    return d.toLocaleDateString('fr-FR', { weekday: 'long' });
+    const s = d.toLocaleDateString('fr-FR', {
+        weekday: 'long',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    });
+    if (!s) return '';
+    return s.replace(/^([a-zà-ÿéèê])/, (ch) => ch.toUpperCase());
 }
 
 function syncReservationDateWeekdayLabel() {
     const dateEl = document.getElementById('event-date-start');
-    const weekdayEl = document.getElementById('event-date-weekday');
-    if (!(dateEl instanceof HTMLInputElement) || !(weekdayEl instanceof HTMLElement)) return;
+    const displayEl = document.getElementById('event-date-display');
+    if (!(dateEl instanceof HTMLInputElement) || !(displayEl instanceof HTMLElement)) return;
     const ymd = String(dateEl.value || '').trim();
-    weekdayEl.textContent = ymd ? formatWeekdayFrFromYmd(ymd) : '';
+    displayEl.textContent = ymd ? formatReservationDateLineFr(ymd) : '';
 }
 
 /**
@@ -1567,8 +1610,19 @@ function reservationDisplayTitleForCurrentUser(currentUser) {
     return e || 'Réservation';
 }
 
-/** En-tête modale édition : libellé selon le rôle (élève = nom seul, sans « Réservé par »). */
-function applyReservationEditorShellForRole(currentUser, event, ownerLabelOverride = '', actorLabelOverride = '') {
+/**
+ * En-tête modale édition : libellé selon le rôle.
+ * @param {string} [createdByLabelOverride] — libellé `planning_profiles_label_for_ids` (créateur)
+ * @param {string} [lastModifiedByLabelOverride] — idem (dernier modificateur)
+ */
+function applyReservationEditorShellForRole(
+    currentUser,
+    event,
+    ownerLabelOverride = '',
+    actorLabelOverride = '',
+    createdByLabelOverride = '',
+    lastModifiedByLabelOverride = ''
+) {
     const editorOwnerEl = document.getElementById('event-editor-owner');
     const wrapTitle = document.getElementById('wrap-reservation-title');
     const wrapMotif = document.getElementById('wrap-reservation-motif');
@@ -1576,10 +1630,28 @@ function applyReservationEditorShellForRole(currentUser, event, ownerLabelOverri
     const sel = document.getElementById('event-motif-select');
     const r = normalizeRole(currentUser?.role);
     const owner = ownerInfoFromEvent(event, currentUser);
+    const slotOwnerName = (ownerLabelOverride || owner.ownerName || 'Inconnu').trim();
+    const createdId = String(event?.extendedProps?.createdByUserId || '').trim();
+    const modifiedId = String(event?.extendedProps?.lastModifiedByUserId || '').trim();
 
     if (r === 'eleve') {
         if (editorOwnerEl) {
-            editorOwnerEl.textContent = reservationDisplayTitleForCurrentUser(currentUser);
+            if (event) {
+                const hasActorColumns = Boolean(createdId);
+                if (hasActorColumns) {
+                    const a = (createdByLabelOverride || '—').trim();
+                    let t = `Créé par ${a}.`;
+                    if (modifiedId && createdId && modifiedId !== createdId) {
+                        const b = (lastModifiedByLabelOverride || '—').trim();
+                        t += ` Créneau modifié par ${b}.`;
+                    }
+                    editorOwnerEl.textContent = t;
+                } else {
+                    editorOwnerEl.textContent = `Créneau pour ${slotOwnerName}.`;
+                }
+            } else {
+                editorOwnerEl.textContent = reservationDisplayTitleForCurrentUser(currentUser);
+            }
             editorOwnerEl.classList.remove('hidden');
         }
         wrapTitle?.classList.add('hidden');
@@ -1929,14 +2001,26 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     const owner = ownerInfoFromEvent(event, currentUser);
     let ownerLabelOverride = '';
     let actorLabelOverride = '';
+    let createdByLabelOverride = '';
+    let lastModifiedByLabelOverride = '';
     if (event) {
-        const ids = [owner.ownerUserId, currentUser?.id].filter(Boolean);
+        const cId = String(event.extendedProps?.createdByUserId || '').trim();
+        const mId = String(event.extendedProps?.lastModifiedByUserId || '').trim();
+        const ids = [owner.ownerUserId, currentUser?.id, cId, mId]
+            .filter(Boolean)
+            .filter((v, i, a) => a.indexOf(v) === i);
         const labelMap = await fetchProfileLabelsForUserIds(ids);
         if (owner.ownerUserId && labelMap.has(owner.ownerUserId)) {
             ownerLabelOverride = String(labelMap.get(owner.ownerUserId) || '');
         }
         if (currentUser?.id && labelMap.has(currentUser.id)) {
             actorLabelOverride = String(labelMap.get(currentUser.id) || '');
+        }
+        if (cId && labelMap.has(cId)) {
+            createdByLabelOverride = String(labelMap.get(cId) || '');
+        }
+        if (mId && labelMap.has(mId)) {
+            lastModifiedByLabelOverride = String(labelMap.get(mId) || '');
         }
     }
 
@@ -1960,7 +2044,9 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         currentUser,
         event || null,
         ownerLabelOverride,
-        actorLabelOverride
+        actorLabelOverride,
+        createdByLabelOverride,
+        lastModifiedByLabelOverride
     );
 
     if (reservationModalTimeSyncAbort) reservationModalTimeSyncAbort.abort();
@@ -2672,6 +2758,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
                 action: 'modified',
                 targetOwnerEmail: oiBeforeRefetch.ownerEmail,
                 targetOwnerDisplayName: oiBeforeRefetch.ownerName,
+                targetOwnerUserId: oiBeforeRefetch.ownerUserId,
                 slotTitle: title,
                 slotStart: startIso,
                 slotEnd: endIso,
@@ -2794,6 +2881,7 @@ export async function deleteReservation(calendar, currentEventRef, currentUser) 
             action: 'deleted',
             targetOwnerEmail: oi.ownerEmail,
             targetOwnerDisplayName: oi.ownerName,
+            targetOwnerUserId: oi.ownerUserId,
             slotTitle: titleDel,
             slotStart: startDel,
             slotEnd: endDel,
