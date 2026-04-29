@@ -41,6 +41,7 @@ import { openCourseStudentsPicker } from './course-students-picker.js';
 import { openCoursSeriesScopeModal } from './cours-series-scope-ui.js';
 
 let saveReservationInFlight = false;
+let deleteReservationInFlight = false;
 
 /** Rechargement grille (RPC Postgres) : invalide le cache mémoire puis refetch FullCalendar. */
 export async function refetchPlanningGrid(calendar) {
@@ -1252,11 +1253,10 @@ function getReservationTextTitleFromForm(currentUser, motif) {
 }
 
 /** Fin de journée affichable (slotMaxTime) le même jour calendaire que `start`. */
-function slotMaxInstantOnSameDay(start, calendar) {
-    const raw = calendar?.getOption?.('slotMaxTime');
-    let h = 22;
-    let m = 0;
-    let s = 0;
+function readCalendarClockOption(raw, fallback) {
+    let h = fallback.h;
+    let m = fallback.m;
+    let s = fallback.s;
     if (typeof raw === 'string') {
         const match = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
         if (match) {
@@ -1269,9 +1269,180 @@ function slotMaxInstantOnSameDay(start, calendar) {
         m = /** @type {{ minutes?: number }} */ (raw).minutes ?? 0;
         s = /** @type {{ seconds?: number }} */ (raw).seconds ?? 0;
     }
+    return { h, m, s };
+}
+
+function slotMinInstantOnSameDay(start, calendar) {
+    const raw = calendar?.getOption?.('slotMinTime');
+    const { h, m, s } = readCalendarClockOption(raw, { h: 8, m: 0, s: 0 });
     const d = new Date(start);
     d.setHours(h, m, s, 0);
     return d;
+}
+
+/** Fin de journée affichable (slotMaxTime) le même jour calendaire que `start`. */
+function slotMaxInstantOnSameDay(start, calendar) {
+    const raw = calendar?.getOption?.('slotMaxTime');
+    const { h, m, s } = readCalendarClockOption(raw, { h: 22, m: 0, s: 0 });
+    const d = new Date(start);
+    d.setHours(h, m, s, 0);
+    return d;
+}
+
+function ymdToNoonDate(dateYmd) {
+    const d = new Date(`${dateYmd}T12:00:00`);
+    return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function addSelectOptions(selectEl, values, preferredValue = '') {
+    if (!(selectEl instanceof HTMLSelectElement)) return '';
+    const unique = [...new Set(values.map((v) => String(v || '').trim()).filter(Boolean))];
+    selectEl.replaceChildren();
+    for (const v of unique) {
+        selectEl.add(new Option(v, v));
+    }
+    if (unique.length === 0) {
+        selectEl.add(new Option('--', '', true, true));
+        return '';
+    }
+    const pref = String(preferredValue || '').trim();
+    if (pref && unique.includes(pref)) {
+        selectEl.value = pref;
+        return pref;
+    }
+    selectEl.value = unique[0];
+    return selectEl.value;
+}
+
+function mergeBusyRanges(ranges) {
+    if (!Array.isArray(ranges) || ranges.length === 0) return [];
+    const sorted = [...ranges].sort((a, b) => a.startMs - b.startMs);
+    const merged = [sorted[0]];
+    for (let i = 1; i < sorted.length; i++) {
+        const cur = sorted[i];
+        const last = merged[merged.length - 1];
+        if (cur.startMs <= last.endMs) {
+            last.endMs = Math.max(last.endMs, cur.endMs);
+            continue;
+        }
+        merged.push({ ...cur });
+    }
+    return merged;
+}
+
+function busyRangesForDay(calendar, dayNoon, excludeEvent = null) {
+    if (!calendar?.getEvents) return [];
+    const dayStart = new Date(dayNoon);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+    const dayStartMs = dayStart.getTime();
+    const dayEndMs = dayEnd.getTime();
+    const resolvedExclude =
+        excludeEvent != null ? resolveLivePlanningEventRef(calendar, excludeEvent) : null;
+    const ranges = [];
+    for (const ev of calendar.getEvents()) {
+        if (ev.display === 'background') continue;
+        if (resolvedExclude && isSameFcEvent(ev, resolvedExclude)) continue;
+        if (resolvedExclude && isSameLogicalEventByOwnerAndRange(ev, resolvedExclude)) continue;
+        const r = eventRangeForOverlap(ev);
+        if (!r) continue;
+        const s = r.start.getTime();
+        const e = r.end.getTime();
+        if (e <= dayStartMs || s >= dayEndMs) continue;
+        ranges.push({ startMs: Math.max(dayStartMs, s), endMs: Math.min(dayEndMs, e) });
+    }
+    return mergeBusyRanges(ranges);
+}
+
+function overlapsBusyRanges(startMs, endMs, busyRanges) {
+    for (const r of busyRanges) {
+        if (startMs < r.endMs && r.startMs < endMs) return true;
+    }
+    return false;
+}
+
+function availableStartTimesForDay(dateYmd, calendar, excludeEvent = null) {
+    const dayNoon = ymdToNoonDate(dateYmd);
+    if (!dayNoon) return [];
+    const slotMinMs = slotMinInstantOnSameDay(dayNoon, calendar).getTime();
+    const slotMaxMs = slotMaxInstantOnSameDay(dayNoon, calendar).getTime();
+    const busy = busyRangesForDay(calendar, dayNoon, excludeEvent);
+    const out = [];
+    const stepMs = 30 * 60 * 1000;
+    for (let t = slotMinMs; t + stepMs <= slotMaxMs; t += stepMs) {
+        if (overlapsBusyRanges(t, t + stepMs, busy)) continue;
+        out.push(formatTimeForSelect(new Date(t)));
+    }
+    return out;
+}
+
+function nextBusyStartAfter(startMs, busyRanges, slotMaxMs) {
+    let boundary = slotMaxMs;
+    for (const r of busyRanges) {
+        if (r.endMs <= startMs) continue;
+        if (r.startMs <= startMs && r.endMs > startMs) return startMs;
+        if (r.startMs > startMs) {
+            boundary = Math.min(boundary, r.startMs);
+            break;
+        }
+    }
+    return boundary;
+}
+
+function availableEndTimesForDayFromStart(dateYmd, startHHmm, calendar, excludeEvent = null) {
+    if (!startHHmm) return [];
+    const dayNoon = ymdToNoonDate(dateYmd);
+    if (!dayNoon) return [];
+    const start = new Date(`${dateYmd}T${startHHmm}:00`);
+    if (Number.isNaN(start.getTime())) return [];
+    const slotMaxMs = slotMaxInstantOnSameDay(dayNoon, calendar).getTime();
+    const busy = busyRangesForDay(calendar, dayNoon, excludeEvent);
+    const startMs = start.getTime();
+    const hardBoundary = nextBusyStartAfter(startMs, busy, slotMaxMs);
+    const stepMs = 30 * 60 * 1000;
+    const out = [];
+    for (let t = startMs + stepMs; t <= hardBoundary; t += stepMs) {
+        out.push(formatTimeForSelect(new Date(t)));
+    }
+    return out;
+}
+
+function bindReservationTimeSelects({
+    dateInput,
+    startSelect,
+    endSelect,
+    calendar = null,
+    excludeEvent = null,
+    preferredStart = '',
+    preferredEnd = ''
+}) {
+    if (
+        !(dateInput instanceof HTMLInputElement) ||
+        !(startSelect instanceof HTMLSelectElement) ||
+        !(endSelect instanceof HTMLSelectElement)
+    ) {
+        return;
+    }
+
+    const refreshAll = (startPref = '', endPref = '') => {
+        const ymd = String(dateInput.value || '').trim();
+        const starts = availableStartTimesForDay(ymd, calendar, excludeEvent);
+        const pickedStart = addSelectOptions(startSelect, starts, startPref || startSelect.value);
+        const ends = availableEndTimesForDayFromStart(ymd, pickedStart, calendar, excludeEvent);
+        addSelectOptions(endSelect, ends, endPref || endSelect.value);
+    };
+
+    const refreshEndOnly = (endPref = '') => {
+        const ymd = String(dateInput.value || '').trim();
+        const startVal = String(startSelect.value || '').trim();
+        const ends = availableEndTimesForDayFromStart(ymd, startVal, calendar, excludeEvent);
+        addSelectOptions(endSelect, ends, endPref || endSelect.value);
+    };
+
+    refreshAll(preferredStart, preferredEnd);
+    dateInput.onchange = () => refreshAll('', '');
+    startSelect.onchange = () => refreshEndOnly('');
 }
 
 /**
@@ -1666,7 +1837,7 @@ export async function quickCreateFromSelection(calendar, selectInfo, currentUser
         selectInfo.view.type.startsWith('list') ||
         selectInfo.allDay
     ) {
-        await openModal(selectInfo.start, selectInfo.end, null, currentUser);
+        await openModal(selectInfo.start, selectInfo.end, null, currentUser, calendar);
         calendar.unselect();
         return;
     }
@@ -1716,7 +1887,7 @@ export async function quickCreateFromDateClick(calendar, clickDate, currentUser,
         return;
     }
     if (viewType.startsWith('list')) {
-        await openModal(new Date(clickDate), null, null, currentUser);
+        await openModal(new Date(clickDate), null, null, currentUser, calendar);
         return;
     }
 
@@ -1752,8 +1923,8 @@ export async function quickCreateFromDateClick(calendar, clickDate, currentUser,
 
 // --- 2. GESTION DE LA MODALE RÉSERVATION ---
 /**
- * @param {import('@fullcalendar/core').Calendar | null} [calendarForClip] — si défini (ex. clic sur la grille),
- * propose une fin cohérente avec les occupations (max 1 h si tout est libre).
+ * @param {import('@fullcalendar/core').Calendar | null} [calendarForClip] — si défini,
+ * sert au clipping des horaires et aux listes dynamiques début/fin selon disponibilités.
  */
 export async function openModal(start, end, event, currentUser, calendarForClip = null) {
     const modal = document.getElementById('modal_reservation');
@@ -1882,9 +2053,25 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         }
     }
 
-    document.getElementById('event-date-start').value = dateStartVal;
-    setSelectTime(startEl, startInstant);
-    setSelectTime(endEl, endInstant);
+    const dateStartEl = document.getElementById('event-date-start');
+    if (dateStartEl instanceof HTMLInputElement) {
+        dateStartEl.value = dateStartVal;
+    }
+    const availabilityCalendar =
+        calendarForClip && typeof calendarForClip.getEvents === 'function' ? calendarForClip : null;
+    const availabilityExcludeEvent =
+        availabilityCalendar && event
+            ? resolveLivePlanningEventRef(availabilityCalendar, event)
+            : null;
+    bindReservationTimeSelects({
+        dateInput: dateStartEl,
+        startSelect: startEl,
+        endSelect: endEl,
+        calendar: availabilityCalendar,
+        excludeEvent: availabilityExcludeEvent,
+        preferredStart: formatTimeForSelect(startInstant),
+        preferredEnd: formatTimeForSelect(endInstant)
+    });
 
     const rpStart = document.getElementById('event-recur-period-start');
     const rpEnd = document.getElementById('event-recur-period-end');
@@ -2160,6 +2347,10 @@ async function trySyncGoogleCalendar(eventsPayload) {
 
 // --- 3. ACTIONS (SAUVEGARDE / SUPPRESSION) ---
 export async function saveReservation(calendar, currentUser, currentEventRef) {
+    if (deleteReservationInFlight) {
+        showToast('Suppression en cours. Veuillez patienter.', 'error');
+        return;
+    }
     if (!currentUser || !currentUser.email) {
         showToast('Veuillez vous connecter pour enregistrer une réservation.', 'error');
         return;
@@ -2175,7 +2366,9 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     if (saveReservationInFlight) return;
     saveReservationInFlight = true;
     const saveBtn = document.getElementById('btn-save');
+    const deleteBtn = document.getElementById('btn-delete');
     if (saveBtn instanceof HTMLButtonElement) saveBtn.disabled = true;
+    if (deleteBtn instanceof HTMLButtonElement) deleteBtn.disabled = true;
 
     try {
     if (!isBackendAuthConfigured()) {
@@ -2540,10 +2733,16 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     } finally {
         saveReservationInFlight = false;
         if (saveBtn instanceof HTMLButtonElement) saveBtn.disabled = false;
+        if (deleteBtn instanceof HTMLButtonElement) deleteBtn.disabled = false;
     }
 }
 
 export async function deleteReservation(calendar, currentEventRef, currentUser) {
+    if (saveReservationInFlight) {
+        showToast('Enregistrement en cours. Réessayez après la fin.', 'error');
+        return;
+    }
+    if (deleteReservationInFlight) return;
     if (!currentEventRef || !confirm('Supprimer cette réservation ?')) return;
     if (!currentUser?.email) {
         showToast('Connectez-vous pour supprimer.', 'error');
@@ -2561,19 +2760,6 @@ export async function deleteReservation(calendar, currentEventRef, currentUser) 
 
     const dbTypeDel = planningDbSlotTypeForEventUpdate(liveRef);
     const rMeDel = normalizeRole(currentUser.role);
-    /** @type {Record<string, unknown> | null} */
-    let settingsForVoid = null;
-    if (rMeDel === 'eleve' && dbTypeDel === 'travail perso') {
-        await fetchOrganSchoolSettings();
-        settingsForVoid = getOrganSchoolSettingsCached();
-        if (settingsForVoid?.eleve_forbid_delete_after_slot_start && liveRef.start) {
-            const st = liveRef.start instanceof Date ? liveRef.start : new Date(liveRef.start);
-            if (Number.isFinite(st.getTime()) && Date.now() >= st.getTime()) {
-                showToast('Vous ne pouvez plus annuler ce créneau une fois l’heure de début passée.', 'error');
-                return;
-            }
-        }
-    }
 
     const oi = ownerInfoFromEvent(liveRef, currentUser);
     const titleDel = String(liveRef.title || '').trim() || 'Créneau';
@@ -2589,53 +2775,83 @@ export async function deleteReservation(calendar, currentEventRef, currentUser) 
         showToast('Créneau sans identifiant base : suppression impossible.', 'error');
         return;
     }
-    const tokenDb = await getAccessToken();
-    const targets = await fetchPlanningMirrorTargetsForDelete(canonicalId);
-    if (tokenDb && targets.length > 0) {
-        for (const t of targets) {
-            const rDel = await bridgeDeleteEvent(tokenDb, t.googleEventId, t.calendarId);
-            if (!rDel.ok && !rDel.skipped) {
-                showToast(`Suppression agenda : ${rDel.error || 'échec'}`, 'error');
-                return;
+
+    deleteReservationInFlight = true;
+    const saveBtn = document.getElementById('btn-save');
+    const deleteBtn = document.getElementById('btn-delete');
+    if (saveBtn instanceof HTMLButtonElement) saveBtn.disabled = true;
+    if (deleteBtn instanceof HTMLButtonElement) deleteBtn.disabled = true;
+    document.getElementById('modal_reservation')?.close();
+
+    try {
+        /** @type {Record<string, unknown> | null} */
+        let settingsForVoid = null;
+        if (rMeDel === 'eleve' && dbTypeDel === 'travail perso') {
+            await fetchOrganSchoolSettings();
+            settingsForVoid = getOrganSchoolSettingsCached();
+            if (settingsForVoid?.eleve_forbid_delete_after_slot_start && liveRef.start) {
+                const st = liveRef.start instanceof Date ? liveRef.start : new Date(liveRef.start);
+                if (Number.isFinite(st.getTime()) && Date.now() >= st.getTime()) {
+                    showToast(
+                        'Vous ne pouvez plus annuler ce créneau une fois l’heure de début passée.',
+                        'error'
+                    );
+                    return;
+                }
             }
         }
-    }
-    const delRow = await deletePlanningEventRow(canonicalId);
-    if (!delRow.ok) {
-        showToast(delRow.error || 'Suppression base impossible.', 'error');
-        return;
-    }
-    if (
-        rMeDel === 'eleve' &&
-        dbTypeDel === 'travail perso' &&
-        settingsForVoid &&
-        liveRef.start &&
-        liveRef.end
-    ) {
-        const s0 = liveRef.start instanceof Date ? liveRef.start : new Date(liveRef.start);
-        const e0 = liveRef.end instanceof Date ? liveRef.end : new Date(liveRef.end);
-        await logEleveTravailVoidIfNeeded(settingsForVoid, { slotStart: s0, slotEnd: e0 });
-    }
-    liveRef.remove();
-    invalidateCalendarListCache();
-    if (calendar && typeof calendar.refetchEvents === 'function') {
-        await calendar.refetchEvents();
-    }
-    document.getElementById('modal_reservation').close();
-    showToast('Créneau supprimé.');
-    const meDb = String(currentUser.email).trim().toLowerCase();
-    if (oi.ownerEmail && oi.ownerEmail !== meDb && startDel && endDel) {
-        notifySlotOwnerAfterThirdPartyEditNonBlocking({
-            currentUser,
-            action: 'deleted',
-            targetOwnerEmail: oi.ownerEmail,
-            targetOwnerDisplayName: oi.ownerName,
-            slotTitle: titleDel,
-            slotStart: startDel,
-            slotEnd: endDel,
-            previousStartIso: '',
-            previousEndIso: ''
-        });
+
+        const tokenDb = await getAccessToken();
+        const targets = await fetchPlanningMirrorTargetsForDelete(canonicalId);
+        if (tokenDb && targets.length > 0) {
+            for (const t of targets) {
+                const rDel = await bridgeDeleteEvent(tokenDb, t.googleEventId, t.calendarId);
+                if (!rDel.ok && !rDel.skipped) {
+                    showToast(`Suppression agenda : ${rDel.error || 'échec'}`, 'error');
+                    return;
+                }
+            }
+        }
+        const delRow = await deletePlanningEventRow(canonicalId);
+        if (!delRow.ok) {
+            showToast(delRow.error || 'Suppression base impossible.', 'error');
+            return;
+        }
+        if (
+            rMeDel === 'eleve' &&
+            dbTypeDel === 'travail perso' &&
+            settingsForVoid &&
+            liveRef.start &&
+            liveRef.end
+        ) {
+            const s0 = liveRef.start instanceof Date ? liveRef.start : new Date(liveRef.start);
+            const e0 = liveRef.end instanceof Date ? liveRef.end : new Date(liveRef.end);
+            await logEleveTravailVoidIfNeeded(settingsForVoid, { slotStart: s0, slotEnd: e0 });
+        }
+        liveRef.remove();
+        invalidateCalendarListCache();
+        if (calendar && typeof calendar.refetchEvents === 'function') {
+            await calendar.refetchEvents();
+        }
+        showToast('Créneau supprimé.');
+        const meDb = String(currentUser.email).trim().toLowerCase();
+        if (oi.ownerEmail && oi.ownerEmail !== meDb && startDel && endDel) {
+            notifySlotOwnerAfterThirdPartyEditNonBlocking({
+                currentUser,
+                action: 'deleted',
+                targetOwnerEmail: oi.ownerEmail,
+                targetOwnerDisplayName: oi.ownerName,
+                slotTitle: titleDel,
+                slotStart: startDel,
+                slotEnd: endDel,
+                previousStartIso: '',
+                previousEndIso: ''
+            });
+        }
+    } finally {
+        deleteReservationInFlight = false;
+        if (saveBtn instanceof HTMLButtonElement) saveBtn.disabled = false;
+        if (deleteBtn instanceof HTMLButtonElement) deleteBtn.disabled = false;
     }
 }
 

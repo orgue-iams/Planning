@@ -233,7 +233,7 @@ function initCalendarAndRevealUi() {
         },
         onEventClick: (info) => {
             currentEvent = info.event;
-            void openModal(info.event.start, info.event.end, info.event, currentUser).catch((err) =>
+            void openModal(info.event.start, info.event.end, info.event, currentUser, calendar).catch((err) =>
                 console.error(err)
             );
         },
