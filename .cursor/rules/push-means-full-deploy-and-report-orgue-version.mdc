@@ -1,0 +1,28 @@
+---
+description: Raccourci utilisateur "fais un push" = push + déploiements nécessaires, et mention systématique de la version orgue-v après modif locale
+alwaysApply: true
+---
+
+# Préférences utilisateur de livraison
+
+## 1) Interprétation de "fais un push"
+
+Quand l'utilisateur écrit **"fais un push"** (ou formulation équivalente), l'agent doit l'interpréter comme une demande de **livraison complète** :
+
+- exécuter le workflow git nécessaire (commit/push de la branche de travail) ;
+- lancer les déploiements applicables pour que le service fonctionne (front GitHub Pages, Supabase DB/Edge selon changements) ;
+- ne pas demander à l'utilisateur d'exécuter les commandes lui-même ;
+- ne pas demander de confirmation chat pour lancer les scripts/commandes de déploiement.
+
+Si un déploiement est bloqué par un prérequis technique manquant (auth/token/secret/réseau), l'agent doit :
+
+- tenter la commande ;
+- reporter clairement l'erreur exacte ;
+- indiquer le minimum manquant pour débloquer ;
+- reprendre automatiquement le déploiement dès que l'information est fournie.
+
+## 2) Modifications locales : toujours annoncer orgue-v
+
+Après chaque modification locale livrée (même avant publication), l'agent doit toujours indiquer la **version cache courante** `orgue-vNNN` lue depuis `js/config/cache-name.js`.
+
+Si la livraison inclut des changements front statiques nécessitant invalidation cache (JS/CSS/components/index/sw), l'agent doit incrémenter `CACHE_NAME` selon les règles PWA du repo, puis annoncer explicitement la nouvelle valeur `orgue-vNNN`.
