@@ -206,7 +206,32 @@ export async function upsertPlanningEventRow(p) {
             .select('id')
             .maybeSingle();
         if (error) return { ok: false, error: error.message, id: null };
-        return { ok: true, error: null, id: data?.id ? String(data.id) : existingId };
+        if (data?.id) return { ok: true, error: null, id: String(data.id) };
+
+        // Aucun enregistrement mis à jour (créneau optimiste avec id canonique inédit) :
+        // on crée explicitement la ligne avec cet id pour éviter la disparition au refetch.
+        const { data: insData, error: insErr } = await sb
+            .from('planning_event')
+            .insert({ ...row, id: existingId })
+            .select('id')
+            .single();
+        if (!insErr) {
+            return { ok: true, error: null, id: insData?.id ? String(insData.id) : existingId };
+        }
+
+        // Cas course rare : insert en doublon, on retente une mise à jour.
+        const msg = String(insErr?.message || '');
+        if (/23505|duplicate key|already exists/i.test(msg)) {
+            const { data: retryData, error: retryErr } = await sb
+                .from('planning_event')
+                .update(updateRow)
+                .eq('id', existingId)
+                .select('id')
+                .maybeSingle();
+            if (retryErr) return { ok: false, error: retryErr.message, id: null };
+            if (retryData?.id) return { ok: true, error: null, id: String(retryData.id) };
+        }
+        return { ok: false, error: msg || 'Upsert planning_event impossible.', id: null };
     }
     const { data, error } = await sb.from('planning_event').insert(row).select('id').single();
     if (error) return { ok: false, error: error.message, id: null };
