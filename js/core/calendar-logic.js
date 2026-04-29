@@ -41,6 +41,41 @@ import { openCourseStudentsPicker } from './course-students-picker.js';
 import { openCoursSeriesScopeModal } from './cours-series-scope-ui.js';
 
 let saveReservationInFlight = false;
+let deleteReservationInFlight = false;
+/** @type {AbortController | null} */
+let reservationModalTimeSyncAbort = null;
+
+export function isReservationMutationInFlight() {
+    return saveReservationInFlight || deleteReservationInFlight;
+}
+
+function setReservationModalMutationLock(locked) {
+    const modal = document.getElementById('modal_reservation');
+    if (!(modal instanceof HTMLDialogElement)) return;
+    if (locked) {
+        modal.setAttribute('data-mutation-lock', '1');
+    } else {
+        modal.removeAttribute('data-mutation-lock');
+    }
+    const controls = [
+        'btn-save',
+        'btn-delete',
+        'btn-cancel-reservation',
+        'event-date-start',
+        'event-start',
+        'event-end',
+        'event-motif-select',
+        'event-title-input'
+    ];
+    for (const id of controls) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        if ('disabled' in el) {
+            // @ts-ignore - HTML elements exposing disabled
+            el.disabled = Boolean(locked);
+        }
+    }
+}
 
 /** Rechargement grille (RPC Postgres) : invalide le cache mémoire puis refetch FullCalendar. */
 export async function refetchPlanningGrid(calendar) {
@@ -531,23 +566,19 @@ function allowedMotifsForRole(role) {
     const r = normalizeRole(role);
     if (r === 'admin') return [...RESERVATION_MOTIFS];
     if (r === 'prof') return RESERVATION_MOTIFS.filter((m) => m !== 'Fermeture');
-    if (r === 'eleve') return ['Travail', 'Cours'];
+    if (r === 'eleve') return ['Travail'];
     return RESERVATION_MOTIFS.filter((m) => m !== 'Fermeture');
 }
 
 /**
- * Modale : élève qui réserve un cours n’a pas « Travail » (résa perso = grille rapide).
- * Édition d’un créneau perso : Travail perso. + Cours ; créneau cours : Cours seul.
+ * Modale élève : toujours « Travail perso. » uniquement.
  * Fermeture : liste réservée aux administrateurs.
  * @param {import('@fullcalendar/core').EventApi | null} event
  */
 function allowedMotifsForReservationModal(currentUser, event) {
     const base = allowedMotifsForRole(currentUser?.role);
     if (normalizeRole(currentUser?.role) !== 'eleve') return base;
-    if (!event) return ['Cours'];
-    const t = String(event.extendedProps?.type ?? '').toLowerCase();
-    if (t === 'cours' || t === 'maintenance') return ['Cours'];
-    return base;
+    return ['Travail'];
 }
 
 function defaultMotifForRole(role) {
@@ -788,6 +819,8 @@ export async function maybeNotifySlotOwnerAfterThirdPartyEdit({
         .trim()
         .toLowerCase();
     if (!actor || !owner || owner === actor) return;
+    const ownerDisplay = String(targetOwnerDisplayName ?? '').trim();
+    const ownerLabel = ownerDisplay && ownerDisplay !== owner ? `${ownerDisplay} (${owner})` : owner;
 
     let r;
     try {
@@ -805,13 +838,13 @@ export async function maybeNotifySlotOwnerAfterThirdPartyEdit({
     } catch (e) {
         console.warn('[slot-notify] échec appel', e);
         showToast(
-            `L’e-mail n’a pas pu être envoyé à ${String(targetOwnerDisplayName ?? '').trim() || owner}. Merci de le ou la prévenir directement.`,
+            `L’e-mail n’a pas pu être envoyé à ${ownerLabel}. Merci de le ou la prévenir directement.`,
             'error'
         );
         return;
     }
 
-    const label = String(targetOwnerDisplayName ?? '').trim() || owner;
+    const label = ownerLabel;
     if (r.skipped) return;
     if (r.emailSent) {
         showToast(`Un e-mail a été envoyé à ${label} pour l’informer du changement.`, 'success');
@@ -1300,6 +1333,137 @@ function nextExclusiveFreeBoundary(start, calendar) {
     return new Date(boundary);
 }
 
+function slotMinInstantOnSameDay(start, calendar) {
+    const raw = calendar?.getOption?.('slotMinTime');
+    let h = 8;
+    let m = 0;
+    let s = 0;
+    if (typeof raw === 'string') {
+        const match = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+        if (match) {
+            h = +match[1];
+            m = +match[2];
+            s = +(match[3] || 0);
+        }
+    } else if (raw && typeof raw === 'object') {
+        h = /** @type {{ hours?: number }} */ (raw).hours ?? 0;
+        m = /** @type {{ minutes?: number }} */ (raw).minutes ?? 0;
+        s = /** @type {{ seconds?: number }} */ (raw).seconds ?? 0;
+    }
+    const d = new Date(start);
+    d.setHours(h, m, s, 0);
+    return d;
+}
+
+function nextExclusiveFreeBoundaryWithExclude(start, calendar, excludeEvent) {
+    const limit = slotMaxInstantOnSameDay(start, calendar).getTime();
+    let boundary = limit;
+    const startMs = start.getTime();
+    const resolvedExclude =
+        excludeEvent != null ? resolveLivePlanningEventRef(calendar, excludeEvent) : null;
+    for (const ev of calendar.getEvents()) {
+        if (ev.display === 'background') continue;
+        if (resolvedExclude && isSameFcEvent(ev, resolvedExclude)) continue;
+        if (resolvedExclude && isSameLogicalEventByOwnerAndRange(ev, resolvedExclude)) continue;
+        const r = eventRangeForOverlap(ev);
+        if (!r) continue;
+        const es = r.start.getTime();
+        const ee = r.end.getTime();
+        if (ee <= startMs) continue;
+        if (es <= startMs && ee > startMs) {
+            return new Date(startMs);
+        }
+        if (es > startMs && sameCalendarDay(r.start, start)) {
+            boundary = Math.min(boundary, es);
+        }
+    }
+    return new Date(boundary);
+}
+
+function buildHalfHourChoices(startInclusive, endInclusive) {
+    const out = [];
+    const cur = new Date(startInclusive);
+    cur.setSeconds(0, 0);
+    while (cur.getTime() <= endInclusive.getTime()) {
+        const minute = cur.getMinutes();
+        if (minute === 0 || minute === 30) out.push(formatTimeForSelect(cur));
+        cur.setMinutes(cur.getMinutes() + 30);
+    }
+    return out;
+}
+
+function setSelectOptions(selectEl, values, preferred) {
+    if (!(selectEl instanceof HTMLSelectElement)) return '';
+    const unique = [...new Set(values)];
+    const fallback = unique[0] || '';
+    const keep = preferred && unique.includes(preferred) ? preferred : fallback;
+    selectEl.replaceChildren();
+    for (const v of unique) selectEl.add(new Option(v, v));
+    if (keep) selectEl.value = keep;
+    return keep;
+}
+
+function syncReservationModalTimeOptions(calendar, eventRef) {
+    const dateEl = document.getElementById('event-date-start');
+    const startEl = document.getElementById('event-start');
+    const endEl = document.getElementById('event-end');
+    if (!(dateEl instanceof HTMLInputElement)) return;
+    if (!(startEl instanceof HTMLSelectElement)) return;
+    if (!(endEl instanceof HTMLSelectElement)) return;
+    if (!calendar?.getEvents) return;
+    const dateValue = String(dateEl.value || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) return;
+    const dayAnchor = new Date(`${dateValue}T12:00:00`);
+    if (Number.isNaN(dayAnchor.getTime())) return;
+    const dayStart = slotMinInstantOnSameDay(dayAnchor, calendar);
+    const dayMax = slotMaxInstantOnSameDay(dayAnchor, calendar);
+    const lastStart = new Date(dayMax.getTime() - 30 * 60 * 1000);
+    const startChoices = [];
+    for (
+        let t = new Date(dayStart);
+        t.getTime() <= lastStart.getTime();
+        t = new Date(t.getTime() + 30 * 60 * 1000)
+    ) {
+        const boundary = nextExclusiveFreeBoundaryWithExclude(t, calendar, eventRef);
+        if (boundary.getTime() >= t.getTime() + 30 * 60 * 1000) {
+            startChoices.push(formatTimeForSelect(t));
+        }
+    }
+    const preferredStart = startEl.value;
+    const selectedStart = setSelectOptions(startEl, startChoices, preferredStart);
+    if (!selectedStart) {
+        endEl.replaceChildren();
+        return;
+    }
+    const startAt = new Date(`${dateValue}T${selectedStart}:00`);
+    const boundary = nextExclusiveFreeBoundaryWithExclude(startAt, calendar, eventRef);
+    const endChoices = buildHalfHourChoices(
+        new Date(startAt.getTime() + 30 * 60 * 1000),
+        new Date(Math.min(boundary.getTime(), dayMax.getTime()))
+    );
+    const plusOneHour = formatTimeForSelect(new Date(startAt.getTime() + 60 * 60 * 1000));
+    const preferredEnd = endChoices.includes(plusOneHour)
+        ? plusOneHour
+        : endChoices.includes(endEl.value)
+          ? endEl.value
+          : endChoices[0] || '';
+    setSelectOptions(endEl, endChoices, preferredEnd);
+}
+
+function formatWeekdayFrFromYmd(ymd) {
+    const d = new Date(`${ymd}T12:00:00`);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('fr-FR', { weekday: 'long' });
+}
+
+function syncReservationDateWeekdayLabel() {
+    const dateEl = document.getElementById('event-date-start');
+    const weekdayEl = document.getElementById('event-date-weekday');
+    if (!(dateEl instanceof HTMLInputElement) || !(weekdayEl instanceof HTMLElement)) return;
+    const ymd = String(dateEl.value || '').trim();
+    weekdayEl.textContent = ymd ? formatWeekdayFrFromYmd(ymd) : '';
+}
+
 /**
  * Dernière heure de fin autorisée sur la grille HH:mm des `<select>` (8:00 … 22:00, pas de 22:30).
  * @param {Date} hardCap — fin exclusive max (début du prochain occupé ou slot max)
@@ -1666,7 +1830,7 @@ export async function quickCreateFromSelection(calendar, selectInfo, currentUser
         selectInfo.view.type.startsWith('list') ||
         selectInfo.allDay
     ) {
-        await openModal(selectInfo.start, selectInfo.end, null, currentUser);
+        await openModal(selectInfo.start, selectInfo.end, null, currentUser, calendar);
         calendar.unselect();
         return;
     }
@@ -1716,7 +1880,7 @@ export async function quickCreateFromDateClick(calendar, clickDate, currentUser,
         return;
     }
     if (viewType.startsWith('list')) {
-        await openModal(new Date(clickDate), null, null, currentUser);
+        await openModal(new Date(clickDate), null, null, currentUser, calendar);
         return;
     }
 
@@ -1784,37 +1948,6 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     const pastHint = document.getElementById('event-readonly-past-hint');
     if (pastHint) pastHint.classList.add('hidden');
 
-    if (event && !canEditEvent) {
-        if (wrapRead && wrapEdit) {
-            wrapRead.classList.remove('hidden');
-            wrapEdit.classList.add('hidden');
-        }
-        if (pastHint && isPastSlot) pastHint.classList.remove('hidden');
-        const desc = document.getElementById('event-readonly-description');
-        const ownerEl = document.getElementById('event-readonly-owner');
-        const whenEl = document.getElementById('event-readonly-when');
-        if (desc) desc.textContent = String(event.title || '').trim() || 'Créneau';
-        if (ownerEl) ownerEl.textContent = ownerText;
-        if (whenEl) whenEl.textContent = formatOccupationWhenSentence(start, end);
-        const irw = document.getElementById('wrap-readonly-inscrits');
-        const ir = document.getElementById('event-readonly-inscrits');
-        if (ir && irw) {
-            const ins = event?.extendedProps?.inscrits;
-            if (Array.isArray(ins) && ins.length > 0) {
-                ir.textContent = ins.join(', ');
-                irw.classList.remove('hidden');
-            } else {
-                irw.classList.add('hidden');
-            }
-        }
-        modalActions?.classList.add('justify-end');
-        modalActions?.classList.remove('justify-between');
-        document.getElementById('btn-save')?.classList.add('hidden');
-        document.getElementById('btn-delete')?.classList.add('hidden');
-        modal.showModal();
-        return;
-    }
-
     if (wrapRead && wrapEdit) {
         wrapRead.classList.add('hidden');
         wrapEdit.classList.remove('hidden');
@@ -1830,9 +1963,14 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         actorLabelOverride
     );
 
+    if (reservationModalTimeSyncAbort) reservationModalTimeSyncAbort.abort();
+    reservationModalTimeSyncAbort = new AbortController();
+    const modalSignal = reservationModalTimeSyncAbort.signal;
     const toDateInput = (d) => d.toLocaleDateString('en-CA');
+    setReservationModalMutationLock(false);
     const startEl = document.getElementById('event-start');
     const endEl = document.getElementById('event-end');
+    const dateEl = document.getElementById('event-date-start');
 
     let dateStartVal;
     let startInstant;
@@ -1882,9 +2020,28 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         }
     }
 
-    document.getElementById('event-date-start').value = dateStartVal;
+    if (dateEl instanceof HTMLInputElement) dateEl.value = dateStartVal;
     setSelectTime(startEl, startInstant);
     setSelectTime(endEl, endInstant);
+    syncReservationDateWeekdayLabel();
+    if (calendarForClip?.getEvents) {
+        syncReservationModalTimeOptions(calendarForClip, event || null);
+        dateEl?.addEventListener(
+            'change',
+            () => {
+                syncReservationDateWeekdayLabel();
+                syncReservationModalTimeOptions(calendarForClip, event || null);
+            },
+            { signal: modalSignal }
+        );
+        startEl?.addEventListener(
+            'change',
+            () => syncReservationModalTimeOptions(calendarForClip, event || null),
+            { signal: modalSignal }
+        );
+    } else {
+        dateEl?.addEventListener('change', () => syncReservationDateWeekdayLabel(), { signal: modalSignal });
+    }
 
     const rpStart = document.getElementById('event-recur-period-start');
     const rpEnd = document.getElementById('event-recur-period-end');
@@ -2173,8 +2330,10 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     }
 
     if (saveReservationInFlight) return;
+    if (deleteReservationInFlight) return;
     saveReservationInFlight = true;
     const saveBtn = document.getElementById('btn-save');
+    setReservationModalMutationLock(true);
     if (saveBtn instanceof HTMLButtonElement) saveBtn.disabled = true;
 
     try {
@@ -2539,11 +2698,13 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     })();
     } finally {
         saveReservationInFlight = false;
+        setReservationModalMutationLock(false);
         if (saveBtn instanceof HTMLButtonElement) saveBtn.disabled = false;
     }
 }
 
 export async function deleteReservation(calendar, currentEventRef, currentUser) {
+    if (deleteReservationInFlight || saveReservationInFlight) return;
     if (!currentEventRef || !confirm('Supprimer cette réservation ?')) return;
     if (!currentUser?.email) {
         showToast('Connectez-vous pour supprimer.', 'error');
@@ -2559,10 +2720,13 @@ export async function deleteReservation(calendar, currentEventRef, currentUser) 
         return;
     }
 
+    deleteReservationInFlight = true;
+    setReservationModalMutationLock(true);
     const dbTypeDel = planningDbSlotTypeForEventUpdate(liveRef);
     const rMeDel = normalizeRole(currentUser.role);
     /** @type {Record<string, unknown> | null} */
     let settingsForVoid = null;
+    try {
     if (rMeDel === 'eleve' && dbTypeDel === 'travail perso') {
         await fetchOrganSchoolSettings();
         settingsForVoid = getOrganSchoolSettingsCached();
@@ -2636,6 +2800,10 @@ export async function deleteReservation(calendar, currentEventRef, currentUser) 
             previousStartIso: '',
             previousEndIso: ''
         });
+    }
+    } finally {
+        deleteReservationInFlight = false;
+        setReservationModalMutationLock(false);
     }
 }
 

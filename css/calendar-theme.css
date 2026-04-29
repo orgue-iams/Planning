@@ -2,6 +2,7 @@
 /* Largeur axe temps : une seule valeur pour colgroup + cellules (évite le décalage en-tête / corps). */
 .fc {
     --planning-axis-col-width: calc(5.5rem * 2 / 3);
+    --planning-slot-height: 3.6rem;
 }
 
 /* Laisser FullCalendar gérer le tactile (sélection long-press + drag) sans imposer pan-y au parent. */
@@ -127,7 +128,7 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
 
 /* Lignes d’heure : bordure sur les « lanes » et la grille jours — pas sur les libellés d’heure (voir plus bas). */
 .fc-timegrid-slot {
-    height: 3.6rem !important;
+    height: var(--planning-slot-height) !important;
     border-bottom: 1px solid #f1f5f9 !important;
 }
 
@@ -247,7 +248,7 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     }
 
     .fc {
-        --planning-axis-col-width: calc(4.75rem * 2 / 3);
+        --planning-axis-col-width: calc(4.2rem * 2 / 3);
     }
 
     .fc-timegrid-slots table > colgroup > col:first-child,
@@ -275,7 +276,9 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     }
 
     .fc .fc-timegrid-slot-label {
-        font-size: 0.625rem;
+        font-size: 0.59rem;
+        padding-inline-start: 0.12rem;
+        padding-inline-end: 0.12rem;
     }
 
     .fc .fc-day-head-gcal {

@@ -41,7 +41,34 @@ export function initSwipe(calendarEl, calendar) {
 
     let lastNavAt = 0;
     let horizontalSwipeStartedOnEvent = false;
+    let pinchTracking = false;
+    let pinchStartDistance = 0;
+    let pinchStartSlotRem = 3.6;
     const NAV_COOLDOWN_MS = 350;
+    const PINCH_MIN_REM = 2.2;
+    const PINCH_MAX_REM = 6.4;
+    const PINCH_SENSITIVITY = 1.35;
+
+    function touchDistance(a, b) {
+        const dx = b.clientX - a.clientX;
+        const dy = b.clientY - a.clientY;
+        return Math.hypot(dx, dy);
+    }
+
+    function currentSlotRem() {
+        const root = calendarEl.querySelector('.fc');
+        const ref = root instanceof HTMLElement ? root : calendarEl;
+        const v = getComputedStyle(ref).getPropertyValue('--planning-slot-height').trim();
+        const n = parseFloat(v);
+        if (Number.isFinite(n) && n > 0) return n;
+        return 3.6;
+    }
+
+    function setSlotRem(rem) {
+        const clamped = Math.max(PINCH_MIN_REM, Math.min(PINCH_MAX_REM, rem));
+        calendarEl.style.setProperty('--planning-slot-height', `${clamped.toFixed(2)}rem`);
+        if (typeof calendar.updateSize === 'function') calendar.updateSize();
+    }
     const canNavigateNow = () => Date.now() - lastNavAt > NAV_COOLDOWN_MS;
     const navigate = (dir) => {
         if (!canNavigateNow()) return;
@@ -67,6 +94,14 @@ export function initSwipe(calendarEl, calendar) {
     };
 
     const onTouchStart = (ev) => {
+        if (ev.touches && ev.touches.length === 2) {
+            pinchTracking = true;
+            tracking = false;
+            horizontalSwipeStartedOnEvent = false;
+            pinchStartDistance = touchDistance(ev.touches[0], ev.touches[1]);
+            pinchStartSlotRem = currentSlotRem();
+            return;
+        }
         if (!ev.touches || ev.touches.length !== 1) return;
         const t = ev.touches[0];
         startX = t.clientX;
@@ -76,7 +111,20 @@ export function initSwipe(calendarEl, calendar) {
         horizontalSwipeStartedOnEvent = targetTouchesEventSurface(ev.target);
     };
 
+    const onTouchMove = (ev) => {
+        if (!pinchTracking || !ev.touches || ev.touches.length !== 2) return;
+        const d = touchDistance(ev.touches[0], ev.touches[1]);
+        if (d <= 0 || pinchStartDistance <= 0) return;
+        const ratio = d / pinchStartDistance;
+        setSlotRem(pinchStartSlotRem * Math.pow(ratio, PINCH_SENSITIVITY));
+        ev.preventDefault();
+    };
+
     const onTouchEnd = (ev) => {
+        if (pinchTracking) {
+            if (!ev.touches || ev.touches.length < 2) pinchTracking = false;
+            return;
+        }
         if (!tracking || !ev.changedTouches || ev.changedTouches.length !== 1) return;
         tracking = false;
 
@@ -102,6 +150,7 @@ export function initSwipe(calendarEl, calendar) {
 
     calendarEl.addEventListener('pointerdown', onPointerDownCapture, { capture: true });
     calendarEl.addEventListener('touchstart', onTouchStart, { passive: true });
+    calendarEl.addEventListener('touchmove', onTouchMove, { passive: false });
     calendarEl.addEventListener('touchend', onTouchEnd, { passive: true });
 
     /*

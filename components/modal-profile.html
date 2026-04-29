@@ -10,15 +10,14 @@
         <dl class="mb-4 border border-slate-100 rounded-xl p-3 bg-slate-50/80 space-y-0 divide-y divide-slate-200/80">
             <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2 first:pt-0">
                 <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none">Nom</dt>
-                <dd id="profile-display-name" class="m-0 min-w-0 text-sm font-medium leading-snug text-slate-800">—</dd>
+                <dd class="m-0 min-w-0">
+                    <input type="text" id="profile-display-name-input" class="input input-xs input-bordered w-full min-w-0 text-[11px] h-8" autocomplete="name" />
+                </dd>
             </div>
             <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2">
                 <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none">E-mail</dt>
                 <dd class="m-0 min-w-0">
-                    <div class="flex items-stretch gap-1.5">
-                        <input type="email" id="profile-email-input" class="input input-xs input-bordered flex-1 min-w-0 text-[11px] h-8" autocomplete="email" />
-                        <button type="button" id="profile-email-save" class="btn btn-xs h-8 min-h-0">Enregistrer</button>
-                    </div>
+                    <input type="email" id="profile-email-input" class="input input-xs input-bordered w-full min-w-0 text-[11px] h-8" autocomplete="email" />
                     <p id="profile-email-hint" class="text-[9px] text-slate-500 mt-1 hidden">Vérifiez votre boîte e-mail si une confirmation est demandée par Supabase.</p>
                 </dd>
             </div>
@@ -35,6 +34,11 @@
                             maxlength="40"
                         />
                     </label>
+                </dd>
+            </div>
+            <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-start min-h-[2.75rem] py-2">
+                <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none pt-1">Visibilité</dt>
+                <dd class="m-0 min-w-0 space-y-2">
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" id="profile-share-email" class="checkbox checkbox-primary checkbox-sm" />
                         <span class="text-[10px] text-slate-700">Afficher mon e-mail dans l’annuaire « Utilisateurs »</span>
@@ -43,7 +47,6 @@
                         <input type="checkbox" id="profile-share-phone" class="checkbox checkbox-primary checkbox-sm" />
                         <span class="text-[10px] text-slate-700">Afficher mon téléphone dans l’annuaire « Utilisateurs »</span>
                     </label>
-                    <button type="button" id="profile-contact-save" class="btn btn-xs w-fit">Enregistrer téléphone et visibilité</button>
                 </dd>
             </div>
             <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2">
@@ -60,7 +63,6 @@
                             <input type="checkbox" id="profile-pass-show-plain" class="checkbox checkbox-primary checkbox-sm" />
                             <span class="label-text text-[10px] text-slate-600">Afficher les mots de passe</span>
                         </label>
-                        <button type="button" id="profile-pass-save" class="btn btn-xs w-fit">Mettre à jour</button>
                     </div>
                 </dd>
             </div>
@@ -68,8 +70,7 @@
 
         <div class="rounded-xl border border-slate-200 bg-white p-3 mb-4">
             <p class="text-[10px] font-bold text-slate-700 mb-1">Agendas Google</p>
-            <p class="text-[9px] text-slate-500 leading-snug mb-3">
-                <strong>Planning général</strong> : tous les créneaux de l’orgue. <strong>Votre calendrier personnel</strong> : vos réservations « travail ».
+            <p class="text-[11px] text-slate-600 leading-snug mb-3">
                 Dans Google Agenda : <em>Paramètres</em> → <em>Ajouter un agenda</em> → <em>À partir de l’URL</em>, ou utilisez le lien « intégrer » pour un aperçu.
             </p>
 
@@ -106,7 +107,8 @@
         </div>
 
         <div class="modal-action mt-0 pt-2 border-t border-slate-100">
-            <button type="button" class="btn btn-ghost btn-sm font-normal text-[11px]" onclick="document.getElementById('modal_profile').close()">Fermer</button>
+            <button type="button" id="profile-close-btn" class="btn btn-ghost btn-sm font-normal text-[11px]">Fermer</button>
+            <button type="button" id="profile-save-all" class="btn btn-primary btn-sm font-normal text-[11px]">Enregistrer</button>
         </div>
     </div>
 </dialog>

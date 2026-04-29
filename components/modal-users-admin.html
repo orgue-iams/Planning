@@ -1,10 +1,10 @@
 <dialog id="modal_users_admin" class="modal">
-    <div class="modal-box p-5 w-[96%] max-w-5xl max-h-[90dvh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col">
-        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest shrink-0">Gestion des comptes</h3>
-        <p class="text-[10px] text-slate-500 mb-3 leading-snug">Création directe de compte (avec mot de passe) ou invitation par e-mail s’enregistrent tout de suite. Les changements dans le tableau (nom, prénom, e-mail, rôle, statut) ne sont envoyés qu’avec <strong>Sauver et fermer</strong>. Suppression et mot de passe restent immédiats. Le pool Google des comptes : menu <strong>Réglages</strong> (engrenage) → <strong>Calendriers des utilisateurs</strong>.</p>
+    <div class="modal-box p-5 w-[96%] max-w-xl max-h-[90dvh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col">
+        <h3 id="admin-user-modal-title" class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest shrink-0">Nouvel utilisateur</h3>
+        <p id="admin-user-modal-subtitle" class="text-[10px] text-slate-500 mb-3 leading-snug">Créer un compte directement ou envoyer une invitation.</p>
 
         <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-2 sm:p-2.5 mb-3 shrink-0">
-            <p class="text-[9px] font-black uppercase text-slate-500 mb-1.5 tracking-wide">Créer / inviter</p>
+            <p class="text-[9px] font-black uppercase text-slate-500 mb-1.5 tracking-wide">Utilisateur</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 gap-y-1.5">
                 <label class="flex flex-col gap-0 min-w-0">
                     <span class="text-[9px] font-bold text-slate-500 leading-none mb-0.5">Nom <span class="font-normal text-slate-400">(oblig.)</span></span>
@@ -20,7 +20,7 @@
                 </label>
                 <label class="flex flex-col gap-0 min-w-0 sm:col-span-2">
                     <span class="text-[9px] font-bold text-slate-500 leading-none mb-0.5">Téléphone <span class="font-normal text-slate-400">(facult.)</span></span>
-                    <input type="tel" id="admin-invite-phone" placeholder="+33…" class="input input-xs input-bordered w-full text-xs h-8 min-h-0" maxlength="40" autocomplete="tel" />
+                    <input type="tel" id="admin-invite-phone" placeholder="06 12 34 56 78" class="input input-xs input-bordered w-full text-xs h-8 min-h-0" maxlength="40" autocomplete="tel" />
                 </label>
             </div>
             <div class="grid grid-cols-[auto_minmax(0,1fr)] gap-2 items-end mt-1.5">
@@ -49,33 +49,14 @@
                 </label>
             </div>
             <ul id="admin-create-pw-policy" class="text-[8px] text-slate-500 list-disc list-inside mt-1.5 mb-1.5 pl-0.5 columns-1 sm:columns-2 sm:gap-x-6 gap-y-0"></ul>
-            <div class="flex flex-wrap gap-1.5 pt-0.5">
+            <div id="admin-user-create-actions" class="flex flex-wrap gap-1.5 pt-0.5">
                 <button type="button" id="admin-create-btn" class="btn btn-primary btn-xs flex-1 min-w-[7rem] sm:flex-none font-normal text-[10px] h-8 min-h-0 px-3">Créer le compte</button>
                 <button type="button" id="admin-invite-btn" class="btn btn-outline btn-xs flex-1 min-w-[7rem] sm:flex-none font-normal text-[10px] h-8 min-h-0 px-3">Inviter</button>
             </div>
-        </div>
-
-        <div class="flex-1 min-h-0 overflow-x-auto overflow-y-auto border border-slate-200 rounded-xl">
-            <table class="table table-xs table-pin-rows admin-users-table w-full min-w-[46rem]">
-                <thead>
-                    <tr class="bg-slate-100">
-                        <th class="min-w-[6.5rem]">Nom</th>
-                        <th class="min-w-[6.5rem]">Prénom</th>
-                        <th class="min-w-[9rem]">E-mail</th>
-                        <th class="min-w-[7rem]">Téléphone</th>
-                        <th class="w-28">Rôle</th>
-                        <th class="w-24">Statut</th>
-                        <th class="min-w-[8rem] max-w-[11rem]">Calendrier Google</th>
-                        <th class="min-w-[10rem]">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="admin-users-tbody"></tbody>
-            </table>
-        </div>
-
-        <div class="modal-action shrink-0 mt-3 pt-2 border-t border-slate-100 flex flex-wrap justify-end gap-2">
-            <button type="button" id="admin-users-btn-cancel" class="btn btn-ghost btn-sm font-normal text-[11px]">Annuler</button>
-            <button type="button" id="admin-users-btn-save-close" class="btn btn-primary btn-sm font-normal text-[11px]">Sauver et fermer</button>
+            <div id="admin-user-edit-actions" class="hidden flex flex-wrap gap-1.5 pt-0.5">
+                <button type="button" id="admin-user-edit-save" class="btn btn-primary btn-xs flex-1 min-w-[7rem] sm:flex-none font-normal text-[10px] h-8 min-h-0 px-3">Sauvegarder</button>
+                <button type="button" id="admin-user-edit-close" class="btn btn-ghost btn-xs flex-1 min-w-[7rem] sm:flex-none font-normal text-[10px] h-8 min-h-0 px-3">Fermer</button>
+            </div>
         </div>
     </div>
 </dialog>

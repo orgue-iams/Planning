@@ -1,16 +1,15 @@
 <header class="app-navbar navbar bg-white border-b fixed top-0 z-50 w-full flex flex-col shadow-sm max-sm:shadow-none max-sm:rounded-b-none max-sm:border-b-0">
     <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-center gap-1 min-h-12 h-12 px-2 sm:px-3 w-full max-sm:min-h-0 max-sm:h-auto max-sm:pb-1 max-sm:pt-[max(0px,env(safe-area-inset-top,0px))] max-sm:gap-0.5">
-        <div class="flex items-center gap-1.5 sm:gap-2 min-w-0 max-sm:min-h-0">
+        <button type="button" id="btn-rules-trigger" class="flex items-center gap-1.5 sm:gap-2 min-w-0 max-sm:min-h-0 rounded-lg px-1.5 py-1 border border-transparent hover:bg-blue-100 hover:border-blue-300 transition-colors">
             <span class="text-lg sm:text-lg shrink-0 max-sm:text-base max-sm:leading-none" aria-hidden="true">🎹</span>
-            <div class="flex flex-col min-w-0 max-sm:flex-row max-sm:items-baseline max-sm:gap-1 max-sm:min-w-0">
+            <span class="flex flex-col min-w-0 max-sm:flex-row max-sm:items-baseline max-sm:gap-1 max-sm:min-w-0">
                 <span class="font-black text-[11px] uppercase leading-none text-slate-800 truncate max-sm:text-[10px]">Orgue</span>
                 <span class="text-[10px] uppercase text-slate-500 font-bold tracking-wider truncate max-sm:text-[8px] max-sm:tracking-wide max-sm:opacity-90 max-sm:min-w-0 shrink">Gérard Bancells</span>
-            </div>
-        </div>
+            </span>
+        </button>
 
         <div class="flex justify-center min-w-0 px-0.5 max-sm:px-0 gap-1 sm:gap-1.5 items-center flex-wrap">
             <button type="button" id="btn-admin-clear-week" class="hidden btn btn-outline btn-xs font-sans font-semibold normal-case text-[10px] sm:text-[11px] leading-tight text-error border-error/40 bg-white hover:bg-error/5 px-2 sm:px-2 h-8 sm:h-8 max-sm:h-7 max-sm:min-h-7 max-sm:px-1.5 max-sm:text-[9px] shrink-0" title="Admin : supprime en base tous les créneaux de la période, et supprime dans Google tous les événements sur la même plage (calendrier principal + secondaires assignés). Indépendant des miroirs en base.">Vider semaine</button>
-            <button type="button" id="btn-rules" class="btn btn-ghost btn-xs font-sans font-semibold normal-case text-[11px] sm:text-[13px] leading-tight text-slate-700 border border-slate-200 bg-white shadow-sm hover:bg-slate-50 hover:border-slate-300 px-2 sm:px-2.5 h-8 sm:h-9 max-sm:h-7 max-sm:min-h-7 max-sm:px-1.5 max-sm:text-[10px] max-sm:leading-tight max-w-[min(52vw,11rem)] sm:max-w-[min(72vw,18rem)] max-sm:max-w-[min(46vw,9.5rem)] truncate shrink-0" title="Consignes">Consignes</button>
         </div>
 
         <div class="flex items-center justify-end gap-0.5 sm:gap-1 min-w-0 max-sm:gap-0.5">
@@ -41,7 +40,6 @@
                 <ul tabindex="0" class="dropdown-content menu z-[100] mt-1 w-56 rounded-box border border-slate-200 bg-base-100 p-2 shadow-lg">
                     <li><a href="#" id="menu-item-directory" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Utilisateurs</a></li>
                     <li class="hidden" id="menu-item-config-wrap"><a href="#" id="menu-item-config" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Configuration du planning</a></li>
-                    <li class="hidden" id="menu-item-users-admin-wrap"><a href="#" id="menu-item-users-admin" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Gestion des comptes</a></li>
                     <li class="hidden" id="menu-item-calendar-pool-wrap"><a href="#" id="menu-item-calendar-pool" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Calendriers des utilisateurs</a></li>
                     <li class="hidden" id="menu-item-announcements-wrap"><a href="#" id="menu-item-announcements" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Annonces</a></li>
                 </ul>

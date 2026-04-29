@@ -23,6 +23,12 @@ const adminRowOpLocks = new Set();
 
 let adminUsersBulkSaveInFlight = false;
 
+function formatFrPhone(raw) {
+    const digits = String(raw || '').replace(/\D+/g, '').slice(0, 10);
+    if (!digits) return '';
+    return digits.replace(/(\d{2})(?=\d)/g, '$1 ').trim();
+}
+
 /** @returns {string | null} */
 function takeAdminRowLock(userId, kind) {
     const key = `${String(userId)}:${kind}`;
@@ -222,7 +228,10 @@ async function persistAdminUserRow(tr) {
         const iniN = String(nomIn.getAttribute('data-initial-nom') ?? '').trim();
         const iniP = String(prenomIn.getAttribute('data-initial-prenom') ?? '').trim();
         const phoneIn = tr.querySelector('.admin-user-phone');
-        const tel = phoneIn instanceof HTMLInputElement ? phoneIn.value.trim().slice(0, 40) : '';
+        const tel =
+            phoneIn instanceof HTMLInputElement
+                ? formatFrPhone(phoneIn.value).trim().slice(0, 40)
+                : '';
         const iniTel = String(phoneIn?.getAttribute?.('data-initial-phone') ?? '').trim();
         if (nom !== iniN || prenom !== iniP || tel !== iniTel) {
             await planningAdminInvoke('update_user_nom_prenom', { user_id: uid, nom, prenom, telephone: tel });
@@ -393,7 +402,7 @@ function renderUsersTable(users) {
         const prenomAttr = escapeHtmlAttr(prenomRaw);
         const emailRaw = String(u.email ?? '').trim();
         const emailAttr = escapeHtmlAttr(emailRaw);
-        const phoneRaw = String(u.telephone ?? '').trim();
+        const phoneRaw = formatFrPhone(String(u.telephone ?? '').trim());
         const phoneAttr = escapeHtmlAttr(phoneRaw);
         const viewerId = String(adminPlanningViewerId ?? getPlanningSessionUser()?.id ?? '');
         const emailReadonly = viewerId !== '' && String(u.id) === viewerId;
@@ -410,7 +419,7 @@ function renderUsersTable(users) {
             <td class="align-middle min-w-[6rem]">
                 <input type="text" class="input input-xs input-bordered w-full min-w-0 admin-user-prenom" data-user-id="${escapeAttr(u.id)}" data-initial-prenom="${prenomAttr}" value="${prenomAttr}" autocomplete="given-name" />
             </td>
-            <td class="break-all align-middle">${emailInput}</td>
+            <td class="break-all align-middle min-w-[14rem]">${emailInput}</td>
             <td class="align-middle min-w-[7rem]">
                 <input type="tel" maxlength="40" class="input input-xs input-bordered w-full min-w-0 admin-user-phone" data-user-id="${escapeAttr(
                     u.id
@@ -571,6 +580,11 @@ export function initAdminUsersUi(currentUser) {
         const vis = pw?.getAttribute('type') === 'text';
         setAdminCreatePassVisible(!vis);
     });
+    document.getElementById('admin-invite-phone')?.addEventListener('blur', (e) => {
+        const el = e.target;
+        if (!(el instanceof HTMLInputElement)) return;
+        el.value = formatFrPhone(el.value);
+    });
 
     document.getElementById('menu-item-users-admin')?.addEventListener('click', (e) => {
         e.preventDefault();
@@ -613,7 +627,10 @@ export function initAdminUsersUi(currentUser) {
             const prenom = prenomEl?.value?.trim() || '';
             const password = document.getElementById('admin-create-password')?.value || '';
             const phoneInviteEl = document.getElementById('admin-invite-phone');
-            const telephone = phoneInviteEl instanceof HTMLInputElement ? phoneInviteEl.value.trim().slice(0, 40) : '';
+            const telephone =
+                phoneInviteEl instanceof HTMLInputElement
+                    ? formatFrPhone(phoneInviteEl.value).trim().slice(0, 40)
+                    : '';
             const role = document.getElementById('admin-invite-role')?.value || 'eleve';
             if (!email) {
                 showToast('Indiquez un e-mail.', 'error');
@@ -677,7 +694,10 @@ export function initAdminUsersUi(currentUser) {
             const nom = nomEl?.value?.trim() || '';
             const prenom = prenomEl?.value?.trim() || '';
             const phoneInviteEl2 = document.getElementById('admin-invite-phone');
-            const telephone = phoneInviteEl2 instanceof HTMLInputElement ? phoneInviteEl2.value.trim().slice(0, 40) : '';
+            const telephone =
+                phoneInviteEl2 instanceof HTMLInputElement
+                    ? formatFrPhone(phoneInviteEl2.value).trim().slice(0, 40)
+                    : '';
             const role = document.getElementById('admin-invite-role')?.value || 'eleve';
             if (!email) {
                 showToast('Indiquez un e-mail.', 'error');
@@ -764,6 +784,12 @@ export function initAdminUsersUi(currentUser) {
             setAdminPwFieldsVisible(false);
             document.getElementById('modal_admin_password')?.showModal();
         }
+    });
+    document.getElementById('admin-users-tbody')?.addEventListener('focusout', (ev) => {
+        const t = ev.target;
+        if (!(t instanceof HTMLInputElement)) return;
+        if (!t.classList.contains('admin-user-phone')) return;
+        t.value = formatFrPhone(t.value);
     });
 
     document.getElementById('admin-pw-save')?.addEventListener('click', async () => {

@@ -30,7 +30,7 @@
             <div id="wrap-reservation-motif" class="form-control">
                 <label class="label py-0"><span class="label-text font-bold text-[11px] uppercase text-slate-500">Motif</span></label>
                 <p id="event-motif-hint-fermeture" class="text-[10px] text-slate-500 -mt-1 mb-1">Le motif <strong>Fermeture</strong> est réservé aux administrateurs.</p>
-                <select id="event-motif-select" class="select select-sm w-full font-bold text-sm h-11 bg-slate-50 border border-slate-200 rounded-lg shadow-sm focus:border-slate-300 focus:outline-none focus:ring-0"></select>
+                <select id="event-motif-select" class="select select-sm w-full font-normal text-sm h-11 bg-slate-50 border border-slate-200 rounded-lg shadow-sm focus:border-slate-300 focus:outline-none focus:ring-0"></select>
             </div>
             <div id="wrap-reservation-title" class="form-control">
                 <label class="label py-0" for="event-title-input"><span class="label-text font-bold text-[11px] uppercase text-slate-500">Titre</span></label>
@@ -39,11 +39,12 @@
             <div id="wrap-datetime-simple" class="bg-slate-100/80 p-4 rounded-xl border border-slate-200">
                 <div class="flex flex-nowrap items-center gap-x-2 text-sm text-slate-800 font-bold">
                     <span class="shrink-0">Le</span>
-                    <input type="date" id="event-date-start" aria-label="Jour" class="input input-sm w-auto min-w-[9.25rem] min-h-10 font-black text-sm bg-white border border-slate-200 rounded-lg shadow-sm focus:border-slate-300 focus:outline-none focus:ring-0" />
+                    <input type="date" id="event-date-start" aria-label="Jour" class="input input-sm w-auto min-w-[9.25rem] min-h-10 font-normal text-sm bg-white border border-slate-200 rounded-lg shadow-sm focus:border-slate-300 focus:outline-none focus:ring-0" />
+                    <span id="event-date-weekday" class="shrink-0 text-sm font-normal text-slate-700 capitalize"></span>
                     <span class="shrink-0">de</span>
-                    <select id="event-start" aria-label="Heure de début" class="select select-sm w-[6.25rem] shrink-0 min-h-10 font-black text-sm bg-white border border-slate-200 rounded-lg shadow-sm focus:border-slate-300 focus:outline-none focus:ring-0"></select>
+                    <select id="event-start" aria-label="Heure de début" class="select select-sm w-[6.25rem] shrink-0 min-h-10 font-normal text-sm bg-white border border-slate-200 rounded-lg shadow-sm focus:border-slate-300 focus:outline-none focus:ring-0"></select>
                     <span class="shrink-0">à</span>
-                    <select id="event-end" aria-label="Heure de fin" class="select select-sm w-[6.25rem] shrink-0 min-h-10 font-black text-sm bg-white border border-slate-200 rounded-lg shadow-sm focus:border-slate-300 focus:outline-none focus:ring-0"></select>
+                    <select id="event-end" aria-label="Heure de fin" class="select select-sm w-[6.25rem] shrink-0 min-h-10 font-normal text-sm bg-white border border-slate-200 rounded-lg shadow-sm focus:border-slate-300 focus:outline-none focus:ring-0"></select>
                 </div>
             </div>
 
@@ -123,7 +124,7 @@
         <div class="modal-action flex justify-between mt-4 pt-3 border-t border-slate-100 shrink-0 sticky bottom-0 bg-base-100">
             <button type="button" id="btn-delete" class="btn btn-error btn-outline btn-sm font-black text-[11px] px-3">SUPPRIMER</button>
             <div class="flex gap-2">
-                <button type="button" class="btn btn-ghost btn-sm font-black text-[11px]" onclick="document.getElementById('modal_reservation').close()">ANNULER</button>
+                <button type="button" id="btn-cancel-reservation" class="btn btn-ghost btn-sm font-black text-[11px]" onclick="document.getElementById('modal_reservation').close()">ANNULER</button>
                 <button type="button" id="btn-save" class="btn btn-primary btn-sm px-5 font-black text-[11px] shadow-lg shadow-primary/20">VALIDER</button>
             </div>
         </div>

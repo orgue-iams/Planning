@@ -166,6 +166,31 @@
     flex-shrink: 0;
 }
 
+@media (max-width: 640px) {
+    #planning-legend {
+        flex-wrap: nowrap !important;
+        gap: 0.45rem;
+        font-size: 0.56rem;
+        overflow-x: auto;
+        overflow-y: hidden;
+        white-space: nowrap;
+        scrollbar-width: thin;
+    }
+
+    #planning-legend > span:first-child {
+        width: auto !important;
+        font-size: 0.52rem !important;
+    }
+
+    #planning-legend .legend-item {
+        font-size: 0.56rem;
+    }
+
+    #planning-legend #app-build-badge {
+        display: none;
+    }
+}
+
 .legend-swatch--fermeture {
     background: #ff790a;
 }

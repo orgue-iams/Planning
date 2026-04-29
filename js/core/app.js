@@ -22,7 +22,8 @@ import {
     captureResizeStart,
     maybeNotifySlotOwnerAfterThirdPartyEdit,
     ownerInfoFromEvent,
-    refetchPlanningGrid
+    refetchPlanningGrid,
+    isReservationMutationInFlight
 } from './calendar-logic.js';
 import {
     login,
@@ -48,7 +49,7 @@ import {
 import { initMessagesUi, resetMessagesUiBindings, tryShowBroadcastPopup } from './messages-ui.js';
 import { destroyPlanningQuillMount } from '../utils/planning-quill.js';
 import { applyLoginBanner } from './login-banner.js';
-import { initAdminUsersUi, resetAdminUsersUiBindings } from './admin-users-ui.js';
+import { initAdminUsersUi, resetAdminUsersUiBindings } from './admin-users-modal-ui.js';
 import { initAdminCalendarPoolUi, resetAdminCalendarPoolBindings } from './admin-calendar-pool-ui.js';
 import { initAnnouncementsUi, resetAnnouncementsUiBindings } from './announcements-ui.js';
 import { showToast } from '../utils/toast.js';
@@ -233,7 +234,13 @@ function initCalendarAndRevealUi() {
         },
         onEventClick: (info) => {
             currentEvent = info.event;
-            void openModal(info.event.start, info.event.end, info.event, currentUser).catch((err) =>
+            void openModal(
+                info.event.start,
+                info.event.end,
+                info.event,
+                currentUser,
+                info.view?.calendar || calendar
+            ).catch((err) =>
                 console.error(err)
             );
         },
@@ -409,11 +416,46 @@ function wireDialogBackdropClose() {
             ) {
                 return;
             }
-            /* Gestion des comptes : fermeture fond / abandon gérés dans admin-users-ui.js */
+            /* Fenêtre utilisateur admin : fermeture fond / abandon gérés dans admin-users-modal-ui.js */
             if (e.target.id === 'modal_users_admin') return;
+            if (e.target.id === 'modal_reservation' && isReservationMutationInFlight()) return;
             e.target.close();
         }
     });
+}
+
+function wireHeaderHoverMenus() {
+    const specs = [
+        { wrapId: 'header-semaines-types-wrap', btnId: 'btn-header-agenda-menu' },
+        { wrapId: 'header-settings-wrap', btnId: 'btn-header-settings' },
+        { wrapId: 'user-menu-wrap', btnId: 'btn-user-menu' }
+    ];
+    for (const { wrapId, btnId } of specs) {
+        const wrap = document.getElementById(wrapId);
+        const btn = document.getElementById(btnId);
+        if (!(wrap instanceof HTMLElement) || !(btn instanceof HTMLElement)) continue;
+        let leaveTimer = 0;
+        const open = () => {
+            window.clearTimeout(leaveTimer);
+            wrap.classList.add('dropdown-open');
+            btn.classList.add('bg-blue-100', 'border-blue-300');
+        };
+        const close = () => {
+            leaveTimer = window.setTimeout(() => {
+                wrap.classList.remove('dropdown-open');
+                btn.classList.remove('bg-blue-100', 'border-blue-300');
+            }, 120);
+        };
+        wrap.addEventListener('mouseenter', open);
+        wrap.addEventListener('mouseleave', close);
+        wrap.addEventListener('focusin', open);
+        wrap.addEventListener('focusout', () => {
+            window.setTimeout(() => {
+                if (wrap.contains(document.activeElement)) return;
+                close();
+            }, 0);
+        });
+    }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -453,6 +495,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     setLogoutHandler(performLogout);
     wireDialogBackdropClose();
+    wireHeaderHoverMenus();
+    document.getElementById('modal_reservation')?.addEventListener('cancel', (e) => {
+        if (!isReservationMutationInFlight()) return;
+        e.preventDefault();
+    });
 
     const policyUl = document.getElementById('password-policy-lines');
     if (policyUl) {

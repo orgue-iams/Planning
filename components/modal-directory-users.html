@@ -1,11 +1,17 @@
 <dialog id="modal_directory_users" class="modal">
     <div class="modal-box p-5 w-[96%] max-w-2xl max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 shadow-2xl">
         <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest">Utilisateurs</h3>
-        <p class="text-[10px] text-slate-600 mb-3 leading-snug">
-            Annuaire interne : prénom et nom, e-mail et téléphone lorsque la personne accepte de les partager (réglages dans
-            <strong>Mon profil</strong>). Les administrateurs voient toutes les coordonnées renseignées.
-        </p>
+        
+        <div id="directory-add-user-wrap" class="hidden mb-2">
+            <button type="button" id="directory-add-user-btn" class="btn btn-ghost btn-xs border border-slate-200">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
+                Ajouter
+            </button>
+        </div>
         <div id="directory-users-status" class="text-[11px] text-slate-500 mb-3 min-h-[1rem]"></div>
+        <div id="directory-admin-users-wrap" class="hidden mb-4">
+            <div id="directory-admin-users-table"></div>
+        </div>
         <div id="directory-section-admins" class="mb-4"></div>
         <div id="directory-section-profs" class="mb-4"></div>
         <div id="directory-section-eleves" class="mb-4"></div>

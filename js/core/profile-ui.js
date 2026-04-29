@@ -20,6 +20,51 @@ import {
 } from './planning-courses.js';
 
 let profileUiBound = false;
+let profileSaveInFlight = false;
+let profileBaseline = null;
+
+function formatFrPhone(raw) {
+    const digits = String(raw || '').replace(/\D+/g, '').slice(0, 10);
+    if (!digits) return '';
+    return digits.replace(/(\d{2})(?=\d)/g, '$1 ').trim();
+}
+
+function readProfileFormState() {
+    const nameEl = document.getElementById('profile-display-name-input');
+    const emailEl = document.getElementById('profile-email-input');
+    const phoneEl = document.getElementById('profile-phone-input');
+    const shareEmailEl = document.getElementById('profile-share-email');
+    const sharePhoneEl = document.getElementById('profile-share-phone');
+    return {
+        name: nameEl instanceof HTMLInputElement ? nameEl.value.trim() : '',
+        email: emailEl instanceof HTMLInputElement ? emailEl.value.trim() : '',
+        phone: phoneEl instanceof HTMLInputElement ? formatFrPhone(phoneEl.value) : '',
+        shareEmail: shareEmailEl instanceof HTMLInputElement ? shareEmailEl.checked : true,
+        sharePhone: sharePhoneEl instanceof HTMLInputElement ? sharePhoneEl.checked : false
+    };
+}
+
+function syncProfileBaselineFromForm() {
+    profileBaseline = readProfileFormState();
+}
+
+function hasProfilePendingChanges() {
+    if (!profileBaseline) return false;
+    const cur = readProfileFormState();
+    const passA = document.getElementById('profile-pass-new');
+    const passB = document.getElementById('profile-pass-confirm');
+    const hasPwd =
+        (passA instanceof HTMLInputElement && passA.value.trim() !== '') ||
+        (passB instanceof HTMLInputElement && passB.value.trim() !== '');
+    return (
+        cur.name !== profileBaseline.name ||
+        cur.email !== profileBaseline.email ||
+        cur.phone !== profileBaseline.phone ||
+        cur.shareEmail !== profileBaseline.shareEmail ||
+        cur.sharePhone !== profileBaseline.sharePhone ||
+        hasPwd
+    );
+}
 
 async function loadPersonalPoolRow(userId) {
     if (!isBackendAuthConfigured() || !userId) {
@@ -122,7 +167,10 @@ export async function refreshHeaderWeekStrip(user) {
 }
 
 async function fillProfileModal(user) {
-    document.getElementById('profile-display-name').textContent = user.name || '—';
+    const displayNameInput = document.getElementById('profile-display-name-input');
+    if (displayNameInput instanceof HTMLInputElement) {
+        displayNameInput.value = String(user.name || '').trim();
+    }
     const emailInput = document.getElementById('profile-email-input');
     if (emailInput instanceof HTMLInputElement) {
         emailInput.value = user.email || '';
@@ -148,7 +196,7 @@ async function fillProfileModal(user) {
         }
     }
     const phoneInput = document.getElementById('profile-phone-input');
-    if (phoneInput instanceof HTMLInputElement) phoneInput.value = tel;
+    if (phoneInput instanceof HTMLInputElement) phoneInput.value = formatFrPhone(tel);
     const shE = document.getElementById('profile-share-email');
     if (shE instanceof HTMLInputElement) shE.checked = shareEmail;
     const shP = document.getElementById('profile-share-phone');
@@ -158,6 +206,7 @@ async function fillProfileModal(user) {
     const passConfirm = document.getElementById('profile-pass-confirm');
     if (passNew instanceof HTMLInputElement) passNew.value = '';
     if (passConfirm instanceof HTMLInputElement) passConfirm.value = '';
+    syncProfileBaselineFromForm();
 
     const isEleve = String(user.role).toLowerCase() === 'eleve';
     document.getElementById('profile-cours-section')?.classList.toggle('hidden', !isEleve);
@@ -245,6 +294,8 @@ async function fillProfileModal(user) {
 
 export function resetProfileUiBindings() {
     profileUiBound = false;
+    profileSaveInFlight = false;
+    profileBaseline = null;
 }
 
 export function initProfileUi(currentUser) {
@@ -271,53 +322,10 @@ export function initProfileUi(currentUser) {
         void copyInputUrl('profile-url-personal')
     );
 
-    document.getElementById('profile-email-save')?.addEventListener('click', async () => {
-        const input = document.getElementById('profile-email-input');
-        if (!(input instanceof HTMLInputElement)) return;
-        const res = await updateCurrentUserEmail(input.value);
-        if (!res.ok) {
-            showToast(res.error || 'Impossible de modifier l’e-mail.', 'error');
-            return;
-        }
-        document.getElementById('profile-email-hint')?.classList.remove('hidden');
-        showToast('Demande de changement d’e-mail enregistrée.', 'success');
-    });
-
-    document.getElementById('profile-contact-save')?.addEventListener('click', async () => {
-        const u = getPlanningSessionUser();
-        if (!u?.id || !isBackendAuthConfigured()) {
-            showToast('Session indisponible.', 'error');
-            return;
-        }
-        const sb = getSupabaseClient();
-        if (!sb) {
-            showToast('Session indisponible.', 'error');
-            return;
-        }
-        const phoneEl = document.getElementById('profile-phone-input');
-        const telephone = phoneEl instanceof HTMLInputElement ? phoneEl.value.trim().slice(0, 40) : '';
-        const cE = document.getElementById('profile-share-email');
-        const cP = document.getElementById('profile-share-phone');
-        const directory_share_email = cE instanceof HTMLInputElement ? cE.checked : true;
-        const directory_share_phone = cP instanceof HTMLInputElement ? cP.checked : false;
-        const { error } = await sb
-            .from('profiles')
-            .update({ telephone, directory_share_email, directory_share_phone })
-            .eq('id', u.id);
-        if (error) {
-            showToast(error.message || 'Impossible d’enregistrer.', 'error');
-            return;
-        }
-        const cur = getPlanningSessionUser();
-        if (cur) {
-            setPlanningSessionUser({
-                ...cur,
-                telephone,
-                directory_share_email,
-                directory_share_phone
-            });
-        }
-        showToast('Téléphone et visibilité enregistrés.', 'success');
+    document.getElementById('profile-phone-input')?.addEventListener('blur', (e) => {
+        const el = e.target;
+        if (!(el instanceof HTMLInputElement)) return;
+        el.value = formatFrPhone(el.value);
     });
 
     const passToggle = document.getElementById('profile-pass-show-plain');
@@ -330,19 +338,92 @@ export function initProfileUi(currentUser) {
     passToggle?.addEventListener('change', (e) =>
         applyPassVisibility(Boolean((e.target instanceof HTMLInputElement && e.target.checked)))
     );
-    document.getElementById('modal_profile')?.addEventListener('close', () => applyPassVisibility(false));
+    const profileDlg = document.getElementById('modal_profile');
+    profileDlg?.addEventListener('close', () => applyPassVisibility(false));
+    profileDlg?.addEventListener('cancel', (e) => {
+        if (!hasProfilePendingChanges()) return;
+        e.preventDefault();
+        if (confirm('Fermer sans enregistrer les modifications du profil ?')) {
+            profileDlg.close();
+        }
+    });
 
-    document.getElementById('profile-pass-save')?.addEventListener('click', async () => {
-        const a = /** @type {HTMLInputElement | null} */ (document.getElementById('profile-pass-new'));
-        const b = /** @type {HTMLInputElement | null} */ (document.getElementById('profile-pass-confirm'));
-        const res = await updateCurrentUserPasswordSimple(a?.value || '', b?.value || '');
-        if (!res.ok) {
-            showToast(res.error || 'Impossible de modifier le mot de passe.', 'error');
+    document.getElementById('profile-close-btn')?.addEventListener('click', () => {
+        if (!profileDlg) return;
+        if (hasProfilePendingChanges()) {
+            if (!confirm('Fermer sans enregistrer les modifications du profil ?')) return;
+        }
+        profileDlg.close();
+    });
+
+    document.getElementById('profile-save-all')?.addEventListener('click', async () => {
+        if (profileSaveInFlight) return;
+        const u = getPlanningSessionUser();
+        if (!u?.id || !isBackendAuthConfigured()) {
+            showToast('Session indisponible.', 'error');
             return;
         }
-        if (a) a.value = '';
-        if (b) b.value = '';
-        applyPassVisibility(false);
-        showToast('Mot de passe modifié avec succès.', 'success');
+        const sb = getSupabaseClient();
+        if (!sb) {
+            showToast('Session indisponible.', 'error');
+            return;
+        }
+        profileSaveInFlight = true;
+        const saveBtn = document.getElementById('profile-save-all');
+        if (saveBtn instanceof HTMLButtonElement) saveBtn.disabled = true;
+        try {
+            const form = readProfileFormState();
+            const telephone = String(form.phone || '').slice(0, 40);
+            const { error } = await sb
+                .from('profiles')
+                .update({
+                    display_name: form.name,
+                    telephone,
+                    directory_share_email: form.shareEmail,
+                    directory_share_phone: form.sharePhone
+                })
+                .eq('id', u.id);
+            if (error) {
+                showToast(error.message || 'Impossible d’enregistrer.', 'error');
+                return;
+            }
+            const current = getPlanningSessionUser();
+            if (current) {
+                setPlanningSessionUser({
+                    ...current,
+                    name: form.name,
+                    telephone,
+                    directory_share_email: form.shareEmail,
+                    directory_share_phone: form.sharePhone
+                });
+            }
+            const previousEmail = String(u.email || '').trim().toLowerCase();
+            const nextEmail = String(form.email || '').trim().toLowerCase();
+            if (nextEmail && nextEmail !== previousEmail) {
+                const emailRes = await updateCurrentUserEmail(form.email);
+                if (!emailRes.ok) {
+                    showToast(emailRes.error || 'Impossible de modifier l’e-mail.', 'error');
+                    return;
+                }
+                document.getElementById('profile-email-hint')?.classList.remove('hidden');
+            }
+            const a = /** @type {HTMLInputElement | null} */ (document.getElementById('profile-pass-new'));
+            const b = /** @type {HTMLInputElement | null} */ (document.getElementById('profile-pass-confirm'));
+            if ((a?.value || '').trim() || (b?.value || '').trim()) {
+                const passRes = await updateCurrentUserPasswordSimple(a?.value || '', b?.value || '');
+                if (!passRes.ok) {
+                    showToast(passRes.error || 'Impossible de modifier le mot de passe.', 'error');
+                    return;
+                }
+                if (a) a.value = '';
+                if (b) b.value = '';
+                applyPassVisibility(false);
+            }
+            showToast('Profil enregistré.', 'success');
+            syncProfileBaselineFromForm();
+        } finally {
+            profileSaveInFlight = false;
+            if (saveBtn instanceof HTMLButtonElement) saveBtn.disabled = false;
+        }
     });
 }
