@@ -6,6 +6,7 @@
   "scripts": {
     "build": "npm run build:css",
     "build:css": "npx @tailwindcss/cli -i ./css/tailwind.input.css -o ./css/tailwind.generated.css --minify",
+    "serve:local": "bash ./scripts/start-local-server.sh",
     "predeploy": "npm run build:css",
     "deploy:supabase": "node scripts/deploy-supabase.cjs",
     "deploy:supabase:db": "supabase db push --yes",

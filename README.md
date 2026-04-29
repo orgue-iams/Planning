@@ -12,7 +12,18 @@ Le projet compile Tailwind + DaisyUI en local (pas de script CDN Tailwind en pro
 - Build CSS : `npm run build:css`
 - Build standard : `npm run build`
 - Watch CSS (dev) : `npm run watch:css`
+- Serveur local : `npm run serve:local` (http://localhost:4173)
 - Préparer le dossier GitHub Pages (`_site/`, avec build CSS inclus) : `npm run deploy:pages`
+
+## Démarrage automatique dans Cursor
+
+Le projet configure un auto-lancement du serveur local à l'ouverture du dossier dans Cursor/VS Code :
+
+- tâche : `.vscode/tasks.json` (`Start local web server (auto)`)
+- trigger auto : `.vscode/settings.json` (`task.allowAutomaticTasks`)
+- script idempotent : `scripts/start-local-server.sh`
+
+Le serveur est démarré en arrière-plan sur **http://localhost:4173** et le script évite les doublons si le port est déjà occupé.
 
 ## Checklist avant push/deploy
 
@@ -22,7 +33,7 @@ Le projet compile Tailwind + DaisyUI en local (pas de script CDN Tailwind en pro
 4. Incrémenter `CACHE_NAME` dans `js/config/cache-name.js` si les assets changent
 5. Déployer (CI : workflow **Deploy GitHub Pages** sur `main` / `master`)
 
-Version cache actuelle : `orgue-v158`.
+Version cache actuelle : `orgue-v171`.
 
 ## Notes
 
