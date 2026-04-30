@@ -91,6 +91,45 @@ function keyPreview(k: string) {
     return `${s.slice(0, 6)}…${s.slice(-4)}`;
 }
 
+async function probeBrevoAuth(apiKey: string) {
+    const attempts: Array<{ mode: string; headers: Record<string, string> }> = [
+        {
+            mode: 'api-key',
+            headers: { accept: 'application/json', 'api-key': apiKey }
+        },
+        {
+            mode: 'authorization-bearer',
+            headers: { accept: 'application/json', Authorization: `Bearer ${apiKey}` }
+        },
+        {
+            mode: 'partner-key',
+            headers: { accept: 'application/json', 'partner-key': apiKey }
+        }
+    ];
+    const out: Array<{ mode: string; status: number; detail: string }> = [];
+    for (const a of attempts) {
+        try {
+            const res = await fetch('https://api.brevo.com/v3/account', {
+                method: 'GET',
+                headers: a.headers
+            });
+            const txt = await res.text();
+            out.push({
+                mode: a.mode,
+                status: res.status,
+                detail: txt.slice(0, 220)
+            });
+        } catch (e) {
+            out.push({
+                mode: a.mode,
+                status: 0,
+                detail: String(e instanceof Error ? e.message : e).slice(0, 220)
+            });
+        }
+    }
+    return out;
+}
+
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
@@ -135,6 +174,7 @@ Deno.serve(async (req) => {
 
         if (body.debugBrevo === true) {
             const fromDomain = fromEmail.includes('@') ? fromEmail.split('@')[1] : '';
+            const authProbe = await probeBrevoAuth(apiKey);
             return json({
                 ok: true,
                 debug: {
@@ -142,7 +182,8 @@ Deno.serve(async (req) => {
                     keyStartsWithXkeysib: apiKey.toLowerCase().startsWith('xkeysib-'),
                     keyPreview: keyPreview(apiKey),
                     fromEmailPreview: fromEmail ? `${fromEmail.slice(0, 3)}…@${fromDomain}` : '',
-                    fromEmailDomain: fromDomain
+                    fromEmailDomain: fromDomain,
+                    authProbe
                 }
             });
         }
