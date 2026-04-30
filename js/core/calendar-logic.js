@@ -945,9 +945,14 @@ export function getEventContent(arg, currentUser) {
 
     const formatShortDay = (d) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 
+    const timeTextFc = String(arg.timeText || '').trim();
     let timeLine;
     if (!sameCalendarDay) {
         timeLine = `${formatShortDay(start)} ${formatTime(start)} → ${formatShortDay(endDisplay)} ${formatTime(endDisplay)}`;
+    } else if (timeTextFc) {
+        // Utiliser le libellé horaire calculé par FullCalendar (source affichée sur la grille),
+        // pour éviter tout décalage visuel entre position du créneau et bandeau horaire.
+        timeLine = timeTextFc.replace(/\s*-\s*/g, ' – ');
     } else {
         timeLine = `${formatTime(start)} – ${formatTime(endDisplay)}`;
     }

@@ -179,20 +179,46 @@ ${detailHtml}
 <p>Ce message est automatique ; en cas de question, vous pouvez répondre directement à cette personne.</p>
 </body></html>`;
 
-        const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+        const brevoBody = {
+            sender: { name: fromName, email: fromEmail },
+            to: [{ email: targetEmail }],
+            subject,
+            htmlContent: html
+        };
+
+        let brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
             method: 'POST',
             headers: {
                 accept: 'application/json',
                 'content-type': 'application/json',
                 'api-key': apiKey
             },
-            body: JSON.stringify({
-                sender: { name: fromName, email: fromEmail },
-                to: [{ email: targetEmail }],
-                subject,
-                htmlContent: html
-            })
+            body: JSON.stringify(brevoBody)
         });
+
+        // Compatibilité compte parent/subaccount Brevo : certaines clés ne passent qu'en partner-key.
+        if (brevoRes.status === 401) {
+            const firstRaw = await brevoRes.text();
+            const firstMsg = firstRaw.toLowerCase();
+            if (firstMsg.includes('key not found') || firstMsg.includes('unauthorized')) {
+                brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+                    method: 'POST',
+                    headers: {
+                        accept: 'application/json',
+                        'content-type': 'application/json',
+                        'partner-key': apiKey
+                    },
+                    body: JSON.stringify(brevoBody)
+                });
+            } else {
+                return json({
+                    ok: false,
+                    emailSent: false,
+                    error: 'BREVO_SEND_FAILED',
+                    detail: firstRaw.slice(0, 400)
+                });
+            }
+        }
 
         if (!brevoRes.ok) {
             const t = await brevoRes.text();

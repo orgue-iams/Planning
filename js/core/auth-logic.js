@@ -121,6 +121,7 @@ export async function login(email, pass, rememberMe = true) {
         return { success: false };
     }
     // Réduit les 400 "session stale" après longue inactivité (tokens croisés/revoked en storage).
+    muteSessionLostEvents(4000);
     await clearCorruptedLocalAuthSession();
     let { data, error } = await supabase.auth.signInWithPassword({
         email: id,
@@ -419,6 +420,7 @@ let logoutImpl = () => window.location.reload();
 /** Distinguish déconnexion explicite vs expiration (onAuth SIGNED_OUT). */
 let _userInitiatedLogout = false;
 let _sessionLostHandler = /** @type {((message: string) => void) | null} */ (null);
+let _muteSessionLostEventsUntil = 0;
 
 export function setLogoutHandler(fn) {
     if (typeof fn === 'function') logoutImpl = fn;
@@ -467,6 +469,10 @@ function markUserInitiatedLogout() {
     _userInitiatedLogout = true;
 }
 
+function muteSessionLostEvents(ms = 2500) {
+    _muteSessionLostEventsUntil = Math.max(_muteSessionLostEventsUntil, Date.now() + ms);
+}
+
 /** À appeler une fois au boot (après setSessionLostHandler) si Supabase est configuré. */
 export function initSessionLostListeners() {
     if (typeof window === 'undefined' || !isBackendAuthConfigured()) return;
@@ -475,7 +481,12 @@ export function initSessionLostListeners() {
     const {
         data: { subscription }
     } = sb.auth.onAuthStateChange((event) => {
-        if (event === 'SIGNED_OUT' && !_userInitiatedLogout && _sessionLostHandler) {
+        if (
+            event === 'SIGNED_OUT' &&
+            !_userInitiatedLogout &&
+            Date.now() >= _muteSessionLostEventsUntil &&
+            _sessionLostHandler
+        ) {
             _sessionLostHandler('Votre session a expiré. Vous avez été déconnecté.');
         }
         if (event === 'SIGNED_IN') {
@@ -499,10 +510,10 @@ export function initSessionLostListeners() {
 
 export async function logout() {
     markUserInitiatedLogout();
+    muteSessionLostEvents(4000);
     clearSupabasePasswordRecoveryPending();
     if (isBackendAuthConfigured()) {
         await getSupabaseClient()?.auth.signOut();
     }
-    _userInitiatedLogout = false;
     logoutImpl();
 }
