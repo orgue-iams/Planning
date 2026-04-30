@@ -248,83 +248,22 @@ ${detailHtml}
             htmlContent: html
         };
 
-        const authAttempts: Array<{ mode: string; headers: Record<string, string> }> = [
-            {
-                mode: 'all-headers',
-                headers: {
-                    accept: 'application/json',
-                    'content-type': 'application/json',
-                    'api-key': apiKey,
-                    'Api-Key': apiKey,
-                    apikey: apiKey,
-                    Authorization: `Bearer ${apiKey}`,
-                    'partner-key': apiKey
-                }
+        const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+                accept: 'application/json',
+                'content-type': 'application/json',
+                'api-key': apiKey
             },
-            {
-                mode: 'authorization-bearer',
-                headers: {
-                    accept: 'application/json',
-                    'content-type': 'application/json',
-                    Authorization: `Bearer ${apiKey}`
-                }
-            },
-            {
-                mode: 'partner-key',
-                headers: {
-                    accept: 'application/json',
-                    'content-type': 'application/json',
-                    'partner-key': apiKey
-                }
-            }
-        ];
-
-        let brevoRes: Response | null = null;
-        let lastAuthDetail = '';
-        let authModeUsed = '';
-        const attemptDetails: string[] = [];
-        for (const attempt of authAttempts) {
-            const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-                method: 'POST',
-                headers: attempt.headers,
-                body: JSON.stringify(brevoBody)
-            });
-            authModeUsed = attempt.mode;
-            if (res.ok) {
-                brevoRes = res;
-                break;
-            }
-            const raw = await res.text();
-            lastAuthDetail = `[${attempt.mode}] ${raw.slice(0, 300)}`;
-            attemptDetails.push(lastAuthDetail);
-            if (res.status !== 401) {
-                return json({
-                    ok: false,
-                    emailSent: false,
-                    error: 'BREVO_SEND_FAILED',
-                    detail: lastAuthDetail
-                });
-            }
-        }
-        if (!brevoRes) {
-            return json({
-                ok: false,
-                emailSent: false,
-                error: 'BREVO_SEND_FAILED',
-                detail:
-                    attemptDetails.join(' | ').slice(0, 800) ||
-                    lastAuthDetail ||
-                    'Aucune méthode d’auth Brevo acceptée.'
-            });
-        }
-
+            body: JSON.stringify(brevoBody)
+        });
         if (!brevoRes.ok) {
             const t = await brevoRes.text();
             return json({
                 ok: false,
                 emailSent: false,
                 error: 'BREVO_SEND_FAILED',
-                detail: `[${authModeUsed}] ${t.slice(0, 350)}`
+                detail: `[api-key] ${t.slice(0, 350)}`
             });
         }
 
