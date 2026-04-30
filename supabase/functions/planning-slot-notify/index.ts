@@ -188,11 +188,15 @@ ${detailHtml}
 
         const authAttempts: Array<{ mode: string; headers: Record<string, string> }> = [
             {
-                mode: 'api-key',
+                mode: 'all-headers',
                 headers: {
                     accept: 'application/json',
                     'content-type': 'application/json',
-                    'api-key': apiKey
+                    'api-key': apiKey,
+                    'Api-Key': apiKey,
+                    apikey: apiKey,
+                    Authorization: `Bearer ${apiKey}`,
+                    'partner-key': apiKey
                 }
             },
             {
@@ -216,6 +220,7 @@ ${detailHtml}
         let brevoRes: Response | null = null;
         let lastAuthDetail = '';
         let authModeUsed = '';
+        const attemptDetails: string[] = [];
         for (const attempt of authAttempts) {
             const res = await fetch('https://api.brevo.com/v3/smtp/email', {
                 method: 'POST',
@@ -229,6 +234,7 @@ ${detailHtml}
             }
             const raw = await res.text();
             lastAuthDetail = `[${attempt.mode}] ${raw.slice(0, 300)}`;
+            attemptDetails.push(lastAuthDetail);
             if (res.status !== 401) {
                 return json({
                     ok: false,
@@ -243,7 +249,10 @@ ${detailHtml}
                 ok: false,
                 emailSent: false,
                 error: 'BREVO_SEND_FAILED',
-                detail: lastAuthDetail || 'Aucune méthode d’auth Brevo acceptée.'
+                detail:
+                    attemptDetails.join(' | ').slice(0, 800) ||
+                    lastAuthDetail ||
+                    'Aucune méthode d’auth Brevo acceptée.'
             });
         }
 
