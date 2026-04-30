@@ -592,6 +592,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         await new Promise((r) => setTimeout(r, 200));
     }
 
+    const hadStoredSupabaseSession = (() => {
+        try {
+            const hasSbKeys = (s) => {
+                for (let i = 0; i < s.length; i++) {
+                    const k = s.key(i);
+                    if (k && k.startsWith('sb-')) return true;
+                }
+                return false;
+            };
+            return hasSbKeys(localStorage) || hasSbKeys(sessionStorage);
+        } catch {
+            return false;
+        }
+    })();
     const restored = await tryRestoreSession();
     if (restored) {
         currentUser = restored;
@@ -599,6 +613,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         refreshHeaderUser(currentUser);
         initCalendarAndRevealUi();
         document.getElementById('modal_login')?.close();
+    } else if (hadStoredSupabaseSession && isBackendAuthConfigured()) {
+        showToast('Votre session a expiré. Merci de vous reconnecter.', 'info', 6000);
     }
 
     if (await shouldResumeSupabasePasswordRecovery()) {

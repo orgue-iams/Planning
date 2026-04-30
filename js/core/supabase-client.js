@@ -122,8 +122,13 @@ export function isInvalidRefreshTokenError(err) {
     return (
         code === 'refresh_token_not_found' ||
         code === 'invalid_refresh_token' ||
+        code === 'refresh_token_expired' ||
+        code === 'refresh_token_already_used' ||
+        code === 'invalid_grant' ||
         /invalid.?refresh.?token/.test(msg) ||
-        /refresh.?token.?not.?found/.test(msg)
+        /refresh.?token.?not.?found/.test(msg) ||
+        /refresh.?token.*(expired|revoked|already used|invalid)/.test(msg) ||
+        /invalid.?grant/.test(msg)
     );
 }
 

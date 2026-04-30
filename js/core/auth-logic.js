@@ -120,15 +120,19 @@ export async function login(email, pass, rememberMe = true) {
         showToast('Configuration Supabase invalide.', 'error');
         return { success: false };
     }
-    try {
-        await supabase.auth.signOut({ scope: 'local' });
-    } catch {
-        /* session absente ou stockage restreint */
-    }
-    const { data, error } = await supabase.auth.signInWithPassword({
+    // Réduit les 400 "session stale" après longue inactivité (tokens croisés/revoked en storage).
+    await clearCorruptedLocalAuthSession();
+    let { data, error } = await supabase.auth.signInWithPassword({
         email: id,
         password: pass
     });
+    if (error && isInvalidRefreshTokenError(error)) {
+        await clearCorruptedLocalAuthSession();
+        ({ data, error } = await supabase.auth.signInWithPassword({
+            email: id,
+            password: pass
+        }));
+    }
     if (error) {
         const raw = String(error.message || '').toLowerCase();
         let msg = error.message || 'Identifiants invalides.';
