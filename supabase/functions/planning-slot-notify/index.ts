@@ -66,6 +66,16 @@ function actionLabelFr(action: SlotAction): string {
     }
 }
 
+function normalizeSecretValue(v: string | undefined): string {
+    const raw = String(v ?? '').trim();
+    if (!raw) return '';
+    const unquoted =
+        (raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))
+            ? raw.slice(1, -1).trim()
+            : raw;
+    return unquoted.replace(/\r?\n/g, '').trim();
+}
+
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
@@ -115,8 +125,8 @@ Deno.serve(async (req) => {
             return json({ ok: true, emailSent: false, skipped: true }, 200);
         }
 
-        const apiKey = Deno.env.get('BREVO_API_KEY')?.trim();
-        const fromEmail = Deno.env.get('NOTIFY_FROM_EMAIL')?.trim();
+        const apiKey = normalizeSecretValue(Deno.env.get('BREVO_API_KEY'));
+        const fromEmail = normalizeSecretValue(Deno.env.get('NOTIFY_FROM_EMAIL'));
         const fromName = (Deno.env.get('NOTIFY_FROM_NAME') ?? 'Planning Orgue IAMS').trim();
 
         if (!apiKey || !fromEmail) {
