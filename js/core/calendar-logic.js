@@ -884,7 +884,14 @@ export async function maybeNotifySlotOwnerAfterThirdPartyEdit({
                 debugBrevo: true
             }).then((dbg) => {
                 const d = /** @type {{ debug?: unknown }} */ (dbg).debug;
-                if (d) console.warn('[slot-notify] Brevo debug', d);
+                if (d) {
+                    console.warn('[slot-notify] Brevo debug', d);
+                    try {
+                        console.warn('[slot-notify] Brevo debug json', JSON.stringify(d));
+                    } catch {
+                        /* */
+                    }
+                }
             }).catch(() => {
                 /* non bloquant */
             });
