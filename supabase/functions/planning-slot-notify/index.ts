@@ -186,38 +186,65 @@ ${detailHtml}
             htmlContent: html
         };
 
-        let brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-            method: 'POST',
-            headers: {
-                accept: 'application/json',
-                'content-type': 'application/json',
-                'api-key': apiKey
+        const authAttempts: Array<{ mode: string; headers: Record<string, string> }> = [
+            {
+                mode: 'api-key',
+                headers: {
+                    accept: 'application/json',
+                    'content-type': 'application/json',
+                    'api-key': apiKey
+                }
             },
-            body: JSON.stringify(brevoBody)
-        });
+            {
+                mode: 'authorization-bearer',
+                headers: {
+                    accept: 'application/json',
+                    'content-type': 'application/json',
+                    Authorization: `Bearer ${apiKey}`
+                }
+            },
+            {
+                mode: 'partner-key',
+                headers: {
+                    accept: 'application/json',
+                    'content-type': 'application/json',
+                    'partner-key': apiKey
+                }
+            }
+        ];
 
-        // Compatibilité compte parent/subaccount Brevo : certaines clés ne passent qu'en partner-key.
-        if (brevoRes.status === 401) {
-            const firstRaw = await brevoRes.text();
-            const firstMsg = firstRaw.toLowerCase();
-            if (firstMsg.includes('key not found') || firstMsg.includes('unauthorized')) {
-                brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-                    method: 'POST',
-                    headers: {
-                        accept: 'application/json',
-                        'content-type': 'application/json',
-                        'partner-key': apiKey
-                    },
-                    body: JSON.stringify(brevoBody)
-                });
-            } else {
+        let brevoRes: Response | null = null;
+        let lastAuthDetail = '';
+        let authModeUsed = '';
+        for (const attempt of authAttempts) {
+            const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+                method: 'POST',
+                headers: attempt.headers,
+                body: JSON.stringify(brevoBody)
+            });
+            authModeUsed = attempt.mode;
+            if (res.ok) {
+                brevoRes = res;
+                break;
+            }
+            const raw = await res.text();
+            lastAuthDetail = `[${attempt.mode}] ${raw.slice(0, 300)}`;
+            if (res.status !== 401) {
                 return json({
                     ok: false,
                     emailSent: false,
                     error: 'BREVO_SEND_FAILED',
-                    detail: firstRaw.slice(0, 400)
+                    detail: lastAuthDetail
                 });
             }
+        }
+        if (!brevoRes) {
+            return json({
+                ok: false,
+                emailSent: false,
+                error: 'BREVO_SEND_FAILED',
+                detail: lastAuthDetail || 'Aucune méthode d’auth Brevo acceptée.'
+            });
         }
 
         if (!brevoRes.ok) {
@@ -226,7 +253,7 @@ ${detailHtml}
                 ok: false,
                 emailSent: false,
                 error: 'BREVO_SEND_FAILED',
-                detail: t.slice(0, 400)
+                detail: `[${authModeUsed}] ${t.slice(0, 350)}`
             });
         }
 
