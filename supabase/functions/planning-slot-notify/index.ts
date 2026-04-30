@@ -84,6 +84,13 @@ function normalizeBrevoApiKey(v: string | undefined): string {
     return s;
 }
 
+function keyPreview(k: string) {
+    const s = String(k || '');
+    if (!s) return '';
+    if (s.length <= 10) return `${s.slice(0, 2)}…${s.slice(-2)}`;
+    return `${s.slice(0, 6)}…${s.slice(-4)}`;
+}
+
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
@@ -113,6 +120,33 @@ Deno.serve(async (req) => {
             return json({ ok: false, emailSent: false, error: 'JSON invalide' }, 400);
         }
 
+        const apiKey = normalizeBrevoApiKey(Deno.env.get('BREVO_API_KEY'));
+        const fromEmail = normalizeSecretValue(Deno.env.get('NOTIFY_FROM_EMAIL'));
+        const fromName = (Deno.env.get('NOTIFY_FROM_NAME') ?? 'Planning Orgue IAMS').trim();
+
+        if (!apiKey || !fromEmail) {
+            return json({
+                ok: false,
+                emailSent: false,
+                error: 'EMAIL_NOT_CONFIGURED',
+                detail: 'Secrets BREVO_API_KEY et NOTIFY_FROM_EMAIL requis'
+            });
+        }
+
+        if (body.debugBrevo === true) {
+            const fromDomain = fromEmail.includes('@') ? fromEmail.split('@')[1] : '';
+            return json({
+                ok: true,
+                debug: {
+                    keyLength: apiKey.length,
+                    keyStartsWithXkeysib: apiKey.toLowerCase().startsWith('xkeysib-'),
+                    keyPreview: keyPreview(apiKey),
+                    fromEmailPreview: fromEmail ? `${fromEmail.slice(0, 3)}…@${fromDomain}` : '',
+                    fromEmailDomain: fromDomain
+                }
+            });
+        }
+
         const targetEmail = String(body.targetEmail ?? '')
             .trim()
             .toLowerCase();
@@ -131,19 +165,6 @@ Deno.serve(async (req) => {
 
         if (targetEmail === actorEmail) {
             return json({ ok: true, emailSent: false, skipped: true }, 200);
-        }
-
-        const apiKey = normalizeBrevoApiKey(Deno.env.get('BREVO_API_KEY'));
-        const fromEmail = normalizeSecretValue(Deno.env.get('NOTIFY_FROM_EMAIL'));
-        const fromName = (Deno.env.get('NOTIFY_FROM_NAME') ?? 'Planning Orgue IAMS').trim();
-
-        if (!apiKey || !fromEmail) {
-            return json({
-                ok: false,
-                emailSent: false,
-                error: 'EMAIL_NOT_CONFIGURED',
-                detail: 'Secrets BREVO_API_KEY et NOTIFY_FROM_EMAIL requis'
-            });
         }
 
         const actorDisplayName = String(body.actorDisplayName ?? '').trim() || actorEmail;

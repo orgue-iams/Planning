@@ -879,6 +879,15 @@ export async function maybeNotifySlotOwnerAfterThirdPartyEdit({
         } else if (errCode === 'BREVO_SEND_FAILED' && detail) {
             hint = ` Voir console (F12) pour le détail Brevo.`;
             console.warn('[slot-notify] Brevo', detail);
+            // Diagnostic serveur (sans exposer la clé) pour confirmer le secret réellement lu côté function.
+            void invokeSlotNotify({
+                debugBrevo: true
+            }).then((dbg) => {
+                const d = /** @type {{ debug?: unknown }} */ (dbg).debug;
+                if (d) console.warn('[slot-notify] Brevo debug', d);
+            }).catch(() => {
+                /* non bloquant */
+            });
         } else if (errCode && errCode !== 'undefined') {
             hint = ` (${errCode})`;
         }
