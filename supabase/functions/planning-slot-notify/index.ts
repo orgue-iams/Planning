@@ -76,6 +76,14 @@ function normalizeSecretValue(v: string | undefined): string {
     return unquoted.replace(/\r?\n/g, '').trim();
 }
 
+function normalizeBrevoApiKey(v: string | undefined): string {
+    let s = normalizeSecretValue(v);
+    if (!s) return '';
+    s = s.replace(/^api-key\s*:\s*/i, '').trim();
+    s = s.replace(/^bearer\s+/i, '').trim();
+    return s;
+}
+
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
@@ -125,7 +133,7 @@ Deno.serve(async (req) => {
             return json({ ok: true, emailSent: false, skipped: true }, 200);
         }
 
-        const apiKey = normalizeSecretValue(Deno.env.get('BREVO_API_KEY'));
+        const apiKey = normalizeBrevoApiKey(Deno.env.get('BREVO_API_KEY'));
         const fromEmail = normalizeSecretValue(Deno.env.get('NOTIFY_FROM_EMAIL'));
         const fromName = (Deno.env.get('NOTIFY_FROM_NAME') ?? 'Planning Orgue IAMS').trim();
 
