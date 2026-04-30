@@ -264,7 +264,7 @@ export function initDirectoryUsersUi() {
     });
     document.getElementById('directory-admin-users-table')?.addEventListener('click', (e) => {
         const t = e.target;
-        if (!(t instanceof HTMLElement)) return;
+        if (!(t instanceof Element)) return;
         const copyBtn = t.closest('.directory-copy-cal');
         if (copyBtn instanceof HTMLButtonElement) {
             copyCalendarUrl(copyBtn.dataset.calId || '');

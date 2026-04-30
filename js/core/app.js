@@ -194,6 +194,8 @@ function refreshHeaderUser(user) {
 function initCalendarAndRevealUi() {
     if (calendar) return;
     let suppressDateClickUntil = 0;
+    let lastDateClickStamp = 0;
+    let lastDateClickKey = '';
 
     const handlers = {
         onDatesSet: null,
@@ -220,6 +222,14 @@ function initCalendarAndRevealUi() {
         onDateClick: (info) => {
             queueMicrotask(() => {
                 if (Date.now() < suppressDateClickUntil) return;
+                const slotMs = info?.date instanceof Date ? info.date.getTime() : Number.NaN;
+                const clickKey = Number.isFinite(slotMs)
+                    ? `${info.view?.type || ''}:${slotMs}:${info.allDay ? '1' : '0'}`
+                    : '';
+                const now = Date.now();
+                if (clickKey && clickKey === lastDateClickKey && now - lastDateClickStamp < 450) return;
+                lastDateClickKey = clickKey;
+                lastDateClickStamp = now;
                 currentEvent = null;
                 if (!currentUser?.email) {
                     showToast('Connectez-vous pour réserver.', 'error');
