@@ -1,9 +1,8 @@
 <dialog id="modal_users_admin" class="modal">
     <div class="modal-box p-5 w-[96%] max-w-xl max-h-[90dvh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col">
         <h3 id="admin-user-modal-title" class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest shrink-0">Nouvel utilisateur</h3>
-        <p id="admin-user-modal-subtitle" class="text-[10px] text-slate-500 mb-3 leading-snug">Créer un compte directement ou envoyer une invitation.</p>
 
-        <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-2 sm:p-2.5 mb-3 shrink-0">
+        <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-2 sm:p-2.5 mb-3 shrink-0 flex-1 min-h-0 overflow-y-auto">
             <p class="text-[9px] font-black uppercase text-slate-500 mb-1.5 tracking-wide">Utilisateur</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 gap-y-1.5">
                 <label class="flex flex-col gap-0 min-w-0">
@@ -23,6 +22,19 @@
                     <input type="tel" id="admin-invite-phone" placeholder="06 12 34 56 78" class="input input-xs input-bordered w-full text-xs h-8 min-h-0" maxlength="40" autocomplete="tel" />
                 </label>
             </div>
+
+            <div id="admin-user-create-mode-wrap" class="hidden mt-2 space-y-1.5">
+                <p class="text-[9px] font-black uppercase text-slate-500 tracking-wide">Action</p>
+                <label class="flex items-start gap-2 cursor-pointer text-[10px] font-bold text-slate-700 leading-snug">
+                    <input type="radio" name="admin-user-create-mode" value="invite" class="radio radio-xs radio-primary shrink-0 mt-0.5" checked />
+                    Inviter par e-mail (sans définir de mot de passe)
+                </label>
+                <label class="flex items-start gap-2 cursor-pointer text-[10px] font-bold text-slate-700 leading-snug">
+                    <input type="radio" name="admin-user-create-mode" value="create" class="radio radio-xs radio-primary shrink-0 mt-0.5" />
+                    Créer le compte tout de suite (mot de passe requis)
+                </label>
+            </div>
+
             <div class="grid grid-cols-[auto_minmax(0,1fr)] gap-2 items-end mt-1.5">
                 <label class="flex flex-col gap-0 w-max max-w-full shrink-0">
                     <span class="text-[9px] font-bold text-slate-500 leading-none mb-0.5">Rôle</span>
@@ -33,7 +45,7 @@
                     </select>
                 </label>
                 <label class="flex flex-col gap-0 min-w-0">
-                    <span class="text-[9px] font-bold text-slate-500 leading-none mb-0.5">Mot de passe <span class="font-normal text-slate-400">(oblig. pour « Créer le compte » ; ignoré pour « Inviter »)</span></span>
+                    <span id="admin-password-label" class="text-[9px] font-bold text-slate-500 leading-none mb-0.5">Mot de passe</span>
                     <div class="flex items-stretch gap-1 w-full min-w-0">
                         <button type="button" id="admin-create-pw-toggle" class="btn btn-ghost btn-xs btn-square shrink-0 h-8 w-8 min-h-8 p-0 text-slate-500 hover:text-slate-700 border border-slate-200 bg-white hover:bg-slate-50 shadow-none" aria-label="Afficher le mot de passe" aria-pressed="false">
                             <svg id="admin-create-pw-icon-show" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-[18px] h-[18px]" aria-hidden="true">
@@ -44,22 +56,17 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.274M6.228 6.228L3 3m3.228 3.228L12 12m-5.772-5.772L9.88 9.88M18.228 18.228L21 21m-2.772-2.772L12 12" />
                             </svg>
                         </button>
-                        <input type="password" id="admin-create-password" autocomplete="new-password" placeholder="Pour création uniquement" class="input input-xs input-bordered flex-1 min-w-0 text-xs h-8 min-h-0 admin-create-password-input" />
+                        <input type="password" id="admin-create-password" autocomplete="new-password" placeholder="" class="input input-xs input-bordered flex-1 min-w-0 text-xs h-8 min-h-0 admin-create-password-input" />
                     </div>
+                    <span id="admin-password-field-hint" class="hidden text-[8px] text-slate-500 mt-0.5 leading-snug"></span>
                 </label>
             </div>
-            <ul id="admin-create-pw-policy" class="text-[8px] text-slate-500 list-disc list-inside mt-1.5 mb-1.5 pl-0.5 columns-1 sm:columns-2 sm:gap-x-6 gap-y-0"></ul>
-            <div id="admin-user-create-actions" class="flex flex-wrap gap-1.5 pt-0.5">
-                <button type="button" id="admin-create-btn" class="btn btn-primary btn-xs flex-1 min-w-[7rem] sm:flex-none font-normal text-[10px] h-8 min-h-0 px-3">Créer le compte</button>
-                <button type="button" id="admin-invite-btn" class="btn btn-outline btn-xs flex-1 min-w-[7rem] sm:flex-none font-normal text-[10px] h-8 min-h-0 px-3">Inviter</button>
-            </div>
-            <div id="admin-user-edit-actions" class="hidden flex flex-wrap gap-1.5 pt-0.5">
-                <button type="button" id="admin-user-edit-save" class="btn btn-primary btn-xs flex-1 min-w-[7rem] sm:flex-none font-normal text-[10px] h-8 min-h-0 px-3">Sauvegarder</button>
-                <button type="button" id="admin-user-edit-close" class="btn btn-ghost btn-xs flex-1 min-w-[7rem] sm:flex-none font-normal text-[10px] h-8 min-h-0 px-3">Fermer</button>
-            </div>
+            <ul id="admin-create-pw-policy" class="text-[8px] text-slate-500 list-disc list-inside mt-1.5 mb-1 pl-0.5 columns-1 sm:columns-2 sm:gap-x-6 gap-y-0"></ul>
         </div>
-        <div class="modal-action mt-3 border-t border-slate-200 pt-3 shrink-0 flex flex-wrap justify-end gap-2">
+
+        <div class="modal-action mt-2 border-t border-slate-200 pt-3 shrink-0 flex flex-wrap justify-end gap-2">
             <button type="button" id="admin-user-modal-cancel" class="btn btn-ghost btn-sm font-normal text-[11px]">Annuler</button>
+            <button type="button" id="admin-user-modal-save" class="btn btn-primary btn-sm font-normal text-[11px]">Enregistrer</button>
         </div>
     </div>
 </dialog>

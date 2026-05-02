@@ -8,8 +8,43 @@ import { showToast } from '../utils/toast.js';
 import { PLANNING_ROLE_OPTIONS, isPlanningRole, normalizePlanningRole } from './planning-roles.js';
 
 let bound = false;
+/** @type {{ id: string; nom: string; prenom: string; email: string; telephone: string; role: string } | null} */
 let editUser = null;
 let editSnapshot = null;
+
+function confirmAdminAsync(message) {
+    return new Promise((resolve) => {
+        const dlg = document.getElementById('modal_admin_confirm');
+        const msg = document.getElementById('admin-confirm-message');
+        const btnOk = document.getElementById('admin-confirm-ok');
+        const btnCancel = document.getElementById('admin-confirm-cancel');
+        if (!dlg || !msg || !btnOk || !btnCancel) {
+            resolve(false);
+            return;
+        }
+        msg.textContent = message;
+
+        const cleanupAnd = (v) => {
+            btnOk.removeEventListener('click', onOk);
+            btnCancel.removeEventListener('click', onCancel);
+            dlg.removeEventListener('cancel', onCancel);
+            dlg.removeEventListener('click', onBackdrop);
+            dlg.close();
+            resolve(v);
+        };
+        const onOk = () => cleanupAnd(true);
+        const onCancel = () => cleanupAnd(false);
+        const onBackdrop = (e) => {
+            if (e.target === dlg) onCancel();
+        };
+
+        btnOk.addEventListener('click', onOk);
+        btnCancel.addEventListener('click', onCancel);
+        dlg.addEventListener('cancel', onCancel);
+        dlg.addEventListener('click', onBackdrop);
+        dlg.showModal();
+    });
+}
 
 function formatFrPhone(raw) {
     const digits = String(raw || '').replace(/\D+/g, '').slice(0, 10);
@@ -18,9 +53,7 @@ function formatFrPhone(raw) {
 }
 
 function roleOptions() {
-    return PLANNING_ROLE_OPTIONS.map(
-        (r) => `<option value="${r.value}">${r.label}</option>`
-    ).join('');
+    return PLANNING_ROLE_OPTIONS.map((r) => `<option value="${r.value}">${r.label}</option>`).join('');
 }
 
 function setCreatePasswordVisible(visible) {
@@ -60,6 +93,40 @@ function applyForm(data) {
     setCreatePasswordVisible(false);
 }
 
+function getCreateMode() {
+    const el = document.querySelector('input[name="admin-user-create-mode"]:checked');
+    return el instanceof HTMLInputElement && el.value === 'create' ? 'create' : 'invite';
+}
+
+function syncCreateModePasswordField() {
+    const edit = Boolean(editUser);
+    const inviteMode = !edit && getCreateMode() === 'invite';
+    const pw = document.getElementById('admin-create-password');
+    const toggle = document.getElementById('admin-create-pw-toggle');
+    if (pw instanceof HTMLInputElement) {
+        pw.disabled = inviteMode;
+        if (inviteMode) pw.value = '';
+    }
+    toggle?.toggleAttribute('disabled', inviteMode);
+}
+
+function updatePasswordFieldChrome(isEdit) {
+    const pw = document.getElementById('admin-create-password');
+    const hint = document.getElementById('admin-password-field-hint');
+    if (hint) {
+        if (isEdit) {
+            hint.textContent = 'Facultatif — laisser vide pour ne pas changer le mot de passe.';
+            hint.classList.remove('hidden');
+        } else {
+            hint.classList.add('hidden');
+            hint.textContent = '';
+        }
+    }
+    if (pw instanceof HTMLInputElement) {
+        pw.placeholder = isEdit ? '' : getCreateMode() === 'create' ? `Au moins ${PASSWORD_MIN_LENGTH} caractères` : '';
+    }
+}
+
 function hasEditChanges() {
     if (!editUser || !editSnapshot) return false;
     const cur = readForm();
@@ -73,15 +140,33 @@ function hasEditChanges() {
     );
 }
 
+function hasCreateFormChanges() {
+    const f = readForm();
+    const invite = getCreateMode() === 'invite';
+    return Boolean(
+        f.nom ||
+            f.prenom ||
+            f.email ||
+            f.telephone ||
+            (!invite && f.password) ||
+            f.role !== 'eleve' ||
+            getCreateMode() !== 'invite'
+    );
+}
+
 function setMode(isEdit) {
     document.getElementById('admin-user-modal-title').textContent = isEdit
         ? 'Modifier un utilisateur'
         : 'Nouvel utilisateur';
-    document.getElementById('admin-user-modal-subtitle').textContent = isEdit
-        ? 'Modifiez les informations du compte, puis sauvegardez.'
-        : 'Créer un compte directement ou envoyer une invitation.';
-    document.getElementById('admin-user-create-actions')?.classList.toggle('hidden', isEdit);
-    document.getElementById('admin-user-edit-actions')?.classList.toggle('hidden', !isEdit);
+    document.getElementById('admin-user-create-mode-wrap')?.classList.toggle('hidden', isEdit);
+    const inviteRadio = document.querySelector('input[name="admin-user-create-mode"][value="invite"]');
+    const createRadio = document.querySelector('input[name="admin-user-create-mode"][value="create"]');
+    if (!isEdit) {
+        if (inviteRadio instanceof HTMLInputElement) inviteRadio.checked = true;
+        if (createRadio instanceof HTMLInputElement) createRadio.checked = false;
+    }
+    updatePasswordFieldChrome(isEdit);
+    syncCreateModePasswordField();
 }
 
 async function createUser() {
@@ -102,6 +187,10 @@ async function createUser() {
     });
     showToast('Compte créé.');
     applyForm({ role: 'eleve' });
+    const ir = document.querySelector('input[name="admin-user-create-mode"][value="invite"]');
+    if (ir instanceof HTMLInputElement) ir.checked = true;
+    syncCreateModePasswordField();
+    updatePasswordFieldChrome(false);
 }
 
 async function inviteUser() {
@@ -153,11 +242,19 @@ async function saveEditedUser() {
     applyForm(editSnapshot);
 }
 
-function tryCloseEditModal() {
+async function saveOrCreateUser() {
+    if (editUser) return saveEditedUser();
+    if (getCreateMode() === 'create') return createUser();
+    return inviteUser();
+}
+
+async function tryCloseUserModal() {
     const dlg = document.getElementById('modal_users_admin');
     if (!(dlg instanceof HTMLDialogElement)) return;
-    if (editUser && hasEditChanges()) {
-        if (!confirm('Fermer sans sauvegarder les modifications ?')) return;
+    const dirty = editUser ? hasEditChanges() : hasCreateFormChanges();
+    if (dirty) {
+        const ok = await confirmAdminAsync('Abandonner les modifications non enregistrées ?');
+        if (!ok) return;
     }
     dlg.close();
 }
@@ -186,6 +283,7 @@ export function openAdminUserModalForEdit(userRow) {
     editSnapshot = { ...editUser, password: '' };
     setMode(true);
     applyForm(editSnapshot);
+    syncCreateModePasswordField();
     dlg.showModal();
 }
 
@@ -197,7 +295,6 @@ export function resetAdminUsersUiBindings() {
 
 export function initAdminUsersUi(currentUser) {
     const show = isBackendAuthConfigured() && isAdmin(currentUser);
-    // Gestion des comptes n'est plus un menu direct.
     document.getElementById('menu-item-users-admin-wrap')?.classList.add('hidden');
     if (!show || bound) return;
     bound = true;
@@ -216,27 +313,32 @@ export function initAdminUsersUi(currentUser) {
 
     document.getElementById('admin-create-pw-toggle')?.addEventListener('click', () => {
         const pw = document.getElementById('admin-create-password');
+        if (pw instanceof HTMLInputElement && pw.disabled) return;
         setCreatePasswordVisible(pw?.getAttribute('type') !== 'text');
     });
     document.getElementById('admin-invite-phone')?.addEventListener('blur', (e) => {
         if (e.target instanceof HTMLInputElement) e.target.value = formatFrPhone(e.target.value);
     });
-    document.getElementById('admin-create-btn')?.addEventListener('click', () =>
-        void createUser().catch((e) => showToast(e?.message || String(e), 'error'))
+
+    document.querySelectorAll('input[name="admin-user-create-mode"]').forEach((r) => {
+        r.addEventListener('change', () => {
+            updatePasswordFieldChrome(Boolean(editUser));
+            syncCreateModePasswordField();
+        });
+    });
+
+    document.getElementById('admin-user-modal-save')?.addEventListener('click', () =>
+        void saveOrCreateUser().catch((e) => showToast(e?.message || String(e), 'error'))
     );
-    document.getElementById('admin-invite-btn')?.addEventListener('click', () =>
-        void inviteUser().catch((e) => showToast(e?.message || String(e), 'error'))
+    document.getElementById('admin-user-modal-cancel')?.addEventListener('click', () =>
+        void tryCloseUserModal()
     );
-    document.getElementById('admin-user-edit-save')?.addEventListener('click', () =>
-        void saveEditedUser().catch((e) => showToast(e?.message || String(e), 'error'))
-    );
-    document.getElementById('admin-user-edit-close')?.addEventListener('click', tryCloseEditModal);
-    document.getElementById('admin-user-modal-cancel')?.addEventListener('click', tryCloseEditModal);
 
     const dlg = document.getElementById('modal_users_admin');
     dlg?.addEventListener('cancel', (e) => {
-        if (!editUser || !hasEditChanges()) return;
+        const dirty = editUser ? hasEditChanges() : hasCreateFormChanges();
+        if (!dirty) return;
         e.preventDefault();
-        tryCloseEditModal();
+        void tryCloseUserModal();
     });
 }

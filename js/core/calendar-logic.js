@@ -44,9 +44,56 @@ let saveReservationInFlight = false;
 let deleteReservationInFlight = false;
 /** @type {AbortController | null} */
 let reservationModalTimeSyncAbort = null;
+/** @type {string | null} */
+let reservationModalFormBaseline = null;
 
 export function isReservationMutationInFlight() {
     return saveReservationInFlight || deleteReservationInFlight;
+}
+
+function snapshotReservationModalFormState() {
+    const val = (id) => {
+        const el = document.getElementById(id);
+        if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) return el.value;
+        return '';
+    };
+    const chk = (id) => {
+        const el = document.getElementById(id);
+        return el instanceof HTMLInputElement && el.checked;
+    };
+    const bits = [
+        val('event-motif-select'),
+        val('event-title-input'),
+        val('event-date-start'),
+        val('event-start'),
+        val('event-end'),
+        String(chk('event-recurring')),
+        val('event-recur-period-start'),
+        val('event-recur-period-end'),
+        val('event-recur-start'),
+        val('event-recur-end'),
+        chk('recur-mode-all') ? 'all' : 'days',
+        val('reservation-slot-owner-email'),
+        ...[1, 2, 3, 4, 5, 6, 0].map((i) => String(chk(`recur-dow-${i}`)))
+    ];
+    return bits.join('\x1e');
+}
+
+/** À appeler après remplissage complet de la modale créneau. */
+export function captureReservationModalFormBaseline() {
+    reservationModalFormBaseline = snapshotReservationModalFormState();
+}
+
+export function isReservationModalDirty() {
+    if (reservationModalFormBaseline === null) return false;
+    return snapshotReservationModalFormState() !== reservationModalFormBaseline;
+}
+
+/** Fermeture modale (bouton Annuler, fond) : false si mutation en cours ou si l’utilisateur refuse d’abandonner. */
+export function reservationModalMayCloseNow() {
+    if (isReservationMutationInFlight()) return false;
+    if (!isReservationModalDirty()) return true;
+    return window.confirm('Abandonner les modifications ?');
 }
 
 function setReservationModalMutationLock(locked) {
@@ -2016,6 +2063,7 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     const modal = document.getElementById('modal_reservation');
     if (!modal) return;
     const isPastSlot = Boolean(event && isReservationStartBeforeTodayLocal(event));
+    const meRoleOpen = normalizeRole(currentUser?.role);
     const canEditEvent = !event || canCurrentUserEditEvent(currentUser, event);
     reservationModalUserRef = currentUser;
     reservationModalCanEditRef = canEditEvent;
@@ -2215,10 +2263,16 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     }
 
     document.getElementById('btn-save').classList.toggle('hidden', !canEditEvent);
-    document.getElementById('btn-delete').classList.toggle('hidden', !canEditEvent || !event);
+    const showDelete =
+        Boolean(event) &&
+        canCurrentUserEditEventIgnoringPast(currentUser, event) &&
+        (!isPastSlot || meRoleOpen === 'admin' || meRoleOpen === 'prof');
+    document.getElementById('btn-delete').classList.toggle('hidden', !showDelete);
 
     await prepareReservationOwnerSelect(currentUser, event || null, canEditEvent);
     await prepareReservationInscritsSelect(currentUser, event || null, canEditEvent);
+
+    captureReservationModalFormBaseline();
 
     modal.showModal();
     requestAnimationFrame(() => {
@@ -2819,11 +2873,14 @@ export async function deleteReservation(calendar, currentEventRef, currentUser) 
         return;
     }
     const liveRef = resolveLivePlanningEventRef(calendar, currentEventRef);
+    const rMeDel = normalizeRole(currentUser.role);
     if (isReservationStartBeforeTodayLocal(liveRef)) {
-        showToast('Les créneaux passés ne sont pas modifiables.', 'error');
-        return;
+        if (rMeDel !== 'admin' && rMeDel !== 'prof') {
+            showToast('Les créneaux passés ne sont pas modifiables.', 'error');
+            return;
+        }
     }
-    if (!canCurrentUserEditEvent(currentUser, liveRef)) {
+    if (!canCurrentUserEditEventIgnoringPast(currentUser, liveRef)) {
         showToast('Vous ne pouvez pas supprimer ce créneau.', 'error');
         return;
     }
@@ -2831,7 +2888,6 @@ export async function deleteReservation(calendar, currentEventRef, currentUser) 
     deleteReservationInFlight = true;
     setReservationModalMutationLock(true);
     const dbTypeDel = planningDbSlotTypeForEventUpdate(liveRef);
-    const rMeDel = normalizeRole(currentUser.role);
     /** @type {Record<string, unknown> | null} */
     let settingsForVoid = null;
     try {

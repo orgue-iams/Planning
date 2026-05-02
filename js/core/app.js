@@ -23,7 +23,9 @@ import {
     maybeNotifySlotOwnerAfterThirdPartyEdit,
     ownerInfoFromEvent,
     refetchPlanningGrid,
-    isReservationMutationInFlight
+    isReservationMutationInFlight,
+    reservationModalMayCloseNow,
+    isReservationModalDirty
 } from './calendar-logic.js';
 import {
     login,
@@ -445,7 +447,9 @@ function wireDialogBackdropClose() {
             }
             /* Fenêtre utilisateur admin : fermeture fond / abandon gérés dans admin-users-modal-ui.js */
             if (e.target.id === 'modal_users_admin') return;
-            if (e.target.id === 'modal_reservation' && isReservationMutationInFlight()) return;
+            if (e.target.id === 'modal_reservation') {
+                if (!reservationModalMayCloseNow()) return;
+            }
             e.target.close();
         }
     });
@@ -529,8 +533,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     wireDialogBackdropClose();
     wireHeaderHoverMenus();
     document.getElementById('modal_reservation')?.addEventListener('cancel', (e) => {
-        if (!isReservationMutationInFlight()) return;
-        e.preventDefault();
+        if (isReservationMutationInFlight()) {
+            e.preventDefault();
+            return;
+        }
+        if (isReservationModalDirty()) {
+            e.preventDefault();
+            if (window.confirm('Abandonner les modifications ?')) {
+                e.target.close();
+            }
+        }
+    });
+    document.getElementById('btn-cancel-reservation')?.addEventListener('click', () => {
+        const m = document.getElementById('modal_reservation');
+        if (!(m instanceof HTMLDialogElement)) return;
+        if (!reservationModalMayCloseNow()) return;
+        m.close();
     });
 
     const policyUl = document.getElementById('password-policy-lines');
