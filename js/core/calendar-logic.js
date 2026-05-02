@@ -89,7 +89,7 @@ export function isReservationModalDirty() {
     return snapshotReservationModalFormState() !== reservationModalFormBaseline;
 }
 
-/** Fermeture modale (bouton Annuler, fond) : false si mutation en cours ou si l’utilisateur refuse d’abandonner. */
+/** Fermeture modale (bouton Fermer, fond) : false si mutation en cours ou si l’utilisateur refuse d’abandonner. */
 export function reservationModalMayCloseNow() {
     if (isReservationMutationInFlight()) return false;
     if (!isReservationModalDirty()) return true;
