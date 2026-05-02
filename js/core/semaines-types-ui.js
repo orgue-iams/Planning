@@ -5,7 +5,6 @@ import { isAdmin, isPrivilegedUser } from './auth-logic.js';
 import { getPlanningSessionUser } from './session-user.js';
 import { getSupabaseClient, isBackendAuthConfigured, getPlanningConfig } from './supabase-client.js';
 import { showToast } from '../utils/toast.js';
-import { populateTimeSelectElement } from '../utils/time-helpers.js';
 import {
     fetchOrganSchoolSettings,
     getOrganSchoolSettingsCached,
@@ -19,18 +18,6 @@ import {
 } from './template-apply-engine.js';
 import { saveProfWeekCycleFromApply } from './week-cycle.js';
 import { openCourseStudentsPicker } from './course-students-picker.js';
-
-const DOW_OPTS = [
-    { v: 1, t: 'Lun' },
-    { v: 2, t: 'Mar' },
-    { v: 3, t: 'Mer' },
-    { v: 4, t: 'Jeu' },
-    { v: 5, t: 'Ven' },
-    { v: 6, t: 'Sam' },
-    { v: 7, t: 'Dim' }
-];
-
-const USERS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>`;
 
 const ST_DRAG_GRIP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>`;
 
@@ -255,6 +242,12 @@ let stGoogleSyncInFlight = false;
 let stUiBound = false;
 /** @type {HTMLTableRowElement | null} */
 let stDnDRow = null;
+/** @type {Map<string, object>} */
+let stElevesByIdRef = new Map();
+/** @type {HTMLTableRowElement | null} */
+let stLineEditTargetTr = null;
+/** @type {string[]} */
+let stLineEditPendingStudents = [];
 
 export function resetSemainesTypesUiBindings() {
     stAbort?.abort();
@@ -263,6 +256,9 @@ export function resetSemainesTypesUiBindings() {
     stGoogleSyncInFlight = false;
     stUiBound = false;
     stDnDRow = null;
+    stElevesByIdRef = new Map();
+    stLineEditTargetTr = null;
+    stLineEditPendingStudents = [];
 }
 
 function mainCalId() {
@@ -318,47 +314,45 @@ function enrolledLabelsSorted(ids, byId) {
     return rows.map((r) => r.label);
 }
 
-function syncReadonlyStudentsText(tr, studentIds, elevesById) {
-    const el = tr.querySelector('.st-students-readonly-text');
-    if (!el) return;
-    const typ = tr.querySelector('.st-type')?.value || 'cours';
-    if (typ !== 'cours') {
-        el.textContent = '—';
-        return;
-    }
-    const labels = enrolledLabelsSorted(studentIds, elevesById);
-    const html = labels.length ? labels.map(escapeAttr).join('<br>') : '—';
-    el.innerHTML = html;
+function padTime(raw) {
+    const s = String(raw || '08:00').slice(0, 5);
+    return /^\d{2}:\d{2}$/.test(s) ? s : '08:00';
 }
 
-/** Compat : anciennes lignes pouvaient attacher des écouteurs inline ; nettoyage léger. */
-function detachStStudentsEditListeners(_tr) {}
+function slotTypeLabel(slotType) {
+    return slotType === 'cours' ? 'Cours' : 'Travail perso.';
+}
 
-/** Bouton « élèves » : modale deux colonnes (réutilisable avec la réservation cours). */
-function wireStudentsPickerButton(tr, elevesById) {
-    const btn = tr.querySelector('.st-students-toggle');
-    const sel = tr.querySelector('.st-students');
-    if (!btn || !sel) return;
-    if (btn.dataset.stStudentsBound === '1') return;
-    btn.dataset.stStudentsBound = '1';
-    const elevesList = [...elevesById.values()];
-    btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const typ = tr.querySelector('.st-type')?.value || 'cours';
-        if (typ !== 'cours') return;
-        const selected = [...sel.selectedOptions].map((o) => o.value).filter(Boolean);
-        const picked = await openCourseStudentsPicker({
-            title: 'Inscriptions au cours (semaine type)',
-            maxStudents: 5,
-            eleves: elevesList,
-            selectedUserIds: selected
-        });
-        if (!picked) return;
-        for (const o of sel.options) {
-            o.selected = picked.includes(o.value);
-        }
-        syncReadonlyStudentsText(tr, picked, elevesById);
-    });
+const ST_DOW_LONG = ['—', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+
+function dowLongLabel(dow) {
+    const v = Math.min(7, Math.max(1, Number(dow) || 1));
+    return ST_DOW_LONG[v] || '—';
+}
+
+/** Met à jour les libellés lisibles (sans listes factices) à partir des data-* de ligne. */
+function syncRowReadonlyDisplay(tr, elevesById) {
+    const typ = tr.dataset.stSlotType || 'cours';
+    const dow = parseInt(tr.dataset.stDow || '1', 10);
+    tr.querySelector('.st-ro-type')?.replaceChildren(document.createTextNode(slotTypeLabel(typ)));
+    tr.querySelector('.st-ro-dow')?.replaceChildren(document.createTextNode(dowLongLabel(dow)));
+    tr.querySelector('.st-ro-start')?.replaceChildren(document.createTextNode(padTime(tr.dataset.stStart)));
+    tr.querySelector('.st-ro-end')?.replaceChildren(document.createTextNode(padTime(tr.dataset.stEnd)));
+    const title = String(tr.dataset.stTitle || '').trim();
+    const titleEl = tr.querySelector('.st-ro-title');
+    if (titleEl) titleEl.textContent = title || '—';
+    const roStudents = tr.querySelector('.st-ro-students');
+    if (!roStudents) return;
+    if (typ !== 'cours') {
+        roStudents.textContent = '—';
+        return;
+    }
+    const ids = String(tr.dataset.stStudents || '')
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean);
+    const labels = enrolledLabelsSorted(ids, elevesById);
+    roStudents.innerHTML = labels.length ? labels.map(escapeAttr).join('<br>') : '—';
 }
 
 function parseRowsFromTbody(tbody, weekLetter, ownerId) {
@@ -366,25 +360,25 @@ function parseRowsFromTbody(tbody, weekLetter, ownerId) {
     for (const tr of tbody?.querySelectorAll('tr[data-st-line]') || []) {
         if (tr.getAttribute('data-st-editable') !== '1') continue;
         const id = tr.getAttribute('data-line-id') || '';
-        const dow = parseInt(tr.querySelector('.st-dow')?.value || '1', 10);
-        const st = tr.querySelector('.st-start')?.value || '08:00';
-        const en = tr.querySelector('.st-end')?.value || '09:00';
-        const typ = tr.querySelector('.st-type')?.value || 'cours';
-        const title = String(tr.querySelector('.st-title')?.value || '').trim();
-        const sel = tr.querySelector('.st-students');
-        const studs = [];
-        if (sel && typ === 'cours') {
-            for (const o of sel.selectedOptions) {
-                if (o.value) studs.push(o.value);
-            }
-        }
+        const dow = parseInt(tr.dataset.stDow || '1', 10);
+        const st = padTime(tr.dataset.stStart);
+        const en = padTime(tr.dataset.stEnd);
+        const typ = tr.dataset.stSlotType === 'reservation' ? 'reservation' : 'cours';
+        const title = String(tr.dataset.stTitle || '').trim();
+        const studs =
+            typ === 'cours'
+                ? String(tr.dataset.stStudents || '')
+                      .split(',')
+                      .map((x) => x.trim())
+                      .filter(Boolean)
+                : [];
         rows.push({
             domId: id,
             week_type: weekLetter,
             day_of_week: dow,
             start_time: `${st}:00`,
             end_time: `${en}:00`,
-            slot_type: typ === 'cours' ? 'cours' : 'reservation',
+            slot_type: typ,
             title,
             studentIds: studs,
             owner_user_id: ownerId
@@ -392,6 +386,120 @@ function parseRowsFromTbody(tbody, weekLetter, ownerId) {
     }
     return rows;
 }
+
+function refreshStleStudentSummary() {
+    const el = document.getElementById('stle-students-summary');
+    if (!el) return;
+    const labels = enrolledLabelsSorted(stLineEditPendingStudents, stElevesByIdRef);
+    el.textContent = labels.length ? labels.join(', ') : 'Aucun inscrit';
+}
+
+function wireStLineEditModal() {
+    const dlg = document.getElementById('modal_st_line_edit');
+    const btnOk = document.getElementById('stle-btn-ok');
+    const btnCancel = document.getElementById('stle-btn-cancel');
+    const btnStudents = document.getElementById('stle-btn-students');
+    if (!dlg || !btnOk || !btnCancel || !btnStudents || dlg.dataset.stleWired === '1') return;
+    dlg.dataset.stleWired = '1';
+
+    btnStudents.addEventListener('click', async () => {
+        const typ =
+            dlg.querySelector('input[name="stle-slot-type"]:checked')?.value === 'reservation'
+                ? 'reservation'
+                : 'cours';
+        if (typ !== 'cours') {
+            showToast('Les inscriptions concernent uniquement les créneaux « Cours ».', 'info');
+            return;
+        }
+        const elevesList = [...stElevesByIdRef.values()];
+        const picked = await openCourseStudentsPicker({
+            title: 'Inscriptions au cours (semaine type)',
+            maxStudents: 5,
+            eleves: elevesList,
+            selectedUserIds: stLineEditPendingStudents
+        });
+        if (!picked) return;
+        stLineEditPendingStudents = picked;
+        refreshStleStudentSummary();
+    });
+
+    btnCancel.addEventListener('click', () => {
+        stLineEditTargetTr = null;
+        dlg.close();
+    });
+
+    btnOk.addEventListener('click', () => {
+        const tr = stLineEditTargetTr;
+        if (!tr) return;
+        const typRaw = dlg.querySelector('input[name="stle-slot-type"]:checked')?.value;
+        const typ = typRaw === 'reservation' ? 'reservation' : 'cours';
+        const dowSel = /** @type {HTMLSelectElement | null} */ (document.getElementById('stle-dow'));
+        const dow = parseInt(dowSel?.value || '1', 10);
+        const st = padTime(/** @type {HTMLInputElement | null} */ (document.getElementById('stle-start'))?.value);
+        const en = padTime(/** @type {HTMLInputElement | null} */ (document.getElementById('stle-end'))?.value);
+        const title = String(/** @type {HTMLInputElement | null} */ (document.getElementById('stle-title'))?.value || '').trim();
+        if (st >= en) {
+            showToast('L’heure de fin doit être après le début.', 'error');
+            return;
+        }
+        tr.dataset.stSlotType = typ;
+        tr.dataset.stDow = String(Math.min(7, Math.max(1, dow)));
+        tr.dataset.stStart = st;
+        tr.dataset.stEnd = en;
+        tr.dataset.stTitle = title;
+        tr.dataset.stStudents = typ === 'cours' ? stLineEditPendingStudents.join(',') : '';
+        tr.classList.remove('st-row-cours', 'st-row-travail', 'st-row-other-prof');
+        tr.classList.add(typ === 'cours' ? 'st-row-cours' : 'st-row-travail');
+        syncRowReadonlyDisplay(tr, stElevesByIdRef);
+        stLineEditTargetTr = null;
+        dlg.close();
+    });
+
+    dlg.addEventListener('close', () => {
+        stLineEditTargetTr = null;
+    });
+
+    dlg.addEventListener('change', (ev) => {
+        const t = ev.target;
+        if (!(t instanceof HTMLInputElement) || t.name !== 'stle-slot-type') return;
+        const isCours = t.value === 'cours';
+        document.getElementById('stle-students-wrap')?.classList.toggle('hidden', !isCours);
+    });
+}
+
+function openStLineEditModal(tr) {
+    const dlg = document.getElementById('modal_st_line_edit');
+    if (!dlg || !(dlg instanceof HTMLDialogElement)) return;
+    wireStLineEditModal();
+
+    stLineEditTargetTr = tr;
+    const typ = tr.dataset.stSlotType === 'reservation' ? 'reservation' : 'cours';
+    const coursRadio = /** @type {HTMLInputElement | null} */ (document.getElementById('stle-type-cours'));
+    const resRadio = /** @type {HTMLInputElement | null} */ (document.getElementById('stle-type-reservation'));
+    if (coursRadio) coursRadio.checked = typ === 'cours';
+    if (resRadio) resRadio.checked = typ === 'reservation';
+
+    const dowSel = /** @type {HTMLSelectElement | null} */ (document.getElementById('stle-dow'));
+    if (dowSel) dowSel.value = String(Math.min(7, Math.max(1, parseInt(tr.dataset.stDow || '1', 10))));
+
+    const stIn = /** @type {HTMLInputElement | null} */ (document.getElementById('stle-start'));
+    const enIn = /** @type {HTMLInputElement | null} */ (document.getElementById('stle-end'));
+    if (stIn) stIn.value = padTime(tr.dataset.stStart);
+    if (enIn) enIn.value = padTime(tr.dataset.stEnd);
+
+    const ti = /** @type {HTMLInputElement | null} */ (document.getElementById('stle-title'));
+    if (ti) ti.value = String(tr.dataset.stTitle || '').trim();
+
+    stLineEditPendingStudents = String(tr.dataset.stStudents || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    refreshStleStudentSummary();
+
+    document.getElementById('stle-students-wrap')?.classList.toggle('hidden', typ !== 'cours');
+    dlg.showModal();
+}
+
 
 function validateNoOverlap(rows) {
     const byWeek = { A: [], B: [] };
@@ -434,17 +542,29 @@ function makeStudentOptionsHtml(eleves) {
 /**
  * @param {HTMLElement} tbody
  * @param {object | null} line
- * @param {string} optHtml
+ * @param {string} _optHtml réservé compat appelants (non utilisé — données élèves via data-students + édition modale).
  * @param {{ isAdmin: boolean, ownerLabel: string, lineOwnerId: string, currentUserId: string, elevesById: Map<string, object> }} ctx
  */
-function appendTemplateRow(tbody, line, optHtml, ctx) {
+function appendTemplateRow(tbody, line, _optHtml, ctx) {
     const { isAdmin, ownerLabel, lineOwnerId, currentUserId, elevesById } = ctx;
-    const isReadonly = isAdmin || lineOwnerId !== currentUserId;
+    const isOwnRow = String(lineOwnerId) === String(currentUserId);
+    const isReadonly = isAdmin || !isOwnRow;
+    const slotT = line?.slot_type === 'reservation' ? 'reservation' : 'cours';
+    const sid = line?.studentIds || [];
+
     const tr = document.createElement('tr');
     tr.setAttribute('data-st-line', '1');
     tr.setAttribute('data-line-id', line?.id || '');
     tr.setAttribute('data-owner-id', lineOwnerId);
     tr.setAttribute('data-st-editable', isReadonly ? '0' : '1');
+
+    tr.dataset.stSlotType = slotT;
+    tr.dataset.stDow = String(line?.day_of_week ?? 1);
+    tr.dataset.stStart = String(line?.start_time || '08:00:00').slice(0, 5);
+    tr.dataset.stEnd = String(line?.end_time || '09:00:00').slice(0, 5);
+    tr.dataset.stTitle = String(line?.title || '').trim();
+    tr.dataset.stStudents = sid.join(',');
+
     const otherProfCours =
         line?.slot_type === 'cours' && String(lineOwnerId) !== String(currentUserId);
     if (otherProfCours) {
@@ -452,107 +572,36 @@ function appendTemplateRow(tbody, line, optHtml, ctx) {
     } else {
         tr.classList.add(line?.slot_type === 'cours' ? 'st-row-cours' : 'st-row-travail');
     }
-    if (isReadonly) {
-        tr.style.pointerEvents = 'none';
-    }
-
-    const dowSel = DOW_OPTS.map(
-        (o) => `<option value="${o.v}" ${line?.day_of_week === o.v ? 'selected' : ''}>${o.t}</option>`
-    ).join('');
-    const typeSel = `<option value="cours" ${line?.slot_type === 'cours' ? 'selected' : ''}>Cours</option>
-        <option value="reservation" ${line?.slot_type === 'reservation' ? 'selected' : ''}>Travail perso.</option>`;
-    const st = String(line?.start_time || '08:00:00').slice(0, 5);
-    const en = String(line?.end_time || '09:00:00').slice(0, 5);
-    const title = escapeAttr(line?.title || '');
-    const sid = line?.studentIds || [];
-
-    let studentsCell = '';
-    if (isReadonly) {
-        const labels = enrolledLabelsSorted(sid, elevesById);
-        const studentsHtml =
-            line?.slot_type === 'reservation'
-                ? '—'
-                : labels.length
-                  ? labels.map(escapeAttr).join('<br>')
-                  : '—';
-        studentsCell = `<td class="st-students-cell align-top">
-            <div class="st-students-readonly-wrap flex items-start gap-1 min-w-0">
-                <span class="st-students-readonly-text flex-1 min-w-0 text-[10px] font-normal font-sans text-slate-700 leading-snug">${studentsHtml}</span>
-            </div>
-        </td>`;
-    } else {
-        studentsCell = `<td class="st-students-cell align-top">
-            <div class="st-students-readonly-wrap flex items-start gap-1 min-w-0">
-                <span class="st-students-readonly-text flex-1 min-w-0 text-[10px] font-normal font-sans text-slate-700 leading-snug"></span>
-                <button type="button" class="st-students-toggle btn btn-ghost btn-xs p-0.5 min-h-0 h-auto shrink-0 border-0" title="Modifier les inscrits" aria-label="Modifier les inscrits">${USERS_SVG}</button>
-            </div>
-            <select multiple class="st-students hidden" size="1">${optHtml}</select>
-        </td>`;
-    }
 
     const dragCell = isReadonly
         ? '<td class="w-7 p-0"></td>'
         : `<td class="w-7 p-0 align-middle text-center select-none"><span class="st-drag-handle inline-flex cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 p-0.5 rounded hover:bg-slate-100" draggable="true" title="Glisser vers l’autre semaine type" aria-label="Glisser vers l’autre semaine type">${ST_DRAG_GRIP_SVG}</span></td>`;
 
+    const actionsCell = isReadonly
+        ? '<td class="p-1 align-top w-14"></td>'
+        : `<td class="p-1 align-top w-14">
+      <div class="flex flex-col items-end gap-0.5">
+        <button type="button" class="st-row-edit btn btn-ghost btn-xs btn-square border border-slate-200 planning-icon-btn" title="Modifier le créneau" aria-label="Modifier le créneau">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L8.25 18.463 3 21l2.537-5.25L16.862 3.487z"/></svg>
+        </button>
+        <button type="button" class="btn btn-ghost btn-xs st-del font-black text-error min-h-0 h-7 leading-none" title="Supprimer la ligne">×</button>
+      </div>
+    </td>`;
+
     tr.innerHTML = `
         ${dragCell}
-        <td class="text-[10px] font-bold font-sans text-slate-800 align-top">${escapeAttr(ownerLabel)}</td>
-        <td><select class="select select-xs st-type max-w-[5.5rem] text-[10px] font-normal font-sans text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${typeSel}</select></td>
-        <td><select class="select select-xs st-dow max-w-[4.5rem] text-[10px] font-normal font-sans text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}>${dowSel}</select></td>
-        <td><select class="select select-xs st-start max-w-[4.5rem] text-[10px] font-normal font-sans text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
-        <td><select class="select select-xs st-end max-w-[4.5rem] text-[10px] font-normal font-sans text-slate-700 bg-white border border-slate-200 rounded" ${isReadonly ? 'disabled' : ''}></select></td>
-        <td><input type="text" class="input input-xs st-title w-full min-w-[6rem] text-[10px] font-normal font-sans text-slate-700 bg-white border border-slate-200 rounded" value="${title}" ${isReadonly ? 'readonly' : ''} /></td>
-        ${studentsCell}
-        <td>${isReadonly ? '' : '<button type="button" class="btn btn-ghost btn-xs st-del font-black text-error">×</button>'}</td>
+        <td class="text-[10px] font-bold font-sans text-slate-800 align-top p-2 break-words max-w-[9rem]">${escapeAttr(ownerLabel)}</td>
+        <td class="align-top p-2 text-[10px] text-slate-800 leading-snug"><span class="st-ro-type"></span></td>
+        <td class="align-top p-2 text-[10px] text-slate-800 leading-snug"><span class="st-ro-dow"></span></td>
+        <td class="align-top p-2 text-[10px] font-mono text-slate-800 leading-snug whitespace-nowrap"><span class="st-ro-start"></span></td>
+        <td class="align-top p-2 text-[10px] font-mono text-slate-800 leading-snug whitespace-nowrap"><span class="st-ro-end"></span></td>
+        <td class="align-top p-2 text-[10px] text-slate-800 leading-snug min-w-[6rem] max-w-[14rem] break-words"><span class="st-ro-title"></span></td>
+        <td class="st-students-cell align-top p-2 min-w-[9rem] max-w-[20rem]"><span class="st-ro-students text-[10px] font-normal font-sans text-slate-700 leading-snug"></span></td>
+        ${actionsCell}
     `;
     tbody.appendChild(tr);
-    const ss = tr.querySelector('.st-start');
-    const se = tr.querySelector('.st-end');
-    populateTimeSelectElement(ss);
-    populateTimeSelectElement(se);
-    if (ss) ss.value = st;
-    if (se) se.value = en;
-    const stSel = tr.querySelector('.st-students');
-    if (stSel && sid.length) {
-        for (const id of sid) {
-            const o = stSel.querySelector(`option[value="${id}"]`);
-            if (o) o.selected = true;
-        }
-    }
-    if (!isReadonly) {
-        syncReadonlyStudentsText(tr, sid, elevesById);
-        wireStudentsPickerButton(tr, elevesById);
-    }
+    syncRowReadonlyDisplay(tr, elevesById);
     tr.querySelector('.st-del')?.addEventListener('click', () => tr.remove());
-    tr.querySelector('.st-type')?.addEventListener('change', () => {
-        const t = tr.querySelector('.st-type')?.value;
-        const mul = tr.querySelector('.st-students');
-        const ro = tr.querySelector('.st-students-readonly-wrap');
-        const btn = tr.querySelector('.st-students-toggle');
-        detachStStudentsEditListeners(tr);
-        if (t !== 'cours') {
-            if (mul) {
-                mul.classList.add('hidden');
-                for (const o of mul.options) o.selected = false;
-            }
-            ro?.classList.remove('hidden');
-            if (ro) tr.querySelector('.st-students-readonly-text').textContent = '—';
-            ro?.classList.toggle('opacity-40', true);
-            btn?.classList.add('hidden');
-        } else {
-            ro?.classList.remove('opacity-40');
-            btn?.classList.remove('hidden');
-            const cur = [];
-            if (mul) {
-                for (const o of mul.selectedOptions) {
-                    if (o.value) cur.push(o.value);
-                }
-            }
-            syncReadonlyStudentsText(tr, cur, elevesById);
-        }
-        tr.classList.remove('st-row-cours', 'st-row-travail', 'st-row-other-prof');
-        tr.classList.add(t === 'cours' ? 'st-row-cours' : 'st-row-travail');
-    });
     return tr;
 }
 
@@ -672,6 +721,7 @@ async function openSemainesTypesModal(user) {
         currentUserId: String(user.id),
         elevesById
     };
+    stElevesByIdRef = elevesById;
 
     for (const line of lines) {
         const tbody = line.week_type === 'A' ? ta : tb;
@@ -1187,6 +1237,7 @@ async function runSemainesTypesAddRow(week) {
     if (!u?.id) return;
     const eleves = await loadEleves();
     const elevesById = new Map(eleves.map((e) => [e.user_id, e]));
+    stElevesByIdRef = elevesById;
     const ownerLabels = await loadOwnerLabels([u.id]);
     const tbody =
         week === 'B' ? document.getElementById('st-tbody-b') : document.getElementById('st-tbody-a');
@@ -1238,6 +1289,15 @@ function onSemainesTypesDocumentClick(e) {
     if (t.closest('#st-goto-cal')) {
         e.preventDefault();
         runSemainesTypesGotoCal();
+        return;
+    }
+    const editLineBtn = t.closest('.st-row-edit');
+    if (editLineBtn instanceof HTMLButtonElement) {
+        e.preventDefault();
+        const tr = editLineBtn.closest('tr[data-st-line]');
+        if (tr instanceof HTMLTableRowElement && tr.getAttribute('data-st-editable') === '1') {
+            openStLineEditModal(tr);
+        }
     }
 }
 

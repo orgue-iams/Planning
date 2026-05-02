@@ -73,12 +73,14 @@ function readProfileFormState() {
     const phoneEl = document.getElementById('profile-phone-input');
     const shareEmailEl = document.getElementById('profile-share-email');
     const sharePhoneEl = document.getElementById('profile-share-phone');
+    const shareCalEl = document.getElementById('profile-share-calendar');
     return {
         name: nameEl instanceof HTMLInputElement ? nameEl.value.trim() : '',
         email: emailEl instanceof HTMLInputElement ? emailEl.value.trim() : '',
         phone: phoneEl instanceof HTMLInputElement ? formatFrPhone(phoneEl.value) : '',
         shareEmail: shareEmailEl instanceof HTMLInputElement ? shareEmailEl.checked : true,
-        sharePhone: sharePhoneEl instanceof HTMLInputElement ? sharePhoneEl.checked : false
+        sharePhone: sharePhoneEl instanceof HTMLInputElement ? sharePhoneEl.checked : false,
+        shareCalendar: shareCalEl instanceof HTMLInputElement ? shareCalEl.checked : false
     };
 }
 
@@ -100,6 +102,7 @@ function hasProfilePendingChanges() {
         cur.phone !== profileBaseline.phone ||
         cur.shareEmail !== profileBaseline.shareEmail ||
         cur.sharePhone !== profileBaseline.sharePhone ||
+        cur.shareCalendar !== profileBaseline.shareCalendar ||
         hasPwd
     );
 }
@@ -227,18 +230,20 @@ async function fillProfileModal(user) {
     let tel = String(user.telephone ?? '').trim();
     let shareEmail = user.directory_share_email !== false;
     let sharePhone = user.directory_share_phone === true;
+    let shareCalendar = user.directory_share_calendar === true;
     if (isBackendAuthConfigured() && user.id) {
         const sb = getSupabaseClient();
         if (sb) {
             const { data } = await sb
                 .from('profiles')
-                .select('telephone, directory_share_email, directory_share_phone')
+                .select('telephone, directory_share_email, directory_share_phone, directory_share_calendar')
                 .eq('id', user.id)
                 .maybeSingle();
             if (data) {
                 tel = String(data.telephone ?? '').trim();
                 shareEmail = data.directory_share_email !== false;
                 sharePhone = data.directory_share_phone === true;
+                shareCalendar = data.directory_share_calendar === true;
             }
         }
     }
@@ -248,6 +253,8 @@ async function fillProfileModal(user) {
     if (shE instanceof HTMLInputElement) shE.checked = shareEmail;
     const shP = document.getElementById('profile-share-phone');
     if (shP instanceof HTMLInputElement) shP.checked = sharePhone;
+    const shC = document.getElementById('profile-share-calendar');
+    if (shC instanceof HTMLInputElement) shC.checked = shareCalendar;
     document.getElementById('profile-role-label').textContent = roleLabelFr(user.role);
     const passNew = document.getElementById('profile-pass-new');
     const passConfirm = document.getElementById('profile-pass-confirm');
@@ -422,7 +429,8 @@ export function initProfileUi(currentUser) {
                     display_name: form.name,
                     telephone,
                     directory_share_email: form.shareEmail,
-                    directory_share_phone: form.sharePhone
+                    directory_share_phone: form.sharePhone,
+                    directory_share_calendar: form.shareCalendar
                 })
                 .eq('id', u.id);
             if (error) {
@@ -436,7 +444,8 @@ export function initProfileUi(currentUser) {
                     name: form.name,
                     telephone,
                     directory_share_email: form.shareEmail,
-                    directory_share_phone: form.sharePhone
+                    directory_share_phone: form.sharePhone,
+                    directory_share_calendar: form.shareCalendar
                 });
             }
             const previousEmail = String(u.email || '').trim().toLowerCase();

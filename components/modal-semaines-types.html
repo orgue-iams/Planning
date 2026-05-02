@@ -33,7 +33,7 @@
                                     <th class="text-[10px] font-normal font-sans">Fin</th>
                                     <th class="text-[10px] font-normal font-sans">Titre</th>
                                     <th class="min-w-[10rem] text-[10px] font-normal font-sans">Élèves</th>
-                                    <th></th>
+                                    <th class="w-14 p-1 text-[10px] font-normal font-sans text-right" aria-label="Actions"></th>
                                 </tr>
                             </thead>
                             <tbody id="st-tbody-a"></tbody>
@@ -57,7 +57,7 @@
                                     <th class="text-[10px] font-normal font-sans">Fin</th>
                                     <th class="text-[10px] font-normal font-sans">Titre</th>
                                     <th class="min-w-[10rem] text-[10px] font-normal font-sans">Élèves</th>
-                                    <th></th>
+                                    <th class="w-14 p-1 text-[10px] font-normal font-sans text-right" aria-label="Actions"></th>
                                 </tr>
                             </thead>
                             <tbody id="st-tbody-b"></tbody>
@@ -143,5 +143,63 @@
                 <button type="button" id="st-goto-cal" class="btn btn-primary btn-sm font-black text-[11px]">Fermer</button>
             </div>
         </footer>
+    </div>
+</dialog>
+
+<dialog id="modal_st_line_edit" class="modal">
+    <div class="modal-box p-5 w-[96%] max-w-md rounded-2xl border border-slate-200 shadow-2xl">
+        <h3 class="font-black text-xs mb-3 uppercase text-slate-500 border-b pb-2 tracking-widest">Modifier le créneau</h3>
+        <div class="space-y-3 text-[11px] text-slate-800">
+            <fieldset class="border border-slate-200 rounded-xl p-2 bg-slate-50/80">
+                <legend class="text-[9px] font-bold text-slate-500 px-1">Type</legend>
+                <div class="flex flex-wrap gap-3 mt-1">
+                    <label class="flex items-center gap-1.5 cursor-pointer font-medium">
+                        <input type="radio" name="stle-slot-type" id="stle-type-cours" value="cours" class="radio radio-xs" checked />
+                        Cours
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer font-medium">
+                        <input type="radio" name="stle-slot-type" id="stle-type-reservation" value="reservation" class="radio radio-xs" />
+                        Travail perso.
+                    </label>
+                </div>
+            </fieldset>
+            <div>
+                <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="stle-dow">Jour</label>
+                <select id="stle-dow" class="select select-bordered select-sm w-full text-[11px] bg-white">
+                    <option value="1">Lundi</option>
+                    <option value="2">Mardi</option>
+                    <option value="3">Mercredi</option>
+                    <option value="4">Jeudi</option>
+                    <option value="5">Vendredi</option>
+                    <option value="6">Samedi</option>
+                    <option value="7">Dimanche</option>
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="stle-start">Début</label>
+                    <input type="time" id="stle-start" step="300" class="input input-bordered input-sm w-full font-mono text-[11px] bg-white" />
+                </div>
+                <div>
+                    <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="stle-end">Fin</label>
+                    <input type="time" id="stle-end" step="300" class="input input-bordered input-sm w-full font-mono text-[11px] bg-white" />
+                </div>
+            </div>
+            <div>
+                <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="stle-title">Titre</label>
+                <input type="text" id="stle-title" class="input input-bordered input-sm w-full text-[11px] bg-white" maxlength="200" />
+            </div>
+            <div id="stle-students-wrap" class="rounded-xl border border-slate-200 bg-slate-50/80 p-2">
+                <p class="text-[9px] font-bold text-slate-600 mb-1">Élèves inscrits</p>
+                <p id="stle-students-summary" class="text-[10px] text-slate-700 leading-snug mb-2 min-h-[2.5rem]"></p>
+                <button type="button" id="stle-btn-students" class="btn btn-outline btn-xs font-black text-[10px] w-full sm:w-auto">
+                    Inscriptions (glisser-déposer)
+                </button>
+            </div>
+        </div>
+        <div class="modal-action mt-4 pt-2 border-t border-slate-100 flex flex-wrap justify-end gap-2">
+            <button type="button" id="stle-btn-cancel" class="btn btn-ghost btn-sm font-black text-[11px]">Annuler</button>
+            <button type="button" id="stle-btn-ok" class="btn btn-primary btn-sm font-black text-[11px]">Valider</button>
+        </div>
     </div>
 </dialog>

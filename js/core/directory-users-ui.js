@@ -38,6 +38,14 @@ function hideLegacyDirectorySections(secAdm, secProf, secElv) {
     secElv?.replaceChildren();
 }
 
+function directoryDisplayName(r) {
+    const p = String(r?.prenom || '').trim();
+    const n = String(r?.nom || '').trim();
+    const combined = [p, n].filter(Boolean).join(' ').trim();
+    if (combined) return combined;
+    return String(r?.display_name || '').trim() || '—';
+}
+
 /** Un seul tableau : en-têtes de colonnes alignés pour les 3 blocs (admin / prof / élève). */
 function renderDirectoryUnified(container, admins, profs, eleves) {
     if (!container) return;
@@ -52,11 +60,11 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
     wrap.className = 'overflow-x-auto rounded-xl border border-slate-200';
     const table = document.createElement('table');
     table.className =
-        'w-full text-left text-[11px] max-sm:text-[10px] table-fixed border-collapse directory-users-readonly';
+        'w-full text-left text-[11px] max-sm:text-[10px] border-collapse directory-users-readonly';
 
     const cg = document.createElement('colgroup');
     cg.innerHTML =
-        '<col style="width:32%"><col style="width:44%"><col style="width:24%">';
+        '<col class="min-w-[7rem] sm:min-w-[9rem]"><col><col class="w-[1%] whitespace-nowrap">';
     table.appendChild(cg);
 
     const thead = document.createElement('thead');
@@ -96,15 +104,16 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
             for (const r of rows) {
                 const tr = document.createElement('tr');
                 tr.className = 'border-t border-slate-100';
-                const name = String(r.display_name || '').trim() || '—';
+                const name = directoryDisplayName(r);
                 const em = String(r.email || '').trim();
                 const ph = formatFrPhone(String(r.telephone || '').trim());
+                const cal = String(r.calendar_label || '').trim();
 
                 const tdName = document.createElement('td');
                 tdName.className =
-                    'p-2 max-sm:p-1.5 max-sm:pl-2 align-top max-w-0 whitespace-nowrap overflow-hidden text-ellipsis';
+                    'p-2 max-sm:p-1.5 max-sm:pl-2 align-top break-words [overflow-wrap:anywhere] leading-snug';
                 const nameEl = document.createElement('strong');
-                nameEl.className = 'font-semibold text-slate-900 leading-snug block truncate';
+                nameEl.className = 'font-semibold text-slate-900 leading-snug';
                 nameEl.textContent = name;
                 tdName.appendChild(nameEl);
                 tr.appendChild(tdName);
@@ -119,7 +128,14 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
                     a.textContent = em;
                     tdEmail.appendChild(a);
                 } else {
-                    tdEmail.textContent = em || '—';
+                    tdEmail.appendChild(document.createTextNode(em || '—'));
+                }
+                if (cal) {
+                    const sub = document.createElement('div');
+                    sub.className =
+                        'mt-1 text-[10px] max-sm:text-[9px] text-slate-600 leading-snug break-words';
+                    sub.textContent = cal;
+                    tdEmail.appendChild(sub);
                 }
                 tr.appendChild(tdEmail);
 
@@ -210,22 +226,21 @@ function renderAdminDirectoryTable(users) {
     wrap.className = 'overflow-x-auto rounded-xl border border-slate-200';
     const table = document.createElement('table');
     table.className =
-        'directory-users-admin w-full text-left text-[11px] max-sm:text-[10px] table-fixed border-collapse';
+        'directory-users-admin w-full text-left text-[11px] max-sm:text-[10px] border-collapse';
 
     const cg = document.createElement('colgroup');
     cg.innerHTML =
-        '<col style="width:20%"><col style="width:34%"><col style="width:18%"><col><col style="width:2.85rem">';
+        '<col class="min-w-[7rem] sm:min-w-[9rem]"><col><col class="w-[1%] whitespace-nowrap"><col class="w-[2.75rem]">';
     table.appendChild(cg);
 
     const thead = document.createElement('thead');
     thead.className =
         'bg-slate-50 text-slate-600 font-bold uppercase tracking-wide text-[10px] max-sm:text-[9px] border-b border-slate-200';
     thead.innerHTML = `<tr>
-        <th class="p-2 max-sm:p-1.5 max-sm:pl-2 font-semibold">Nom</th>
-        <th class="p-2 max-sm:p-1.5 font-semibold">E-mail</th>
-        <th class="p-2 max-sm:p-1.5 font-semibold">Tél.</th>
-        <th class="p-2 max-sm:p-1.5 font-semibold">Calendrier</th>
-        <th class="p-2 max-sm:p-1.5 max-sm:pr-2 w-14"></th>
+        <th class="p-2 max-sm:p-1.5 max-sm:pl-2 font-semibold align-bottom">Nom</th>
+        <th class="p-2 max-sm:p-1.5 font-semibold align-bottom">E-mail</th>
+        <th class="p-2 max-sm:p-1.5 font-semibold align-bottom">Tél.</th>
+        <th class="p-2 max-sm:p-1.5 max-sm:pr-2 w-11 font-semibold align-bottom" aria-label="Actions"></th>
       </tr>`;
     table.appendChild(thead);
 
@@ -239,37 +254,68 @@ function renderAdminDirectoryTable(users) {
     for (const r of sorted) {
         const tr = document.createElement('tr');
         tr.className = 'border-t border-slate-100';
-        const label = `${String(r.prenom || '').trim()} ${String(r.nom || '').trim()}`.trim() || '—';
+        const label =
+            `${String(r.prenom || '').trim()} ${String(r.nom || '').trim()}`.trim() ||
+            String(r.display_name || '').trim() ||
+            '—';
         const email = String(r.email || '').trim();
         const phone = formatFrPhone(String(r.telephone || '').trim()) || '—';
-        const calLabel = String(r.personal_calendar_label || '').trim() || 'Non attribué';
+        const calLabel = String(r.personal_calendar_label || '').trim();
         const calId = String(r.personal_google_calendar_id || '').trim();
-        const emailCell = email
-            ? `<a class="link link-primary break-words [overflow-wrap:anywhere]" href="mailto:${encodeURIComponent(email)}">${escapeHtml(email)}</a>`
-            : escapeHtml('—');
-        tr.innerHTML = `
-          <td class="p-2 max-sm:p-1.5 max-sm:pl-2 align-top leading-snug max-w-0 whitespace-nowrap overflow-hidden text-ellipsis">${escapeHtml(label)}</td>
-          <td class="p-2 max-sm:p-1.5 align-top leading-snug">${emailCell}</td>
-          <td class="p-2 max-sm:p-1.5 align-top font-mono text-[10px] max-sm:text-[9px] whitespace-nowrap">${escapeHtml(phone)}</td>
-          <td class="p-2 max-sm:p-1.5 align-top min-w-0">
-            <div class="flex flex-col gap-1 items-start min-w-0 max-w-full">
-              <span class="text-[10px] max-sm:text-[9px] leading-snug whitespace-normal break-words">${escapeHtml(calLabel)}</span>
-              ${
-                  calId
-                      ? `<div class="flex items-center gap-1 shrink-0">
-                <button type="button" class="btn btn-ghost btn-xs btn-square border border-slate-200 directory-copy-cal planning-icon-btn" data-cal-id="${escapeHtmlAttr(calId)}" aria-label="Copier l'URL du calendrier" title="Copier URL">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9 9 0 019 9zM18.75 10.5h-6.75a1.125 1.125 0 00-1.125 1.125v6.75"/></svg>
-                </button>
-              </div>`
-                      : ''
-              }
-            </div>
-          </td>
-          <td class="p-2 max-sm:p-1.5 max-sm:pr-2 text-right align-top">
-            <button type="button" class="btn btn-ghost btn-xs btn-square border border-slate-200 directory-edit-user" data-user-id="${escapeHtmlAttr(String(r.id || ''))}" aria-label="Modifier l'utilisateur" title="Modifier">
+
+        const tdName = document.createElement('td');
+        tdName.className =
+            'p-2 max-sm:p-1.5 max-sm:pl-2 align-top leading-snug break-words [overflow-wrap:anywhere] font-semibold text-slate-900';
+        tdName.textContent = label;
+        tr.appendChild(tdName);
+
+        const tdEmail = document.createElement('td');
+        tdEmail.className =
+            'p-2 max-sm:p-1.5 align-top leading-snug break-words [overflow-wrap:anywhere]';
+        if (email.includes('@')) {
+            const a = document.createElement('a');
+            a.href = `mailto:${email}`;
+            a.className = 'link link-primary';
+            a.textContent = email;
+            tdEmail.appendChild(a);
+        } else {
+            tdEmail.textContent = email || '—';
+        }
+        const calLine = document.createElement('div');
+        calLine.className =
+            'mt-1 flex flex-wrap items-center gap-1 text-[10px] max-sm:text-[9px] text-slate-600 leading-snug';
+        const calText = document.createElement('span');
+        calText.className = 'break-words min-w-0';
+        calText.textContent = calLabel || 'Non attribué';
+        calLine.appendChild(calText);
+        if (calId) {
+            const copyBtn = document.createElement('button');
+            copyBtn.type = 'button';
+            copyBtn.className =
+                'btn btn-ghost btn-xs btn-square border border-slate-200 directory-copy-cal planning-icon-btn shrink-0';
+            copyBtn.dataset.calId = calId;
+            copyBtn.setAttribute('aria-label', "Copier l'URL du calendrier");
+            copyBtn.title = 'Copier URL';
+            copyBtn.innerHTML =
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9 9 0 019 9zM18.75 10.5h-6.75a1.125 1.125 0 00-1.125 1.125v6.75"/></svg>';
+            calLine.appendChild(copyBtn);
+        }
+        tdEmail.appendChild(calLine);
+        tr.appendChild(tdEmail);
+
+        const tdPhone = document.createElement('td');
+        tdPhone.className =
+            'p-2 max-sm:p-1.5 align-top font-mono text-[10px] max-sm:text-[9px] whitespace-nowrap text-slate-800';
+        tdPhone.textContent = phone;
+        tr.appendChild(tdPhone);
+
+        const tdAct = document.createElement('td');
+        tdAct.className = 'p-2 max-sm:p-1.5 max-sm:pr-2 text-right align-top';
+        tdAct.innerHTML = `<button type="button" class="btn btn-ghost btn-xs btn-square border border-slate-200 directory-edit-user" data-user-id="${escapeHtmlAttr(String(r.id || ''))}" aria-label="Modifier l'utilisateur" title="Modifier">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L8.25 18.463 3 21l2.537-5.25L16.862 3.487z"/></svg>
-            </button>
-          </td>`;
+            </button>`;
+        tr.appendChild(tdAct);
+
         tr.dataset.userJson = JSON.stringify(r);
         tb.appendChild(tr);
     }

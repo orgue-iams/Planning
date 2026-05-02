@@ -6,7 +6,7 @@ import { formatProfileFullName } from '../utils/profile-full-name.js';
 /**
  * Construit l’objet utilisateur applicatif à partir d’une session Supabase + ligne `profiles`.
  * @param {import('https://esm.sh/@supabase/supabase-js@2.49.8').Session} session
- * @returns {Promise<{ name: string, email: string, role: string, id: string, telephone?: string, directory_share_email?: boolean, directory_share_phone?: boolean } | null>}
+ * @returns {Promise<{ name: string, email: string, role: string, id: string, telephone?: string, directory_share_email?: boolean, directory_share_phone?: boolean, directory_share_calendar?: boolean } | null>}
  */
 export async function fetchAppUserFromSession(session) {
     const supabase = getSupabaseClient();
@@ -14,7 +14,9 @@ export async function fetchAppUserFromSession(session) {
 
     const { data, error } = await supabase
         .from('profiles')
-        .select('nom, prenom, display_name, role, reservation_types, telephone, directory_share_email, directory_share_phone')
+        .select(
+            'nom, prenom, display_name, role, reservation_types, telephone, directory_share_email, directory_share_phone, directory_share_calendar'
+        )
         .eq('id', session.user.id)
         .maybeSingle();
 
@@ -44,6 +46,7 @@ export async function fetchAppUserFromSession(session) {
         id: session.user.id,
         telephone: String(data?.telephone ?? '').trim(),
         directory_share_email: data?.directory_share_email !== false,
-        directory_share_phone: data?.directory_share_phone === true
+        directory_share_phone: data?.directory_share_phone === true,
+        directory_share_calendar: data?.directory_share_calendar === true
     };
 }
