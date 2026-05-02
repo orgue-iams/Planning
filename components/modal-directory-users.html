@@ -12,9 +12,11 @@
         <div id="directory-admin-users-wrap" class="hidden mb-4">
             <div id="directory-admin-users-table"></div>
         </div>
-        <div id="directory-section-admins" class="mb-4"></div>
-        <div id="directory-section-profs" class="mb-4"></div>
-        <div id="directory-section-eleves" class="mb-4"></div>
+        <!-- Annuaire lecture seule : un seul tableau (colonnes alignées mobile / desktop) -->
+        <div id="directory-readonly-unified" class="mb-4 hidden"></div>
+        <div id="directory-section-admins" class="mb-4 hidden" aria-hidden="true"></div>
+        <div id="directory-section-profs" class="mb-4 hidden" aria-hidden="true"></div>
+        <div id="directory-section-eleves" class="mb-4 hidden" aria-hidden="true"></div>
         <div class="modal-action mt-4 pt-2 border-t border-slate-100">
             <button type="button" id="directory-users-close-btn" class="btn btn-ghost btn-sm font-black text-[11px]">Fermer</button>
         </div>
