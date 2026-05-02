@@ -14,8 +14,11 @@ export function isTouchSwipeWeekNavigationEnabled() {
 
 /**
  * Swipe horizontal pour naviguer entre périodes (tactile natif, sans Hammer sur le calendrier).
+ *
+ * @param {{ suppressGridInteractionUntil?: number } | null | undefined} [touchInteractionGate]
+ *        Fenêtre où FC ne doit pas traiter sélection / clic après un pincement (évite création de créneau fantôme).
  */
-export function initSwipe(calendarEl, calendar) {
+export function initSwipe(calendarEl, calendar, touchInteractionGate) {
     if (!(calendarEl instanceof HTMLElement) || !calendar) return;
     if (!isTouchSwipeWeekNavigationEnabled()) return;
 
@@ -42,6 +45,8 @@ export function initSwipe(calendarEl, calendar) {
     let lastNavAt = 0;
     let horizontalSwipeStartedOnEvent = false;
     let pinchTracking = false;
+    /** True dès qu’un geste à 2 doigts a commencé, jusqu’à ce que tous les doigts soient relevés. */
+    let pinchGestureUsed = false;
     let pinchStartDistance = 0;
     let pinchStartSlotRem = 3.6;
     const NAV_COOLDOWN_MS = 350;
@@ -67,7 +72,20 @@ export function initSwipe(calendarEl, calendar) {
     function setSlotRem(rem) {
         const clamped = Math.max(PINCH_MIN_REM, Math.min(PINCH_MAX_REM, rem));
         calendarEl.style.setProperty('--planning-slot-height', `${clamped.toFixed(2)}rem`);
+        const fcRoot = calendarEl.querySelector('.fc');
+        if (fcRoot instanceof HTMLElement) {
+            fcRoot.style.setProperty('--planning-slot-height', `${clamped.toFixed(2)}rem`);
+        }
         if (typeof calendar.updateSize === 'function') calendar.updateSize();
+    }
+
+    function bumpPinchSuppressGate() {
+        if (!touchInteractionGate) return;
+        const until = Date.now() + 550;
+        touchInteractionGate.suppressGridInteractionUntil = Math.max(
+            touchInteractionGate.suppressGridInteractionUntil ?? 0,
+            until
+        );
     }
     const canNavigateNow = () => Date.now() - lastNavAt > NAV_COOLDOWN_MS;
     const navigate = (dir) => {
@@ -93,13 +111,23 @@ export function initSwipe(calendarEl, calendar) {
         horizontalSwipeStartedOnEvent = targetTouchesEventSurface(ev.target);
     };
 
-    const onTouchStart = (ev) => {
-        if (ev.touches && ev.touches.length === 2) {
+    /** Capture + passive:false : avant FullCalendar, pour pouvoir bloquer la sélection sur les colonnes jour. */
+    const onTouchStartCapture = (ev) => {
+        if (ev.touches && ev.touches.length >= 2) {
+            pinchGestureUsed = true;
             pinchTracking = true;
             tracking = false;
             horizontalSwipeStartedOnEvent = false;
             pinchStartDistance = touchDistance(ev.touches[0], ev.touches[1]);
             pinchStartSlotRem = currentSlotRem();
+            try {
+                if (typeof calendar.unselect === 'function') calendar.unselect();
+            } catch {
+                /* */
+            }
+            bumpPinchSuppressGate();
+            ev.preventDefault();
+            ev.stopPropagation();
             return;
         }
         if (!ev.touches || ev.touches.length !== 1) return;
@@ -111,13 +139,27 @@ export function initSwipe(calendarEl, calendar) {
         horizontalSwipeStartedOnEvent = targetTouchesEventSurface(ev.target);
     };
 
-    const onTouchMove = (ev) => {
+    const onTouchMoveCapture = (ev) => {
         if (!pinchTracking || !ev.touches || ev.touches.length !== 2) return;
         const d = touchDistance(ev.touches[0], ev.touches[1]);
         if (d <= 0 || pinchStartDistance <= 0) return;
         const ratio = d / pinchStartDistance;
         setSlotRem(pinchStartSlotRem * Math.pow(ratio, PINCH_SENSITIVITY));
         ev.preventDefault();
+        ev.stopPropagation();
+    };
+
+    const onTouchEndCapture = (ev) => {
+        if (pinchGestureUsed) {
+            ev.stopPropagation();
+        }
+        if (pinchTracking && (!ev.touches || ev.touches.length < 2)) {
+            pinchTracking = false;
+            bumpPinchSuppressGate();
+        }
+        if (!ev.touches || ev.touches.length === 0) {
+            pinchGestureUsed = false;
+        }
     };
 
     const onTouchEnd = (ev) => {
@@ -149,8 +191,10 @@ export function initSwipe(calendarEl, calendar) {
     };
 
     calendarEl.addEventListener('pointerdown', onPointerDownCapture, { capture: true });
-    calendarEl.addEventListener('touchstart', onTouchStart, { passive: true });
-    calendarEl.addEventListener('touchmove', onTouchMove, { passive: false });
+    calendarEl.addEventListener('touchstart', onTouchStartCapture, { capture: true, passive: false });
+    calendarEl.addEventListener('touchmove', onTouchMoveCapture, { capture: true, passive: false });
+    calendarEl.addEventListener('touchend', onTouchEndCapture, { capture: true, passive: true });
+    calendarEl.addEventListener('touchcancel', onTouchEndCapture, { capture: true, passive: true });
     calendarEl.addEventListener('touchend', onTouchEnd, { passive: true });
 
     /*

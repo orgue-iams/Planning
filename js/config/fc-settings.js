@@ -54,7 +54,7 @@ export function bindResponsiveCalendarToolbar(calendar) {
     mql.addEventListener('change', apply);
 }
 
-export const getCalendarConfig = (handlers, currentUser) => {
+export const getCalendarConfig = (handlers, currentUser, touchInteractionGate) => {
     const privileged =
         currentUser && (currentUser.role === 'admin' || currentUser.role === 'prof');
     const { slotMinTime, slotMaxTime } = getChapelSlotBounds();
@@ -97,6 +97,8 @@ export const getCalendarConfig = (handlers, currentUser) => {
         selectLongPressDelay: 250,
 
         selectAllow: (selectInfo) => {
+            const gateUntil = touchInteractionGate?.suppressGridInteractionUntil ?? 0;
+            if (gateUntil && Date.now() < gateUntil) return false;
             /* FC appelle parfois ce hook pendant handleHitUpdate avec seulement start/end (sans `view`) :
              * accéder à `view.type` plantait et cassait toute la sélection cliquer-glisser. */
             if (!selectInfo?.start || !selectInfo?.end) return true;
