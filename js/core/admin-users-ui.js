@@ -525,10 +525,18 @@ function fillPasswordPolicyLists() {
     }
 }
 
-function setAdminPwFieldsVisible(visible) {
-    const t = visible ? 'text' : 'password';
-    document.getElementById('admin-pw-new')?.setAttribute('type', t);
-    document.getElementById('admin-pw-new2')?.setAttribute('type', t);
+function resetAdminPwModalToggles() {
+    for (const id of ['admin-pw-new', 'admin-pw-new2']) {
+        const el = document.getElementById(id);
+        if (el instanceof HTMLInputElement) el.type = 'password';
+    }
+    document.querySelectorAll('#modal_admin_password [data-admin-pw-toggle]').forEach((node) => {
+        const btn = /** @type {HTMLButtonElement} */ (node);
+        btn.setAttribute('aria-pressed', 'false');
+        btn.setAttribute('aria-label', 'Afficher le mot de passe');
+        btn.querySelector('.planning-pass-toggle__show')?.classList.remove('hidden');
+        btn.querySelector('.planning-pass-toggle__hide')?.classList.add('hidden');
+    });
 }
 
 let adminUsersHandlersBound = false;
@@ -570,9 +578,18 @@ export function initAdminUsersUi(currentUser) {
         void saveAdminUsersTableAndClose(usersAdminDlg);
     });
 
-    document.getElementById('admin-pw-show-plain')?.addEventListener('change', (e) => {
-        const el = e.target;
-        setAdminPwFieldsVisible(el instanceof HTMLInputElement && el.checked);
+    document.getElementById('modal_admin_password')?.addEventListener('click', (e) => {
+        const btn = e.target instanceof Element ? e.target.closest('[data-admin-pw-toggle]') : null;
+        if (!(btn instanceof HTMLButtonElement)) return;
+        const id = btn.getAttribute('data-admin-pw-toggle');
+        const input = id ? document.getElementById(id) : null;
+        if (!(input instanceof HTMLInputElement)) return;
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        btn.setAttribute('aria-pressed', String(show));
+        btn.setAttribute('aria-label', show ? 'Masquer le mot de passe' : 'Afficher le mot de passe');
+        btn.querySelector('.planning-pass-toggle__show')?.classList.toggle('hidden', show);
+        btn.querySelector('.planning-pass-toggle__hide')?.classList.toggle('hidden', !show);
     });
 
     document.getElementById('admin-create-pw-toggle')?.addEventListener('click', () => {
@@ -779,9 +796,7 @@ export function initAdminUsersUi(currentUser) {
             document.getElementById('admin-pw-target-email').textContent = email;
             document.getElementById('admin-pw-new').value = '';
             document.getElementById('admin-pw-new2').value = '';
-            const showCb = document.getElementById('admin-pw-show-plain');
-            if (showCb instanceof HTMLInputElement) showCb.checked = false;
-            setAdminPwFieldsVisible(false);
+            resetAdminPwModalToggles();
             document.getElementById('modal_admin_password')?.showModal();
         }
     });

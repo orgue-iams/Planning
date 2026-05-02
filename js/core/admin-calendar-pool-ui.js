@@ -82,7 +82,7 @@ function renderPoolTableRows(rows) {
     if (list.length === 0) {
         const tr = document.createElement('tr');
         tr.innerHTML =
-            '<td colspan="4" class="text-[10px] text-slate-500 text-center py-4">Aucune entrée. Ajoutez un calendrier ci-dessus.</td>';
+            '<td colspan="4" class="text-[10px] text-slate-500 text-center py-4">Aucune entrée. Utilisez le bouton + pour ajouter un calendrier.</td>';
         tb.appendChild(tr);
         updatePoolSortButtonsUi();
         return;
@@ -165,6 +165,21 @@ export function initAdminCalendarPoolUi(currentUser) {
     document.getElementById('calendar-pool-sort-label')?.addEventListener('click', () => setPoolSort('label'));
     document.getElementById('calendar-pool-sort-assignee')?.addEventListener('click', () => setPoolSort('assignee_nom'));
 
+    const openPoolAddModal = () => {
+        const gid = document.getElementById('calendar-pool-add-google-id');
+        const lb = document.getElementById('calendar-pool-add-label');
+        if (gid instanceof HTMLInputElement) gid.value = '';
+        if (lb instanceof HTMLInputElement) lb.value = '';
+        document.getElementById('modal_calendar_pool_add')?.showModal();
+        requestAnimationFrame(() => gid?.focus());
+    };
+
+    document.getElementById('calendar-pool-open-add')?.addEventListener('click', () => openPoolAddModal());
+
+    document.getElementById('calendar-pool-add-cancel')?.addEventListener('click', () => {
+        document.getElementById('modal_calendar_pool_add')?.close();
+    });
+
     document.getElementById('modal_calendar_pool')?.addEventListener('click', async (ev) => {
         const t = ev.target;
         const btn = t instanceof Element ? t.closest('.calendar-pool-copy-url') : null;
@@ -182,17 +197,11 @@ export function initAdminCalendarPoolUi(currentUser) {
         }
     });
 
-    document.getElementById('calendar-pool-refresh')?.addEventListener('click', () => {
-        void refreshCalendarPoolModalTable().catch((err) =>
-            showToast(err instanceof Error ? err.message : String(err), 'error')
-        );
-    });
-
-    document.getElementById('calendar-pool-add-btn')?.addEventListener('click', async () => {
+    const submitPoolAdd = async () => {
         const google_calendar_id = normalizeGoogleCalendarId(
-            document.getElementById('calendar-pool-google-id')?.value ?? ''
+            document.getElementById('calendar-pool-add-google-id')?.value ?? ''
         );
-        const label = document.getElementById('calendar-pool-label')?.value?.trim() || '';
+        const label = document.getElementById('calendar-pool-add-label')?.value?.trim() || '';
         if (!google_calendar_id) {
             showToast('Indiquez l’ID du calendrier Google.', 'error');
             return;
@@ -204,13 +213,20 @@ export function initAdminCalendarPoolUi(currentUser) {
                 sort_order: 0
             });
             showToast('Calendrier ajouté au pool.');
-            const gid = document.getElementById('calendar-pool-google-id');
-            const lb = document.getElementById('calendar-pool-label');
-            if (gid) gid.value = '';
-            if (lb) lb.value = '';
+            document.getElementById('modal_calendar_pool_add')?.close();
             await refreshCalendarPoolModalTable();
         } catch (err) {
             showToast(err instanceof Error ? err.message : String(err), 'error');
         }
+    };
+
+    document.getElementById('calendar-pool-add-submit')?.addEventListener('click', () => void submitPoolAdd());
+    document.getElementById('modal_calendar_pool_add')?.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        const t = e.target;
+        if (!(t instanceof HTMLElement)) return;
+        if (!t.closest('#calendar-pool-add-google-id, #calendar-pool-add-label')) return;
+        e.preventDefault();
+        void submitPoolAdd();
     });
 }

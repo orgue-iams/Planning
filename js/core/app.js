@@ -201,9 +201,6 @@ function initCalendarAndRevealUi() {
     let suppressDateClickUntil = 0;
     let lastDateClickStamp = 0;
     let lastDateClickKey = '';
-    /** Rempli par `initSwipe` : après un pincement, bloquer sélection / clic grille un court instant. */
-    const touchInteractionGate = { suppressGridInteractionUntil: 0 };
-
     const handlers = {
         onDatesSet: null,
         onResizeStart: (info) => captureResizeStart(info),
@@ -214,10 +211,6 @@ function initCalendarAndRevealUi() {
          * Enregistrement rapide sur la plage choisie (sans modale en vue semaine/jour).
          */
         onSelect: (info) => {
-            if (Date.now() < touchInteractionGate.suppressGridInteractionUntil) {
-                calendar?.unselect();
-                return;
-            }
             suppressDateClickUntil = Date.now() + 900;
             currentEvent = null;
             if (!currentUser?.email) {
@@ -232,7 +225,6 @@ function initCalendarAndRevealUi() {
         /** Clic simple : création rapide 1 h / 30 min (sans modale), sauf vue liste → modale. */
         onDateClick: (info) => {
             queueMicrotask(() => {
-                if (Date.now() < touchInteractionGate.suppressGridInteractionUntil) return;
                 if (Date.now() < suppressDateClickUntil) return;
                 const slotMs = info?.date instanceof Date ? info.date.getTime() : Number.NaN;
                 const clickKey = Number.isFinite(slotMs)
@@ -349,7 +341,7 @@ function initCalendarAndRevealUi() {
         invalidateCalendarListCache();
         calendar = new FullCalendar.Calendar(
             calendarEl,
-            getCalendarConfig(handlers, currentUser, touchInteractionGate)
+            getCalendarConfig(handlers, currentUser)
         );
         calendar.render();
         const toolbarCtl = initCalendarToolbar(calendar);
@@ -367,7 +359,7 @@ function initCalendarAndRevealUi() {
         });
         bindResponsiveCalendarToolbar(calendar);
 
-        initSwipe(calendarEl, calendar, touchInteractionGate);
+        initSwipe(calendarEl, calendar);
 
         document.getElementById('btn-save').onclick = () =>
             void saveReservation(calendar, currentUser, currentEvent).catch((err) =>

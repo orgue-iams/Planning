@@ -35,8 +35,8 @@
                 </label>
             </div>
 
-            <div class="grid grid-cols-[auto_minmax(0,1fr)] gap-2 items-end mt-1.5">
-                <label class="flex flex-col gap-0 w-max max-w-full shrink-0">
+            <div class="mt-2">
+                <label class="flex flex-col gap-0 w-max max-w-full">
                     <span class="text-[9px] font-bold text-slate-500 leading-none mb-0.5">Rôle</span>
                     <select id="admin-invite-role" class="select select-xs select-bordered w-max max-w-full text-[10px] h-8 min-h-0 py-0 leading-tight" aria-label="Rôle du compte">
                         <option value="admin">Admin</option>
@@ -44,22 +44,27 @@
                         <option value="eleve" selected>Élève</option>
                     </select>
                 </label>
-                <label class="flex flex-col gap-0 min-w-0">
-                    <span id="admin-password-label" class="text-[9px] font-bold text-slate-500 leading-none mb-0.5">Mot de passe</span>
-                    <div class="flex items-stretch gap-1 w-full min-w-0">
-                        <button type="button" id="admin-create-pw-toggle" class="btn btn-ghost btn-xs btn-square shrink-0 h-8 w-8 min-h-8 p-0 text-slate-500 hover:text-slate-700 border border-slate-200 bg-white hover:bg-slate-50 shadow-none" aria-label="Afficher le mot de passe" aria-pressed="false">
-                            <svg id="admin-create-pw-icon-show" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-[18px] h-[18px]" aria-hidden="true">
+            </div>
+
+            <div class="mt-3 space-y-1">
+                <span id="admin-password-label" class="text-[9px] font-black uppercase text-slate-500 tracking-wide block">Mot de passe</span>
+                <div class="planning-pass-field relative z-[1] w-full overflow-visible">
+                    <input type="password" id="admin-create-password" autocomplete="new-password" placeholder="" class="input input-xs input-bordered w-full text-xs h-10 min-h-0 pr-[3.25rem] admin-create-password-input bg-slate-50" />
+                    <button type="button" id="admin-create-pw-toggle" class="planning-pass-toggle" aria-label="Afficher le mot de passe" aria-pressed="false">
+                        <span id="admin-create-pw-icon-show" class="planning-pass-toggle__icon" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="20" height="20">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                             </svg>
-                            <svg id="admin-create-pw-icon-hide" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-[18px] h-[18px] hidden" aria-hidden="true">
+                        </span>
+                        <span id="admin-create-pw-icon-hide" class="planning-pass-toggle__icon hidden" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="20" height="20">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.274M6.228 6.228L3 3m3.228 3.228L12 12m-5.772-5.772L9.88 9.88M18.228 18.228L21 21m-2.772-2.772L12 12" />
                             </svg>
-                        </button>
-                        <input type="password" id="admin-create-password" autocomplete="new-password" placeholder="" class="input input-xs input-bordered flex-1 min-w-0 text-xs h-8 min-h-0 admin-create-password-input" />
-                    </div>
-                    <span id="admin-password-field-hint" class="hidden text-[8px] text-slate-500 mt-0.5 leading-snug"></span>
-                </label>
+                        </span>
+                    </button>
+                </div>
+                <span id="admin-password-field-hint" class="hidden text-[8px] text-slate-500 leading-snug"></span>
             </div>
             <ul id="admin-create-pw-policy" class="text-[8px] text-slate-500 list-disc list-inside mt-1.5 mb-1 pl-0.5 columns-1 sm:columns-2 sm:gap-x-6 gap-y-0"></ul>
         </div>
@@ -76,15 +81,42 @@
         <h3 class="font-black text-xs uppercase text-slate-500 mb-2">Nouveau mot de passe</h3>
         <p class="text-[10px] text-slate-500 mb-3 break-all font-mono" id="admin-pw-target-email"></p>
         <input type="hidden" id="admin-pw-user-id" value="" />
-        <input type="password" id="admin-pw-new" autocomplete="new-password" placeholder="Nouveau mot de passe" class="input input-bordered w-full text-sm mb-2" />
-        <input type="password" id="admin-pw-new2" autocomplete="new-password" placeholder="Confirmer" class="input input-bordered w-full text-sm mb-2" />
-        <label class="label cursor-pointer justify-start gap-2 py-1 min-h-0">
-            <input type="checkbox" id="admin-pw-show-plain" class="checkbox checkbox-xs" />
-            <span class="label-text text-[10px] text-slate-600">Afficher les mots de passe en clair</span>
-        </label>
+        <label class="sr-only" for="admin-pw-new">Nouveau mot de passe</label>
+        <div class="planning-pass-field relative z-[1] w-full mb-3 overflow-visible">
+            <input type="password" id="admin-pw-new" autocomplete="new-password" placeholder="Nouveau mot de passe" class="input input-bordered w-full text-sm h-12 min-h-0 pr-[3.25rem] bg-slate-50" />
+            <button type="button" class="planning-pass-toggle" data-admin-pw-toggle="admin-pw-new" aria-label="Afficher le mot de passe" aria-pressed="false">
+                <span class="planning-pass-toggle__icon planning-pass-toggle__show" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="22" height="22">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </span>
+                <span class="planning-pass-toggle__icon planning-pass-toggle__hide hidden" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="22" height="22">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.274M6.228 6.228L3 3m3.228 3.228L12 12m-5.772-5.772L9.88 9.88M18.228 18.228L21 21m-2.772-2.772L12 12" />
+                    </svg>
+                </span>
+            </button>
+        </div>
+        <label class="sr-only" for="admin-pw-new2">Confirmer le mot de passe</label>
+        <div class="planning-pass-field relative z-[1] w-full mb-3 overflow-visible">
+            <input type="password" id="admin-pw-new2" autocomplete="new-password" placeholder="Confirmer" class="input input-bordered w-full text-sm h-12 min-h-0 pr-[3.25rem] bg-slate-50" />
+            <button type="button" class="planning-pass-toggle" data-admin-pw-toggle="admin-pw-new2" aria-label="Afficher le mot de passe" aria-pressed="false">
+                <span class="planning-pass-toggle__icon planning-pass-toggle__show" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="22" height="22">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </span>
+                <span class="planning-pass-toggle__icon planning-pass-toggle__hide hidden" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="22" height="22">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.274M6.228 6.228L3 3m3.228 3.228L12 12m-5.772-5.772L9.88 9.88M18.228 18.228L21 21m-2.772-2.772L12 12" />
+                    </svg>
+                </span>
+            </button>
+        </div>
         <p class="text-[9px] font-black uppercase text-slate-500 mt-2 mb-1 tracking-wide">Politique à respecter</p>
         <ul id="admin-pw-policy" class="text-[10px] text-slate-600 list-disc list-inside mb-3 space-y-1"></ul>
-        <p class="text-[9px] text-slate-400 mb-3">À transmettre à l’utilisateur par un canal adapté ; évitez les mots de passe trop simples.</p>
         <div class="flex justify-end gap-2">
             <button type="button" class="btn btn-ghost btn-sm font-normal text-[11px]" onclick="document.getElementById('modal_admin_password').close()">Fermer</button>
             <button type="button" id="admin-pw-save" class="btn btn-primary btn-sm font-normal text-[11px]">Enregistrer</button>

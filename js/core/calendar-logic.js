@@ -1530,6 +1530,58 @@ function buildHalfHourChoices(startInclusive, endInclusive) {
     return out;
 }
 
+/** Premier créneau 30 min (local) dont le début est ≥ maintenant. */
+function firstHalfHourOnOrAfterNowLocal() {
+    const n = new Date();
+    const totalMins = n.getHours() * 60 + n.getMinutes();
+    const extra = n.getSeconds() > 0 || n.getMilliseconds() > 0 ? 1 : 0;
+    const slot = Math.ceil((totalMins + extra) / 30) * 30;
+    return new Date(n.getFullYear(), n.getMonth(), n.getDate(), Math.floor(slot / 60), slot % 60, 0, 0);
+}
+
+function snapInstantUpToHalfHourGrid(d) {
+    const x = new Date(d);
+    x.setSeconds(0, 0);
+    const m = x.getMinutes();
+    if (m === 0 || m === 30) return x;
+    if (m < 30) {
+        x.setMinutes(30, 0, 0);
+        return x;
+    }
+    x.setHours(x.getHours() + 1, 0, 0, 0);
+    return x;
+}
+
+/**
+ * Borne minimale pour les listes début/fin : élève + jour courant → pas avant l’heure actuelle
+ * ni avant le début du créneau édité (évite de ramener le début dans le passé).
+ */
+function minReservationModalStartInstant(dateYmd, calendar, eventRef) {
+    const dayAnchor = new Date(`${dateYmd}T12:00:00`);
+    if (Number.isNaN(dayAnchor.getTime())) return null;
+    const dayStart = slotMinInstantOnSameDay(dayAnchor, calendar);
+    const dayMax = slotMaxInstantOnSameDay(dayAnchor, calendar);
+    const lastStart = new Date(dayMax.getTime() - 30 * 60 * 1000);
+    let minT = new Date(dayStart.getTime());
+    const today = new Date();
+    if (sameCalendarDay(dayAnchor, today)) {
+        const u = reservationModalUserRef;
+        if (normalizeRole(u?.role) === 'eleve') {
+            const nowB = firstHalfHourOnOrAfterNowLocal();
+            minT = new Date(Math.max(minT.getTime(), nowB.getTime()));
+            if (eventRef?.start) {
+                const raw = eventRef.start;
+                const es = raw instanceof Date ? raw : new Date(raw);
+                if (!Number.isNaN(es.getTime()) && sameCalendarDay(es, dayAnchor)) {
+                    minT = new Date(Math.max(minT.getTime(), es.getTime()));
+                }
+            }
+        }
+    }
+    if (minT.getTime() > lastStart.getTime()) return null;
+    return minT;
+}
+
 function setSelectOptions(selectEl, values, preferred) {
     if (!(selectEl instanceof HTMLSelectElement)) return '';
     const unique = [...new Set(values)];
@@ -1556,9 +1608,17 @@ function syncReservationModalTimeOptions(calendar, eventRef) {
     const dayStart = slotMinInstantOnSameDay(dayAnchor, calendar);
     const dayMax = slotMaxInstantOnSameDay(dayAnchor, calendar);
     const lastStart = new Date(dayMax.getTime() - 30 * 60 * 1000);
+    const rawMin = minReservationModalStartInstant(dateValue, calendar, eventRef);
+    let loopStart = new Date(dayStart.getTime());
+    if (rawMin) {
+        loopStart = snapInstantUpToHalfHourGrid(new Date(Math.max(rawMin.getTime(), dayStart.getTime())));
+        while (loopStart.getTime() < rawMin.getTime()) {
+            loopStart = new Date(loopStart.getTime() + 30 * 60 * 1000);
+        }
+    }
     const startChoices = [];
     for (
-        let t = new Date(dayStart);
+        let t = new Date(loopStart);
         t.getTime() <= lastStart.getTime();
         t = new Date(t.getTime() + 30 * 60 * 1000)
     ) {

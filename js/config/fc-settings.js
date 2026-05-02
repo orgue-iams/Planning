@@ -11,7 +11,10 @@ import {
     getCalendarListCache,
     setCalendarListCache
 } from '../core/calendar-events-list-cache.js';
-import { fcDragResizePropsForEvent, applyDragResizePropsToFcEvent } from '../core/calendar-logic.js';
+import {
+    fcDragResizePropsForEvent,
+    applyDragResizePropsToFcEvent
+} from '../core/calendar-logic.js';
 import { fetchPlanningEventsForFullCalendar } from '../core/planning-events-db.js';
 import { scheduleTimeGridColumnSync } from '../utils/timegrid-column-sync.js';
 import { getChapelSlotBounds } from '../core/organ-settings.js';
@@ -54,7 +57,7 @@ export function bindResponsiveCalendarToolbar(calendar) {
     mql.addEventListener('change', apply);
 }
 
-export const getCalendarConfig = (handlers, currentUser, touchInteractionGate) => {
+export const getCalendarConfig = (handlers, currentUser) => {
     const privileged =
         currentUser && (currentUser.role === 'admin' || currentUser.role === 'prof');
     const { slotMinTime, slotMaxTime } = getChapelSlotBounds();
@@ -97,8 +100,6 @@ export const getCalendarConfig = (handlers, currentUser, touchInteractionGate) =
         selectLongPressDelay: 250,
 
         selectAllow: (selectInfo) => {
-            const gateUntil = touchInteractionGate?.suppressGridInteractionUntil ?? 0;
-            if (gateUntil && Date.now() < gateUntil) return false;
             /* FC appelle parfois ce hook pendant handleHitUpdate avec seulement start/end (sans `view`) :
              * accéder à `view.type` plantait et cassait toute la sélection cliquer-glisser. */
             if (!selectInfo?.start || !selectInfo?.end) return true;
@@ -137,12 +138,19 @@ export const getCalendarConfig = (handlers, currentUser, touchInteractionGate) =
             scheduleTimeGridColumnSync(document.getElementById('calendar'));
         },
 
-        /* Recalcule editable/startEditable après chaque chargement (ex. créneau déplacé le même jour : élève + heure passée). */
+        /* Créneaux passés / droits : premier rendu + refetch (évite tout « draggable » avant navigation). */
         eventsSet: (info) => {
             try {
                 for (const ev of info.events) {
                     applyDragResizePropsToFcEvent(ev, currentUser);
                 }
+            } catch {
+                /* */
+            }
+        },
+        eventDidMount: (info) => {
+            try {
+                applyDragResizePropsToFcEvent(info.event, currentUser);
             } catch {
                 /* */
             }

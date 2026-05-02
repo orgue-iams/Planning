@@ -1,18 +1,10 @@
 <dialog id="modal_calendar_pool" class="modal">
     <div class="modal-box p-5 w-[96%] max-w-4xl max-h-[90dvh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col">
-        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest shrink-0">Calendriers des utilisateurs (pool)</h3>
-        <p class="text-[10px] text-slate-500 mb-3 leading-snug">Créez d’abord chaque calendrier dans Google Agenda (compte orgue.iams), puis ajoutez-le <strong>un par un</strong> avec son ID (vous pouvez coller l’URL d’intégration : l’ID est extrait du paramètre <code class="text-[8px] bg-slate-100 px-0.5 rounded">src</code>). <strong>Partagez chaque calendrier secondaire</strong> avec l’e-mail du compte de service / OAuth utilisé par calendar-bridge, avec « Modifier les événements » — comme pour l’agenda principal — sinon la synchro miroir renvoie « Not Found ». Les comptes élève / prof / admin reçoivent le prochain créneau libre du pool. Si le pool est vide, le profil affiche <code class="text-[8px] bg-slate-100 px-0.5 rounded">POOL_SATURATED</code>.</p>
-
-        <div class="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end mb-3 shrink-0">
-            <label class="flex flex-col gap-0 min-w-0">
-                <span class="text-[9px] font-bold text-slate-600">ID calendrier Google <span class="font-normal text-slate-400">(oblig.)</span></span>
-                <input type="text" id="calendar-pool-google-id" placeholder="ID ou lien intégration (?src=…)" class="input input-xs input-bordered w-full text-[10px] h-8 min-h-0 font-mono" autocomplete="off" />
-            </label>
-            <label class="flex flex-col gap-0 min-w-0">
-                <span class="text-[9px] font-bold text-slate-600">Libellé <span class="font-normal text-slate-400">(ex. Planning IAMS 27)</span></span>
-                <input type="text" id="calendar-pool-label" placeholder="Nom affiché dans l’admin" class="input input-xs input-bordered w-full text-[10px] h-8 min-h-0" autocomplete="off" />
-            </label>
-            <button type="button" id="calendar-pool-add-btn" class="btn btn-primary btn-xs font-normal text-[10px] h-8 min-h-0">Ajouter</button>
+        <div class="flex flex-wrap items-center gap-2 justify-between shrink-0 border-b border-slate-100 pb-2 mb-3">
+            <h3 class="font-black text-xs uppercase text-slate-500 tracking-widest m-0">Calendriers des utilisateurs (pool)</h3>
+            <button type="button" id="calendar-pool-open-add" class="btn btn-square btn-sm btn-ghost planning-icon-btn border border-slate-200" title="Ajouter" aria-label="Ajouter un calendrier au pool">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
+            </button>
         </div>
 
         <div class="flex-1 min-h-0 overflow-auto rounded-xl border border-slate-200 mb-3">
@@ -48,8 +40,25 @@
         </div>
 
         <div class="modal-action shrink-0 mt-0 pt-2 border-t border-slate-100">
-            <button type="button" id="calendar-pool-refresh" class="btn btn-ghost btn-sm font-normal text-[11px]">Actualiser</button>
             <button type="button" class="btn btn-ghost btn-sm font-normal text-[11px]" onclick="document.getElementById('modal_calendar_pool').close()">Fermer</button>
+        </div>
+    </div>
+</dialog>
+
+<dialog id="modal_calendar_pool_add" class="modal">
+    <div class="modal-box p-5 w-[96%] max-w-md rounded-2xl border border-slate-200 shadow-2xl">
+        <h3 class="font-black text-xs mb-3 uppercase text-slate-500 border-b pb-2 tracking-widest">Ajouter un calendrier</h3>
+        <label class="flex flex-col gap-0 min-w-0 mb-2">
+            <span class="text-[9px] font-bold text-slate-600">ID calendrier Google <span class="font-normal text-slate-400">(oblig.)</span></span>
+            <input type="text" id="calendar-pool-add-google-id" placeholder="ID ou lien (?src=…)" class="input input-xs input-bordered w-full text-[10px] h-9 min-h-0 font-mono" autocomplete="off" />
+        </label>
+        <label class="flex flex-col gap-0 min-w-0 mb-4">
+            <span class="text-[9px] font-bold text-slate-600">Libellé</span>
+            <input type="text" id="calendar-pool-add-label" placeholder="Nom affiché dans l’admin" class="input input-xs input-bordered w-full text-[10px] h-9 min-h-0" autocomplete="off" />
+        </label>
+        <div class="modal-action mt-0 flex justify-end gap-2 border-t border-slate-100 pt-3">
+            <button type="button" id="calendar-pool-add-cancel" class="btn btn-ghost btn-sm font-normal text-[11px]">Annuler</button>
+            <button type="button" id="calendar-pool-add-submit" class="btn btn-primary btn-sm font-normal text-[11px]">Ajouter</button>
         </div>
     </div>
 </dialog>

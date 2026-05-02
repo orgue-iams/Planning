@@ -5,12 +5,9 @@
     --planning-slot-height: 3.6rem;
 }
 
-/*
- * pan-x pan-y : laisse le scroll de la grille et les gestes à 2 doigts pour le pincement (hauteur des lignes),
- * sans `manipulation` qui sur WebKit peut empêcher le suivi fiable du pinch custom (touch-handler.js).
- */
+/* Laisser FullCalendar gérer le tactile (sélection long-press + drag) sans imposer pan-y au parent. */
 #calendar {
-    touch-action: pan-x pan-y;
+    touch-action: manipulation;
 }
 
 /* Pas de cadre extérieur sur la grille (thème FC = 1px sur .fc-scrollgrid). */

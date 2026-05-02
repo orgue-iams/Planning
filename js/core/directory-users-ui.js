@@ -56,7 +56,7 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
 
     const cg = document.createElement('colgroup');
     cg.innerHTML =
-        '<col style="width:24%"><col style="width:50%"><col style="width:26%">';
+        '<col style="width:32%"><col style="width:44%"><col style="width:24%">';
     table.appendChild(cg);
 
     const thead = document.createElement('thead');
@@ -101,9 +101,10 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
                 const ph = formatFrPhone(String(r.telephone || '').trim());
 
                 const tdName = document.createElement('td');
-                tdName.className = 'p-2 max-sm:p-1.5 max-sm:pl-2 align-top';
+                tdName.className =
+                    'p-2 max-sm:p-1.5 max-sm:pl-2 align-top max-w-0 whitespace-nowrap overflow-hidden text-ellipsis';
                 const nameEl = document.createElement('strong');
-                nameEl.className = 'font-semibold text-slate-900 leading-snug';
+                nameEl.className = 'font-semibold text-slate-900 leading-snug block truncate';
                 nameEl.textContent = name;
                 tdName.appendChild(nameEl);
                 tr.appendChild(tdName);
@@ -247,17 +248,19 @@ function renderAdminDirectoryTable(users) {
             ? `<a class="link link-primary break-words [overflow-wrap:anywhere]" href="mailto:${encodeURIComponent(email)}">${escapeHtml(email)}</a>`
             : escapeHtml('—');
         tr.innerHTML = `
-          <td class="p-2 max-sm:p-1.5 max-sm:pl-2 align-top leading-snug">${escapeHtml(label)}</td>
+          <td class="p-2 max-sm:p-1.5 max-sm:pl-2 align-top leading-snug max-w-0 whitespace-nowrap overflow-hidden text-ellipsis">${escapeHtml(label)}</td>
           <td class="p-2 max-sm:p-1.5 align-top leading-snug">${emailCell}</td>
           <td class="p-2 max-sm:p-1.5 align-top font-mono text-[10px] max-sm:text-[9px] whitespace-nowrap">${escapeHtml(phone)}</td>
           <td class="p-2 max-sm:p-1.5 align-top min-w-0">
-            <div class="flex items-center gap-1 min-w-0">
-              <span class="truncate">${escapeHtml(calLabel)}</span>
+            <div class="flex flex-col gap-1 items-start min-w-0 max-w-full">
+              <span class="text-[10px] max-sm:text-[9px] leading-snug whitespace-normal break-words">${escapeHtml(calLabel)}</span>
               ${
                   calId
-                      ? `<button type="button" class="btn btn-ghost btn-xs btn-square border border-slate-200 shrink-0 directory-copy-cal" data-cal-id="${escapeHtmlAttr(calId)}" aria-label="Copier l'URL du calendrier" title="Copier URL">
+                      ? `<div class="flex items-center gap-1 shrink-0">
+                <button type="button" class="btn btn-ghost btn-xs btn-square border border-slate-200 directory-copy-cal planning-icon-btn" data-cal-id="${escapeHtmlAttr(calId)}" aria-label="Copier l'URL du calendrier" title="Copier URL">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9 9 0 019 9zM18.75 10.5h-6.75a1.125 1.125 0 00-1.125 1.125v6.75"/></svg>
-                </button>`
+                </button>
+              </div>`
                       : ''
               }
             </div>

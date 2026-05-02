@@ -52,9 +52,9 @@
 /* Bouton « Auj. » et déclencheur de vue — plat, arrondi */
 .cal-tb-pill {
     appearance: none;
-    border: 0;
+    border: 1px solid rgb(203 213 225);
     margin: 0;
-    background: #f1f5f9;
+    background: rgb(226 232 240);
     color: #334155;
     font-size: 0.8125rem;
     font-weight: 600;
@@ -67,11 +67,13 @@
 }
 
 .cal-tb-pill:hover {
-    background: #e2e8f0;
+    background: rgb(59 130 246);
+    border-color: rgb(37 99 235);
+    color: #fff;
 }
 
 .cal-tb-pill:active {
-    background: #cbd5e1;
+    background: rgb(37 99 235);
 }
 
 .cal-tb-pill--view {
@@ -89,13 +91,13 @@
 /* Chevrons : pas de cadre, fond rond au survol */
 .cal-tb-nav {
     appearance: none;
-    border: 0;
+    border: 1px solid rgb(203 213 225);
     margin: 0;
     padding: 0;
     width: 2.25rem;
     height: 2.25rem;
     border-radius: 9999px;
-    background: transparent;
+    background: rgb(226 232 240);
     color: #475569;
     cursor: pointer;
     display: inline-flex;
@@ -106,11 +108,13 @@
 }
 
 .cal-tb-nav:hover {
-    background: rgb(15 23 42 / 0.08);
+    background: rgb(59 130 246);
+    border-color: rgb(37 99 235);
+    color: #fff;
 }
 
 .cal-tb-nav:active {
-    background: rgb(15 23 42 / 0.12);
+    background: rgb(37 99 235);
 }
 
 .cal-tb-nav svg {

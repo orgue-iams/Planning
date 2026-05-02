@@ -71,3 +71,21 @@ html, body {
         padding-top: calc(2.5rem + env(safe-area-inset-top, 0px) + 2.65rem);
     }
 }
+
+/* Icônes / boutons carrés « neutres » : fond bleu-gris, survol bleu plein */
+#app-header .btn.btn-ghost.btn-square:not(.planning-pass-toggle),
+.modal .btn.btn-ghost.btn-square:not(.planning-pass-toggle):not(.btn-disabled),
+.planning-icon-btn:not(:disabled) {
+    background-color: rgb(226 232 240) !important;
+    border-color: rgb(203 213 225) !important;
+    color: rgb(51 65 85) !important;
+    box-shadow: none;
+}
+
+#app-header .btn.btn-ghost.btn-square:not(.planning-pass-toggle):hover:not(:disabled),
+.modal .btn.btn-ghost.btn-square:not(.planning-pass-toggle):hover:not(.btn-disabled),
+.planning-icon-btn:hover:not(:disabled) {
+    background-color: rgb(59 130 246) !important;
+    border-color: rgb(37 99 235) !important;
+    color: #fff !important;
+}
