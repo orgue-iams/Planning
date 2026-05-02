@@ -381,7 +381,9 @@ function initCalendarAndRevealUi() {
         });
 
         unbindTimeGridColumnSync?.();
-        unbindTimeGridColumnSync = bindTimeGridColumnSync(calendarEl);
+        unbindTimeGridColumnSync = bindTimeGridColumnSync(calendarEl, () => {
+            if (typeof calendar?.updateSize === 'function') calendar.updateSize();
+        });
 
         initMessagesUi(currentUser);
         initProfileUi(currentUser);

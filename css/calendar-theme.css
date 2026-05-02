@@ -132,6 +132,13 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     border-bottom: 1px solid #f1f5f9 !important;
 }
 
+/* Colonnes « jour » : FC pose la hauteur sur .fc-timegrid-slot-lane, pas .fc-timegrid-slot — aligner le pincement + thème. */
+#calendar .fc-timegrid-cols .fc-timegrid-slot-lane {
+    height: var(--planning-slot-height) !important;
+    min-height: var(--planning-slot-height);
+    box-sizing: border-box;
+}
+
 /*
  * Colonne libellés (fc-timegrid-slots, 1re colonne du sous-tableau) : aucun trait horizontal.
  * Ne pas cibler .fc-timegrid-slot-lane : ce sont les marques d’heure qui continuent sous les jours.
