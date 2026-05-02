@@ -35,6 +35,7 @@ import {
     setLogoutHandler,
     setSessionLostHandler,
     initSessionLostListeners,
+    muteSessionLostEvents,
     tryRestoreSession,
     getRememberMePreference,
     isPrivilegedUser,
@@ -606,6 +607,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             return false;
         }
     })();
+    // SIGNED_OUT pendant tryRestoreSession (clés sb-* invalides → signOut local) déclencherait aussi le toast erreur : un seul message info ci-dessous.
+    if (hadStoredSupabaseSession && isBackendAuthConfigured()) {
+        muteSessionLostEvents(12000);
+    }
     const restored = await tryRestoreSession();
     if (restored) {
         currentUser = restored;

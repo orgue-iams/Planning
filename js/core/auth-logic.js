@@ -469,7 +469,8 @@ function markUserInitiatedLogout() {
     _userInitiatedLogout = true;
 }
 
-function muteSessionLostEvents(ms = 2500) {
+/** Évite un doublon toast / performLogout quand GoTrue émet SIGNED_OUT pendant un nettoyage de session au boot (ex. refresh invalide). */
+export function muteSessionLostEvents(ms = 2500) {
     _muteSessionLostEventsUntil = Math.max(_muteSessionLostEventsUntil, Date.now() + ms);
 }
 
