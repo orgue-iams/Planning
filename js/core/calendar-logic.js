@@ -547,6 +547,21 @@ export function isReservationStartBeforeTodayLocal(eventLike) {
 }
 
 /**
+ * Créneau à traiter comme « passé » pour désactiver édition / drag / suppression.
+ * — Tous les rôles : jour calendaire avant aujourd’hui.
+ * — Élève uniquement : même jour mais heure de début strictement avant maintenant (créneau déjà commencé).
+ */
+export function isReservationNonEditablePast(currentUser, eventLike) {
+    if (!eventLike?.start) return false;
+    if (isReservationStartBeforeTodayLocal(eventLike)) return true;
+    if (normalizeRole(currentUser?.role) !== 'eleve') return false;
+    const raw = eventLike.start;
+    const start = raw instanceof Date ? raw : new Date(raw);
+    if (Number.isNaN(start.getTime())) return false;
+    return start.getTime() < Date.now();
+}
+
+/**
  * Drag / redimensionnement : le calendrier a eventStartEditable / eventDurationEditable à false par défaut ;
  * on active par événement selon les mêmes règles que la modale (propriétaire, prof sur élève/prof, admin).
  * Les créneaux passés restent non éditables ; sur tactile, pas de redimensionnement (drag déplacement ok).
@@ -557,7 +572,7 @@ export function fcDragResizePropsForEvent(eventLike, currentUser) {
     if (!start || Number.isNaN(start.getTime())) {
         return { editable: false, startEditable: false, durationEditable: false };
     }
-    if (isReservationStartBeforeTodayLocal({ start })) {
+    if (isReservationNonEditablePast(currentUser, eventLike)) {
         return { editable: false, startEditable: false, durationEditable: false };
     }
     if (!eventLike || !canCurrentUserEditEventIgnoringPast(currentUser, eventLike)) {
@@ -568,6 +583,23 @@ export function fcDragResizePropsForEvent(eventLike, currentUser) {
         typeof window.matchMedia === 'function' &&
         window.matchMedia('(pointer: coarse)').matches;
     return { editable: true, startEditable: true, durationEditable: !coarsePointer };
+}
+
+/**
+ * Recalcule les drapeaux FC après déplacement / changement d’heure (évite un créneau encore « draggable »
+ * alors qu’il est passé pour un élève).
+ * @param {import('@fullcalendar/core').EventApi | null} eventApi
+ */
+export function applyDragResizePropsToFcEvent(eventApi, currentUser) {
+    if (!eventApi || typeof eventApi.setProp !== 'function') return;
+    const p = fcDragResizePropsForEvent(eventApi, currentUser);
+    try {
+        eventApi.setProp('editable', p.editable);
+        eventApi.setProp('startEditable', p.startEditable);
+        eventApi.setProp('durationEditable', p.durationEditable);
+    } catch (e) {
+        console.warn('[Planning] applyDragResizePropsToFcEvent', e);
+    }
 }
 
 /** Créneau tout juste ajouté par l’utilisateur connecté (owner = moi). */
@@ -596,7 +628,7 @@ function canCurrentUserEditEventIgnoringPast(currentUser, event) {
 
 export function canCurrentUserEditEvent(currentUser, event) {
     if (!currentUser?.email || !event) return false;
-    if (isReservationStartBeforeTodayLocal(event)) return false;
+    if (isReservationNonEditablePast(currentUser, event)) return false;
     return canCurrentUserEditEventIgnoringPast(currentUser, event);
 }
 
@@ -1027,12 +1059,15 @@ export function getEventContent(arg, currentUser) {
 
     const showTitleRow = Boolean(title) && (!sameCalendarDay || durationMin > 30);
 
+    const pastReadonly = isReservationNonEditablePast(currentUser, arg.event);
+
     /* Même contenu pour le miroir FC (drag / redimensionnement) : horaires mis à jour en direct par FC. */
     const mirrorCls = isMirror ? ' event-box--fc-mirror' : '';
+    const pastCls = pastReadonly ? ' event-box--past-readonly' : '';
     const aria = isMirror ? ' aria-hidden="true"' : '';
 
     let innerHTML = `
-        <div class="event-box flex flex-col h-full w-full ${colorClass}${mirrorCls}"${aria}>
+        <div class="event-box flex flex-col h-full w-full ${colorClass}${mirrorCls}${pastCls}"${aria}>
             <div class="event-time event-time-fc">${timeLine}</div>`;
     if (showTitleRow) {
         innerHTML += `
@@ -1274,7 +1309,7 @@ export async function handleEventResize(info, currentUser) {
     const start = info.event.start;
     const end = info.event.end;
     if (!start || !end) return;
-    if (isReservationStartBeforeTodayLocal(info.event)) {
+    if (isReservationNonEditablePast(currentUser, info.event)) {
         info.revert();
         resizePreviousRange.delete(info.event);
         showToast('Les créneaux passés ne sont pas modifiables.', 'error');
@@ -2007,6 +2042,12 @@ export async function quickCreateFromSelection(calendar, selectInfo, currentUser
         return;
     }
 
+    if (isReservationNonEditablePast(currentUser, { start: rangeStart })) {
+        showToast('Impossible de réserver sur un créneau passé.', 'error');
+        calendar.unselect();
+        return;
+    }
+
     commitQuickReservation(calendar, currentUser, rangeStart, rangeEnd, title, motif);
     calendar.unselect();
 }
@@ -2032,7 +2073,7 @@ export async function quickCreateFromDateClick(calendar, clickDate, currentUser,
         }
     }
 
-    if (isReservationStartBeforeTodayLocal({ start: anchor })) {
+    if (isReservationNonEditablePast(currentUser, { start: anchor })) {
         showToast('Impossible de réserver sur un créneau passé.', 'error');
         return;
     }
@@ -2062,7 +2103,7 @@ export async function quickCreateFromDateClick(calendar, clickDate, currentUser,
 export async function openModal(start, end, event, currentUser, calendarForClip = null) {
     const modal = document.getElementById('modal_reservation');
     if (!modal) return;
-    const isPastSlot = Boolean(event && isReservationStartBeforeTodayLocal(event));
+    const isPastSlot = Boolean(event && isReservationNonEditablePast(currentUser, event));
     const meRoleOpen = normalizeRole(currentUser?.role);
     const canEditEvent = !event || canCurrentUserEditEvent(currentUser, event);
     reservationModalUserRef = currentUser;
@@ -2485,7 +2526,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     const liveEventRef = currentEventRef
         ? resolveLivePlanningEventRef(calendar, currentEventRef)
         : null;
-    if (liveEventRef && isReservationStartBeforeTodayLocal(liveEventRef)) {
+    if (liveEventRef && isReservationNonEditablePast(currentUser, liveEventRef)) {
         showToast('Les créneaux passés ne sont pas modifiables.', 'error');
         return;
     }
@@ -2657,8 +2698,8 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         return;
     }
 
-    if (liveEventRef && isReservationStartBeforeTodayLocal({ start: new Date(startStr) })) {
-        showToast('Impossible d’enregistrer une date antérieure à aujourd’hui.', 'error');
+    if (liveEventRef && isReservationNonEditablePast(currentUser, { start: new Date(startStr) })) {
+        showToast('Impossible d’enregistrer un créneau dans le passé.', 'error');
         return;
     }
 
@@ -2874,7 +2915,7 @@ export async function deleteReservation(calendar, currentEventRef, currentUser) 
     }
     const liveRef = resolveLivePlanningEventRef(calendar, currentEventRef);
     const rMeDel = normalizeRole(currentUser.role);
-    if (isReservationStartBeforeTodayLocal(liveRef)) {
+    if (isReservationNonEditablePast(currentUser, liveRef)) {
         if (rMeDel !== 'admin' && rMeDel !== 'prof') {
             showToast('Les créneaux passés ne sont pas modifiables.', 'error');
             return;

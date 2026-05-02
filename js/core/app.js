@@ -14,7 +14,8 @@ import {
     setRecurringOptionsVisible,
     handleEventResize,
     canCurrentUserEditEvent,
-    isReservationStartBeforeTodayLocal,
+    isReservationNonEditablePast,
+    applyDragResizePropsToFcEvent,
     isCalendarEventDropLocationValid,
     onCalendarEventDragStart,
     onCalendarEventDragStop,
@@ -275,13 +276,13 @@ function initCalendarAndRevealUi() {
                 showToast('Déposez le créneau sur la grille du planning.', 'error');
                 return;
             }
-            if (isReservationStartBeforeTodayLocal(info.event)) {
+            if (isReservationNonEditablePast(currentUser, info.event)) {
                 info.revert();
                 const hadRight =
                     info.oldEvent && canCurrentUserEditEvent(currentUser, info.oldEvent);
                 showToast(
                     hadRight
-                        ? 'Impossible de placer un créneau avant aujourd’hui.'
+                        ? 'Impossible de placer un créneau dans le passé.'
                         : 'Vous ne pouvez pas déplacer ce créneau.',
                     'error'
                 );
@@ -297,6 +298,7 @@ function initCalendarAndRevealUi() {
                 info.revert();
                 return;
             }
+            applyDragResizePropsToFcEvent(info.event, currentUser);
             const oi = ownerInfoFromEvent(info.event, currentUser);
             const me = String(currentUser?.email ?? '')
                 .trim()

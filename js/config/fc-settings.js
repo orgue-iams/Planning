@@ -11,7 +11,7 @@ import {
     getCalendarListCache,
     setCalendarListCache
 } from '../core/calendar-events-list-cache.js';
-import { fcDragResizePropsForEvent } from '../core/calendar-logic.js';
+import { fcDragResizePropsForEvent, applyDragResizePropsToFcEvent } from '../core/calendar-logic.js';
 import { fetchPlanningEventsForFullCalendar } from '../core/planning-events-db.js';
 import { scheduleTimeGridColumnSync } from '../utils/timegrid-column-sync.js';
 import { getChapelSlotBounds } from '../core/organ-settings.js';
@@ -135,6 +135,17 @@ export const getCalendarConfig = (handlers, currentUser, touchInteractionGate) =
 
         viewDidMount: () => {
             scheduleTimeGridColumnSync(document.getElementById('calendar'));
+        },
+
+        /* Recalcule editable/startEditable après chaque chargement (ex. créneau déplacé le même jour : élève + heure passée). */
+        eventsSet: (info) => {
+            try {
+                for (const ev of info.events) {
+                    applyDragResizePropsToFcEvent(ev, currentUser);
+                }
+            } catch {
+                /* */
+            }
         },
 
         /* Source des créneaux : toujours RPC Postgres. Cache mémoire 90 s + clé par utilisateur. */
