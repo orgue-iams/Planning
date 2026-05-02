@@ -19,6 +19,44 @@ import {
     isoWeekRangeLocal
 } from './planning-courses.js';
 
+const WEEK_STRIP_DISMISS_PREFIX = 'planning_week_strip_dismissed:';
+
+function weekStripDismissStorageKey(email) {
+    return `${WEEK_STRIP_DISMISS_PREFIX}${String(email || '').trim().toLowerCase()}`;
+}
+
+function isWeekStripDismissedSession(user) {
+    if (!user?.email) return false;
+    try {
+        return sessionStorage.getItem(weekStripDismissStorageKey(user.email)) === '1';
+    } catch {
+        return false;
+    }
+}
+
+function setWeekStripDismissedSession(user) {
+    if (!user?.email) return;
+    try {
+        sessionStorage.setItem(weekStripDismissStorageKey(user.email), '1');
+    } catch {
+        /* quota / navigation privée */
+    }
+}
+
+let weekStripDismissBound = false;
+
+function ensureWeekStripDismissControl() {
+    if (weekStripDismissBound) return;
+    weekStripDismissBound = true;
+    document.getElementById('header-week-strip-dismiss')?.addEventListener('click', () => {
+        const u = getPlanningSessionUser();
+        if (!u?.email || String(u.role || '').toLowerCase() !== 'eleve') return;
+        setWeekStripDismissedSession(u);
+        document.getElementById('header-week-strip-wrap')?.classList.add('hidden');
+        document.getElementById('app-shell')?.classList.remove('planning-shell--weekstrip');
+    });
+}
+
 let profileUiBound = false;
 let profileSaveInFlight = false;
 let profileBaseline = null;
@@ -98,23 +136,32 @@ async function copyInputUrl(inputId) {
     }
 }
 
-/** Bandeau sous la barre : prochains cours de la semaine civile (lundi–dimanche) ou message + prochain hors semaine. */
+/** Bandeau sous la barre : prochains cours de la semaine civile (lundi–dimanche) ou message + prochain hors semaine (élèves uniquement). */
 export async function refreshHeaderWeekStrip(user) {
     const wrap = document.getElementById('header-week-strip-wrap');
     const el = document.getElementById('header-week-courses');
+    const shell = document.getElementById('app-shell');
     if (!wrap || !el) return;
     if (!user?.email) {
-        wrap.classList.add('hidden');
-        el.textContent = '';
-        return;
-    }
-    const r = String(user.role || '').toLowerCase();
-    if (r === 'admin' || r === 'prof') {
         wrap.classList.add('hidden');
         el.textContent = '';
         el.title = '';
         return;
     }
+    const r = String(user.role || '').toLowerCase();
+    if (r !== 'eleve') {
+        wrap.classList.add('hidden');
+        el.textContent = '';
+        el.title = '';
+        return;
+    }
+    ensureWeekStripDismissControl();
+    if (isWeekStripDismissedSession(user)) {
+        wrap.classList.add('hidden');
+        shell?.classList.remove('planning-shell--weekstrip');
+        return;
+    }
+    shell?.classList.add('planning-shell--weekstrip');
     wrap.classList.remove('hidden');
     el.textContent = 'Chargement des cours…';
 

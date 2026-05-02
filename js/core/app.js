@@ -187,8 +187,9 @@ function refreshHeaderUser(user) {
     /* Réglages : visible pour tout utilisateur connecté (annuaire « Utilisateurs ») ; entrées admin/prof restent masquées individuellement. */
     document.getElementById('header-settings-wrap')?.classList.toggle('hidden', !isBackendAuthConfigured());
     document.getElementById('btn-admin-clear-week')?.classList.toggle('hidden', r !== 'admin');
-    const showWeekStrip = r !== 'admin' && r !== 'prof';
-    shell?.classList.toggle('planning-shell--weekstrip', showWeekStrip);
+    if (r !== 'eleve') {
+        shell?.classList.remove('planning-shell--weekstrip');
+    }
     void refreshHeaderWeekStrip(user);
 }
 
