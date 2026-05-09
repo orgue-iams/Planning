@@ -1,0 +1,61 @@
+name: Supabase Keepalive
+
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Resolve Supabase URL
+        id: resolve
+        env:
+          SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          if [ -n "${SUPABASE_PROJECT_URL:-}" ]; then
+            url="$SUPABASE_PROJECT_URL"
+          elif [ -n "${SUPABASE_PROJECT_REF:-}" ]; then
+            url="https://${SUPABASE_PROJECT_REF}.supabase.co"
+          else
+            echo "::error::Missing secret: SUPABASE_PROJECT_URL or SUPABASE_PROJECT_REF"
+            exit 1
+          fi
+          url="${url%/}"
+          echo "project_url=$url" >> "$GITHUB_OUTPUT"
+          echo "Using Supabase host: $url"
+
+      - name: Ping Auth health endpoint
+        env:
+          PROJECT_URL: ${{ steps.resolve.outputs.project_url }}
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent \
+            --retry 3 \
+            --retry-delay 3 \
+            --max-time 20 \
+            "$PROJECT_URL/auth/v1/health" >/dev/null
+          echo "Auth health endpoint OK"
+
+      - name: Optional REST ping (if anon key configured)
+        env:
+          PROJECT_URL: ${{ steps.resolve.outputs.project_url }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "SUPABASE_ANON_KEY not set: skipping REST ping"
+            exit 0
+          fi
+          curl --fail --show-error --silent \
+            --retry 3 \
+            --retry-delay 3 \
+            --max-time 20 \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$PROJECT_URL/rest/v1/" >/dev/null
+          echo "REST endpoint OK"

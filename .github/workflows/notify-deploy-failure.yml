@@ -10,6 +10,7 @@ on:
     workflows:
       - Deploy Supabase
       - pages build and deployment
+      - Supabase Keepalive
     types: [completed]
     branches: [main, master]
 
