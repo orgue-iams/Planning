@@ -34,12 +34,22 @@ jobs:
           PROJECT_URL: ${{ steps.resolve.outputs.project_url }}
         run: |
           set -euo pipefail
-          curl --fail --show-error --silent \
+          code="$(curl --show-error --silent \
+            --output /dev/null \
+            --write-out '%{http_code}' \
             --retry 3 \
             --retry-delay 3 \
             --max-time 20 \
-            "$PROJECT_URL/auth/v1/health" >/dev/null
-          echo "Auth health endpoint OK"
+            "$PROJECT_URL/auth/v1/health")"
+          case "$code" in
+            200|401|404)
+              echo "Auth endpoint reachable (HTTP $code)"
+              ;;
+            *)
+              echo "::error::Auth endpoint unreachable or unexpected response (HTTP $code)"
+              exit 1
+              ;;
+          esac
 
       - name: Optional REST ping (if anon key configured)
         env:
