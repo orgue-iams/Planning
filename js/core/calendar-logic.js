@@ -1014,11 +1014,22 @@ export function getEventContent(arg, currentUser) {
     const isMine = Boolean(me && ownerEmail && ownerEmail === me);
     const type = arg.event.extendedProps?.type || 'reservation';
 
+    const inscritsRaw = arg.event.extendedProps?.inscrits;
+    const inscritsList = Array.isArray(inscritsRaw)
+        ? inscritsRaw.map((x) => String(x).trim().toLowerCase()).filter(Boolean)
+        : typeof inscritsRaw === 'string'
+          ? String(inscritsRaw)
+                .split(/[,;]/)
+                .map((x) => x.trim().toLowerCase())
+                .filter(Boolean)
+          : [];
+    const amInscribedInCours = Boolean(me && inscritsList.includes(me));
+
     let colorClass = 'event-slot-default';
     if (type === 'fermeture') {
         colorClass = 'event-fermeture';
     } else if (type === 'cours' || type === 'maintenance') {
-        colorClass = 'event-cours';
+        colorClass = amInscribedInCours || isMine ? 'event-travail-mine' : 'event-cours';
     } else if (type === 'concert') {
         colorClass = 'event-concert';
     } else if (type === 'autre') {

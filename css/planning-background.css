@@ -51,7 +51,7 @@
 #app-shell.planning-app-shell > #calendar,
 #app-shell.planning-app-shell > #planning-legend {
     position: relative;
-    z-index: 1;
+    z-index: 0;
 }
 
 /* Barre d’outils + légende : lisibles sur le fond */
@@ -62,10 +62,22 @@
     border-radius: 0 !important;
 }
 
+[data-theme='dark'] .calendar-toolbar {
+    background: rgba(15, 23, 42, 0.94) !important;
+    border-color: rgb(51 65 85) !important;
+    border-bottom-color: rgb(71 85 105) !important;
+}
+
 #planning-legend.planning-legend-frosted {
     background: rgb(255 255 255 / 0.82) !important;
     -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
+}
+
+[data-theme='dark'] #planning-legend.planning-legend-frosted {
+    background: rgba(15, 23, 42, 0.92) !important;
+    border-color: rgb(51 65 85);
+    color: rgb(226 232 240);
 }
 
 /* Calendrier : pas de panneau blanc opaque */
@@ -102,6 +114,10 @@
     backdrop-filter: blur(8px);
 }
 
+[data-theme='dark'] #calendar .fc-scrollgrid-section-sticky:not(.fc-scrollgrid-section-header) > * {
+    background: rgba(15, 23, 42, 0.88) !important;
+}
+
 /*
  * Première ligne d’en-tête (jours + coin heures) : blanc opaque, au-dessus du fond photo.
  * (Annule le voile 82 % des sticky et le transparent imposé au harness.)
@@ -125,6 +141,20 @@
     background-color: #fff !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
+}
+
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-scroller,
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-scroller-harness,
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header table,
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-col-header,
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header th,
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header td,
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-col-header-cell,
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-col-header-cell-cushion,
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-scrollgrid-sync-inner,
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-timegrid-axis,
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-timegrid-axis-frame {
+    background-color: rgb(15 23 42) !important;
 }
 
 /* Corps timegrid + slats : cellules transparentes */

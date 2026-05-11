@@ -1,5 +1,5 @@
 /**
- * Modale Profil + bandeau « cours de la semaine » dans l’en-tête.
+ * Modale Profil.
  */
 import {
     roleLabelFr,
@@ -11,7 +11,6 @@ import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from '.
 import { googleCalendarEmbedUrl } from '../utils/google-calendar-url.js';
 import { showToast } from '../utils/toast.js';
 import { getPlanningThemePref, setPlanningThemePref } from '../utils/planning-theme.js';
-import { formatTimeFr24 } from '../utils/time-helpers.js';
 import {
     filterCoursEventsForUser,
     sortEventsByStart,
@@ -19,44 +18,6 @@ import {
     fetchCalendarEventsInRange,
     isoWeekRangeLocal
 } from './planning-courses.js';
-
-const WEEK_STRIP_DISMISS_PREFIX = 'planning_week_strip_dismissed:';
-
-function weekStripDismissStorageKey(email) {
-    return `${WEEK_STRIP_DISMISS_PREFIX}${String(email || '').trim().toLowerCase()}`;
-}
-
-function isWeekStripDismissedSession(user) {
-    if (!user?.email) return false;
-    try {
-        return sessionStorage.getItem(weekStripDismissStorageKey(user.email)) === '1';
-    } catch {
-        return false;
-    }
-}
-
-function setWeekStripDismissedSession(user) {
-    if (!user?.email) return;
-    try {
-        sessionStorage.setItem(weekStripDismissStorageKey(user.email), '1');
-    } catch {
-        /* quota / navigation privée */
-    }
-}
-
-let weekStripDismissBound = false;
-
-function ensureWeekStripDismissControl() {
-    if (weekStripDismissBound) return;
-    weekStripDismissBound = true;
-    document.getElementById('header-week-strip-dismiss')?.addEventListener('click', () => {
-        const u = getPlanningSessionUser();
-        if (!u?.email || String(u.role || '').toLowerCase() !== 'eleve') return;
-        setWeekStripDismissedSession(u);
-        document.getElementById('header-week-strip-wrap')?.classList.add('hidden');
-        document.getElementById('app-shell')?.classList.remove('planning-shell--weekstrip');
-    });
-}
 
 let profileUiBound = false;
 let profileSaveInFlight = false;
@@ -140,81 +101,9 @@ async function copyInputUrl(inputId) {
     }
 }
 
-/** Bandeau sous la barre : prochains cours de la semaine civile (lundi–dimanche) ou message + prochain hors semaine (élèves uniquement). */
-export async function refreshHeaderWeekStrip(user) {
-    const wrap = document.getElementById('header-week-strip-wrap');
-    const el = document.getElementById('header-week-courses');
-    const shell = document.getElementById('app-shell');
-    if (!wrap || !el) return;
-    if (!user?.email) {
-        wrap.classList.add('hidden');
-        el.textContent = '';
-        el.title = '';
-        return;
-    }
-    const r = String(user.role || '').toLowerCase();
-    if (r !== 'eleve') {
-        wrap.classList.add('hidden');
-        el.textContent = '';
-        el.title = '';
-        return;
-    }
-    ensureWeekStripDismissControl();
-    if (isWeekStripDismissedSession(user)) {
-        wrap.classList.add('hidden');
-        shell?.classList.remove('planning-shell--weekstrip');
-        return;
-    }
-    shell?.classList.add('planning-shell--weekstrip');
-    wrap.classList.remove('hidden');
-    el.textContent = 'Chargement des cours…';
-
-    try {
-        const { start, end } = isoWeekRangeLocal(new Date());
-        const all = await fetchCalendarEventsInRange(start, end);
-        const myCours = sortEventsByStart(filterCoursEventsForUser(all, user));
-        const now = new Date();
-        const inWeekFuture = myCours.filter((e) => new Date(String(e.start)) >= now);
-
-        if (inWeekFuture.length > 0) {
-            const lines = inWeekFuture.map(formatCoursLineFr);
-            const max = 3;
-            const shown = lines.slice(0, max);
-            el.textContent =
-                lines.length > max
-                    ? `Cette semaine : ${shown.join(' · ')} · (+${lines.length - max} autre(s))`
-                    : `Cette semaine : ${shown.join(' · ')}`;
-            el.title = lines.join('\n');
-            return;
-        }
-
-        const after = new Date(end.getTime() + 1);
-        const horizon = new Date(after);
-        horizon.setDate(horizon.getDate() + 120);
-        const more = await fetchCalendarEventsInRange(after, horizon);
-        const nextAll = sortEventsByStart(filterCoursEventsForUser(more, user)).filter(
-            (e) => new Date(String(e.start)) >= now
-        );
-        const next = nextAll[0];
-        if (next) {
-            const d = new Date(String(next.start));
-            const dateStr = d.toLocaleDateString('fr-FR', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric'
-            });
-            const hour = formatTimeFr24(d);
-            el.textContent = `Pas de cours cette semaine, le prochain cours sera le ${dateStr} à ${hour} : ${String(next.title || 'Cours').trim()}`;
-        } else {
-            el.textContent =
-                'Pas de cours cette semaine, aucun cours à venir trouvé dans l’agenda pour votre compte.';
-        }
-        el.title = '';
-    } catch {
-        el.textContent = 'Impossible de charger les cours (agenda).';
-        el.title = '';
-    }
+/** Ancien bandeau « cours de la semaine » supprimé : nettoie la classe shell si besoin. */
+export async function refreshHeaderWeekStrip(_user) {
+    document.getElementById('app-shell')?.classList.remove('planning-shell--weekstrip');
 }
 
 async function fillProfileModal(user) {

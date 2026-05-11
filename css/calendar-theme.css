@@ -190,7 +190,13 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
 /* Force le texte à prendre toute la largeur sans marges inutiles */
 .fc-timegrid-event-harness {
     margin: 0 !important;
-    padding: 0.5px !important;
+    padding: 0 !important;
+}
+
+#calendar .fc-timegrid-event-harness-inset .fc-timegrid-event-harness,
+#calendar .fc-timegrid-col-events .fc-timegrid-event-harness {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
 }
 
 /* --- AFFICHAGE DU TEXTE DANS LES CASES --- */
@@ -431,4 +437,33 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     .fc .fc-day-head-gcal__dom-plain {
         font-size: 0.76rem;
     }
+}
+
+/* Thème sombre : en-têtes colonnes jours — textes en clair ; pas de distinction « aujourd’hui » sur les chiffres. */
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-col-header-cell,
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-timegrid-axis {
+    background-color: rgb(15 23 42) !important;
+}
+
+[data-theme='dark'] .fc .fc-day-head-gcal__dow {
+    color: rgb(203 213 225) !important;
+}
+
+[data-theme='dark'] .fc .fc-day-head-gcal__dom,
+[data-theme='dark'] .fc .fc-day-head-gcal__dom-plain {
+    color: #fff !important;
+}
+
+[data-theme='dark'] .fc .fc-day-head-gcal--today .fc-day-head-gcal__dom {
+    color: #fff !important;
+}
+
+[data-theme='dark'] .fc .fc-day-head-gcal--today .fc-day-head-gcal__dow {
+    color: rgb(226 232 240) !important;
+    font-weight: 600;
+}
+
+[data-theme='dark'] .fc .fc-day-head-gcal__dom-badge,
+[data-theme='dark'] .fc .fc-day-head-gcal--today .fc-day-head-gcal__dom-badge {
+    background: rgb(71 85 105) !important;
 }

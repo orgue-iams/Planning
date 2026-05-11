@@ -32,9 +32,8 @@ html, body {
 /* Hauteur : le conteneur parent (#app-shell) est en flex ; le calendrier prend l’espace restant */
 #app-shell #calendar {
     min-height: 0;
-    /* Au-dessus du fond photo ; sous la barre d’outils (z-index toolbar plus élevé) */
     position: relative;
-    z-index: 1;
+    z-index: 0;
 }
 
 /*
@@ -58,16 +57,6 @@ html, body {
         min-height: calc(3.25rem + env(safe-area-inset-top, 0px));
         align-content: center;
         box-shadow: 0 1px 0 rgb(226 232 240);
-    }
-}
-
-/* Bandeau « cours de la semaine » sous la navbar : décale le contenu pour ne pas le masquer */
-#app-shell.planning-shell--weekstrip {
-    padding-top: calc(3.25rem + 1.6rem);
-}
-@media (max-width: 639px) {
-    #app-shell.planning-shell--weekstrip {
-        padding-top: calc(3.25rem + env(safe-area-inset-top, 0px) + 1.6rem);
     }
 }
 
@@ -163,4 +152,89 @@ html, body {
     width: 1.15rem;
     height: 1.15rem;
     flex-shrink: 0;
+}
+
+/* Thème sombre : navbar + barre d’outils calendrier (texte / fonds). */
+[data-theme='dark'] #app-header .app-navbar.navbar {
+    background-color: rgb(15 23 42) !important;
+    border-color: rgb(51 65 85) !important;
+    box-shadow: 0 1px 0 rgb(30 41 55);
+}
+
+[data-theme='dark'] #app-header #user-display-name {
+    color: rgb(248 250 252) !important;
+}
+
+[data-theme='dark'] #app-header #user-display-role {
+    color: rgb(203 213 225) !important;
+}
+
+[data-theme='dark'] #app-header #header-build-version {
+    color: rgb(148 163 184) !important;
+}
+
+[data-theme='dark'] #app-header .font-black.uppercase {
+    color: rgb(248 250 252) !important;
+}
+
+[data-theme='dark'] #app-header .text-slate-500.font-bold.uppercase {
+    color: rgb(203 213 225) !important;
+}
+
+[data-theme='dark'] #app-header .btn.btn-ghost.btn-square {
+    background-color: rgb(51 65 85) !important;
+    border-color: rgb(71 85 105) !important;
+    color: rgb(226 232 240) !important;
+}
+
+[data-theme='dark'] #app-header .btn.btn-ghost.btn-square:hover:not(:disabled) {
+    background-color: rgb(59 130 246) !important;
+    border-color: rgb(37 99 235) !important;
+    color: #fff !important;
+}
+
+[data-theme='dark'] #app-header svg {
+    color: rgb(226 232 240);
+    stroke: currentColor;
+}
+
+[data-theme='dark'] .calendar-toolbar__title {
+    color: rgb(241 245 249) !important;
+}
+
+[data-theme='dark'] .cal-tb-pill,
+[data-theme='dark'] .cal-tb-nav {
+    background: rgb(51 65 85) !important;
+    border-color: rgb(71 85 105) !important;
+    color: rgb(248 250 252) !important;
+}
+
+[data-theme='dark'] .cal-tb-pill:hover,
+[data-theme='dark'] .cal-tb-nav:hover {
+    background: rgb(59 130 246) !important;
+    border-color: rgb(37 99 235) !important;
+    color: #fff !important;
+}
+
+[data-theme='dark'] .cal-view-dd__menu {
+    background: rgb(30 41 59) !important;
+    border-color: rgb(71 85 105) !important;
+}
+
+[data-theme='dark'] .cal-view-dd__menu button {
+    color: rgb(241 245 249);
+}
+
+[data-theme='dark'] .cal-view-dd__menu button:hover {
+    background: rgb(51 65 85);
+}
+
+[data-theme='dark'] .cal-view-dd__menu button.is-active {
+    background: rgb(30 58 138);
+    color: rgb(191 219 254);
+}
+
+[data-theme='dark'] #btn-rules-trigger:hover {
+    background-color: rgba(59, 130, 246, 0.22) !important;
+    border-color: rgb(71 85 105) !important;
 }

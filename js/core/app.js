@@ -165,7 +165,6 @@ function refreshHeaderUser(user) {
     const roleEl = document.getElementById('user-display-role');
     const menuWrap = document.getElementById('user-menu-wrap');
     const shell = document.getElementById('app-shell');
-    const stripWrap = document.getElementById('header-week-strip-wrap');
     if (!user?.email) {
         if (nameEl) nameEl.textContent = 'Invité';
         if (roleEl) {
@@ -175,7 +174,6 @@ function refreshHeaderUser(user) {
         menuWrap?.classList.add('hidden');
         document.getElementById('header-semaines-types-wrap')?.classList.add('hidden');
         document.getElementById('header-settings-wrap')?.classList.add('hidden');
-        stripWrap?.classList.add('hidden');
         shell?.classList.remove('planning-shell--weekstrip');
         document.getElementById('btn-admin-clear-week')?.classList.add('hidden');
         return;
@@ -183,7 +181,7 @@ function refreshHeaderUser(user) {
     if (nameEl) nameEl.textContent = String(user.name || '').trim() || user.email.split('@')[0];
     if (roleEl) {
         const label = roleLabelFr(user.role);
-        roleEl.textContent = label ? `· ${label}` : '';
+        roleEl.textContent = label || '';
         roleEl.classList.toggle('hidden', !label);
     }
     menuWrap?.classList.remove('hidden');
