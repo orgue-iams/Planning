@@ -519,6 +519,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const loginV = document.getElementById('login-version-badge');
     const buildLegend = document.getElementById('app-build-badge');
+    const headerBuild = document.getElementById('header-build-version');
     if (loginV) {
         loginV.textContent = CACHE_NAME;
         loginV.title = CACHE_NAME;
@@ -526,6 +527,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (buildLegend) {
         buildLegend.textContent = CACHE_NAME;
         buildLegend.title = CACHE_NAME;
+    }
+    if (headerBuild) {
+        headerBuild.textContent = CACHE_NAME;
+        headerBuild.title = CACHE_NAME;
     }
     setLogoutHandler(performLogout);
     setSessionLostHandler((msg) => {

@@ -63,11 +63,11 @@ html, body {
 
 /* Bandeau « cours de la semaine » sous la navbar : décale le contenu pour ne pas le masquer */
 #app-shell.planning-shell--weekstrip {
-    padding-top: calc(3.5rem + 2.65rem);
+    padding-top: calc(3.5rem + 1.6rem);
 }
 @media (max-width: 639px) {
     #app-shell.planning-shell--weekstrip {
-        padding-top: calc(3.5rem + env(safe-area-inset-top, 0px) + 2.65rem);
+        padding-top: calc(3.5rem + env(safe-area-inset-top, 0px) + 1.6rem);
     }
 }
 
@@ -100,4 +100,67 @@ html, body {
     background-color: rgb(59 130 246) !important;
     border-color: rgb(37 99 235) !important;
     color: #fff !important;
+}
+
+/* Bouton flottant « Consignes » (calque fixe au-dessus du planning). */
+.planning-rules-fab {
+    position: fixed;
+    right: max(0.65rem, env(safe-area-inset-right, 0px));
+    bottom: max(0.65rem, env(safe-area-inset-bottom, 0px));
+    z-index: 40;
+    width: 3.1rem;
+    height: 3.1rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 9999px;
+    cursor: pointer;
+    background: transparent;
+    box-shadow: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.planning-rules-fab__inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    border-radius: 9999px;
+    border: 2px solid #3b82f6;
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 2px 14px rgba(15, 23, 42, 0.12);
+    color: #1e40af;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease,
+        transform 0.12s ease;
+}
+
+.planning-rules-fab:hover .planning-rules-fab__inner,
+.planning-rules-fab:focus-visible .planning-rules-fab__inner {
+    background: rgba(255, 255, 255, 0.72);
+    border-color: #2563eb;
+    color: #1d4ed8;
+}
+
+.planning-rules-fab:active .planning-rules-fab__inner {
+    transform: scale(0.96);
+}
+
+.planning-rules-fab:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 3px;
+}
+
+.planning-rules-fab__icon {
+    width: 1.15rem;
+    height: 1.15rem;
+    flex-shrink: 0;
 }

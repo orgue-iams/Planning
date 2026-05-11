@@ -107,7 +107,11 @@ const VIEW_ITEMS = [
     { id: 'dayGridMonth', label: 'Mois' },
     { id: 'timeGridDay', label: 'Jour' },
     { id: 'multiMonthYear', label: 'Année' },
-    { id: 'listWeek', label: 'Planning' }
+    {
+        id: 'listWeek',
+        label: 'Planning',
+        title: 'Liste chronologique des créneaux sur la semaine affichée (pas la grille avec heures).'
+    }
 ];
 
 /** @param {import('@fullcalendar/core').CalendarApi} calendar */
@@ -175,12 +179,15 @@ export function initCalendarToolbar(calendar) {
     });
 
     viewMenu.replaceChildren();
-    for (const { id, label } of VIEW_ITEMS) {
+    for (const item of VIEW_ITEMS) {
+        const { id, label } = item;
         const li = document.createElement('li');
         const b = document.createElement('button');
         b.type = 'button';
         b.textContent = label;
         b.setAttribute('data-view', id);
+        const tip = 'title' in item ? item.title : '';
+        if (tip) b.title = tip;
         b.addEventListener('click', (ev) => {
             ev.stopPropagation();
             calendar.changeView(id);

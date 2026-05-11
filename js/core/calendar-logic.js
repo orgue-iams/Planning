@@ -2060,9 +2060,13 @@ export async function quickCreateFromSelection(calendar, selectInfo, currentUser
         showToast('Connectez-vous pour réserver.', 'error');
         return;
     }
+    const vtSel = selectInfo.view?.type ?? '';
+    const isYearLikeView =
+        vtSel === 'multiMonthYear' || (typeof vtSel === 'string' && vtSel.includes('multiMonth'));
     if (
-        selectInfo.view.type === 'dayGridMonth' ||
-        selectInfo.view.type.startsWith('list') ||
+        vtSel === 'dayGridMonth' ||
+        vtSel.startsWith('list') ||
+        isYearLikeView ||
         selectInfo.allDay
     ) {
         await openModal(selectInfo.start, selectInfo.end, null, currentUser, calendar);
@@ -2125,9 +2129,24 @@ export async function quickCreateFromDateClick(calendar, clickDate, currentUser,
         return;
     }
 
+    const isYearLikeView =
+        viewType === 'multiMonthYear' ||
+        (typeof viewType === 'string' && viewType.includes('multiMonth'));
+    if (isYearLikeView) {
+        let anchor = new Date(clickDate);
+        if (allDayFlag !== false) {
+            anchor.setHours(8, 0, 0, 0);
+        }
+        if (isReservationNonEditablePast(currentUser, { start: anchor })) {
+            showToast('Impossible de réserver sur un créneau passé.', 'error');
+            return;
+        }
+        await openModal(anchor, null, null, currentUser, calendar);
+        return;
+    }
+
     let anchor = new Date(clickDate);
-    const isMonthLike = viewType === 'dayGridMonth' || viewType.startsWith('multiMonth');
-    if (isMonthLike) {
+    if (viewType === 'dayGridMonth') {
         if (allDayFlag !== false) {
             anchor.setHours(8, 0, 0, 0);
         }

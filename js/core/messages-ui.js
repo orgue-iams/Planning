@@ -72,6 +72,7 @@ export function initMessagesUi(_ignored) {
         document.getElementById('btn-rules') ||
         document.querySelector('#app-header #btn-rules-trigger') ||
         document.querySelector('#app-header #btn-rules');
+    const btnRulesFab = document.getElementById('btn-rules-fab');
     const modalRules = document.getElementById('modal_rules');
     const modalBroadcast = document.getElementById('modal_broadcast');
 
@@ -123,45 +124,45 @@ export function initMessagesUi(_ignored) {
         { signal }
     );
 
-    btnRules?.addEventListener(
-        'click',
-        async () => {
-            applyPrivVisibility();
-            resetRulesQuill();
-            let text = getRulesText();
-            const backend = isBackendAuthConfigured();
-            if (backend) {
-                try {
-                    const remote = await fetchOrganRulesRemote();
-                    if (remote !== null && remote !== '') text = remote;
-                } catch {
-                    showToast('Impossible de charger les consignes distantes. Affichage de la version locale.', 'info');
-                }
+    const openRulesFromUserAction = async () => {
+        applyPrivVisibility();
+        resetRulesQuill();
+        let text = getRulesText();
+        const backend = isBackendAuthConfigured();
+        if (backend) {
+            try {
+                const remote = await fetchOrganRulesRemote();
+                if (remote !== null && remote !== '') text = remote;
+            } catch {
+                showToast('Impossible de charger les consignes distantes. Affichage de la version locale.', 'info');
             }
-            if (backend && (!text || String(text).trim() === '')) {
-                text = getRulesText();
+        }
+        if (backend && (!text || String(text).trim() === '')) {
+            text = getRulesText();
+        }
+        if (!modalRules || !view) {
+            const fallback = ensureFallbackRulesModal();
+            const fallbackView = fallback?.querySelector('#rules-fallback-view');
+            if (fallbackView) {
+                const raw = String(text ?? '');
+                const inner = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
+                fallbackView.innerHTML = `<div class="organ-rich">${inner}</div>`;
             }
-            if (!modalRules || !view) {
-                const fallback = ensureFallbackRulesModal();
-                const fallbackView = fallback?.querySelector('#rules-fallback-view');
-                if (fallbackView) {
-                    const raw = String(text ?? '');
-                    const inner = looksLikeHtml(raw) ? sanitizeRulesHtml(raw) : plainTextToSafeHtml(raw);
-                    fallbackView.innerHTML = `<div class="organ-rich">${inner}</div>`;
-                }
-                fallback?.showModal();
-                return;
-            }
-            renderRulesView(text);
-            editWrap?.classList.add('hidden');
-            view?.classList.remove('hidden');
-            btnSave?.classList.add('hidden');
-            const uOpen = getPlanningSessionUser();
-            btnEdit?.classList.toggle('hidden', !isPrivilegedUser(uOpen));
-            modalRules?.showModal();
-        },
-        { signal }
-    );
+            fallback?.showModal();
+            return;
+        }
+        renderRulesView(text);
+        editWrap?.classList.add('hidden');
+        view?.classList.remove('hidden');
+        btnSave?.classList.add('hidden');
+        const uOpen = getPlanningSessionUser();
+        btnEdit?.classList.toggle('hidden', !isPrivilegedUser(uOpen));
+        modalRules?.showModal();
+    };
+
+    btnRules?.addEventListener('click', () => void openRulesFromUserAction(), { signal });
+
+    btnRulesFab?.addEventListener('click', () => void openRulesFromUserAction(), { signal });
 
     btnClose?.addEventListener(
         'click',

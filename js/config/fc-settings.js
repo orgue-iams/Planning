@@ -277,12 +277,12 @@ export const getCalendarConfig = (handlers, currentUser) => {
             const domStr = escapeHtmlText(String(dom));
             const domBlock = arg.isToday
                 ? `<span class="fc-day-head-gcal__dom-badge"><span class="fc-day-head-gcal__dom">${domStr}</span></span>`
-                : `<span class="fc-day-head-gcal__dom fc-day-head-gcal__dom-plain">${domStr}</span>`;
+                : `<span class="fc-day-head-gcal__dom-plain-wrap"><span class="fc-day-head-gcal__dom fc-day-head-gcal__dom-plain">${domStr}</span></span>`;
             return {
                 html:
                     `<div class="fc-day-head-gcal${todayCls}">` +
                     `<span class="fc-day-head-gcal__dow">${dow}</span>` +
-                    `${domBlock}</div>`
+                    `<span class="fc-day-head-gcal__dom-row">${domBlock}</span></div>`
             };
         }
     };

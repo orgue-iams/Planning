@@ -1,7 +1,8 @@
 /* --- STRUCTURE DE LA GRILLE --- */
 /* Largeur axe temps : une seule valeur pour colgroup + cellules (évite le décalage en-tête / corps). */
 .fc {
-    --planning-axis-col-width: calc(5.5rem * 2 / 3);
+    /* ~ largeur « HH:mm » tabular 0.6875rem + ~1 ch de marge de chaque côté (mesure stable ; voir slot-label). */
+    --planning-axis-col-width: 2.76rem;
     --planning-slot-height: 3.6rem;
 }
 
@@ -79,14 +80,15 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     max-width: var(--planning-axis-col-width) !important;
 }
 
-/* Colonne heures : typo (cellules mineures vides inchangées). */
+/* Colonne heures : typo (cellules mineures vides inchangées). `ch` sert au calcul de --planning-axis-col-width. */
 .fc .fc-timegrid-slot-label {
     font-size: 0.6875rem;
     font-weight: 600;
     line-height: 1.15;
     font-variant-numeric: tabular-nums;
-    padding-inline-start: 0.2rem;
-    padding-inline-end: 0.25rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    padding-inline-start: 1ch;
+    padding-inline-end: 1ch;
     white-space: nowrap;
     vertical-align: top;
     overflow: visible;
@@ -255,7 +257,7 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     }
 
     .fc {
-        --planning-axis-col-width: calc(4.2rem * 2 / 3);
+        --planning-axis-col-width: 2.38rem;
     }
 
     .fc-timegrid-slots table > colgroup > col:first-child,
@@ -317,6 +319,28 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     text-transform: none;
 }
 
+/* Même hauteur que le badge « aujourd’hui » : numéros alignés verticalement ; sans jour courant, alignement horizontal conservé. */
+.fc .fc-day-head-gcal__dom-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.65rem;
+    width: 100%;
+    flex-shrink: 0;
+}
+
+/* Même boîte que le badge « aujourd’hui » (sans fond) : alignement vertical des chiffres. */
+.fc .fc-day-head-gcal__dom-plain-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-width: 1.65rem;
+    width: 1.65rem;
+    height: 1.65rem;
+    flex-shrink: 0;
+}
+
 .fc .fc-day-head-gcal__dom-badge {
     display: inline-flex;
     align-items: center;
@@ -365,8 +389,12 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     width: 100%;
 }
 
+.fc .fc-col-header-cell .fc-day-head-gcal__dom-row {
+    flex-shrink: 0;
+}
+
 .fc .fc-col-header-cell .fc-day-head-gcal__dom-badge,
-.fc .fc-col-header-cell .fc-day-head-gcal__dom-plain {
+.fc .fc-col-header-cell .fc-day-head-gcal__dom-plain-wrap {
     flex-shrink: 0;
 }
 
@@ -381,6 +409,16 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     .fc .fc-day-head-gcal__dow {
         font-size: 0.58rem;
         line-height: 1;
+    }
+
+    .fc .fc-day-head-gcal__dom-row {
+        min-height: 1.5rem;
+    }
+
+    .fc .fc-day-head-gcal__dom-plain-wrap {
+        min-width: 1.5rem;
+        width: 1.5rem;
+        height: 1.5rem;
     }
 
     .fc .fc-day-head-gcal__dom-badge {

@@ -13,6 +13,7 @@
         </div>
 
         <div class="flex items-center justify-end gap-1 sm:gap-1 min-w-0 max-sm:gap-1 max-sm:pr-0.5">
+            <span id="header-build-version" class="text-[8px] sm:text-[9px] font-mono text-slate-400 tabular-nums shrink-0 self-center max-w-[5.5rem] truncate mr-0.5 sm:mr-1" title="" aria-label="Version de l’application"></span>
             <div id="user-identity" class="flex flex-col items-end min-w-0 mr-1 sm:mr-1 leading-tight max-sm:mr-1.5 max-sm:max-w-[min(46vw,11rem)]">
                 <span id="user-display-name" class="text-[10px] sm:text-[11px] font-black text-slate-800 max-sm:text-[10px] max-sm:leading-snug text-right whitespace-normal break-words">Invité</span>
                 <span id="user-display-role" class="text-[9px] font-bold text-slate-500 uppercase tracking-wide text-right whitespace-normal break-words max-sm:text-[9px] hidden"></span>
@@ -61,10 +62,10 @@
             </div>
         </div>
     </div>
-    <div id="header-week-strip-wrap" class="hidden w-full px-2 sm:px-3 pb-1.5 pt-0 border-t border-slate-100 bg-white">
-        <div class="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100/95 px-2 py-1.5 shadow-sm">
-            <div id="header-week-courses" role="status" class="flex-1 min-w-0 text-[10px] sm:text-[11px] leading-snug text-slate-700 truncate" title=""></div>
-            <button type="button" id="header-week-strip-dismiss" class="btn btn-ghost btn-xs btn-square h-7 min-h-7 w-7 min-w-7 shrink-0 border-0 bg-transparent p-0 text-base leading-none text-slate-500 hover:bg-slate-200/80 hover:text-slate-900" aria-label="Masquer le bandeau des cours">×</button>
+    <div id="header-week-strip-wrap" class="hidden w-full px-2 sm:px-3 py-0 border-t border-slate-100 bg-white">
+        <div class="flex items-center gap-0.5 rounded-md border border-slate-200 bg-slate-100/95 px-1.5 py-0">
+            <div id="header-week-courses" role="status" class="flex-1 min-w-0 text-[9px] sm:text-[10px] leading-tight text-slate-700 truncate py-0.5" title=""></div>
+            <button type="button" id="header-week-strip-dismiss" class="btn btn-ghost btn-xs btn-square h-5 min-h-5 w-5 min-w-5 shrink-0 border-0 bg-transparent p-0 text-sm leading-none text-slate-500 hover:bg-slate-200/80 hover:text-slate-900" aria-label="Masquer le bandeau des cours">×</button>
         </div>
     </div>
 </header>
