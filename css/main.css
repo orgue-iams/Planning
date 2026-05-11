@@ -29,6 +29,10 @@ html, body {
     overflow: hidden;
 }
 
+[data-theme='dark'] body:not(.auth-pending) {
+    background-color: rgb(15 23 42) !important;
+}
+
 /* Hauteur : le conteneur parent (#app-shell) est en flex ; le calendrier prend l’espace restant */
 #app-shell #calendar {
     min-height: 0;
@@ -48,7 +52,7 @@ html, body {
     max-height: 100dvh;
     min-height: 0;
     overflow: hidden;
-    padding-bottom: max(0.25rem, env(safe-area-inset-bottom, 0px));
+    padding-bottom: 0;
 }
 
 /* Smartphone : navbar — hauteur alignée avec le padding du #app-shell (évite chevauchement barre calendrier). */
@@ -58,6 +62,10 @@ html, body {
         align-content: center;
         box-shadow: 0 1px 0 rgb(226 232 240);
     }
+}
+
+[data-theme='dark'] #app-header .app-navbar {
+    box-shadow: 0 1px 0 rgb(30 41 55);
 }
 
 /* Téléphone en paysage : gagner de la hauteur pour la grille (pas de menu dans cette configuration). */

@@ -81,7 +81,8 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
         const tbody = document.createElement('tbody');
 
         const secRow = document.createElement('tr');
-        secRow.className = 'bg-slate-100/95 border-t border-slate-200';
+        secRow.className =
+            'directory-users-section-row bg-slate-100/95 border-t border-slate-200';
         const secTd = document.createElement('td');
         secTd.colSpan = 3;
         secTd.className =
@@ -92,7 +93,7 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
 
         if (!rows.length) {
             const tr = document.createElement('tr');
-            tr.className = 'border-t border-slate-100';
+            tr.className = 'directory-users-empty-row border-t border-slate-100';
             const td = document.createElement('td');
             td.colSpan = 3;
             td.className =
@@ -103,7 +104,7 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
         } else {
             for (const r of rows) {
                 const tr = document.createElement('tr');
-                tr.className = 'border-t border-slate-100';
+                tr.className = 'directory-users-data-row border-t border-slate-100';
                 const name = directoryDisplayName(r);
                 const em = String(r.email || '').trim();
                 const ph = formatFrPhone(String(r.telephone || '').trim());

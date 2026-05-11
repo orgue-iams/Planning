@@ -3,7 +3,7 @@
  * Rendu des événements, ouverture des modales et CRUD
  */
 
-import { showToast } from '../utils/toast.js';
+import { showPersistentToast, showToast } from '../utils/toast.js';
 import { formatTimeFr24, formatWeekdayDayTimeFr24 } from '../utils/time-helpers.js';
 import { getAccessToken, isBackendAuthConfigured, isPrivilegedUser } from './auth-logic.js';
 import { bridgeDeleteEvent, invokeCalendarBridge } from './calendar-bridge.js';
@@ -2923,7 +2923,13 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         ...(enrollSync.emailsCsv ? { inscrits: enrollSync.emailsCsv } : {})
     };
     document.getElementById('modal_reservation').close();
-    showToast(liveEventRef ? 'Réservation mise à jour.' : 'Réservation enregistrée.');
+    /** @type {ReturnType<typeof showPersistentToast> | null} */
+    let updateProgressToast = null;
+    if (liveEventRef) {
+        updateProgressToast = showPersistentToast('Mise à jour…', 'info');
+    } else {
+        showToast('Réservation enregistrée.');
+    }
     if (liveEventRef) {
         const localInscritsEmails =
             dbSlotType === 'cours'
@@ -2987,6 +2993,8 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
             await refetchPlanningGrid(calendar);
         } catch (e) {
             console.error(e);
+        } finally {
+            updateProgressToast?.finish('Réservation mise à jour.', 'success');
         }
     })();
     } finally {

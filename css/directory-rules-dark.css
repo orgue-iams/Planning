@@ -1,0 +1,115 @@
+/* Annuaire « Utilisateurs » + modale « Consignes » — thème sombre (lisibilité). */
+
+[data-theme='dark'] #modal_directory_users .modal-box {
+    background-color: rgb(30 41 59) !important;
+    border-color: rgb(51 65 85) !important;
+    color: rgb(241 245 249);
+}
+
+[data-theme='dark'] #modal_directory_users h3 {
+    color: rgb(226 232 240) !important;
+    border-color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] #modal_directory_users .rounded-xl.border-slate-200 {
+    border-color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] #modal_directory_users table.directory-users-readonly thead {
+    background-color: rgb(82 96 120) !important;
+    color: rgb(248 250 252) !important;
+}
+
+[data-theme='dark'] #modal_directory_users table.directory-users-readonly thead th {
+    color: rgb(248 250 252) !important;
+}
+
+[data-theme='dark'] #modal_directory_users .directory-users-section-row {
+    background-color: rgb(82 96 120) !important;
+    border-color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] #modal_directory_users .directory-users-section-row td {
+    color: rgb(241 245 249) !important;
+}
+
+[data-theme='dark'] #modal_directory_users .directory-users-data-row {
+    background-color: rgb(55 65 81) !important;
+}
+
+[data-theme='dark'] #modal_directory_users .directory-users-data-row td {
+    color: rgb(248 250 252) !important;
+}
+
+[data-theme='dark'] #modal_directory_users .directory-users-data-row strong {
+    color: rgb(248 250 252) !important;
+}
+
+[data-theme='dark'] #modal_directory_users .directory-users-data-row a.link-primary {
+    color: rgb(147 197 253) !important;
+}
+
+[data-theme='dark'] #modal_directory_users .directory-users-data-row .text-slate-600 {
+    color: rgb(203 213 225) !important;
+}
+
+[data-theme='dark'] #modal_directory_users .directory-users-data-row .text-slate-800 {
+    color: rgb(248 250 252) !important;
+}
+
+[data-theme='dark'] #modal_directory_users .directory-users-empty-row td {
+    background-color: rgb(55 65 81) !important;
+    color: rgb(203 213 225) !important;
+}
+
+[data-theme='dark'] #modal_directory_users #directory-users-status {
+    color: rgb(203 213 225);
+}
+
+[data-theme='dark'] #modal_rules .modal-box {
+    background-color: rgb(30 41 59) !important;
+    border-color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] #modal_rules h3 {
+    color: rgb(241 245 249) !important;
+    border-color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] #modal_rules #rules-view {
+    color: rgb(248 250 252);
+}
+
+[data-theme='dark'] #modal_rules .modal-action {
+    border-color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] #modal_rules .organ-rich {
+    --organ-prose: rgb(248 250 252);
+}
+
+[data-theme='dark'] #modal_rules .organ-rich-h {
+    color: rgb(248 250 252) !important;
+}
+
+[data-theme='dark'] #modal_rules .organ-rich-h-level3 {
+    color: rgb(241 245 249) !important;
+}
+
+[data-theme='dark'] #modal_rules .organ-rich-bq {
+    background: rgb(51 65 85 / 0.65);
+    color: rgb(226 232 240);
+    border-left-color: rgb(148 163 184);
+}
+
+[data-theme='dark'] #modal_rules .organ-rich-hr {
+    border-top-color: rgb(71 85 105);
+}
+
+[data-theme='dark'] #modal_rules .organ-rich-a {
+    color: rgb(147 197 253);
+}
+
+[data-theme='dark'] #modal_rules .organ-rich-a:hover {
+    color: rgb(191 219 254);
+}

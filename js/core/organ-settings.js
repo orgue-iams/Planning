@@ -10,13 +10,38 @@ export function invalidateOrganSchoolSettingsCache() {
     cache = null;
 }
 
+/**
+ * Normalise une valeur `time` Postgres / chaîne / objet driver en `HH:mm:ss` pour FullCalendar.
+ * Évite notamment `"[object Object]"` ou formats invalides qui feraient retomber FC sur une fin de journée 24 h.
+ */
+function rawTimeToFcHHMMSS(raw, fallback) {
+    if (raw == null || raw === '') return fallback;
+    if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+        const o = /** @type {{ hours?: number; minutes?: number; seconds?: number }} */ (raw);
+        if ('hours' in o || typeof o.hours === 'number') {
+            const h = Math.min(23, Math.max(0, Number(o.hours) || 0));
+            const m = Math.min(59, Math.max(0, Number(o.minutes) || 0));
+            const s = Math.min(59, Math.max(0, Number(o.seconds) || 0));
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+    }
+    const s = String(raw).trim();
+    if (!s || s.includes('[object Object]')) return fallback;
+    const match = s.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    if (!match) return fallback;
+    const h = Math.min(23, Math.max(0, parseInt(match[1], 10)));
+    const m = Math.min(59, Math.max(0, parseInt(match[2], 10)));
+    const sec = match[3] != null ? Math.min(59, Math.max(0, parseInt(match[3], 10))) : 0;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
 /** Bornes grille FullCalendar `HH:MM:SS` */
 export function getChapelSlotBounds() {
-    const min = cache?.chapel_slot_min || '08:00:00';
-    const max = cache?.chapel_slot_max || '22:00:00';
+    const minRaw = cache?.chapel_slot_min ?? '08:00:00';
+    const maxRaw = cache?.chapel_slot_max ?? '22:00:00';
     return {
-        slotMinTime: min.length === 5 ? `${min}:00` : min,
-        slotMaxTime: max.length === 5 ? `${max}:00` : max
+        slotMinTime: rawTimeToFcHHMMSS(minRaw, '08:00:00'),
+        slotMaxTime: rawTimeToFcHHMMSS(maxRaw, '22:00:00')
     };
 }
 

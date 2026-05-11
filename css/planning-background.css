@@ -18,6 +18,12 @@
     border-radius: 0.25rem;
 }
 
+@media (max-width: 639px) {
+    .planning-page-bg {
+        border-radius: 0;
+    }
+}
+
 .planning-page-bg::before {
     content: '';
     position: absolute;
@@ -38,12 +44,12 @@
 }
 
 [data-theme='dark'] .planning-page-bg::after {
-    background: rgba(15, 23, 42, 0.88);
-    backdrop-filter: saturate(0.85) blur(1px);
+    background: rgba(15, 23, 42, 0.38);
+    backdrop-filter: saturate(0.8) blur(0.5px);
 }
 
 [data-theme='dark'] .planning-page-bg::before {
-    filter: grayscale(0.5) brightness(0.45) contrast(1) saturate(0.65);
+    filter: invert(1) hue-rotate(180deg) grayscale(0.35) contrast(0.92) brightness(1.02);
 }
 
 /* Contenu au-dessus du fond (la barre d’outils garde z-index: 30 dans calendar-toolbar.css) */
@@ -86,8 +92,9 @@
     box-shadow: none !important;
 }
 
-/* FullCalendar : zones « page » transparentes ; créneaux vides = fond visible */
-#calendar .fc {
+/* FullCalendar : zones « page » transparentes ; jour courant = même teinte qu’en clair. */
+#calendar .fc,
+[data-theme='dark'] #calendar .fc {
     --fc-page-bg-color: transparent;
     --fc-today-bg-color: rgba(255, 220, 40, 0.12);
 }
@@ -179,4 +186,49 @@
 
 #calendar .fc-list-event:hover td {
     background: rgb(241 245 249 / 0.65) !important;
+}
+
+/* Légende collée au bas sur téléphone (safe area intégrée au bloc). */
+@media (max-width: 639px) {
+    #planning-legend.planning-legend--mobile-flush {
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+        border-left: none;
+        border-right: none;
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: max(0.45rem, env(safe-area-inset-bottom, 0px));
+    }
+}
+
+/* Mode sombre : colonne des heures + filets grille (plus de fond blanc sur l’axe). */
+[data-theme='dark'] #calendar .fc-timegrid-slots td.fc-timegrid-slot-label {
+    background-color: rgb(30 41 59) !important;
+    color: rgb(226 232 240) !important;
+}
+
+[data-theme='dark'] #calendar .fc-timegrid-slots td.fc-timegrid-slot-label .fc-timegrid-slot-label-cushion {
+    color: inherit;
+}
+
+[data-theme='dark'] #calendar .fc-scrollgrid-section-body > td.fc-timegrid-axis,
+[data-theme='dark'] #calendar .fc-timegrid .fc-scrollgrid-sync-table tr > td.fc-timegrid-axis {
+    background-color: rgb(30 41 59) !important;
+}
+
+[data-theme='dark'] #calendar .fc-timegrid-slot {
+    border-bottom-color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] #calendar .fc-timegrid-col-frame,
+[data-theme='dark'] #calendar .fc-timegrid-cols .fc-timegrid-body .fc-timegrid-col {
+    border-color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] #calendar .fc-scrollgrid {
+    border-color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] #calendar .fc-list-event:hover td {
+    background: rgb(51 65 85 / 0.55) !important;
 }

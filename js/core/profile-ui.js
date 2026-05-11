@@ -10,7 +10,7 @@ import { getPlanningSessionUser, setPlanningSessionUser } from './session-user.j
 import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
 import { googleCalendarEmbedUrl } from '../utils/google-calendar-url.js';
 import { showToast } from '../utils/toast.js';
-import { getPlanningThemePref, setPlanningThemePref } from '../utils/planning-theme.js';
+import { getPlanningThemePref, setPlanningThemePref, applyPlanningTheme } from '../utils/planning-theme.js';
 import {
     filterCoursEventsForUser,
     sortEventsByStart,
@@ -50,6 +50,13 @@ function syncProfileBaselineFromForm() {
     profileBaseline = readProfileFormState();
 }
 
+function isThemeSelectionDirty() {
+    const themeSel = document.getElementById('profile-theme-select');
+    if (!(themeSel instanceof HTMLSelectElement)) return false;
+    const sel = themeSel.value === 'dark' ? 'dark' : 'light';
+    return sel !== getPlanningThemePref();
+}
+
 function hasProfilePendingChanges() {
     if (!profileBaseline) return false;
     const cur = readProfileFormState();
@@ -65,7 +72,8 @@ function hasProfilePendingChanges() {
         cur.shareEmail !== profileBaseline.shareEmail ||
         cur.sharePhone !== profileBaseline.sharePhone ||
         cur.shareCalendar !== profileBaseline.shareCalendar ||
-        hasPwd
+        hasPwd ||
+        isThemeSelectionDirty()
     );
 }
 
@@ -249,7 +257,7 @@ export function initProfileUi(currentUser) {
     document.getElementById('profile-theme-select')?.addEventListener('change', (e) => {
         const el = e.target;
         if (!(el instanceof HTMLSelectElement)) return;
-        setPlanningThemePref(el.value === 'dark' ? 'dark' : 'light');
+        applyPlanningTheme(el.value === 'dark' ? 'dark' : 'light');
     });
 
     document.getElementById('menu-item-profile')?.addEventListener('click', (e) => {
@@ -289,7 +297,10 @@ export function initProfileUi(currentUser) {
         applyPassVisibility(Boolean((e.target instanceof HTMLInputElement && e.target.checked)))
     );
     const profileDlg = document.getElementById('modal_profile');
-    profileDlg?.addEventListener('close', () => applyPassVisibility(false));
+    profileDlg?.addEventListener('close', () => {
+        applyPassVisibility(false);
+        applyPlanningTheme(getPlanningThemePref());
+    });
     profileDlg?.addEventListener('cancel', (e) => {
         if (!hasProfilePendingChanges()) return;
         e.preventDefault();
@@ -372,6 +383,10 @@ export function initProfileUi(currentUser) {
                 applyPassVisibility(false);
             }
             showToast('Profil enregistré.', 'success');
+            const themeSel = document.getElementById('profile-theme-select');
+            if (themeSel instanceof HTMLSelectElement) {
+                setPlanningThemePref(themeSel.value === 'dark' ? 'dark' : 'light');
+            }
             syncProfileBaselineFromForm();
             document.dispatchEvent(new CustomEvent('planning-profile-saved'));
             document.getElementById('modal_profile')?.close();
