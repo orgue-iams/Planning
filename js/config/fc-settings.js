@@ -58,8 +58,6 @@ export function bindResponsiveCalendarToolbar(calendar) {
 }
 
 export const getCalendarConfig = (handlers, currentUser) => {
-    const privileged =
-        currentUser && (currentUser.role === 'admin' || currentUser.role === 'prof');
     const { slotMinTime, slotMaxTime } = getChapelSlotBounds();
 
     return {
@@ -67,6 +65,8 @@ export const getCalendarConfig = (handlers, currentUser) => {
         headerToolbar: false,
         locale: 'fr',
         firstDay: 1,
+        /* Dimanche masqué par défaut en semaine ; ré-affiché si créneaux pertinents (voir calendar-sunday-column.js). */
+        hiddenDays: [0],
 
         views: {
             multiMonthYear: {
@@ -109,10 +109,7 @@ export const getCalendarConfig = (handlers, currentUser) => {
                 return false;
             }
             if (selectAllowSingleCalendarDay(selectInfo)) return true;
-            const msg = privileged
-                ? 'Une seule journée à la fois sur le calendrier : pour plusieurs jours, cochez « Réservation sur plusieurs jours » dans la fenêtre.'
-                : 'Une seule journée à la fois sur le calendrier : créez un créneau par jour.';
-            showToast(msg, 'error');
+            /* Glisser sur plusieurs jours : refus silencieux (toast retiré — meilleure UX mobile). */
             return false;
         },
 
@@ -144,6 +141,11 @@ export const getCalendarConfig = (handlers, currentUser) => {
                 for (const ev of info.events) {
                     applyDragResizePropsToFcEvent(ev, currentUser);
                 }
+            } catch {
+                /* */
+            }
+            try {
+                handlers.onEventsSet?.(info);
             } catch {
                 /* */
             }
@@ -273,13 +275,14 @@ export const getCalendarConfig = (handlers, currentUser) => {
             const todayCls = arg.isToday ? ' fc-day-head-gcal--today' : '';
             const dow = escapeHtmlText(dowText);
             const domStr = escapeHtmlText(String(dom));
+            const domBlock = arg.isToday
+                ? `<span class="fc-day-head-gcal__dom-badge"><span class="fc-day-head-gcal__dom">${domStr}</span></span>`
+                : `<span class="fc-day-head-gcal__dom fc-day-head-gcal__dom-plain">${domStr}</span>`;
             return {
                 html:
                     `<div class="fc-day-head-gcal${todayCls}">` +
                     `<span class="fc-day-head-gcal__dow">${dow}</span>` +
-                    `<span class="fc-day-head-gcal__dom-badge">` +
-                    `<span class="fc-day-head-gcal__dom">${domStr}</span>` +
-                    `</span></div>`
+                    `${domBlock}</div>`
             };
         }
     };

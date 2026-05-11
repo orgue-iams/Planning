@@ -4,6 +4,7 @@ import { initCalendarToolbar } from './calendar-toolbar.js';
 import { populateTimeSelects } from '../utils/time-helpers.js';
 import { initSwipe } from '../utils/touch-handler.js';
 import { bindTimeGridColumnSync, scheduleTimeGridColumnSync } from '../utils/timegrid-column-sync.js';
+import { updatePlanningSundayColumnVisibility } from './calendar-sunday-column.js';
 import {
     getEventContent,
     openModal,
@@ -203,6 +204,7 @@ function initCalendarAndRevealUi() {
     let lastDateClickKey = '';
     const handlers = {
         onDatesSet: null,
+        onEventsSet: null,
         onResizeStart: (info) => captureResizeStart(info),
 
         /**
@@ -348,6 +350,10 @@ function initCalendarAndRevealUi() {
         handlers.onDatesSet = () => {
             toolbarCtl?.refreshTitle();
             toolbarCtl?.syncViewTriggerLabel();
+            updatePlanningSundayColumnVisibility(calendar, currentUser);
+        };
+        handlers.onEventsSet = () => {
+            updatePlanningSundayColumnVisibility(calendar, currentUser);
         };
         handlers.onDatesSet();
         void fetchWeekCycleAnchor(currentUser).then(() => toolbarCtl?.refreshTitle());
@@ -384,6 +390,9 @@ function initCalendarAndRevealUi() {
 
         initMessagesUi(currentUser);
         initProfileUi(currentUser);
+        document.addEventListener('planning-profile-saved', () => {
+            refreshHeaderUser(getPlanningSessionUser());
+        });
         initSemainesTypesUi(currentUser);
         initStatisticsUi();
         initDirectoryUsersUi();

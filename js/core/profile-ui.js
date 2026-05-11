@@ -472,6 +472,8 @@ export function initProfileUi(currentUser) {
             }
             showToast('Profil enregistré.', 'success');
             syncProfileBaselineFromForm();
+            document.dispatchEvent(new CustomEvent('planning-profile-saved'));
+            document.getElementById('modal_profile')?.close();
         } finally {
             profileSaveInFlight = false;
             if (saveBtn instanceof HTMLButtonElement) saveBtn.disabled = false;

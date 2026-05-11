@@ -52,11 +52,10 @@ html, body {
     padding-bottom: max(0.25rem, env(safe-area-inset-bottom, 0px));
 }
 
-/* Smartphone : navbar + barre calendrier = une colonne compacte (hauteur réduite, bloc visuel uni). */
+/* Smartphone : navbar — hauteur alignée avec le padding du #app-shell (évite chevauchement barre calendrier). */
 @media (max-width: 639px) {
     #app-header .app-navbar {
-        /* pt (safe-area) + ~2,25 rem de contenu + pb-1 : aligné avec #app-shell max-sm:pt-[calc(2.5rem+env(...))] */
-        min-height: calc(2.5rem + env(safe-area-inset-top, 0px));
+        min-height: calc(3.5rem + env(safe-area-inset-top, 0px));
         align-content: center;
         box-shadow: 0 1px 0 rgb(226 232 240);
     }
@@ -68,7 +67,20 @@ html, body {
 }
 @media (max-width: 639px) {
     #app-shell.planning-shell--weekstrip {
-        padding-top: calc(2.5rem + env(safe-area-inset-top, 0px) + 2.65rem);
+        padding-top: calc(3.5rem + env(safe-area-inset-top, 0px) + 2.65rem);
+    }
+}
+
+/* Téléphone en paysage : gagner de la hauteur pour la grille (pas de menu dans cette configuration). */
+@media (orientation: landscape) and (max-height: 520px) {
+    body:not(.auth-pending) #app-header {
+        display: none !important;
+    }
+    body:not(.auth-pending) #app-shell {
+        padding-top: 0.35rem !important;
+    }
+    body:not(.auth-pending) #planning-legend {
+        display: none !important;
     }
 }
 

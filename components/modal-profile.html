@@ -21,6 +21,10 @@
                     <p id="profile-email-hint" class="text-[9px] text-slate-500 mt-1 hidden">Vérifiez votre boîte e-mail si une confirmation est demandée par Supabase.</p>
                 </dd>
             </div>
+            <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2">
+                <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none">Profil</dt>
+                <dd id="profile-role-label" class="m-0 min-w-0 text-sm font-medium leading-snug text-slate-800">—</dd>
+            </div>
             <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-start min-h-[2.75rem] py-2">
                 <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none pt-1">Coordonnées</dt>
                 <dd class="m-0 min-w-0 space-y-2">
@@ -52,10 +56,6 @@
                         <span class="text-[10px] text-slate-700">Afficher le nom de mon planning personnel (calendrier IAMS) dans l’annuaire</span>
                     </label>
                 </dd>
-            </div>
-            <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2">
-                <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none">Profil</dt>
-                <dd id="profile-role-label" class="m-0 min-w-0 text-sm font-medium leading-snug text-slate-800">—</dd>
             </div>
             <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2 last:pb-0">
                 <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none">Mot de passe</dt>
@@ -108,7 +108,7 @@
 
         <div class="modal-action mt-0 pt-2 border-t border-slate-100 flex justify-end gap-2 flex-wrap">
             <button type="button" id="profile-close-btn" class="btn btn-ghost btn-sm font-normal text-[11px]">Fermer</button>
-            <button type="button" id="profile-save-all" class="btn btn-primary btn-sm font-normal text-[11px]">Enregistrer</button>
+            <button type="button" id="profile-save-all" class="btn btn-primary btn-sm font-normal text-[11px]">Valider</button>
         </div>
     </div>
 </dialog>

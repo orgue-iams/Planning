@@ -287,23 +287,12 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
         padding-inline-start: 0.12rem;
         padding-inline-end: 0.12rem;
     }
+}
 
-    .fc .fc-day-head-gcal {
-        gap: 0.12rem;
-        padding: 0.2rem 0.06rem;
-    }
-
-    .fc .fc-day-head-gcal__dow {
-        font-size: 0.6rem;
-    }
-
-    .fc .fc-day-head-gcal__dom-badge {
-        min-width: 1.55rem;
-        height: 1.55rem;
-    }
-
-    .fc .fc-day-head-gcal__dom {
-        font-size: 0.78rem;
+/* Portrait mobile : créneaux un peu moins hauts pour limiter le scroll vertical dans la fenêtre. */
+@media (max-width: 640px) and (orientation: portrait) {
+    .fc {
+        --planning-slot-height: 2.55rem;
     }
 }
 
@@ -314,9 +303,9 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     align-items: center;
     justify-content: center;
     text-align: center;
-    line-height: 1.15;
-    gap: 0.2rem;
-    padding: 0.25rem 0.1rem;
+    line-height: 1.05;
+    gap: 0.12rem;
+    padding: 0.18rem 0.1rem 0.12rem;
     min-width: 0;
 }
 
@@ -348,6 +337,15 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     line-height: 1;
 }
 
+/* Jours autres qu’aujourd’hui : numéro sans pastille grise (pastille bleue réservée au jour courant). */
+.fc .fc-day-head-gcal__dom-plain {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+
 .fc .fc-day-head-gcal--today .fc-day-head-gcal__dom-badge {
     background: #3b82f6;
 }
@@ -367,6 +365,31 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     width: 100%;
 }
 
-.fc .fc-col-header-cell .fc-day-head-gcal__dom-badge {
+.fc .fc-col-header-cell .fc-day-head-gcal__dom-badge,
+.fc .fc-col-header-cell .fc-day-head-gcal__dom-plain {
     flex-shrink: 0;
+}
+
+/* Compactage en-têtes jours sur petits écrans (après les règles générales). */
+@media (max-width: 640px) {
+    .fc .fc-day-head-gcal {
+        gap: 0.05rem;
+        padding: 0.08rem 0.06rem 0.06rem;
+        line-height: 1;
+    }
+
+    .fc .fc-day-head-gcal__dow {
+        font-size: 0.58rem;
+        line-height: 1;
+    }
+
+    .fc .fc-day-head-gcal__dom-badge {
+        min-width: 1.5rem;
+        height: 1.5rem;
+    }
+
+    .fc .fc-day-head-gcal__dom,
+    .fc .fc-day-head-gcal__dom-plain {
+        font-size: 0.76rem;
+    }
 }

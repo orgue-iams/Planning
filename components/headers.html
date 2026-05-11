@@ -1,10 +1,10 @@
 <header class="app-navbar navbar bg-white border-b fixed top-0 z-50 w-full flex flex-col shadow-sm max-sm:shadow-none max-sm:rounded-b-none max-sm:border-b-0">
-    <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-center gap-1 min-h-12 h-12 px-2 sm:px-3 w-full max-sm:min-h-0 max-sm:h-auto max-sm:pb-1 max-sm:pt-[max(0px,env(safe-area-inset-top,0px))] max-sm:gap-0.5">
-        <button type="button" id="btn-rules-trigger" class="flex items-center gap-1.5 sm:gap-2 min-w-0 max-sm:min-h-0 rounded-lg px-1.5 py-1 border border-transparent hover:bg-blue-100 hover:border-blue-300 transition-colors">
-            <span class="text-lg sm:text-lg shrink-0 max-sm:text-xl max-sm:leading-none" aria-hidden="true">🎹</span>
-            <span class="flex flex-col min-w-0 max-sm:flex-row max-sm:items-baseline max-sm:gap-1 max-sm:min-w-0">
-                <span class="font-black text-[11px] uppercase leading-none text-slate-800 truncate max-sm:text-xs">Orgue</span>
-                <span class="text-[10px] uppercase text-slate-500 font-bold tracking-wider truncate max-sm:text-[10px] max-sm:tracking-wide max-sm:opacity-90 max-sm:min-w-0 shrink">Gérard Bancells</span>
+    <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-center gap-1 min-h-12 h-12 px-2 sm:px-3 w-full max-sm:min-h-0 max-sm:h-auto max-sm:pb-1 max-sm:pt-[max(0px,env(safe-area-inset-top,0px))] max-sm:gap-1">
+        <button type="button" id="btn-rules-trigger" class="flex items-center gap-1.5 sm:gap-2 min-w-0 max-sm:min-h-0 rounded-lg px-1 py-0.5 border border-transparent hover:bg-blue-100 hover:border-blue-300 transition-colors max-sm:-ml-0.5">
+            <span class="text-lg sm:text-lg shrink-0 max-sm:text-xl max-sm:leading-none max-sm:w-9 max-sm:h-9 max-sm:inline-flex max-sm:items-center max-sm:justify-center" aria-hidden="true">🎹</span>
+            <span class="flex flex-col min-w-0 justify-center max-sm:gap-0 max-sm:max-h-9 leading-tight">
+                <span class="font-black text-[11px] uppercase text-slate-800 max-sm:text-[10px] max-sm:leading-tight whitespace-normal break-words">Orgue</span>
+                <span class="text-[10px] uppercase text-slate-500 font-bold tracking-wide max-sm:text-[9px] max-sm:leading-tight whitespace-normal break-words max-sm:opacity-90">Gérard Bancells</span>
             </span>
         </button>
 
@@ -12,10 +12,10 @@
             <button type="button" id="btn-admin-clear-week" class="hidden btn btn-outline btn-xs font-sans font-semibold normal-case text-[10px] sm:text-[11px] leading-tight text-error border-error/40 bg-white hover:bg-error/5 px-2 sm:px-2 h-8 sm:h-8 max-sm:h-7 max-sm:min-h-7 max-sm:px-1.5 max-sm:text-[9px] shrink-0" title="Admin : supprime en base tous les créneaux de la période, et supprime dans Google tous les événements sur la même plage (calendrier principal + secondaires assignés). Indépendant des miroirs en base.">Vider semaine</button>
         </div>
 
-        <div class="flex items-center justify-end gap-0.5 sm:gap-1 min-w-0 max-sm:gap-0.5">
-            <div id="user-identity" class="flex flex-col items-end min-w-0 mr-0.5 sm:mr-1 leading-tight max-sm:mr-0">
-                <span id="user-display-name" class="text-[10px] sm:text-[11px] font-black text-slate-800 truncate max-w-[6.5rem] sm:max-w-[12rem] max-sm:max-w-[min(52vw,9.5rem)] max-sm:text-[10px] max-sm:leading-snug">Invité</span>
-                <span id="user-display-role" class="text-[9px] font-bold text-slate-500 uppercase tracking-wide truncate max-w-[6.5rem] sm:max-w-[12rem] max-sm:max-w-[min(52vw,9.5rem)] max-sm:text-[9px] hidden"></span>
+        <div class="flex items-center justify-end gap-1 sm:gap-1 min-w-0 max-sm:gap-1 max-sm:pr-0.5">
+            <div id="user-identity" class="flex flex-col items-end min-w-0 mr-1 sm:mr-1 leading-tight max-sm:mr-1.5 max-sm:max-w-[min(46vw,11rem)]">
+                <span id="user-display-name" class="text-[10px] sm:text-[11px] font-black text-slate-800 max-sm:text-[10px] max-sm:leading-snug text-right whitespace-normal break-words">Invité</span>
+                <span id="user-display-role" class="text-[9px] font-bold text-slate-500 uppercase tracking-wide text-right whitespace-normal break-words max-sm:text-[9px] hidden"></span>
             </div>
             <!-- Prof / admin : menu Agenda (semaines types, statistiques) -->
             <div id="header-semaines-types-wrap" class="hidden shrink-0 dropdown dropdown-end">
