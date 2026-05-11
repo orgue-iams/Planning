@@ -279,6 +279,19 @@ function parseGoogleEventColorMeta(raw: string): {
     }
 }
 
+/** Rappel la veille à 12h00 locale : minutes avant le début (API Google, max. 40320). */
+function reminderMinutesDayBeforeAtNoon(startIso: string): number | null {
+    const start = new Date(startIso);
+    if (Number.isNaN(start.getTime())) return null;
+    const anchor = new Date(start.getTime());
+    anchor.setDate(anchor.getDate() - 1);
+    anchor.setHours(12, 0, 0, 0);
+    const mins = Math.round((start.getTime() - anchor.getTime()) / 60000);
+    if (mins < 15) return null;
+    if (mins > 40320) return 40320;
+    return mins;
+}
+
 function parseDescription(desc: string | undefined): { type: string; owner: string; inscrits: string[] } {
     let type = 'reservation';
     let owner = '';
@@ -362,8 +375,6 @@ function googleEventResource(
         reservationMine
     });
     const insc = (ev.inscrits ?? '').trim();
-    const descParts = [`type=${ev.type || ''}`, `owner=${ev.owner || ''}`];
-    if (insc) descParts.push(`inscrits=${insc}`);
     const priv: Record<string, string> = {
         planningType: String(ev.type || 'reservation'),
         planningOwner: String(ev.owner || '')
@@ -375,9 +386,15 @@ function googleEventResource(
     if (poolGid && !opts?.forPoolCalendarWrite) priv.planningPoolEventId = poolGid;
     const pev = (ev.planningEventId ?? '').trim();
     if (pev) priv.planningEventId = pev;
-    return {
+
+    const remMins = reminderMinutesDayBeforeAtNoon(ev.start);
+    const reminders =
+        remMins != null
+            ? { useDefault: false, overrides: [{ method: 'popup' as const, minutes: remMins }] }
+            : undefined;
+
+    const out: Record<string, unknown> = {
         summary: ev.title,
-        description: descParts.join(' '),
         start: { dateTime: ev.start, timeZone: tz },
         end: { dateTime: ev.end, timeZone: tz },
         colorId,
@@ -385,6 +402,8 @@ function googleEventResource(
         foregroundColor,
         extendedProperties: { private: priv }
     };
+    if (reminders) out.reminders = reminders;
+    return out;
 }
 
 async function gcalFetch(accessToken: string, pathWithQuery: string, init?: RequestInit) {

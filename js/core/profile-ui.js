@@ -10,6 +10,7 @@ import { getPlanningSessionUser, setPlanningSessionUser } from './session-user.j
 import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
 import { googleCalendarEmbedUrl } from '../utils/google-calendar-url.js';
 import { showToast } from '../utils/toast.js';
+import { getPlanningThemePref, setPlanningThemePref } from '../utils/planning-theme.js';
 import { formatTimeFr24 } from '../utils/time-helpers.js';
 import {
     filterCoursEventsForUser,
@@ -339,6 +340,11 @@ async function fillProfileModal(user) {
     } else if (empty) {
         empty.classList.add('hidden');
     }
+
+    const themeSel = document.getElementById('profile-theme-select');
+    if (themeSel instanceof HTMLSelectElement) {
+        themeSel.value = getPlanningThemePref();
+    }
 }
 
 export function resetProfileUiBindings() {
@@ -350,6 +356,12 @@ export function resetProfileUiBindings() {
 export function initProfileUi(currentUser) {
     if (!currentUser?.email || profileUiBound) return;
     profileUiBound = true;
+
+    document.getElementById('profile-theme-select')?.addEventListener('change', (e) => {
+        const el = e.target;
+        if (!(el instanceof HTMLSelectElement)) return;
+        setPlanningThemePref(el.value === 'dark' ? 'dark' : 'light');
+    });
 
     document.getElementById('menu-item-profile')?.addEventListener('click', (e) => {
         e.preventDefault();

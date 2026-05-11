@@ -37,7 +37,17 @@
     backdrop-filter: saturate(0.7) blur(0.5px);
 }
 
+[data-theme='dark'] .planning-page-bg::after {
+    background: rgba(15, 23, 42, 0.88);
+    backdrop-filter: saturate(0.85) blur(1px);
+}
+
+[data-theme='dark'] .planning-page-bg::before {
+    filter: grayscale(0.5) brightness(0.45) contrast(1) saturate(0.65);
+}
+
 /* Contenu au-dessus du fond (la barre d’outils garde z-index: 30 dans calendar-toolbar.css) */
+#app-shell.planning-app-shell > #calendar-toolbar,
 #app-shell.planning-app-shell > #calendar,
 #app-shell.planning-app-shell > #planning-legend {
     position: relative;
@@ -46,9 +56,10 @@
 
 /* Barre d’outils + légende : lisibles sur le fond */
 .calendar-toolbar {
-    background: rgb(255 255 255 / 0.82) !important;
+    background: rgb(255 255 255 / 0.92) !important;
     -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
+    border-radius: 0 !important;
 }
 
 #planning-legend.planning-legend-frosted {

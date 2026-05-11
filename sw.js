@@ -28,6 +28,7 @@ const ASSETS = [
   './js/config/cache-name.js',
   './js/config/fc-settings.js',
   './js/utils/loader.js',
+  './js/utils/planning-theme.js',
   './js/utils/time-helpers.js',
   './js/utils/touch-handler.js',
   './js/utils/toast.js',

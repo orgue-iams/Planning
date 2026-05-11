@@ -1,4 +1,5 @@
 import { loadUIComponents } from '../utils/loader.js';
+import { applyPlanningThemeFromStorage } from '../utils/planning-theme.js';
 import { getCalendarConfig, bindResponsiveCalendarToolbar } from '../config/fc-settings.js';
 import { initCalendarToolbar } from './calendar-toolbar.js';
 import { populateTimeSelects } from '../utils/time-helpers.js';
@@ -179,10 +180,11 @@ function refreshHeaderUser(user) {
         document.getElementById('btn-admin-clear-week')?.classList.add('hidden');
         return;
     }
-    if (nameEl) nameEl.textContent = user.name;
+    if (nameEl) nameEl.textContent = String(user.name || '').trim() || user.email.split('@')[0];
     if (roleEl) {
-        roleEl.textContent = roleLabelFr(user.role);
-        roleEl.classList.remove('hidden');
+        const label = roleLabelFr(user.role);
+        roleEl.textContent = label ? `· ${label}` : '';
+        roleEl.classList.toggle('hidden', !label);
     }
     menuWrap?.classList.remove('hidden');
     const r = String(user.role || '').toLowerCase();
@@ -493,6 +495,7 @@ function wireHeaderHoverMenus() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    applyPlanningThemeFromStorage();
     await loadUIComponents();
     installAdminClearWeekDelegatedClick(() => calendar, () => currentUser);
 

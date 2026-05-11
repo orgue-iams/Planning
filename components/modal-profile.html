@@ -57,7 +57,24 @@
                     </label>
                 </dd>
             </div>
-            <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2 last:pb-0">
+            <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-start min-h-[2.75rem] py-2">
+                <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none pt-1">Affichage</dt>
+                <dd class="m-0 min-w-0">
+                    <label class="block">
+                        <span class="text-[9px] font-bold text-slate-500">Thème</span>
+                        <select
+                            id="profile-theme-select"
+                            class="select select-bordered select-xs w-full max-w-xs text-[11px] h-8 mt-0.5"
+                            autocomplete="off"
+                        >
+                            <option value="light">Clair</option>
+                            <option value="dark">Sombre</option>
+                        </select>
+                    </label>
+                    <p class="text-[9px] text-slate-500 mt-1 leading-snug">Réglage local à ce navigateur.</p>
+                </dd>
+            </div>
+            <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2">
                 <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none">Mot de passe</dt>
                 <dd class="m-0 min-w-0">
                     <div class="flex flex-col gap-1.5">

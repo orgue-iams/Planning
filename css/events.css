@@ -113,7 +113,8 @@
     color: inherit !important;
     opacity: 1;
     text-transform: none;
-    padding: 0.15rem 0.25rem 0;
+    padding: 0.12rem 0.25rem 0.1rem;
+    margin: 0;
     background: var(--slot-bg-soft, #e2e8f0);
     overflow: visible;
     text-overflow: clip;
@@ -121,6 +122,10 @@
     word-break: normal;
     overflow-wrap: break-word;
     hyphens: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+    border-radius: 0 0 7px 7px;
+    box-sizing: border-box;
 }
 
 @media (min-width: 640px) {
@@ -137,19 +142,29 @@
     font-weight: 700;
     color: inherit !important;
     opacity: 1;
-    padding: 0.2rem 0.25rem 0.1rem;
+    flex: 0 0 auto;
+    min-height: 1.35rem;
+    padding: 0.22rem 0.3rem 0.18rem;
+    margin: 0;
     background: var(--slot-bg-strong, #cbd5e1);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: visible;
+    text-overflow: clip;
     letter-spacing: -0.01em;
+    border-radius: 7px 7px 0 0;
+    box-sizing: border-box;
 }
 
 @media (min-width: 640px) {
     .event-time-fc {
         font-size: 0.6875rem;
     }
+}
+
+/* Un seul bloc (ex. 30 min sans titre) : coins arrondis sur tout le créneau. */
+.event-box > .event-time-fc:only-child {
+    border-radius: 7px;
 }
 
 /* Légende */

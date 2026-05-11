@@ -197,13 +197,14 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
 .event-box {
     display: flex;
     flex-direction: column;
-    justify-content: flex-start; /* Titre en haut */
-    align-items: center;      /* Centré horizontalement */
+    justify-content: flex-start;
+    align-items: stretch;
     height: 100%;
     width: 100%;
     border-radius: 7px;
     overflow: hidden;
-    padding: 2px;
+    padding: 0;
+    box-sizing: border-box;
 }
 
 .event-title {
