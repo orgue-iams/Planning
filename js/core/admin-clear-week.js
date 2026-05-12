@@ -29,7 +29,7 @@ export function getPlanningWipeWeekRange(calendar) {
     }
     const view = calendar.view;
     const type = view.type;
-    if (type === 'timeGridWeek' || type === 'listWeek') {
+    if (type === 'timeGridWeek') {
         return {
             start: new Date(view.currentStart),
             endExclusive: new Date(view.currentEnd)

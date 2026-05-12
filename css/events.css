@@ -111,8 +111,8 @@
 .event-title-fc {
     text-align: center;
     font-weight: 400;
-    /* md (défaut) — sm / lg via data-planning-fc-text sur <html> */
-    font-size: clamp(0.56rem, 1.9vw, 0.68rem);
+    /* sm / md / lg via data-planning-fc-text ; md = ancienne taille « grand » */
+    font-size: clamp(0.66rem, 2.1vw, 0.82rem);
     line-height: 1.25;
     color: inherit !important;
     opacity: 1;
@@ -137,12 +137,12 @@ html[data-planning-fc-text='sm'] .event-title-fc {
 }
 
 html[data-planning-fc-text='lg'] .event-title-fc {
-    font-size: clamp(0.66rem, 2.1vw, 0.82rem);
+    font-size: clamp(0.82rem, 2.55vw, 1.06rem);
 }
 
 @media (min-width: 640px) {
     .event-title-fc {
-        font-size: 0.6875rem;
+        font-size: 0.8125rem;
     }
 
     html[data-planning-fc-text='sm'] .event-title-fc {
@@ -150,7 +150,7 @@ html[data-planning-fc-text='lg'] .event-title-fc {
     }
 
     html[data-planning-fc-text='lg'] .event-title-fc {
-        font-size: 0.8125rem;
+        font-size: 1.02rem;
     }
 }
 
@@ -158,7 +158,7 @@ html[data-planning-fc-text='lg'] .event-title-fc {
     display: block;
     width: 100%;
     text-align: center;
-    font-size: clamp(0.52rem, 1.8vw, 0.68rem);
+    font-size: clamp(0.62rem, 2vw, 0.8rem);
     font-weight: 700;
     color: inherit !important;
     opacity: 1;
@@ -181,12 +181,12 @@ html[data-planning-fc-text='sm'] .event-time-fc {
 }
 
 html[data-planning-fc-text='lg'] .event-time-fc {
-    font-size: clamp(0.62rem, 2vw, 0.8rem);
+    font-size: clamp(0.78rem, 2.45vw, 1.02rem);
 }
 
 @media (min-width: 640px) {
     .event-time-fc {
-        font-size: 0.6875rem;
+        font-size: 0.8125rem;
     }
 
     html[data-planning-fc-text='sm'] .event-time-fc {
@@ -194,7 +194,7 @@ html[data-planning-fc-text='lg'] .event-time-fc {
     }
 
     html[data-planning-fc-text='lg'] .event-time-fc {
-        font-size: 0.8125rem;
+        font-size: 0.98rem;
     }
 }
 
@@ -232,11 +232,6 @@ html[data-planning-fc-text='lg'] .event-time-fc {
         overflow-y: hidden;
         white-space: nowrap;
         scrollbar-width: thin;
-    }
-
-    #planning-legend > span:first-child {
-        width: auto !important;
-        font-size: 0.52rem !important;
     }
 
     #planning-legend .legend-item {

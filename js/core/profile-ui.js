@@ -1,10 +1,11 @@
 /**
- * Modale Profil.
+ * Modale Profil — enregistrement progressif (champs + mot de passe).
  */
 import {
     roleLabelFr,
     updateCurrentUserEmail,
-    updateCurrentUserPasswordSimple
+    updateCurrentUserPasswordSimple,
+    PASSWORD_MIN_LENGTH
 } from './auth-logic.js';
 import { getPlanningSessionUser, setPlanningSessionUser } from './session-user.js';
 import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
@@ -16,10 +17,13 @@ import {
     formatCoursLineFr,
     fetchCalendarEventsInRange
 } from './planning-courses.js';
+import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
 
 let profileUiBound = false;
 let profileSaveInFlight = false;
 let profileBaseline = null;
+let profileFieldTimer = 0;
+let profilePwdTimer = 0;
 
 function formatFrPhone(raw) {
     const digits = String(raw || '').replace(/\D+/g, '').slice(0, 10);
@@ -48,23 +52,53 @@ function syncProfileBaselineFromForm() {
     profileBaseline = readProfileFormState();
 }
 
-function hasProfilePendingChanges() {
+function hasProfileFieldChangesVsBaseline() {
     if (!profileBaseline) return false;
     const cur = readProfileFormState();
-    const passA = document.getElementById('profile-pass-new');
-    const passB = document.getElementById('profile-pass-confirm');
-    const hasPwd =
-        (passA instanceof HTMLInputElement && passA.value.trim() !== '') ||
-        (passB instanceof HTMLInputElement && passB.value.trim() !== '');
     return (
         cur.name !== profileBaseline.name ||
         cur.email !== profileBaseline.email ||
         cur.phone !== profileBaseline.phone ||
         cur.shareEmail !== profileBaseline.shareEmail ||
         cur.sharePhone !== profileBaseline.sharePhone ||
-        cur.shareCalendar !== profileBaseline.shareCalendar ||
-        hasPwd
+        cur.shareCalendar !== profileBaseline.shareCalendar
     );
+}
+
+function setPassHint(msg, kind) {
+    const hint = document.getElementById('profile-pass-hint');
+    if (!(hint instanceof HTMLElement)) return;
+    if (!msg) {
+        hint.classList.add('hidden');
+        hint.textContent = '';
+        return;
+    }
+    hint.classList.remove('hidden');
+    hint.textContent = msg;
+    hint.classList.remove('text-error', 'text-success', 'text-slate-600');
+    if (kind === 'error') hint.classList.add('text-error');
+    else if (kind === 'success') hint.classList.add('text-success');
+    else hint.classList.add('text-slate-600');
+}
+
+function syncProfilePassHint() {
+    const a = /** @type {HTMLInputElement | null} */ (document.getElementById('profile-pass-new'));
+    const b = /** @type {HTMLInputElement | null} */ (document.getElementById('profile-pass-confirm'));
+    const av = (a?.value || '').trim();
+    const bv = (b?.value || '').trim();
+    if (!av && !bv) {
+        setPassHint('', '');
+        return;
+    }
+    if (av !== bv) {
+        setPassHint('Mots de passe non identiques.', 'error');
+        return;
+    }
+    if (av.length < PASSWORD_MIN_LENGTH) {
+        setPassHint(`Au moins ${PASSWORD_MIN_LENGTH} caractères.`, 'error');
+        return;
+    }
+    setPassHint('Les mots de passe correspondent.', 'muted');
 }
 
 async function loadPersonalPoolRow(userId) {
@@ -148,6 +182,7 @@ async function fillProfileModal(user) {
     const passConfirm = document.getElementById('profile-pass-confirm');
     if (passNew instanceof HTMLInputElement) passNew.value = '';
     if (passConfirm instanceof HTMLInputElement) passConfirm.value = '';
+    setPassHint('', '');
     syncProfileBaselineFromForm();
 
     const isEleve = String(user.role).toLowerCase() === 'eleve';
@@ -229,6 +264,90 @@ async function fillProfileModal(user) {
     }
 }
 
+async function persistProfileFields() {
+    if (profileSaveInFlight) return;
+    if (!hasProfileFieldChangesVsBaseline()) return;
+    const u = getPlanningSessionUser();
+    if (!u?.id || !isBackendAuthConfigured()) return;
+    const sb = getSupabaseClient();
+    if (!sb) return;
+    profileSaveInFlight = true;
+    try {
+        const form = readProfileFormState();
+        const telephone = String(form.phone || '').slice(0, 40);
+        const { error } = await sb
+            .from('profiles')
+            .update({
+                display_name: form.name,
+                telephone,
+                directory_share_email: form.shareEmail,
+                directory_share_phone: form.sharePhone,
+                directory_share_calendar: form.shareCalendar
+            })
+            .eq('id', u.id);
+        if (error) {
+            showToast(error.message || 'Impossible d’enregistrer.', 'error');
+            return;
+        }
+        const current = getPlanningSessionUser();
+        if (current) {
+            setPlanningSessionUser({
+                ...current,
+                name: form.name,
+                telephone,
+                directory_share_email: form.shareEmail,
+                directory_share_phone: form.sharePhone,
+                directory_share_calendar: form.shareCalendar
+            });
+        }
+        const previousEmail = String(u.email || '').trim().toLowerCase();
+        const nextEmail = String(form.email || '').trim().toLowerCase();
+        if (nextEmail && nextEmail !== previousEmail) {
+            const emailRes = await updateCurrentUserEmail(form.email);
+            if (!emailRes.ok) {
+                showToast(emailRes.error || 'Impossible de modifier l’e-mail.', 'error');
+                return;
+            }
+            document.getElementById('profile-email-hint')?.classList.remove('hidden');
+        }
+        syncProfileBaselineFromForm();
+        document.dispatchEvent(new CustomEvent('planning-profile-saved'));
+    } finally {
+        profileSaveInFlight = false;
+    }
+}
+
+function scheduleProfileFieldsPersist() {
+    window.clearTimeout(profileFieldTimer);
+    profileFieldTimer = window.setTimeout(() => void persistProfileFields(), 450);
+}
+
+async function tryPersistPassword() {
+    const a = /** @type {HTMLInputElement | null} */ (document.getElementById('profile-pass-new'));
+    const b = /** @type {HTMLInputElement | null} */ (document.getElementById('profile-pass-confirm'));
+    const av = (a?.value || '').trim();
+    const bv = (b?.value || '').trim();
+    if (!av && !bv) return;
+    if (av !== bv || av.length < PASSWORD_MIN_LENGTH) return;
+    const passRes = await updateCurrentUserPasswordSimple(av, bv);
+    if (!passRes.ok) {
+        setPassHint(passRes.error || 'Impossible de modifier le mot de passe.', 'error');
+        return;
+    }
+    if (a) a.value = '';
+    if (b) b.value = '';
+    const passToggle = document.getElementById('profile-pass-show-plain');
+    if (passToggle instanceof HTMLInputElement) passToggle.checked = false;
+    document.getElementById('profile-pass-new')?.setAttribute('type', 'password');
+    document.getElementById('profile-pass-confirm')?.setAttribute('type', 'password');
+    setPassHint('Mot de passe changé.', 'success');
+}
+
+function schedulePasswordPersist() {
+    window.clearTimeout(profilePwdTimer);
+    profilePwdTimer = window.setTimeout(() => void tryPersistPassword(), 600);
+}
+
 export function resetProfileUiBindings() {
     profileUiBound = false;
     profileSaveInFlight = false;
@@ -250,7 +369,7 @@ export function initProfileUi(currentUser) {
         const u = getPlanningSessionUser();
         if (!u?.email) return;
         requestAnimationFrame(() => {
-            void fillProfileModal(u).then(() => dlg.showModal());
+            void fillProfileModal(u).then(() => openPlanningRouteDialog('modal_profile', 'Mon profil'));
         });
     });
 
@@ -273,100 +392,31 @@ export function initProfileUi(currentUser) {
         if (passToggle instanceof HTMLInputElement) passToggle.checked = visible;
     };
     passToggle?.addEventListener('change', (e) =>
-        applyPassVisibility(Boolean((e.target instanceof HTMLInputElement && e.target.checked)))
+        applyPassVisibility(Boolean(e.target instanceof HTMLInputElement && e.target.checked))
     );
     const profileDlg = document.getElementById('modal_profile');
     profileDlg?.addEventListener('close', () => {
         applyPassVisibility(false);
     });
-    profileDlg?.addEventListener('cancel', (e) => {
-        if (!hasProfilePendingChanges()) return;
-        e.preventDefault();
-        if (confirm('Fermer sans enregistrer les modifications du profil ?')) {
-            profileDlg.close();
-        }
-    });
 
-    document.getElementById('profile-close-btn')?.addEventListener('click', () => {
-        if (!profileDlg) return;
-        if (hasProfilePendingChanges()) {
-            if (!confirm('Fermer sans enregistrer les modifications du profil ?')) return;
-        }
-        profileDlg.close();
-    });
+    for (const id of [
+        'profile-display-name-input',
+        'profile-email-input',
+        'profile-phone-input',
+        'profile-share-email',
+        'profile-share-phone',
+        'profile-share-calendar'
+    ]) {
+        document.getElementById(id)?.addEventListener('input', scheduleProfileFieldsPersist);
+        document.getElementById(id)?.addEventListener('change', scheduleProfileFieldsPersist);
+    }
 
-    document.getElementById('profile-save-all')?.addEventListener('click', async () => {
-        if (profileSaveInFlight) return;
-        const u = getPlanningSessionUser();
-        if (!u?.id || !isBackendAuthConfigured()) {
-            showToast('Session indisponible.', 'error');
-            return;
-        }
-        const sb = getSupabaseClient();
-        if (!sb) {
-            showToast('Session indisponible.', 'error');
-            return;
-        }
-        profileSaveInFlight = true;
-        const saveBtn = document.getElementById('profile-save-all');
-        if (saveBtn instanceof HTMLButtonElement) saveBtn.disabled = true;
-        try {
-            const form = readProfileFormState();
-            const telephone = String(form.phone || '').slice(0, 40);
-            const { error } = await sb
-                .from('profiles')
-                .update({
-                    display_name: form.name,
-                    telephone,
-                    directory_share_email: form.shareEmail,
-                    directory_share_phone: form.sharePhone,
-                    directory_share_calendar: form.shareCalendar
-                })
-                .eq('id', u.id);
-            if (error) {
-                showToast(error.message || 'Impossible d’enregistrer.', 'error');
-                return;
-            }
-            const current = getPlanningSessionUser();
-            if (current) {
-                setPlanningSessionUser({
-                    ...current,
-                    name: form.name,
-                    telephone,
-                    directory_share_email: form.shareEmail,
-                    directory_share_phone: form.sharePhone,
-                    directory_share_calendar: form.shareCalendar
-                });
-            }
-            const previousEmail = String(u.email || '').trim().toLowerCase();
-            const nextEmail = String(form.email || '').trim().toLowerCase();
-            if (nextEmail && nextEmail !== previousEmail) {
-                const emailRes = await updateCurrentUserEmail(form.email);
-                if (!emailRes.ok) {
-                    showToast(emailRes.error || 'Impossible de modifier l’e-mail.', 'error');
-                    return;
-                }
-                document.getElementById('profile-email-hint')?.classList.remove('hidden');
-            }
-            const a = /** @type {HTMLInputElement | null} */ (document.getElementById('profile-pass-new'));
-            const b = /** @type {HTMLInputElement | null} */ (document.getElementById('profile-pass-confirm'));
-            if ((a?.value || '').trim() || (b?.value || '').trim()) {
-                const passRes = await updateCurrentUserPasswordSimple(a?.value || '', b?.value || '');
-                if (!passRes.ok) {
-                    showToast(passRes.error || 'Impossible de modifier le mot de passe.', 'error');
-                    return;
-                }
-                if (a) a.value = '';
-                if (b) b.value = '';
-                applyPassVisibility(false);
-            }
-            showToast('Profil enregistré.', 'success');
-            syncProfileBaselineFromForm();
-            document.dispatchEvent(new CustomEvent('planning-profile-saved'));
-            document.getElementById('modal_profile')?.close();
-        } finally {
-            profileSaveInFlight = false;
-            if (saveBtn instanceof HTMLButtonElement) saveBtn.disabled = false;
-        }
+    document.getElementById('profile-pass-new')?.addEventListener('input', () => {
+        syncProfilePassHint();
+        schedulePasswordPersist();
+    });
+    document.getElementById('profile-pass-confirm')?.addEventListener('input', () => {
+        syncProfilePassHint();
+        schedulePasswordPersist();
     });
 }

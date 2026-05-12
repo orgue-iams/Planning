@@ -1,54 +1,66 @@
 <header class="app-navbar navbar bg-white border-b border-slate-200 fixed top-0 z-50 w-full flex flex-col shadow-sm max-sm:shadow-none max-sm:rounded-b-none max-sm:border-b-0">
-    <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-center gap-0.5 min-h-12 h-12 px-1.5 sm:px-3 w-full max-sm:min-h-0 max-sm:h-auto max-sm:pb-0.5 max-sm:pt-[max(0px,env(safe-area-inset-top,0px))] max-sm:gap-0.5">
-        <button type="button" id="btn-rules-trigger" class="flex items-start gap-1.5 sm:gap-2 min-w-0 max-sm:min-h-0 rounded-lg px-1 py-0.5 border border-transparent hover:bg-blue-100 hover:border-blue-300 transition-colors max-sm:-ml-0.5 justify-start text-left">
-            <div class="flex flex-col items-center shrink-0 w-8 max-sm:w-9 pt-0.5">
-                <span class="text-lg sm:text-lg leading-none max-sm:text-xl max-sm:inline-flex max-sm:items-center max-sm:justify-center" aria-hidden="true">🎹</span>
-                <span id="header-build-version" class="text-[7px] sm:text-[8px] font-mono text-slate-400 tabular-nums leading-none mt-0.5 max-w-[3.25rem] truncate text-center" title="" aria-label="Version de l’application"></span>
+    <!-- Bandeau unique : menu + marque + période + navigation (desktop) + admin + identité + menu compte -->
+    <div
+        id="calendar-toolbar"
+        class="calendar-toolbar app-navbar__toolbar hidden w-full max-w-full gap-1 min-h-[2.5rem] px-1.5 sm:px-2 py-1"
+    >
+        <div class="calendar-toolbar__left flex items-center gap-1.5 min-w-0 shrink-0">
+            <button
+                type="button"
+                id="btn-app-drawer"
+                class="btn btn-ghost btn-square btn-xs sm:btn-sm border border-transparent hover:border-slate-200 max-sm:!h-9 max-sm:!w-9 max-sm:!min-h-0 shrink-0"
+                aria-label="Menu principal"
+                aria-expanded="false"
+                aria-controls="planning-app-drawer"
+                title="Menu"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
+            <div class="flex flex-col items-center shrink-0 w-8 max-sm:w-8 pt-0.5">
+                <span id="header-build-version" class="text-[7px] sm:text-[8px] font-mono text-slate-400 tabular-nums leading-none max-w-[3.25rem] truncate text-center" title="" aria-label="Version de l’application"></span>
             </div>
             <span class="flex flex-col items-start min-w-0 leading-tight text-left">
                 <span class="font-black text-[11px] uppercase text-slate-800 max-sm:text-[10px] max-sm:leading-tight">Orgue</span>
                 <span class="text-[10px] uppercase text-slate-500 font-bold tracking-wide max-sm:text-[9px] max-sm:leading-tight max-sm:opacity-90">Gérard Bancells</span>
             </span>
-        </button>
-
-        <div class="flex justify-center min-w-0 px-0.5 max-sm:px-0 gap-1 sm:gap-1.5 items-center flex-wrap">
-            <button type="button" id="btn-admin-clear-week" class="hidden btn btn-outline btn-xs font-sans font-semibold normal-case text-[10px] sm:text-[11px] leading-tight text-error border-error/40 bg-white hover:bg-error/5 px-2 sm:px-2 h-8 sm:h-8 max-sm:h-7 max-sm:min-h-7 max-sm:px-1.5 max-sm:text-[9px] shrink-0" title="Admin : supprime en base tous les créneaux de la période, et supprime dans Google tous les événements sur la même plage (calendrier principal + secondaires assignés). Indépendant des miroirs en base.">Vider semaine</button>
+            <div class="hidden lg:flex calendar-toolbar__nav-cluster items-center gap-0.5 shrink-0 ml-0.5 pl-1 border-l border-slate-200/90">
+                <button type="button" id="cal-btn-today" class="cal-tb-pill">Aujourd’hui</button>
+                <button type="button" id="cal-btn-prev" class="cal-tb-nav" aria-label="Période précédente">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <button type="button" id="cal-btn-next" class="cal-tb-nav" aria-label="Période suivante">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                </button>
+            </div>
         </div>
 
-        <div class="flex items-center justify-end gap-1 sm:gap-1 min-w-0 max-sm:gap-1 max-sm:pr-0.5">
-            <div id="user-identity" class="flex flex-col items-end text-right min-w-0 mr-1 sm:mr-1 leading-tight max-sm:mr-1.5 max-sm:max-w-[min(52vw,13rem)]">
+        <div id="cal-toolbar-title" class="calendar-toolbar__title min-w-0 text-center" aria-live="polite"></div>
+
+        <div class="calendar-toolbar__right flex items-center justify-end gap-1 sm:gap-1.5 min-w-0 shrink-0 flex-wrap sm:flex-nowrap">
+            <button
+                type="button"
+                id="btn-admin-clear-week"
+                class="hidden btn btn-outline btn-xs font-sans font-semibold normal-case text-[10px] sm:text-[11px] leading-tight text-error border-error/40 bg-white hover:bg-error/5 px-2 sm:px-2 h-8 sm:h-8 max-sm:h-7 max-sm:min-h-7 max-sm:px-1.5 max-sm:text-[9px] shrink-0"
+                title="Admin : supprime en base tous les créneaux de la période, et supprime dans Google tous les événements sur la même plage (calendrier principal + secondaires assignés). Indépendant des miroirs en base."
+            >
+                Vider semaine
+            </button>
+            <div id="user-identity" class="flex flex-col items-end text-right min-w-0 mr-0.5 max-sm:max-w-[min(46vw,12rem)] leading-tight">
                 <span id="user-display-name" class="text-[10px] sm:text-[11px] font-black text-slate-800 max-sm:text-[10px] max-sm:leading-snug whitespace-normal break-words">Invité</span>
                 <span id="user-display-role" class="text-[9px] font-bold text-slate-500 uppercase tracking-wide max-sm:text-[9px] hidden"></span>
             </div>
-            <!-- Prof / admin : menu Agenda (semaines types, statistiques) -->
-            <div id="header-semaines-types-wrap" class="hidden shrink-0 dropdown dropdown-end">
-                <div tabindex="0" role="button" id="btn-header-agenda-menu" class="btn btn-ghost btn-square btn-xs sm:btn-sm border border-transparent hover:border-slate-200 max-sm:!h-9 max-sm:!w-9 max-sm:!min-h-0" aria-label="Agenda" aria-haspopup="menu" title="Agenda">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                </div>
-                <ul tabindex="0" class="dropdown-content menu z-[100] mt-1 w-56 rounded-box border border-slate-200 bg-base-100 p-2 shadow-lg">
-                    <li><a href="#" id="menu-item-semaines-types" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Semaines types A / B</a></li>
-                    <li><a href="#" id="menu-item-statistics" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Statistiques</a></li>
-                </ul>
-            </div>
-            <!-- Prof / admin : réglages (pool, comptes, config, annonces) -->
-            <div id="header-settings-wrap" class="hidden dropdown dropdown-end shrink-0">
-                <div tabindex="0" role="button" id="btn-header-settings" class="btn btn-ghost btn-square btn-xs sm:btn-sm border border-transparent hover:border-slate-200 max-sm:!h-9 max-sm:!w-9 max-sm:!min-h-0" aria-label="Réglages" aria-haspopup="menu" title="Réglages">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                </div>
-                <ul tabindex="0" class="dropdown-content menu z-[100] mt-1 w-56 rounded-box border border-slate-200 bg-base-100 p-2 shadow-lg">
-                    <li><a href="#" id="menu-item-directory" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Utilisateurs</a></li>
-                    <li class="hidden" id="menu-item-config-wrap"><a href="#" id="menu-item-config" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Configuration du planning</a></li>
-                    <li class="hidden" id="menu-item-calendar-pool-wrap"><a href="#" id="menu-item-calendar-pool" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Calendriers des utilisateurs</a></li>
-                    <li class="hidden" id="menu-item-announcements-wrap"><a href="#" id="menu-item-announcements" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Annonces</a></li>
-                </ul>
-            </div>
             <div id="user-menu-wrap" class="dropdown dropdown-end hidden shrink-0">
-                <div tabindex="0" role="button" id="btn-user-menu" class="btn btn-ghost btn-square btn-xs sm:btn-sm border border-transparent hover:border-slate-200 max-sm:!h-9 max-sm:!w-9 max-sm:!min-h-0" aria-label="Menu utilisateur" aria-haspopup="menu" title="Compte">
+                <div
+                    tabindex="0"
+                    role="button"
+                    id="btn-user-menu"
+                    class="btn btn-ghost btn-square btn-xs sm:btn-sm border border-transparent hover:border-slate-200 max-sm:!h-9 max-sm:!w-9 max-sm:!min-h-0"
+                    aria-label="Menu compte"
+                    aria-haspopup="menu"
+                    title="Compte"
+                >
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
@@ -58,10 +70,6 @@
                     <li>
                         <a href="#" id="menu-item-calendar-preferences" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Préférences du calendrier</a>
                     </li>
-                    <li>
-                        <a href="#" id="menu-item-privacy" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Confidentialité</a>
-                    </li>
-                    <li><a href="#" id="menu-item-help" class="font-bold text-[11px] leading-snug normal-case" role="menuitem">Aide</a></li>
                     <li><a href="#" id="menu-item-logout" class="font-bold text-[11px] text-error leading-snug normal-case" role="menuitem">Déconnexion</a></li>
                 </ul>
             </div>

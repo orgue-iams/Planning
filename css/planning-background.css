@@ -52,8 +52,8 @@
     filter: invert(1) hue-rotate(180deg) grayscale(0.35) contrast(0.92) brightness(1.02);
 }
 
-/* Contenu au-dessus du fond (la barre d’outils garde z-index: 30 dans calendar-toolbar.css) */
-#app-shell.planning-app-shell > #calendar-toolbar,
+/* Contenu au-dessus du fond (barre d’outils dans l’en-tête fixe ; grille + légende dans #app-shell) */
+header.app-navbar #calendar-toolbar,
 #app-shell.planning-app-shell > #calendar,
 #app-shell.planning-app-shell > #planning-legend {
     position: relative;
@@ -231,4 +231,17 @@
 
 [data-theme='dark'] #calendar .fc-list-event:hover td {
     background: rgb(51 65 85 / 0.55) !important;
+}
+
+/* Pas de filets verticaux sur la grille (semaine / jour / mois) : conserver les lignes horaires. */
+#calendar .fc-timegrid-col-frame {
+    border-right-width: 0 !important;
+    border-left-width: 0 !important;
+}
+#calendar .fc-timegrid-cols > table > tbody > tr > td:not(.fc-timegrid-axis) {
+    border-right-width: 0 !important;
+}
+#calendar .fc-daygrid-day,
+#calendar .fc-daygrid-day-frame {
+    border-right-width: 0 !important;
 }

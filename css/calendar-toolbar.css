@@ -1,11 +1,10 @@
 /* Barre d’outils calendrier type Google Agenda (plats, chevrons, titre centré). */
 
 .calendar-toolbar {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
-    gap: 0.25rem;
+    column-gap: 0.25rem;
     min-height: 2.4rem;
     padding: 0.38rem 0.2rem 0.26rem;
     background: #fff;
@@ -19,16 +18,22 @@
 }
 
 .calendar-toolbar__left {
+    grid-column: 1;
+    justify-self: start;
     display: flex;
     flex-direction: row;
     align-items: center;
     gap: 0.15rem;
     flex-shrink: 0;
+    min-width: 0;
 }
 
 .calendar-toolbar__title {
-    flex: 1 1 auto;
+    grid-column: 2;
+    justify-self: center;
+    flex: 0 1 auto;
     min-width: 0;
+    max-width: min(52vw, 22rem);
     text-align: center;
     font-size: 0.875rem;
     font-weight: 500;
@@ -47,7 +52,10 @@
 }
 
 .calendar-toolbar__right {
+    grid-column: 3;
+    justify-self: end;
     flex-shrink: 0;
+    min-width: 0;
 }
 
 /* Bouton « Auj. » et déclencheur de vue — plat, arrondi */
@@ -210,4 +218,8 @@
         width: 1.05rem;
         height: 1.05rem;
     }
+}
+
+[data-theme='dark'] .calendar-toolbar__nav-cluster {
+    border-left-color: rgb(51 65 85) !important;
 }

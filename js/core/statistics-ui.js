@@ -6,6 +6,8 @@ import { isPrivilegedUser } from './auth-logic.js';
 import { getPlanningSessionUser } from './session-user.js';
 import { fetchOrganSchoolSettings, getOrganSchoolSettingsCached } from './organ-settings.js';
 import { fetchPlanningListElevesActifs } from './planning-events-db.js';
+import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
+import { closePlanningDrawer } from './planning-drawer-ui.js';
 
 let bound = false;
 /** Réinitialiser la sélection graphique à l’ouverture de la modale. */
@@ -476,8 +478,9 @@ export function initStatisticsUi() {
 
     document.getElementById('menu-item-statistics')?.addEventListener('click', (ev) => {
         ev.preventDefault();
-        document.getElementById('btn-header-agenda-menu')?.blur();
-        document.getElementById('modal_statistics')?.showModal();
+        closePlanningDrawer();
+        document.getElementById('btn-app-drawer')?.blur();
+        openPlanningRouteDialog('modal_statistics', 'Statistiques');
     });
     document.getElementById('statistics-close-btn')?.addEventListener('click', () => {
         document.getElementById('modal_statistics')?.close();

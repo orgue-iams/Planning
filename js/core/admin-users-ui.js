@@ -8,6 +8,8 @@ import { showToast } from '../utils/toast.js';
 import { PLANNING_ROLE_OPTIONS, normalizePlanningRole, isPlanningRole } from './planning-roles.js';
 import { getPlanningSessionUser } from './session-user.js';
 import { googleCalendarEmbedUrl } from '../utils/google-calendar-url.js';
+import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
+import { closePlanningDrawer } from './planning-drawer-ui.js';
 
 /** @type {string | null} */
 let adminPlanningViewerId = null;
@@ -605,15 +607,16 @@ export function initAdminUsersUi(currentUser) {
 
     document.getElementById('menu-item-users-admin')?.addEventListener('click', (e) => {
         e.preventDefault();
-        document.getElementById('btn-header-settings')?.blur();
+        closePlanningDrawer();
+        document.getElementById('btn-app-drawer')?.blur();
         const dlg = document.getElementById('modal_users_admin');
         if (!dlg) {
             showToast('Fenêtre de gestion indisponible. Rechargez la page.', 'error');
             return;
         }
-        /* Après fermeture du menu DaisyUI, ouvrir au frame suivant évite un conflit tactiles / focus. */
+        /* Après fermeture du menu, ouvrir au frame suivant évite un conflit tactiles / focus. */
         requestAnimationFrame(() => {
-            dlg.show();
+            openPlanningRouteDialog('modal_users_admin', 'Gestion des comptes');
             void refreshUserList();
         });
     });

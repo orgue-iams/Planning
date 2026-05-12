@@ -68,18 +68,6 @@ export const getCalendarConfig = (handlers, currentUser) => {
         /* Dimanche masqué par défaut en semaine ; ré-affiché si créneaux pertinents (voir calendar-sunday-column.js). */
         hiddenDays: [0],
 
-        views: {
-            multiMonthYear: {
-                type: 'multiMonth',
-                duration: { years: 1 },
-                multiMonthMaxColumns: 3,
-                multiMonthMinWidth: 260
-            },
-            listWeek: {
-                listDayFormat: { weekday: 'long' },
-                listDaySideFormat: { month: 'long', day: 'numeric', year: 'numeric' }
-            }
-        },
         slotMinTime,
         slotMaxTime,
         /* Grille visuelle : une ligne par heure. Interaction (sélection, glisser) : pas 30 min. */
@@ -104,7 +92,7 @@ export const getCalendarConfig = (handlers, currentUser) => {
              * accéder à `view.type` plantait et cassait toute la sélection cliquer-glisser. */
             if (!selectInfo?.start || !selectInfo?.end) return true;
             const viewType = selectInfo.view?.type ?? '';
-            if (viewType.startsWith('list')) {
+            if (viewType === 'dayGridMonth') {
                 showToast('Utilisez la vue Semaine ou Jour pour sélectionner une plage sur la grille.', 'info');
                 return false;
             }

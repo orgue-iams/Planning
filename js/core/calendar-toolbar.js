@@ -1,10 +1,11 @@
 /**
- * Barre d’outils type Google Agenda : Auj., ‹ ›, titre de période, menu vues.
+ * Barre d’outils : titre de période, navigation (desktop), synchro avec le tiroir vues.
  */
 
 import { getProfWeekCycleForToolbar, weekCycleLabelForDate } from './week-cycle.js';
 import { isProf } from './auth-logic.js';
 import { getPlanningSessionUser } from './session-user.js';
+import { syncDrawerViewSelection } from './planning-drawer-ui.js';
 
 const MONTH_LONG = [
     'janvier',
@@ -59,8 +60,6 @@ export function formatCalendarToolbarTitle(calendar) {
     let base;
     if (type === 'dayGridMonth') {
         base = `${ucFirst(MONTH_LONG[start.getMonth()])} ${start.getFullYear()}`;
-    } else if (type === 'multiMonthYear' || type.includes('multiMonth')) {
-        base = String(start.getFullYear());
     } else if (type === 'timeGridDay') {
         base = ucFirst(
             start.toLocaleDateString('fr-FR', {
@@ -78,23 +77,13 @@ export function formatCalendarToolbarTitle(calendar) {
         } else {
             base = `${ucFirst(MONTH_SHORT[start.getMonth()])} ${start.getFullYear()} – ${ucFirst(MONTH_SHORT[end.getMonth()])} ${end.getFullYear()}`;
         }
-    } else if (type.startsWith('list')) {
-        if (start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth()) {
-            base = `${start.getDate()} – ${end.getDate()} ${MONTH_LONG[start.getMonth()]} ${start.getFullYear()}`;
-        } else if (start.getFullYear() === end.getFullYear()) {
-            base = `${start.getDate()} ${MONTH_SHORT[start.getMonth()]} – ${end.getDate()} ${MONTH_SHORT[end.getMonth()]} ${start.getFullYear()}`;
-        } else {
-            base = `${start.getDate()} ${MONTH_SHORT[start.getMonth()]} ${start.getFullYear()} – ${end.getDate()} ${MONTH_SHORT[end.getMonth()]} ${end.getFullYear()}`;
-        }
     } else {
         base = view.title || '';
     }
 
     const u = getPlanningSessionUser();
     const state = isProf(u) ? getProfWeekCycleForToolbar() : null;
-    /* Mois / année : une seule étiquette A/B serait trompeuse (plusieurs semaines à l’écran). */
-    const weekCycleOkView =
-        type === 'timeGridWeek' || type === 'timeGridDay' || type.startsWith('list');
+    const weekCycleOkView = type === 'timeGridWeek' || type === 'timeGridDay';
     const wc =
         weekCycleOkView &&
         state?.anchorMondayIso &&
@@ -102,107 +91,35 @@ export function formatCalendarToolbarTitle(calendar) {
     return wc ? `${base} · ${wc}` : base;
 }
 
-const VIEW_ITEMS = [
-    { id: 'timeGridWeek', label: 'Semaine' },
-    { id: 'dayGridMonth', label: 'Mois' },
-    { id: 'timeGridDay', label: 'Jour' },
-    { id: 'multiMonthYear', label: 'Année' },
-    {
-        id: 'listWeek',
-        label: 'Planning',
-        title: 'Liste chronologique des créneaux sur la semaine affichée (pas la grille avec heures).'
-    }
-];
-
 /** @param {import('@fullcalendar/core').CalendarApi} calendar */
 export function initCalendarToolbar(calendar) {
     const titleEl = document.getElementById('cal-toolbar-title');
     const btnToday = document.getElementById('cal-btn-today');
     const btnPrev = document.getElementById('cal-btn-prev');
     const btnNext = document.getElementById('cal-btn-next');
-    const viewTrigger = document.getElementById('cal-view-trigger');
-    const viewLabelEl = document.getElementById('cal-view-trigger-label');
-    const viewMenu = document.getElementById('cal-view-menu');
     const wrap = document.getElementById('calendar-toolbar');
-    if (!titleEl || !btnToday || !btnPrev || !btnNext || !viewTrigger || !viewMenu || !wrap) return;
+    if (!titleEl || !btnToday || !btnPrev || !btnNext || !wrap) return;
 
     const refreshTitle = () => {
         titleEl.textContent = formatCalendarToolbarTitle(calendar);
-    };
-
-    const closeMenu = () => {
-        viewMenu.setAttribute('hidden', '');
-        viewTrigger.setAttribute('aria-expanded', 'false');
-    };
-
-    const syncViewTriggerLabel = () => {
-        const t = calendar.view.type;
-        const item = VIEW_ITEMS.find((v) => v.id === t);
-        const lab = item?.label ?? 'Semaine';
-        if (viewLabelEl) viewLabelEl.textContent = lab;
-        else viewTrigger.textContent = lab;
-        for (const b of viewMenu.querySelectorAll('button[data-view]')) {
-            b.classList.toggle('is-active', b.getAttribute('data-view') === t);
-        }
+        syncDrawerViewSelection(calendar);
     };
 
     btnToday.addEventListener('click', () => {
         calendar.today();
         refreshTitle();
-        syncViewTriggerLabel();
     });
     btnPrev.addEventListener('click', () => {
         calendar.prev();
         refreshTitle();
-        syncViewTriggerLabel();
     });
     btnNext.addEventListener('click', () => {
         calendar.next();
         refreshTitle();
-        syncViewTriggerLabel();
     });
-
-    viewTrigger.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const open = viewMenu.hasAttribute('hidden');
-        if (open) {
-            viewMenu.removeAttribute('hidden');
-            viewTrigger.setAttribute('aria-expanded', 'true');
-        } else {
-            closeMenu();
-        }
-    });
-
-    document.addEventListener('click', (e) => {
-        if (e.target && /** @type {HTMLElement} */ (e.target).closest?.('.cal-view-dd')) return;
-        closeMenu();
-    });
-
-    viewMenu.replaceChildren();
-    for (const item of VIEW_ITEMS) {
-        const { id, label } = item;
-        const li = document.createElement('li');
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.textContent = label;
-        b.setAttribute('data-view', id);
-        const tip = 'title' in item ? item.title : '';
-        if (tip) b.title = tip;
-        b.addEventListener('click', (ev) => {
-            ev.stopPropagation();
-            calendar.changeView(id);
-            closeMenu();
-            refreshTitle();
-            syncViewTriggerLabel();
-            calendar.updateSize();
-        });
-        li.appendChild(b);
-        viewMenu.appendChild(li);
-    }
 
     refreshTitle();
-    syncViewTriggerLabel();
     wrap.classList.remove('hidden');
 
-    return { refreshTitle, syncViewTriggerLabel };
+    return { refreshTitle };
 }

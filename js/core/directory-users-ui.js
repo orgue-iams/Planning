@@ -8,6 +8,8 @@ import { showToast } from '../utils/toast.js';
 import { isAdmin } from './auth-logic.js';
 import { planningAdminInvoke } from './admin-api.js';
 import { openAdminUserModalForCreate, openAdminUserModalForEdit } from './admin-users-modal-ui.js';
+import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
+import { closePlanningDrawer } from './planning-drawer-ui.js';
 
 let bound = false;
 
@@ -357,7 +359,8 @@ export function initDirectoryUsersUi() {
 
     document.getElementById('menu-item-directory')?.addEventListener('click', (e) => {
         e.preventDefault();
-        document.getElementById('btn-header-settings')?.blur();
+        closePlanningDrawer();
+        document.getElementById('btn-app-drawer')?.blur();
         const dlg = document.getElementById('modal_directory_users');
         if (!dlg) {
             showToast('Fenêtre annuaire indisponible. Rechargez la page.', 'error');
@@ -369,10 +372,14 @@ export function initDirectoryUsersUi() {
             const addBtnWrap = document.getElementById('directory-add-user-wrap');
             addBtnWrap?.classList.toggle('hidden', !isAdminUser);
             if (isAdminUser) {
-                void loadAdminDirectoryIntoModal().then(() => dlg.showModal());
+                void loadAdminDirectoryIntoModal().then(() =>
+                    openPlanningRouteDialog('modal_directory_users', 'Utilisateurs')
+                );
             } else {
                 document.getElementById('directory-admin-users-wrap')?.classList.add('hidden');
-                void loadDirectoryIntoModal().then(() => dlg.showModal());
+                void loadDirectoryIntoModal().then(() =>
+                    openPlanningRouteDialog('modal_directory_users', 'Utilisateurs')
+                );
             }
         });
     });

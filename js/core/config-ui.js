@@ -11,9 +11,13 @@ import {
 } from './organ-settings.js';
 import { showToast } from '../utils/toast.js';
 import { normalizeHHmmInput } from '../utils/time-helpers.js';
+import { getPlanningSessionUser } from './session-user.js';
+import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
+import { closePlanningDrawer } from './planning-drawer-ui.js';
 
 let bound = false;
 let configInitialSnapshot = '';
+let persistTimer = 0;
 
 const ELEVE_FIELD_IDS = [
     'config-eleve-cap-enabled',
@@ -24,6 +28,15 @@ const ELEVE_FIELD_IDS = [
     'config-eleve-void-toward-cap',
     'config-eleve-no-delete-after-start',
     'config-eleve-tolerance-days'
+];
+
+const CONFIG_PERSIST_IDS = [
+    'config-school-start',
+    'config-school-end',
+    'config-chapel-min',
+    'config-chapel-max',
+    'config-planning-error-notify-email',
+    ...ELEVE_FIELD_IDS
 ];
 
 function timeDbToInput(t) {
@@ -83,8 +96,44 @@ function currentConfigSnapshot() {
     return JSON.stringify(base);
 }
 
-function isConfigDirty() {
-    return currentConfigSnapshot() !== configInitialSnapshot;
+async function persistConfigIfAdmin() {
+    const u = getPlanningSessionUser();
+    if (!isAdmin(u)) return;
+    const mn = normalizeHHmmInput(document.getElementById('config-chapel-min')?.value);
+    const mx = normalizeHHmmInput(document.getElementById('config-chapel-max')?.value);
+    if (!mn || !mx) {
+        showToast('Heures chapelle invalides : format 24 h (ex. 08:00, 22:00).', 'error');
+        return;
+    }
+    const capOn = document.getElementById('config-eleve-cap-enabled')?.checked;
+    const hzOn = document.getElementById('config-eleve-horizon-enabled')?.checked;
+    const r = await saveOrganSchoolSettingsAdmin({
+        school_year_start: document.getElementById('config-school-start')?.value || null,
+        school_year_end: document.getElementById('config-school-end')?.value || null,
+        chapel_slot_min: `${mn}:00`,
+        chapel_slot_max: `${mx}:00`,
+        planning_error_notify_email: document.getElementById('config-planning-error-notify-email')?.value ?? '',
+        eleve_weekly_travail_cap_enabled: capOn,
+        eleve_weekly_travail_cap_hours: document.getElementById('config-eleve-cap-hours')?.value,
+        eleve_booking_horizon_enabled: hzOn,
+        eleve_booking_horizon_amount: document.getElementById('config-eleve-horizon-amount')?.value,
+        eleve_booking_horizon_unit: document.getElementById('config-eleve-horizon-unit')?.value,
+        eleve_count_voided_travail_toward_cap: document.getElementById('config-eleve-void-toward-cap')?.checked,
+        eleve_forbid_delete_after_slot_start: document.getElementById('config-eleve-no-delete-after-start')?.checked,
+        eleve_booking_tolerance_days: document.getElementById('config-eleve-tolerance-days')?.value
+    });
+    if (!r.ok) {
+        showToast(r.error || 'Erreur.', 'error');
+        return;
+    }
+    invalidateOrganSchoolSettingsCache();
+    showToast('Configuration enregistrée.', 'success', 2800);
+    configInitialSnapshot = currentConfigSnapshot();
+}
+
+function scheduleConfigPersist() {
+    window.clearTimeout(persistTimer);
+    persistTimer = window.setTimeout(() => void persistConfigIfAdmin(), 500);
 }
 
 export function initConfigUi(currentUser) {
@@ -96,7 +145,6 @@ export function initConfigUi(currentUser) {
     const admin = isAdmin(currentUser);
     document.getElementById('config-hint-admin')?.classList.toggle('hidden', !admin);
     document.getElementById('config-hint-readonly')?.classList.toggle('hidden', admin);
-    document.getElementById('config-save-btn')?.classList.toggle('hidden', !admin);
     document.getElementById('config-planning-notify-wrap')?.classList.toggle('hidden', !admin);
 
     for (const id of ['config-school-start', 'config-school-end', 'config-chapel-min', 'config-chapel-max']) {
@@ -122,53 +170,18 @@ export function initConfigUi(currentUser) {
 
     document.getElementById('menu-item-config')?.addEventListener('click', (ev) => {
         ev.preventDefault();
-        document.getElementById('btn-header-settings')?.blur();
-        void fillConfigModal().then(() => document.getElementById('modal_config')?.showModal());
+        document.getElementById('btn-app-drawer')?.blur();
+        closePlanningDrawer();
+        void fillConfigModal().then(() =>
+            openPlanningRouteDialog('modal_config', 'Configuration du planning')
+        );
     });
 
-    document.getElementById('config-close-btn')?.addEventListener('click', () => {
-        if (admin && isConfigDirty()) {
-            const ok = confirm('Fermer sans enregistrer vos modifications ?');
-            if (!ok) return;
-        }
-        document.getElementById('modal_config')?.close();
-    });
-
-    document.getElementById('config-save-btn')?.addEventListener('click', async () => {
-        if (!admin) return;
-        const mn = normalizeHHmmInput(document.getElementById('config-chapel-min')?.value);
-        const mx = normalizeHHmmInput(document.getElementById('config-chapel-max')?.value);
-        if (!mn || !mx) {
-            showToast('Heures chapelle invalides : format 24 h (ex. 08:00, 22:00).', 'error');
-            return;
-        }
-        const capOn = document.getElementById('config-eleve-cap-enabled')?.checked;
-        const hzOn = document.getElementById('config-eleve-horizon-enabled')?.checked;
-        const r = await saveOrganSchoolSettingsAdmin({
-            school_year_start: document.getElementById('config-school-start')?.value || null,
-            school_year_end: document.getElementById('config-school-end')?.value || null,
-            chapel_slot_min: `${mn}:00`,
-            chapel_slot_max: `${mx}:00`,
-            planning_error_notify_email: document.getElementById('config-planning-error-notify-email')?.value ?? '',
-            eleve_weekly_travail_cap_enabled: capOn,
-            eleve_weekly_travail_cap_hours: document.getElementById('config-eleve-cap-hours')?.value,
-            eleve_booking_horizon_enabled: hzOn,
-            eleve_booking_horizon_amount: document.getElementById('config-eleve-horizon-amount')?.value,
-            eleve_booking_horizon_unit: document.getElementById('config-eleve-horizon-unit')?.value,
-            eleve_count_voided_travail_toward_cap: document.getElementById('config-eleve-void-toward-cap')?.checked,
-            eleve_forbid_delete_after_slot_start: document.getElementById('config-eleve-no-delete-after-start')
-                ?.checked,
-            eleve_booking_tolerance_days: document.getElementById('config-eleve-tolerance-days')?.value
-        });
-        if (!r.ok) {
-            showToast(r.error || 'Erreur.', 'error');
-            return;
-        }
-        invalidateOrganSchoolSettingsCache();
-        showToast('Configuration enregistrée. Rechargez la page pour mettre à jour la grille si besoin.', 'success');
-        configInitialSnapshot = currentConfigSnapshot();
-        document.getElementById('modal_config')?.close();
-    });
+    for (const id of CONFIG_PERSIST_IDS) {
+        const el = document.getElementById(id);
+        el?.addEventListener('change', scheduleConfigPersist);
+        el?.addEventListener('input', scheduleConfigPersist);
+    }
 }
 
 export function resetConfigUiBindings() {

@@ -23,6 +23,8 @@
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/planning-background.css">
     <link rel="stylesheet" href="css/calendar-toolbar.css">
+    <link rel="stylesheet" href="css/planning-drawer.css">
+    <link rel="stylesheet" href="css/planning-route-page.css">
     <link rel="stylesheet" href="css/calendar-theme.css">
     <link rel="stylesheet" href="css/events.css">
     <link rel="stylesheet" href="css/modal.css">
@@ -32,33 +34,12 @@
 <body class="bg-slate-50 overflow-hidden auth-pending">
 
     <div id="app-header"></div>
-    
+    <div id="planning-drawer-mount"></div>
+
     <main id="app-shell" class="planning-app-shell pt-[3.25rem] max-sm:pt-[calc(3.25rem+env(safe-area-inset-top,0px))] px-0 sm:px-1 w-full sm:max-w-5xl sm:mx-auto flex flex-col gap-0 max-sm:gap-0 min-h-0">
         <div class="planning-page-bg" aria-hidden="true"></div>
-        <div id="calendar-toolbar" class="calendar-toolbar hidden shrink-0 w-full max-w-full" aria-label="Navigation du calendrier">
-            <div class="calendar-toolbar__left">
-                <button type="button" id="cal-btn-today" class="cal-tb-pill">Auj.</button>
-                <button type="button" id="cal-btn-prev" class="cal-tb-nav" aria-label="Période précédente">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
-                </button>
-                <button type="button" id="cal-btn-next" class="cal-tb-nav" aria-label="Période suivante">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
-                </button>
-            </div>
-            <div class="calendar-toolbar__title" id="cal-toolbar-title"></div>
-            <div class="calendar-toolbar__right">
-                <div class="cal-view-dd">
-                    <button type="button" id="cal-view-trigger" class="cal-tb-pill cal-tb-pill--view" aria-expanded="false" aria-haspopup="listbox">
-                        <span id="cal-view-trigger-label">Semaine</span>
-                        <span class="cal-tb-pill__chev" aria-hidden="true">▾</span>
-                    </button>
-                    <ul id="cal-view-menu" class="cal-view-dd__menu" role="listbox" hidden></ul>
-                </div>
-            </div>
-        </div>
         <div id="calendar" class="planning-calendar-transparent flex-1 min-h-0 w-full"></div>
         <div id="planning-legend" class="planning-legend planning-legend-frosted planning-legend--mobile-flush flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 shrink-0" aria-label="Légende des créneaux">
-            <span class="text-[10px] font-bold uppercase tracking-wide text-slate-500 w-full sm:w-auto">Légende</span>
             <span class="legend-item"><span class="legend-swatch legend-swatch--travail-mine" aria-hidden="true"></span>Mes résa / cours</span>
             <span class="legend-item"><span class="legend-swatch legend-swatch--travail-other" aria-hidden="true"></span>Autres résa.</span>
             <span class="legend-item"><span class="legend-swatch legend-swatch--cours" aria-hidden="true"></span>Cours</span>

@@ -2,6 +2,7 @@ import { loadUIComponents } from '../utils/loader.js';
 import { applyPlanningThemeFromStorage, applyPlanningFcTextScaleFromStorage } from '../utils/planning-theme.js';
 import { getCalendarConfig, bindResponsiveCalendarToolbar } from '../config/fc-settings.js';
 import { initCalendarToolbar } from './calendar-toolbar.js';
+import { initPlanningDrawer, resetPlanningDrawerBindings } from './planning-drawer-ui.js';
 import { populateTimeSelects } from '../utils/time-helpers.js';
 import { initSwipe } from '../utils/touch-handler.js';
 import { bindTimeGridColumnSync, scheduleTimeGridColumnSync } from '../utils/timegrid-column-sync.js';
@@ -73,7 +74,6 @@ import { installAdminClearWeekDelegatedClick } from './admin-clear-week.js';
 import { fetchWeekCycleAnchor, clearProfWeekCycleCache } from './week-cycle.js';
 import { fetchOrganSchoolSettings, invalidateOrganSchoolSettingsCache } from './organ-settings.js';
 import { CACHE_NAME } from '../config/cache-name.js';
-import { normalizePlanningRole } from './planning-roles.js';
 import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
 
 if ('serviceWorker' in navigator) {
@@ -104,6 +104,7 @@ function performLogout() {
     resetDirectoryUsersUiBindings();
     resetCoursSeriesScopeUiBindings();
     resetConfigUiBindings();
+    resetPlanningDrawerBindings();
     invalidateOrganSchoolSettingsCache();
     invalidateCalendarListCache();
     currentEvent = null;
@@ -126,14 +127,13 @@ function performLogout() {
         'modal_admin_password',
         'modal_admin_confirm',
         'modal_announcements',
-        'modal_help',
-        'modal_privacy',
         'modal_profile',
         'modal_calendar_preferences',
         'modal_semaines_types',
         'modal_config',
         'modal_course_students',
         'modal_statistics',
+        'modal_directory_users',
         'modal_cours_series_scope'
     ].forEach((id) => document.getElementById(id)?.close());
     const loginDlg = document.getElementById('modal_login');
@@ -142,25 +142,6 @@ function performLogout() {
     if (rememberCb) rememberCb.checked = getRememberMePreference();
     loginDlg?.showModal();
     requestAnimationFrame(() => document.getElementById('login-email')?.focus());
-}
-
-function syncHelpModalContent(user) {
-    const r = normalizePlanningRole(user?.role);
-    const isStaff = r === 'prof' || r === 'admin';
-    const isAdmin = r === 'admin';
-
-    document.getElementById('help-block-active')?.classList.remove('hidden');
-
-    document.getElementById('help-block-staff')?.classList.toggle('hidden', !isStaff);
-    document.getElementById('help-block-menu-privileged')?.classList.toggle('hidden', !isStaff);
-    document.getElementById('help-block-week-cycle')?.classList.toggle('hidden', !isStaff);
-
-    document.getElementById('help-li-week-cycle')?.classList.toggle('hidden', !isStaff);
-    document.getElementById('help-li-announcements')?.classList.toggle('hidden', !isStaff);
-    document.getElementById('help-li-admin-users')?.classList.toggle('hidden', !isAdmin);
-    document.getElementById('help-li-calendar-pool')?.classList.toggle('hidden', !isAdmin);
-
-    document.getElementById('help-block-eleve-notify')?.classList.toggle('hidden', r !== 'eleve');
 }
 
 function refreshHeaderUser(user) {
@@ -175,8 +156,10 @@ function refreshHeaderUser(user) {
             roleEl.classList.add('hidden');
         }
         menuWrap?.classList.add('hidden');
-        document.getElementById('header-semaines-types-wrap')?.classList.add('hidden');
-        document.getElementById('header-settings-wrap')?.classList.add('hidden');
+        document.getElementById('menu-item-display-prefs-wrap')?.classList.add('hidden');
+        document.getElementById('menu-item-directory-wrap')?.classList.add('hidden');
+        document.getElementById('menu-item-semaines-types-wrap')?.classList.add('hidden');
+        document.getElementById('menu-item-statistics-wrap')?.classList.add('hidden');
         shell?.classList.remove('planning-shell--weekstrip');
         document.getElementById('btn-admin-clear-week')?.classList.add('hidden');
         return;
@@ -190,9 +173,10 @@ function refreshHeaderUser(user) {
     menuWrap?.classList.remove('hidden');
     const r = String(user.role || '').toLowerCase();
     const staff = isBackendAuthConfigured() && (r === 'prof' || r === 'admin');
-    document.getElementById('header-semaines-types-wrap')?.classList.toggle('hidden', !staff);
-    /* Réglages : visible pour tout utilisateur connecté (annuaire « Utilisateurs ») ; entrées admin/prof restent masquées individuellement. */
-    document.getElementById('header-settings-wrap')?.classList.toggle('hidden', !isBackendAuthConfigured());
+    document.getElementById('menu-item-display-prefs-wrap')?.classList.remove('hidden');
+    document.getElementById('menu-item-directory-wrap')?.classList.toggle('hidden', !isBackendAuthConfigured());
+    document.getElementById('menu-item-semaines-types-wrap')?.classList.toggle('hidden', !staff);
+    document.getElementById('menu-item-statistics-wrap')?.classList.toggle('hidden', !staff);
     document.getElementById('btn-admin-clear-week')?.classList.toggle('hidden', r !== 'admin');
     if (r !== 'eleve') {
         shell?.classList.remove('planning-shell--weekstrip');
@@ -352,7 +336,6 @@ function initCalendarAndRevealUi() {
         const toolbarCtl = initCalendarToolbar(calendar);
         handlers.onDatesSet = () => {
             toolbarCtl?.refreshTitle();
-            toolbarCtl?.syncViewTriggerLabel();
             updatePlanningSundayColumnVisibility(calendar, currentUser);
         };
         handlers.onEventsSet = () => {
@@ -369,6 +352,8 @@ function initCalendarAndRevealUi() {
         bindResponsiveCalendarToolbar(calendar);
 
         initSwipe(calendarEl, calendar);
+
+        initPlanningDrawer(calendar);
 
         document.getElementById('btn-save').onclick = () =>
             void saveReservation(calendar, currentUser, currentEvent).catch((err) =>
@@ -463,11 +448,7 @@ function wireDialogBackdropClose() {
 }
 
 function wireHeaderHoverMenus() {
-    const specs = [
-        { wrapId: 'header-semaines-types-wrap', btnId: 'btn-header-agenda-menu' },
-        { wrapId: 'header-settings-wrap', btnId: 'btn-header-settings' },
-        { wrapId: 'user-menu-wrap', btnId: 'btn-user-menu' }
-    ];
+    const specs = [{ wrapId: 'user-menu-wrap', btnId: 'btn-user-menu' }];
     for (const { wrapId, btnId } of specs) {
         const wrap = document.getElementById(wrapId);
         const btn = document.getElementById(btnId);
@@ -501,27 +482,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     applyPlanningFcTextScaleFromStorage();
     await loadUIComponents();
     installAdminClearWeekDelegatedClick(() => calendar, () => currentUser);
-
-    const dlgHelp = document.getElementById('modal_help');
-    const dlgPrivacy = document.getElementById('modal_privacy');
-    const openPrivacyModal = () => dlgPrivacy?.showModal();
-    document.getElementById('menu-item-privacy')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById('btn-user-menu')?.blur();
-        openPrivacyModal();
-    });
-    document.getElementById('menu-item-help')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById('btn-user-menu')?.blur();
-        syncHelpModalContent(getPlanningSessionUser());
-        dlgHelp?.showModal();
-    });
-    document.getElementById('help-btn-close')?.addEventListener('click', () => dlgHelp?.close());
-    document.getElementById('privacy-btn-close')?.addEventListener('click', () => dlgPrivacy?.close());
-    document.getElementById('login-privacy-link')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        openPrivacyModal();
-    });
 
     const loginV = document.getElementById('login-version-badge');
     const buildLegend = document.getElementById('app-build-badge');

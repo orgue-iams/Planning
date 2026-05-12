@@ -17,6 +17,8 @@ import {
     quillSetHtml
 } from '../utils/planning-quill.js';
 import { normalizeHHmmInput } from '../utils/time-helpers.js';
+import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
+import { closePlanningDrawer } from './planning-drawer-ui.js';
 
 function pad2(n) {
     return String(n).padStart(2, '0');
@@ -104,12 +106,13 @@ export function initAnnouncementsUi(currentUser) {
         'click',
         async (e) => {
             e.preventDefault();
-            document.getElementById('btn-header-settings')?.blur();
+            closePlanningDrawer();
+            document.getElementById('btn-app-drawer')?.blur();
             /* Charger d’abord, puis créer Quill une seule fois (évite barres dupliquées si fermeture pendant le fetch). */
             const latest = await fetchLatestLoginAnnouncementForEdit();
             ensureAnnQuill();
             if (!annQuill) {
-                modal?.showModal();
+                openPlanningRouteDialog('modal_announcements', 'Annonces');
                 return;
             }
             const sd = document.getElementById('ann-start-date');
@@ -125,7 +128,7 @@ export function initAnnouncementsUi(currentUser) {
                 presetAnnouncementDateInputs(true);
                 quillSetHtml(annQuill, '');
             }
-            modal?.showModal();
+            openPlanningRouteDialog('modal_announcements', 'Annonces');
         },
         { signal }
     );

@@ -10,6 +10,9 @@ import {
     setPlanningFcTextScale
 } from '../utils/planning-theme.js';
 
+import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
+import { closePlanningDrawer } from './planning-drawer-ui.js';
+
 let bound = false;
 
 const SCALE_STEPS = /** @type {const} */ (['sm', 'md', 'lg']);
@@ -69,11 +72,17 @@ export function initCalendarPreferencesUi(ctx) {
         }
         if (!getPlanningSessionUser()?.email) return;
         fillCalendarPreferencesModal();
-        dlg.showModal();
+        openPlanningRouteDialog('modal_calendar_preferences', 'Préférences du calendrier');
     });
 
-    document.getElementById('cal-pref-close-btn')?.addEventListener('click', () => {
-        document.getElementById('modal_calendar_preferences')?.close();
+    document.getElementById('menu-item-display-preferences')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        closePlanningDrawer();
+        document.getElementById('btn-app-drawer')?.blur();
+        const dlg = document.getElementById('modal_calendar_preferences');
+        if (!dlg || !getPlanningSessionUser()?.email) return;
+        fillCalendarPreferencesModal();
+        openPlanningRouteDialog('modal_calendar_preferences', 'Préférences d’affichage');
     });
 
     document.getElementById('cal-pref-theme-light')?.addEventListener('click', () => {

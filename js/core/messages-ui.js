@@ -67,11 +67,6 @@ export function initMessagesUi(_ignored) {
     messagesUiAbort = new AbortController();
     const { signal } = messagesUiAbort;
 
-    const btnRules =
-        document.getElementById('btn-rules-trigger') ||
-        document.getElementById('btn-rules') ||
-        document.querySelector('#app-header #btn-rules-trigger') ||
-        document.querySelector('#app-header #btn-rules');
     const btnRulesFab = document.getElementById('btn-rules-fab');
     const modalRules = document.getElementById('modal_rules');
     const modalBroadcast = document.getElementById('modal_broadcast');
@@ -159,8 +154,6 @@ export function initMessagesUi(_ignored) {
         btnEdit?.classList.toggle('hidden', !isPrivilegedUser(uOpen));
         modalRules?.showModal();
     };
-
-    btnRules?.addEventListener('click', () => void openRulesFromUserAction(), { signal });
 
     btnRulesFab?.addEventListener('click', () => void openRulesFromUserAction(), { signal });
 

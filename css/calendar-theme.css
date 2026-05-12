@@ -467,3 +467,31 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
 [data-theme='dark'] .fc .fc-day-head-gcal--today .fc-day-head-gcal__dom-badge {
     background: rgb(71 85 105) !important;
 }
+
+/* Grille principale : pas de lignes verticales entre colonnes (lignes horaires horizontales inchangées). */
+#calendar .fc-timegrid-cols .fc-timegrid-col,
+#calendar .fc-timegrid-cols table td.fc-timegrid-col {
+    border-left-width: 0 !important;
+    border-right-width: 0 !important;
+}
+
+#calendar .fc-scrollgrid-sync-table .fc-col-header-cell {
+    border-left-width: 0 !important;
+    border-right-width: 0 !important;
+}
+
+#calendar .fc-daygrid-body .fc-daygrid-day {
+    border-left-width: 0 !important;
+    border-right-width: 0 !important;
+}
+
+#calendar .fc-timegrid-slots td.fc-timegrid-slot {
+    border-left-width: 0 !important;
+    border-right-width: 0 !important;
+}
+
+/* Conserver un léger séparateur entre la colonne des heures et la zone des jours. */
+#calendar .fc-timegrid-axis,
+#calendar td.fc-timegrid-axis {
+    border-right-width: 1px !important;
+}

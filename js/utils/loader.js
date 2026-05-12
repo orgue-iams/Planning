@@ -4,13 +4,12 @@
 export async function loadUIComponents() {
     const components = [
         { id: 'app-header', file: 'components/headers.html' },
+        { id: 'planning-drawer-mount', file: 'components/planning-app-drawer.html' },
         { id: 'app-modals', file: 'components/modal-login.html' },
         { id: 'app-modals', file: 'components/modal-reservation.html', append: true },
         { id: 'app-modals', file: 'components/modal-password.html', append: true },
         { id: 'app-modals', file: 'components/modal-forgot-password.html', append: true },
         { id: 'app-modals', file: 'components/modal-rules.html', append: true },
-        { id: 'app-modals', file: 'components/modal-help.html', append: true },
-        { id: 'app-modals', file: 'components/modal-privacy.html', append: true },
         { id: 'app-modals', file: 'components/modal-broadcast.html', append: true },
         { id: 'app-modals', file: 'components/modal-users-admin.html', append: true },
         { id: 'app-modals', file: 'components/modal-calendar-pool.html', append: true },
