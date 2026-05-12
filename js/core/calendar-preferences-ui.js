@@ -1,7 +1,6 @@
 /**
- * Modale « Préférences du calendrier » (thème + taille du texte des créneaux FC).
+ * Préférences d’affichage (thème + taille du texte FC) — contrôles dans le tiroir menu.
  */
-import { showToast } from '../utils/toast.js';
 import { getPlanningSessionUser } from './session-user.js';
 import {
     getPlanningThemePref,
@@ -9,9 +8,6 @@ import {
     getPlanningFcTextScale,
     setPlanningFcTextScale
 } from '../utils/planning-theme.js';
-
-import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
-import { closePlanningDrawer } from './planning-drawer-ui.js';
 
 let bound = false;
 
@@ -27,32 +23,26 @@ function indexToScale(idx) {
     return SCALE_STEPS[n];
 }
 
-function syncThemeTiles() {
+export function syncCalendarPrefControlsUi() {
     const mode = getPlanningThemePref();
     const light = document.getElementById('cal-pref-theme-light');
     const dark = document.getElementById('cal-pref-theme-dark');
     const isLight = mode !== 'dark';
     if (light instanceof HTMLButtonElement) {
         light.setAttribute('aria-pressed', isLight ? 'true' : 'false');
-        light.classList.toggle('cal-pref-theme-tile--selected', isLight);
+        light.classList.toggle('is-active', isLight);
     }
     if (dark instanceof HTMLButtonElement) {
         dark.setAttribute('aria-pressed', !isLight ? 'true' : 'false');
-        dark.classList.toggle('cal-pref-theme-tile--selected', !isLight);
+        dark.classList.toggle('is-active', !isLight);
     }
-}
 
-function syncTextRange() {
     const range = document.getElementById('cal-pref-text-scale');
-    if (!(range instanceof HTMLInputElement)) return;
-    const idx = scaleToIndex(getPlanningFcTextScale());
-    range.value = String(idx);
-    range.setAttribute('aria-valuenow', String(idx));
-}
-
-function fillCalendarPreferencesModal() {
-    syncThemeTiles();
-    syncTextRange();
+    if (range instanceof HTMLInputElement) {
+        const idx = scaleToIndex(getPlanningFcTextScale());
+        range.value = String(idx);
+        range.setAttribute('aria-valuenow', String(idx));
+    }
 }
 
 /**
@@ -62,36 +52,15 @@ export function initCalendarPreferencesUi(ctx) {
     if (bound) return;
     bound = true;
 
-    document.getElementById('menu-item-calendar-preferences')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById('btn-user-menu')?.blur();
-        const dlg = document.getElementById('modal_calendar_preferences');
-        if (!dlg) {
-            showToast('Fenêtre indisponible. Rechargez la page.', 'error');
-            return;
-        }
-        if (!getPlanningSessionUser()?.email) return;
-        fillCalendarPreferencesModal();
-        openPlanningRouteDialog('modal_calendar_preferences', 'Préférences du calendrier');
-    });
-
-    document.getElementById('menu-item-display-preferences')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        closePlanningDrawer();
-        document.getElementById('btn-app-drawer')?.blur();
-        const dlg = document.getElementById('modal_calendar_preferences');
-        if (!dlg || !getPlanningSessionUser()?.email) return;
-        fillCalendarPreferencesModal();
-        openPlanningRouteDialog('modal_calendar_preferences', 'Préférences d’affichage');
-    });
+    syncCalendarPrefControlsUi();
 
     document.getElementById('cal-pref-theme-light')?.addEventListener('click', () => {
         setPlanningThemePref('light');
-        syncThemeTiles();
+        syncCalendarPrefControlsUi();
     });
     document.getElementById('cal-pref-theme-dark')?.addEventListener('click', () => {
         setPlanningThemePref('dark');
-        syncThemeTiles();
+        syncCalendarPrefControlsUi();
     });
 
     document.getElementById('cal-pref-text-scale')?.addEventListener('input', (e) => {

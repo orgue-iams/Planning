@@ -64,7 +64,11 @@ import { initAnnouncementsUi, resetAnnouncementsUiBindings } from './announcemen
 import { showToast } from '../utils/toast.js';
 import { setPlanningSessionUser, getPlanningSessionUser } from './session-user.js';
 import { initProfileUi, resetProfileUiBindings, refreshHeaderWeekStrip } from './profile-ui.js';
-import { initCalendarPreferencesUi, resetCalendarPreferencesUiBindings } from './calendar-preferences-ui.js';
+import {
+    initCalendarPreferencesUi,
+    resetCalendarPreferencesUiBindings,
+    syncCalendarPrefControlsUi
+} from './calendar-preferences-ui.js';
 import { initSemainesTypesUi, resetSemainesTypesUiBindings } from './semaines-types-ui.js';
 import { initStatisticsUi, resetStatisticsUiBindings } from './statistics-ui.js';
 import { initDirectoryUsersUi, resetDirectoryUsersUiBindings } from './directory-users-ui.js';
@@ -72,7 +76,7 @@ import { initCoursSeriesScopeUi, resetCoursSeriesScopeUiBindings } from './cours
 import { initConfigUi, resetConfigUiBindings } from './config-ui.js';
 import { installAdminClearWeekDelegatedClick } from './admin-clear-week.js';
 import { fetchWeekCycleAnchor, clearProfWeekCycleCache } from './week-cycle.js';
-import { fetchOrganSchoolSettings, invalidateOrganSchoolSettingsCache } from './organ-settings.js';
+import { fetchOrganSchoolSettings, getChapelSlotBounds, invalidateOrganSchoolSettingsCache } from './organ-settings.js';
 import { CACHE_NAME } from '../config/cache-name.js';
 import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
 
@@ -128,7 +132,6 @@ function performLogout() {
         'modal_admin_confirm',
         'modal_announcements',
         'modal_profile',
-        'modal_calendar_preferences',
         'modal_semaines_types',
         'modal_config',
         'modal_course_students',
@@ -147,7 +150,6 @@ function performLogout() {
 function refreshHeaderUser(user) {
     const nameEl = document.getElementById('user-display-name');
     const roleEl = document.getElementById('user-display-role');
-    const menuWrap = document.getElementById('user-menu-wrap');
     const shell = document.getElementById('app-shell');
     if (!user?.email) {
         if (nameEl) nameEl.textContent = 'Invité';
@@ -155,8 +157,9 @@ function refreshHeaderUser(user) {
             roleEl.textContent = '';
             roleEl.classList.add('hidden');
         }
-        menuWrap?.classList.add('hidden');
         document.getElementById('menu-item-display-prefs-wrap')?.classList.add('hidden');
+        document.getElementById('menu-item-profile-wrap')?.classList.add('hidden');
+        document.getElementById('menu-item-logout-wrap')?.classList.add('hidden');
         document.getElementById('menu-item-directory-wrap')?.classList.add('hidden');
         document.getElementById('menu-item-semaines-types-wrap')?.classList.add('hidden');
         document.getElementById('menu-item-statistics-wrap')?.classList.add('hidden');
@@ -170,10 +173,12 @@ function refreshHeaderUser(user) {
         roleEl.textContent = label || '';
         roleEl.classList.toggle('hidden', !label);
     }
-    menuWrap?.classList.remove('hidden');
     const r = String(user.role || '').toLowerCase();
     const staff = isBackendAuthConfigured() && (r === 'prof' || r === 'admin');
     document.getElementById('menu-item-display-prefs-wrap')?.classList.remove('hidden');
+    document.getElementById('menu-item-profile-wrap')?.classList.remove('hidden');
+    document.getElementById('menu-item-logout-wrap')?.classList.remove('hidden');
+    syncCalendarPrefControlsUi();
     document.getElementById('menu-item-directory-wrap')?.classList.toggle('hidden', !isBackendAuthConfigured());
     document.getElementById('menu-item-semaines-types-wrap')?.classList.toggle('hidden', !staff);
     document.getElementById('menu-item-statistics-wrap')?.classList.toggle('hidden', !staff);
@@ -335,6 +340,9 @@ function initCalendarAndRevealUi() {
         calendar.render();
         const toolbarCtl = initCalendarToolbar(calendar);
         handlers.onDatesSet = () => {
+            const b = getChapelSlotBounds();
+            calendar.setOption('slotMinTime', b.slotMinTime);
+            calendar.setOption('slotMaxTime', b.slotMaxTime);
             toolbarCtl?.refreshTitle();
             updatePlanningSundayColumnVisibility(calendar, currentUser);
         };
@@ -448,33 +456,7 @@ function wireDialogBackdropClose() {
 }
 
 function wireHeaderHoverMenus() {
-    const specs = [{ wrapId: 'user-menu-wrap', btnId: 'btn-user-menu' }];
-    for (const { wrapId, btnId } of specs) {
-        const wrap = document.getElementById(wrapId);
-        const btn = document.getElementById(btnId);
-        if (!(wrap instanceof HTMLElement) || !(btn instanceof HTMLElement)) continue;
-        let leaveTimer = 0;
-        const open = () => {
-            window.clearTimeout(leaveTimer);
-            wrap.classList.add('dropdown-open');
-            btn.classList.add('bg-blue-100', 'border-blue-300');
-        };
-        const close = () => {
-            leaveTimer = window.setTimeout(() => {
-                wrap.classList.remove('dropdown-open');
-                btn.classList.remove('bg-blue-100', 'border-blue-300');
-            }, 120);
-        };
-        wrap.addEventListener('mouseenter', open);
-        wrap.addEventListener('mouseleave', close);
-        wrap.addEventListener('focusin', open);
-        wrap.addEventListener('focusout', () => {
-            window.setTimeout(() => {
-                if (wrap.contains(document.activeElement)) return;
-                close();
-            }, 0);
-        });
-    }
+    /* Menu compte retiré : Mon profil / déconnexion sont dans le tiroir. */
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -682,7 +664,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('menu-item-logout')?.addEventListener('click', async (e) => {
         e.preventDefault();
-        document.getElementById('btn-user-menu')?.blur();
+        document.getElementById('btn-app-drawer')?.blur();
         await logout();
     });
 

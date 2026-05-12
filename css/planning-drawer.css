@@ -77,7 +77,51 @@
     margin: 0.35rem 0 0.4rem;
 }
 
+.planning-drawer__section-title--sub {
+    margin-top: 0.65rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.58rem;
+    opacity: 0.95;
+}
+
+.planning-drawer__hint {
+    font-size: 0.58rem;
+    line-height: 1.35;
+    color: rgb(100 116 139);
+    margin: -0.15rem 0 0.45rem;
+}
+
+[data-theme='dark'] .planning-drawer__hint {
+    color: rgb(148 163 184);
+}
+
+.planning-drawer__scale-previews {
+    max-width: 12rem;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.planning-drawer__link--danger {
+    color: rgb(220 38 38) !important;
+}
+
+[data-theme='dark'] .planning-drawer__link--danger {
+    color: rgb(248 113 113) !important;
+}
+
+.planning-drawer__link--danger:hover {
+    background: rgb(254 242 242) !important;
+}
+
+[data-theme='dark'] .planning-drawer__link--danger:hover {
+    background: rgb(127 29 29 / 0.25) !important;
+}
+
 [data-theme='dark'] .planning-drawer__section-title {
+    color: rgb(148 163 184);
+}
+
+[data-theme='dark'] .planning-drawer__section-title--sub {
     color: rgb(148 163 184);
 }
 

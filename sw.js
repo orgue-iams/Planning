@@ -65,7 +65,6 @@ const ASSETS = [
   './components/modal-calendar-pool.html',
   './components/modal-announcements.html',
   './components/modal-profile.html',
-  './components/modal-calendar-preferences.html',
   './components/modal-config.html',
   './components/modal-semaines-types.html',
   './components/modal-course-students.html',

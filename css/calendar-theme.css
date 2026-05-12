@@ -166,9 +166,9 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     transform: translateY(0);
 }
 
-/* Coin / en-tête au-dessus de la colonne heures */
-.fc-timegrid .fc-scrollgrid-section-header > table > tbody > tr > td:first-child,
-.fc-timegrid .fc-scrollgrid-section-header > table > tbody > tr > td:first-child * {
+/* Coin en-tête (colonne heures) : pas de filet fantôme — ne pas cibler les cellules « jour » (contenu dayHeader). */
+.fc-timegrid .fc-scrollgrid-section-header > table > tbody > tr > td.fc-timegrid-axis,
+.fc-timegrid .fc-scrollgrid-section-header > table > tbody > tr > td.fc-timegrid-axis * {
     border-top: none !important;
     border-bottom: none !important;
     box-shadow: none !important;
@@ -478,6 +478,35 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
 #calendar .fc-scrollgrid-sync-table .fc-col-header-cell {
     border-left-width: 0 !important;
     border-right-width: 0 !important;
+}
+
+/* Ligne des jours : hauteur minimale + filet bas unique (sans filets verticaux résiduels). */
+#calendar table.fc-col-header {
+    border-collapse: collapse !important;
+    border-spacing: 0 !important;
+}
+
+#calendar .fc-scrollgrid-section-header .fc-col-header-cell {
+    min-height: 2.85rem;
+    vertical-align: middle !important;
+}
+
+#calendar .fc-scrollgrid-section-header .fc-col-header .fc-col-header-cell {
+    border-bottom: 1px solid rgb(203 213 225) !important;
+}
+
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-col-header .fc-col-header-cell {
+    border-bottom-color: rgb(71 85 105) !important;
+}
+
+#calendar .fc-scrollgrid-section-header .fc-timegrid-axis.fc-col-header-cell,
+#calendar .fc-scrollgrid-section-header tr .fc-timegrid-axis {
+    border-bottom: 1px solid rgb(203 213 225) !important;
+}
+
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-timegrid-axis.fc-col-header-cell,
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header tr .fc-timegrid-axis {
+    border-bottom-color: rgb(71 85 105) !important;
 }
 
 #calendar .fc-daygrid-body .fc-daygrid-day {

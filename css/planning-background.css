@@ -90,6 +90,24 @@ header.app-navbar #calendar-toolbar,
 #calendar.planning-calendar-transparent {
     background: transparent !important;
     box-shadow: none !important;
+    outline: none !important;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* La chaîne flex remplit #calendar pour que la grille + scroll interne consomment la hauteur utile (pas de bande vide sous 22 h). */
+#calendar.planning-calendar-transparent > .fc {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+#calendar .fc-view-harness {
+    flex: 1 1 auto;
+    min-height: 0;
 }
 
 /* FullCalendar : zones « page » transparentes ; jour courant = même teinte qu’en clair. */
@@ -99,7 +117,12 @@ header.app-navbar #calendar-toolbar,
     --fc-today-bg-color: rgba(255, 220, 40, 0.12);
 }
 
-#calendar .fc-scrollgrid,
+#calendar .fc-scrollgrid {
+    background: transparent !important;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
 #calendar .fc-scrollgrid table,
 #calendar .fc-timegrid-body,
 #calendar .fc-timegrid-slots,

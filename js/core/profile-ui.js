@@ -18,6 +18,7 @@ import {
     fetchCalendarEventsInRange
 } from './planning-courses.js';
 import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
+import { closePlanningDrawer } from './planning-drawer-ui.js';
 
 let profileUiBound = false;
 let profileSaveInFlight = false;
@@ -360,7 +361,8 @@ export function initProfileUi(currentUser) {
 
     document.getElementById('menu-item-profile')?.addEventListener('click', (e) => {
         e.preventDefault();
-        document.getElementById('btn-user-menu')?.blur();
+        document.getElementById('btn-app-drawer')?.blur();
+        closePlanningDrawer();
         const dlg = document.getElementById('modal_profile');
         if (!dlg) {
             showToast('Fenêtre profil indisponible. Rechargez la page.', 'error');
