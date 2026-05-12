@@ -47,10 +47,11 @@ function selectAllowSingleCalendarDay(selectInfo) {
     );
 }
 
-/** Recalcul du calendrier au redimensionnement (barre d’outils = HTML custom + en-têtes jours mobile). */
+/** Recalcul grille + barre au changement largeur (mobile / desktop). */
 export function bindResponsiveCalendarToolbar(calendar) {
-    const mql = window.matchMedia('(max-width: 640px)');
+    const mql = window.matchMedia('(max-width: 639px)');
     const apply = () => {
+        calendar.setOption('expandRows', !mql.matches);
         calendar.render();
         calendar.updateSize();
     };
@@ -75,6 +76,9 @@ export const getCalendarConfig = (handlers, currentUser) => {
         snapDuration: '00:30:00',
         allDaySlot: false,
         height: '100%',
+        /* Mobile : false évite la bande vide sous la dernière heure (Safari / 100dvh). Desktop : true remplit la hauteur. */
+        expandRows:
+            typeof window !== 'undefined' && !window.matchMedia('(max-width: 639px)').matches,
         nowIndicator: true,
 
         selectable: true,

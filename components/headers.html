@@ -1,8 +1,9 @@
-<header class="app-navbar navbar bg-white border-b border-slate-200 fixed top-0 z-50 w-full flex flex-col shadow-sm max-sm:shadow-none max-sm:rounded-b-none max-sm:border-b-0">
-    <!-- Bandeau unique : menu + marque + période + navigation (desktop) + admin + identité + menu compte -->
+<header class="app-navbar navbar bg-white fixed top-0 z-50 w-full flex flex-col shadow-sm max-sm:shadow-none max-sm:rounded-b-none">
+    <!-- Même largeur max que #app-shell (grille) : alignement bandeau / planning sur grand écran -->
+    <div class="app-navbar__inner w-full min-w-0 box-border px-0 sm:px-1 sm:max-w-5xl sm:mx-auto">
     <div
         id="calendar-toolbar"
-        class="calendar-toolbar app-navbar__toolbar hidden w-full max-w-full gap-1 min-h-[2.5rem] px-1.5 sm:px-2 py-1"
+        class="calendar-toolbar app-navbar__toolbar hidden w-full max-w-full gap-1 min-h-[2.5rem] px-1.5 sm:px-0 py-1"
     >
         <div class="calendar-toolbar__left flex items-center gap-0.5 min-w-0 shrink-0">
             <button
@@ -50,5 +51,6 @@
                 <span id="user-display-role" class="text-[9px] font-bold text-slate-500 uppercase tracking-wide max-sm:text-[9px] hidden"></span>
             </div>
         </div>
+    </div>
     </div>
 </header>

@@ -493,6 +493,22 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     border-right-width: 0 !important;
 }
 
+/* Ligne des jours : pas de filet en haut ni de séparateurs verticaux résiduels (FC / thème). */
+#calendar .fc-scrollgrid-section.fc-scrollgrid-section-header > td {
+    border-top: none !important;
+}
+
+#calendar .fc-scrollgrid-section-header table th,
+#calendar .fc-scrollgrid-section-header table td {
+    border-left: none !important;
+    border-right: none !important;
+}
+
+#calendar .fc-scrollgrid-section-header .fc-col-header-cell .fc-scrollgrid-sync-inner {
+    border-left: none !important;
+    border-right: none !important;
+}
+
 /* Ligne des jours : hauteur minimale + filet bas unique (sans filets verticaux résiduels). */
 #calendar table.fc-col-header {
     border-collapse: collapse !important;

@@ -71,7 +71,7 @@ header.app-navbar #calendar-toolbar,
 [data-theme='dark'] .calendar-toolbar {
     background: rgba(15, 23, 42, 0.94) !important;
     border-color: transparent !important;
-    border-bottom-color: rgb(51 65 85) !important;
+    border-bottom: none !important;
 }
 
 #planning-legend.planning-legend-frosted {
@@ -120,7 +120,8 @@ header.app-navbar #calendar-toolbar,
 [data-theme='dark'] #calendar .fc {
     --fc-page-bg-color: transparent;
     --fc-today-bg-color: rgba(255, 220, 40, 0.12);
-    --planning-grid-line: rgb(38 50 71);
+    /* Filets horaires plus discrets (plus sombres que l’ancien gris-bleu). */
+    --planning-grid-line: rgb(17 24 39);
 }
 
 #calendar .fc-scrollgrid {
@@ -273,4 +274,22 @@ header.app-navbar #calendar-toolbar,
 #calendar .fc-daygrid-day,
 #calendar .fc-daygrid-day-frame {
     border-right-width: 0 !important;
+}
+
+/*
+ * Smartphone : éviter la « zone vide » sous la dernière heure (FC + 100dvh / liquid harness).
+ * Le corps timegrid ne doit pas s’étirer au-delà du contenu des créneaux.
+ */
+@media (max-width: 639px) {
+    #calendar .fc-timegrid-body {
+        min-height: 0 !important;
+    }
+
+    #calendar .fc-timegrid .fc-scrollgrid-section-body > td {
+        vertical-align: top !important;
+    }
+
+    #calendar .fc-scroller-harness-liquid {
+        min-height: 0 !important;
+    }
 }

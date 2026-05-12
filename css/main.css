@@ -61,12 +61,7 @@ html, body {
     #app-header .app-navbar {
         min-height: calc(3.25rem + env(safe-area-inset-top, 0px));
         align-content: center;
-        box-shadow: 0 1px 0 rgb(226 232 240);
     }
-}
-
-[data-theme='dark'] #app-header .app-navbar {
-    box-shadow: 0 1px 0 rgb(30 41 55);
 }
 
 /* Téléphone en paysage : gagner de la hauteur pour la grille (pas de menu dans cette configuration). */
@@ -166,8 +161,8 @@ html, body {
 /* Thème sombre : navbar + barre d’outils calendrier (texte / fonds). */
 [data-theme='dark'] #app-header .app-navbar.navbar {
     background-color: rgb(15 23 42) !important;
-    border-color: rgb(51 65 85) !important;
-    box-shadow: 0 1px 0 rgb(30 41 55);
+    border-color: transparent !important;
+    box-shadow: none;
 }
 
 [data-theme='dark'] #app-header #user-display-name {
