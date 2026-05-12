@@ -35,4 +35,5 @@ Cela complète la règle utilisateur : ne pas se contenter d’indiquer quoi lan
 
 - Quand des fichiers **statiques** changent (`js/`, `css/`, `components/`, `index.html`, `sw.js`, `cache-name.js`, etc.), lancer **`npm run deploy:pages`** depuis la racine du repo Planning **sans demander** à l’utilisateur : ça compile Tailwind et prépare `_site/` (même étape que la CI).
 - La **publication** en ligne est déclenchée par un **push sur `main`** (workflow `.github/workflows/github-pages.yml`). Après des changements front, enchaîner donc **build `deploy:pages` → commit si besoin → push** quand c’est cohérent avec le reste des livraisons.
+- **Incrément de `CACHE_NAME`** (`js/config/cache-name.js`) : livraison « complète » (Pages + commit/push + Supabase) — détail unique dans **`.cursor/rules/cache-bump-full-ship.mdc`** pour éviter la duplication dans le chat.
 - Après **`npm run deploy:supabase`**, si la session a aussi touché le front ou pour clôturer une livraison complète, exécuter **`npm run deploy:pages`** de la même manière (ne pas laisser ce rappel en « à faire de votre côté » seul).
