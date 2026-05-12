@@ -10,13 +10,11 @@ import { getPlanningSessionUser, setPlanningSessionUser } from './session-user.j
 import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
 import { googleCalendarEmbedUrl } from '../utils/google-calendar-url.js';
 import { showToast } from '../utils/toast.js';
-import { getPlanningThemePref, setPlanningThemePref, applyPlanningTheme } from '../utils/planning-theme.js';
 import {
     filterCoursEventsForUser,
     sortEventsByStart,
     formatCoursLineFr,
-    fetchCalendarEventsInRange,
-    isoWeekRangeLocal
+    fetchCalendarEventsInRange
 } from './planning-courses.js';
 
 let profileUiBound = false;
@@ -50,13 +48,6 @@ function syncProfileBaselineFromForm() {
     profileBaseline = readProfileFormState();
 }
 
-function isThemeSelectionDirty() {
-    const themeSel = document.getElementById('profile-theme-select');
-    if (!(themeSel instanceof HTMLSelectElement)) return false;
-    const sel = themeSel.value === 'dark' ? 'dark' : 'light';
-    return sel !== getPlanningThemePref();
-}
-
 function hasProfilePendingChanges() {
     if (!profileBaseline) return false;
     const cur = readProfileFormState();
@@ -72,8 +63,7 @@ function hasProfilePendingChanges() {
         cur.shareEmail !== profileBaseline.shareEmail ||
         cur.sharePhone !== profileBaseline.sharePhone ||
         cur.shareCalendar !== profileBaseline.shareCalendar ||
-        hasPwd ||
-        isThemeSelectionDirty()
+        hasPwd
     );
 }
 
@@ -237,11 +227,6 @@ async function fillProfileModal(user) {
     } else if (empty) {
         empty.classList.add('hidden');
     }
-
-    const themeSel = document.getElementById('profile-theme-select');
-    if (themeSel instanceof HTMLSelectElement) {
-        themeSel.value = getPlanningThemePref();
-    }
 }
 
 export function resetProfileUiBindings() {
@@ -253,12 +238,6 @@ export function resetProfileUiBindings() {
 export function initProfileUi(currentUser) {
     if (!currentUser?.email || profileUiBound) return;
     profileUiBound = true;
-
-    document.getElementById('profile-theme-select')?.addEventListener('change', (e) => {
-        const el = e.target;
-        if (!(el instanceof HTMLSelectElement)) return;
-        applyPlanningTheme(el.value === 'dark' ? 'dark' : 'light');
-    });
 
     document.getElementById('menu-item-profile')?.addEventListener('click', (e) => {
         e.preventDefault();
@@ -299,7 +278,6 @@ export function initProfileUi(currentUser) {
     const profileDlg = document.getElementById('modal_profile');
     profileDlg?.addEventListener('close', () => {
         applyPassVisibility(false);
-        applyPlanningTheme(getPlanningThemePref());
     });
     profileDlg?.addEventListener('cancel', (e) => {
         if (!hasProfilePendingChanges()) return;
@@ -383,10 +361,6 @@ export function initProfileUi(currentUser) {
                 applyPassVisibility(false);
             }
             showToast('Profil enregistré.', 'success');
-            const themeSel = document.getElementById('profile-theme-select');
-            if (themeSel instanceof HTMLSelectElement) {
-                setPlanningThemePref(themeSel.value === 'dark' ? 'dark' : 'light');
-            }
             syncProfileBaselineFromForm();
             document.dispatchEvent(new CustomEvent('planning-profile-saved'));
             document.getElementById('modal_profile')?.close();

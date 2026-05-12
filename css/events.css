@@ -111,6 +111,7 @@
 .event-title-fc {
     text-align: center;
     font-weight: 400;
+    /* md (défaut) — sm / lg via data-planning-fc-text sur <html> */
     font-size: clamp(0.56rem, 1.9vw, 0.68rem);
     line-height: 1.25;
     color: inherit !important;
@@ -131,9 +132,25 @@
     box-sizing: border-box;
 }
 
+html[data-planning-fc-text='sm'] .event-title-fc {
+    font-size: clamp(0.45rem, 1.55vw, 0.56rem);
+}
+
+html[data-planning-fc-text='lg'] .event-title-fc {
+    font-size: clamp(0.66rem, 2.1vw, 0.82rem);
+}
+
 @media (min-width: 640px) {
     .event-title-fc {
         font-size: 0.6875rem;
+    }
+
+    html[data-planning-fc-text='sm'] .event-title-fc {
+        font-size: 0.5625rem;
+    }
+
+    html[data-planning-fc-text='lg'] .event-title-fc {
+        font-size: 0.8125rem;
     }
 }
 
@@ -159,9 +176,25 @@
     box-sizing: border-box;
 }
 
+html[data-planning-fc-text='sm'] .event-time-fc {
+    font-size: clamp(0.42rem, 1.5vw, 0.54rem);
+}
+
+html[data-planning-fc-text='lg'] .event-time-fc {
+    font-size: clamp(0.62rem, 2vw, 0.8rem);
+}
+
 @media (min-width: 640px) {
     .event-time-fc {
         font-size: 0.6875rem;
+    }
+
+    html[data-planning-fc-text='sm'] .event-time-fc {
+        font-size: 0.5625rem;
+    }
+
+    html[data-planning-fc-text='lg'] .event-time-fc {
+        font-size: 0.8125rem;
     }
 }
 

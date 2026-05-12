@@ -1,5 +1,5 @@
 import { loadUIComponents } from '../utils/loader.js';
-import { applyPlanningThemeFromStorage } from '../utils/planning-theme.js';
+import { applyPlanningThemeFromStorage, applyPlanningFcTextScaleFromStorage } from '../utils/planning-theme.js';
 import { getCalendarConfig, bindResponsiveCalendarToolbar } from '../config/fc-settings.js';
 import { initCalendarToolbar } from './calendar-toolbar.js';
 import { populateTimeSelects } from '../utils/time-helpers.js';
@@ -63,6 +63,7 @@ import { initAnnouncementsUi, resetAnnouncementsUiBindings } from './announcemen
 import { showToast } from '../utils/toast.js';
 import { setPlanningSessionUser, getPlanningSessionUser } from './session-user.js';
 import { initProfileUi, resetProfileUiBindings, refreshHeaderWeekStrip } from './profile-ui.js';
+import { initCalendarPreferencesUi, resetCalendarPreferencesUiBindings } from './calendar-preferences-ui.js';
 import { initSemainesTypesUi, resetSemainesTypesUiBindings } from './semaines-types-ui.js';
 import { initStatisticsUi, resetStatisticsUiBindings } from './statistics-ui.js';
 import { initDirectoryUsersUi, resetDirectoryUsersUiBindings } from './directory-users-ui.js';
@@ -97,6 +98,7 @@ function performLogout() {
     resetAdminUsersUiBindings();
     resetAdminCalendarPoolBindings();
     resetProfileUiBindings();
+    resetCalendarPreferencesUiBindings();
     resetSemainesTypesUiBindings();
     resetStatisticsUiBindings();
     resetDirectoryUsersUiBindings();
@@ -127,6 +129,7 @@ function performLogout() {
         'modal_help',
         'modal_privacy',
         'modal_profile',
+        'modal_calendar_preferences',
         'modal_semaines_types',
         'modal_config',
         'modal_course_students',
@@ -390,6 +393,7 @@ function initCalendarAndRevealUi() {
 
         initMessagesUi(currentUser);
         initProfileUi(currentUser);
+        initCalendarPreferencesUi({ getCalendar: () => calendar });
         document.addEventListener('planning-profile-saved', () => {
             refreshHeaderUser(getPlanningSessionUser());
         });
@@ -494,6 +498,7 @@ function wireHeaderHoverMenus() {
 
 document.addEventListener('DOMContentLoaded', async () => {
     applyPlanningThemeFromStorage();
+    applyPlanningFcTextScaleFromStorage();
     await loadUIComponents();
     installAdminClearWeekDelegatedClick(() => calendar, () => currentUser);
 

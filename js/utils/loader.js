@@ -16,6 +16,7 @@ export async function loadUIComponents() {
         { id: 'app-modals', file: 'components/modal-calendar-pool.html', append: true },
         { id: 'app-modals', file: 'components/modal-announcements.html', append: true },
         { id: 'app-modals', file: 'components/modal-profile.html', append: true },
+        { id: 'app-modals', file: 'components/modal-calendar-preferences.html', append: true },
         { id: 'app-modals', file: 'components/modal-config.html', append: true },
         { id: 'app-modals', file: 'components/modal-semaines-types.html', append: true },
         { id: 'app-modals', file: 'components/modal-course-students.html', append: true },

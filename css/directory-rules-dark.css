@@ -113,3 +113,29 @@
 [data-theme='dark'] #modal_rules .organ-rich-a:hover {
     color: rgb(191 219 254);
 }
+
+/* Préférences du calendrier — mode sombre */
+[data-theme='dark'] #modal_calendar_preferences .modal-box {
+    background-color: rgb(30 41 59) !important;
+    border-color: rgb(51 65 85) !important;
+    color: rgb(241 245 249);
+}
+
+[data-theme='dark'] #modal_calendar_preferences h3 {
+    color: rgb(226 232 240) !important;
+    border-color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] #modal_calendar_preferences .border-slate-100,
+[data-theme='dark'] #modal_calendar_preferences .border-slate-200 {
+    border-color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] #modal_calendar_preferences .text-slate-600,
+[data-theme='dark'] #modal_calendar_preferences .text-slate-500 {
+    color: rgb(203 213 225) !important;
+}
+
+[data-theme='dark'] #modal_calendar_preferences .cal-pref-scale-preview {
+    color: rgb(248 250 252) !important;
+}
