@@ -482,9 +482,6 @@ export function initStatisticsUi() {
         document.getElementById('btn-app-drawer')?.blur();
         openPlanningRouteDialog('modal_statistics', 'Statistiques');
     });
-    document.getElementById('statistics-close-btn')?.addEventListener('click', () => {
-        document.getElementById('modal_statistics')?.close();
-    });
 
     const dlg = document.getElementById('modal_statistics');
     dlg?.addEventListener('toggle', () => {

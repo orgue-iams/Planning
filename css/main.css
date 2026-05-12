@@ -36,6 +36,7 @@ html, body {
 /* Hauteur : le conteneur parent (#app-shell) est en flex ; le calendrier prend l’espace restant */
 #app-shell #calendar {
     min-height: 0;
+    flex: 1 1 0%;
     position: relative;
     z-index: 0;
 }

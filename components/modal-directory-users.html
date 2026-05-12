@@ -1,24 +1,18 @@
 <dialog id="modal_directory_users" class="modal">
-    <div class="modal-box p-5 w-[96%] max-w-2xl max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 shadow-2xl">
-        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest">Utilisateurs</h3>
-        
-        <div id="directory-add-user-wrap" class="hidden mb-2">
-            <button type="button" id="directory-add-user-btn" class="btn btn-ghost btn-xs border border-slate-200">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
-                Ajouter
-            </button>
-        </div>
-        <div id="directory-users-status" class="text-[11px] text-slate-500 mb-3 min-h-[1rem]"></div>
-        <div id="directory-admin-users-wrap" class="hidden mb-4">
+    <div class="modal-box p-4 w-[96%] max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 shadow-2xl min-w-0">
+        <div id="directory-users-status" class="text-[11px] text-slate-500 mb-2 min-h-[1rem]"></div>
+        <div id="directory-readonly-unified" class="mb-0 min-w-0 hidden"></div>
+        <div id="directory-admin-users-wrap" class="mb-0 min-w-0 hidden" aria-hidden="true">
             <div id="directory-admin-users-table"></div>
         </div>
-        <!-- Annuaire lecture seule : un seul tableau (colonnes alignées mobile / desktop) -->
-        <div id="directory-readonly-unified" class="mb-4 hidden"></div>
-        <div id="directory-section-admins" class="mb-4 hidden" aria-hidden="true"></div>
-        <div id="directory-section-profs" class="mb-4 hidden" aria-hidden="true"></div>
-        <div id="directory-section-eleves" class="mb-4 hidden" aria-hidden="true"></div>
-        <div class="modal-action mt-4 pt-2 border-t border-slate-100">
-            <button type="button" id="directory-users-close-btn" class="btn btn-ghost btn-sm font-black text-[11px]">Fermer</button>
+        <div id="directory-section-admins" class="hidden" aria-hidden="true"></div>
+        <div id="directory-section-profs" class="hidden" aria-hidden="true"></div>
+        <div id="directory-section-eleves" class="hidden" aria-hidden="true"></div>
+        <div id="directory-add-user-wrap" class="hidden mt-4 pt-3 border-t border-slate-200">
+            <button type="button" id="directory-add-user-btn" class="planning-drawer__link w-full max-w-none justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
+                + Ajouter
+            </button>
         </div>
     </div>
 </dialog>

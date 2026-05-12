@@ -128,10 +128,14 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     min-height: 0;
 }
 
-/* Lignes d’heure : bordure sur les « lanes » et la grille jours — pas sur les libellés d’heure (voir plus bas). */
+/* Lignes d’heure : uniquement sous les colonnes « jour » (pas sur la colonne libellés). */
 .fc-timegrid-slot {
     height: var(--planning-slot-height) !important;
-    border-bottom: 1px solid #f1f5f9 !important;
+    border-bottom: none !important;
+}
+
+#calendar .fc-timegrid-cols .fc-timegrid-slot {
+    border-bottom: 1px solid var(--planning-grid-line, rgb(226 232 240)) !important;
 }
 
 /* Colonnes « jour » : FC pose la hauteur sur .fc-timegrid-slot-lane, pas .fc-timegrid-slot — aligner le pincement + thème. */
@@ -468,7 +472,16 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     background: rgb(71 85 105) !important;
 }
 
-/* Grille principale : pas de lignes verticales entre colonnes (lignes horaires horizontales inchangées). */
+/* Grille timegrid : aucune ligne verticale (FC peut en poser sur les td du sync-table). */
+#calendar .fc-timegrid .fc-scrollgrid-sync-table > tbody > tr > td,
+#calendar .fc-timegrid .fc-scrollgrid-sync-table > thead > tr > td,
+#calendar .fc-timegrid .fc-scrollgrid-sync-table > tbody > tr > th,
+#calendar .fc-timegrid .fc-scrollgrid-sync-table > thead > tr > th {
+    border-left-width: 0 !important;
+    border-right-width: 0 !important;
+}
+
+/* Grille principale : pas de lignes verticales entre colonnes (lignes horaires uniquement sous les jours). */
 #calendar .fc-timegrid-cols .fc-timegrid-col,
 #calendar .fc-timegrid-cols table td.fc-timegrid-col {
     border-left-width: 0 !important;
@@ -519,8 +532,9 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     border-right-width: 0 !important;
 }
 
-/* Conserver un léger séparateur entre la colonne des heures et la zone des jours. */
+/* Aucune ligne verticale entre axe et jours. */
 #calendar .fc-timegrid-axis,
 #calendar td.fc-timegrid-axis {
-    border-right-width: 1px !important;
+    border-right-width: 0 !important;
+    border-left-width: 0 !important;
 }

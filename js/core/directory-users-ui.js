@@ -48,115 +48,94 @@ function directoryDisplayName(r) {
     return String(r?.display_name || '').trim() || '—';
 }
 
-/** Un seul tableau : en-têtes de colonnes alignés pour les 3 blocs (admin / prof / élève). */
+/** Annuaire lecture seule : sections + cartes empilées (pas de scroll horizontal). */
 function renderDirectoryUnified(container, admins, profs, eleves) {
     if (!container) return;
     container.replaceChildren();
+
     const sections = [
         { title: 'Administrateurs', rows: admins },
         { title: 'Professeurs', rows: profs },
         { title: 'Élèves', rows: eleves },
     ];
 
-    const wrap = document.createElement('div');
-    wrap.className = 'overflow-x-auto rounded-xl border border-slate-200';
-    const table = document.createElement('table');
-    table.className =
-        'w-full text-left text-[11px] max-sm:text-[10px] border-collapse directory-users-readonly';
+    const root = document.createElement('div');
+    root.className = 'directory-users-stack min-w-0 text-[11px] max-sm:text-[10px]';
 
-    const cg = document.createElement('colgroup');
-    cg.innerHTML =
-        '<col class="min-w-[7rem] sm:min-w-[9rem]"><col><col class="w-[1%] whitespace-nowrap">';
-    table.appendChild(cg);
-
-    const thead = document.createElement('thead');
-    thead.className =
-        'bg-slate-50 text-slate-600 font-bold uppercase tracking-wide text-[10px] max-sm:text-[9px] border-b border-slate-200';
-    thead.innerHTML = `<tr>
-      <th class="p-2 max-sm:p-1.5 max-sm:pl-2 font-semibold align-bottom">Nom</th>
-      <th class="p-2 max-sm:p-1.5 font-semibold align-bottom">E-mail</th>
-      <th class="p-2 max-sm:p-1.5 max-sm:pr-2 font-semibold align-bottom">Tél.</th>
-    </tr>`;
-    table.appendChild(thead);
-
+    let firstSection = true;
     for (const { title, rows } of sections) {
-        const tbody = document.createElement('tbody');
+        const block = document.createElement('div');
+        if (!firstSection) block.className = 'mt-4 pt-3 border-t border-slate-200';
+        firstSection = false;
 
-        const secRow = document.createElement('tr');
-        secRow.className =
-            'directory-users-section-row bg-slate-100/95 border-t border-slate-200';
-        const secTd = document.createElement('td');
-        secTd.colSpan = 3;
-        secTd.className =
-            'py-1.5 px-2 max-sm:py-1 max-sm:px-1.5 text-[9px] max-sm:text-[8px] font-black uppercase tracking-wide text-slate-600';
-        secTd.textContent = title;
-        secRow.appendChild(secTd);
-        tbody.appendChild(secRow);
+        const head = document.createElement('p');
+        head.className =
+            'text-[9px] font-black uppercase tracking-wide text-slate-500 mb-2 m-0';
+        head.textContent = title;
+        block.appendChild(head);
 
         if (!rows.length) {
-            const tr = document.createElement('tr');
-            tr.className = 'directory-users-empty-row border-t border-slate-100';
-            const td = document.createElement('td');
-            td.colSpan = 3;
-            td.className =
-                'p-2 max-sm:p-1.5 text-[10px] max-sm:text-[9px] text-slate-500 italic';
-            td.textContent = 'Aucun compte.';
-            tr.appendChild(td);
-            tbody.appendChild(tr);
-        } else {
-            for (const r of rows) {
-                const tr = document.createElement('tr');
-                tr.className = 'directory-users-data-row border-t border-slate-100';
-                const name = directoryDisplayName(r);
-                const em = String(r.email || '').trim();
-                const ph = formatFrPhone(String(r.telephone || '').trim());
-                const cal = String(r.calendar_label || '').trim();
-
-                const tdName = document.createElement('td');
-                tdName.className =
-                    'p-2 max-sm:p-1.5 max-sm:pl-2 align-top break-words [overflow-wrap:anywhere] leading-snug';
-                const nameEl = document.createElement('strong');
-                nameEl.className = 'font-semibold text-slate-900 leading-snug';
-                nameEl.textContent = name;
-                tdName.appendChild(nameEl);
-                tr.appendChild(tdName);
-
-                const tdEmail = document.createElement('td');
-                tdEmail.className =
-                    'p-2 max-sm:p-1.5 align-top break-words [overflow-wrap:anywhere] leading-snug';
-                if (em.includes('@')) {
-                    const a = document.createElement('a');
-                    a.href = `mailto:${em}`;
-                    a.className = 'link link-primary';
-                    a.textContent = em;
-                    tdEmail.appendChild(a);
-                } else {
-                    tdEmail.appendChild(document.createTextNode(em || '—'));
-                }
-                if (cal) {
-                    const sub = document.createElement('div');
-                    sub.className =
-                        'mt-1 text-[10px] max-sm:text-[9px] text-slate-600 leading-snug break-words';
-                    sub.textContent = cal;
-                    tdEmail.appendChild(sub);
-                }
-                tr.appendChild(tdEmail);
-
-                const tdPhone = document.createElement('td');
-                tdPhone.className =
-                    'p-2 max-sm:p-1.5 max-sm:pr-2 align-top font-mono text-[10px] max-sm:text-[9px] whitespace-nowrap text-slate-800';
-                tdPhone.textContent = ph || '—';
-                tr.appendChild(tdPhone);
-
-                tbody.appendChild(tr);
-            }
+            const empty = document.createElement('p');
+            empty.className = 'text-[10px] text-slate-500 italic m-0';
+            empty.textContent = 'Aucun compte.';
+            block.appendChild(empty);
+            root.appendChild(block);
+            continue;
         }
 
-        table.appendChild(tbody);
+        const list = document.createElement('div');
+        list.className = 'divide-y divide-slate-200';
+        for (const r of rows) {
+            const item = document.createElement('div');
+            item.className = 'py-2.5 min-w-0';
+
+            const name = directoryDisplayName(r);
+            const em = String(r.email || '').trim();
+            const ph = formatFrPhone(String(r.telephone || '').trim());
+            const cal = String(r.calendar_label || '').trim();
+
+            const nameEl = document.createElement('p');
+            nameEl.className = 'font-semibold text-slate-900 leading-snug m-0 break-words';
+            nameEl.style.overflowWrap = 'anywhere';
+            nameEl.textContent = name;
+            item.appendChild(nameEl);
+
+            const emailRow = document.createElement('div');
+            emailRow.className = 'mt-0.5 text-[10px] max-sm:text-[9px] leading-snug break-words min-w-0';
+            emailRow.style.overflowWrap = 'anywhere';
+            if (em.includes('@')) {
+                const a = document.createElement('a');
+                a.href = `mailto:${em}`;
+                a.className = 'link link-primary';
+                a.textContent = em;
+                emailRow.appendChild(a);
+            } else {
+                emailRow.appendChild(document.createTextNode(em || '—'));
+            }
+            item.appendChild(emailRow);
+
+            if (cal) {
+                const sub = document.createElement('p');
+                sub.className =
+                    'mt-1 text-[10px] max-sm:text-[9px] text-slate-600 leading-snug m-0 break-words';
+                sub.style.overflowWrap = 'anywhere';
+                sub.textContent = cal;
+                item.appendChild(sub);
+            }
+
+            const phoneRow = document.createElement('p');
+            phoneRow.className =
+                'mt-1 font-mono text-[10px] max-sm:text-[9px] text-slate-700 m-0';
+            phoneRow.textContent = ph ? `Tél. ${ph}` : 'Tél. —';
+            item.appendChild(phoneRow);
+
+            list.appendChild(item);
+        }
+        block.appendChild(list);
+        root.appendChild(block);
     }
 
-    wrap.appendChild(table);
-    container.appendChild(wrap);
+    container.appendChild(root);
 }
 
 async function loadDirectoryIntoModal() {
@@ -168,6 +147,7 @@ async function loadDirectoryIntoModal() {
     if (!unified || !secAdm || !secProf || !secElv) return;
 
     hideLegacyDirectorySections(secAdm, secProf, secElv);
+    document.getElementById('directory-admin-users-wrap')?.classList.add('hidden');
     unified.classList.remove('hidden');
 
     const clearUnifiedBody = () => {
@@ -225,38 +205,22 @@ function renderAdminDirectoryTable(users) {
     const host = document.getElementById('directory-admin-users-table');
     if (!host) return;
     host.replaceChildren();
-    const wrap = document.createElement('div');
-    wrap.className = 'overflow-x-auto rounded-xl border border-slate-200';
-    const table = document.createElement('table');
-    table.className =
-        'directory-users-admin w-full text-left text-[11px] max-sm:text-[10px] border-collapse';
 
-    const cg = document.createElement('colgroup');
-    cg.innerHTML =
-        '<col class="min-w-[7rem] sm:min-w-[9rem]"><col><col class="w-[1%] whitespace-nowrap"><col class="w-[2.75rem]">';
-    table.appendChild(cg);
+    const root = document.createElement('div');
+    root.className = 'directory-users-stack divide-y divide-slate-200 min-w-0 text-[11px] max-sm:text-[10px]';
 
-    const thead = document.createElement('thead');
-    thead.className =
-        'bg-slate-50 text-slate-600 font-bold uppercase tracking-wide text-[10px] max-sm:text-[9px] border-b border-slate-200';
-    thead.innerHTML = `<tr>
-        <th class="p-2 max-sm:p-1.5 max-sm:pl-2 font-semibold align-bottom">Nom</th>
-        <th class="p-2 max-sm:p-1.5 font-semibold align-bottom">E-mail</th>
-        <th class="p-2 max-sm:p-1.5 font-semibold align-bottom">Tél.</th>
-        <th class="p-2 max-sm:p-1.5 max-sm:pr-2 w-11 font-semibold align-bottom" aria-label="Actions"></th>
-      </tr>`;
-    table.appendChild(thead);
-
-    const tb = document.createElement('tbody');
     const sorted = [...users].sort((a, b) =>
         `${String(a.nom || '')} ${String(a.prenom || '')}`.localeCompare(
             `${String(b.nom || '')} ${String(b.prenom || '')}`,
             'fr'
         )
     );
+
     for (const r of sorted) {
-        const tr = document.createElement('tr');
-        tr.className = 'border-t border-slate-100';
+        const row = document.createElement('div');
+        row.className = 'py-3 min-w-0';
+        row.dataset.userJson = JSON.stringify(r);
+
         const label =
             `${String(r.prenom || '').trim()} ${String(r.nom || '').trim()}`.trim() ||
             String(r.display_name || '').trim() ||
@@ -266,29 +230,40 @@ function renderAdminDirectoryTable(users) {
         const calLabel = String(r.personal_calendar_label || '').trim();
         const calId = String(r.personal_google_calendar_id || '').trim();
 
-        const tdName = document.createElement('td');
-        tdName.className =
-            'p-2 max-sm:p-1.5 max-sm:pl-2 align-top leading-snug break-words [overflow-wrap:anywhere] font-semibold text-slate-900';
-        tdName.textContent = label;
-        tr.appendChild(tdName);
+        const top = document.createElement('div');
+        top.className = 'flex items-start justify-between gap-2 min-w-0';
 
-        const tdEmail = document.createElement('td');
-        tdEmail.className =
-            'p-2 max-sm:p-1.5 align-top leading-snug break-words [overflow-wrap:anywhere]';
+        const left = document.createElement('div');
+        left.className = 'min-w-0 flex-1';
+
+        const nameP = document.createElement('p');
+        nameP.className =
+            'font-semibold text-slate-900 leading-snug m-0 break-words';
+        nameP.style.overflowWrap = 'anywhere';
+        nameP.textContent = label;
+        left.appendChild(nameP);
+
+        const emailBlock = document.createElement('div');
+        emailBlock.className =
+            'mt-0.5 text-[10px] max-sm:text-[9px] leading-snug break-words min-w-0';
+        emailBlock.style.overflowWrap = 'anywhere';
         if (email.includes('@')) {
             const a = document.createElement('a');
             a.href = `mailto:${email}`;
             a.className = 'link link-primary';
             a.textContent = email;
-            tdEmail.appendChild(a);
+            emailBlock.appendChild(a);
         } else {
-            tdEmail.textContent = email || '—';
+            emailBlock.textContent = email || '—';
         }
+        left.appendChild(emailBlock);
+
         const calLine = document.createElement('div');
         calLine.className =
-            'mt-1 flex flex-wrap items-center gap-1 text-[10px] max-sm:text-[9px] text-slate-600 leading-snug';
+            'mt-1 flex flex-wrap items-center gap-1 text-[10px] max-sm:text-[9px] text-slate-600 leading-snug min-w-0';
         const calText = document.createElement('span');
         calText.className = 'break-words min-w-0';
+        calText.style.overflowWrap = 'anywhere';
         calText.textContent = calLabel || 'Non attribué';
         calLine.appendChild(calText);
         if (calId) {
@@ -303,28 +278,27 @@ function renderAdminDirectoryTable(users) {
                 '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9 9 0 019 9zM18.75 10.5h-6.75a1.125 1.125 0 00-1.125 1.125v6.75"/></svg>';
             calLine.appendChild(copyBtn);
         }
-        tdEmail.appendChild(calLine);
-        tr.appendChild(tdEmail);
+        left.appendChild(calLine);
 
-        const tdPhone = document.createElement('td');
-        tdPhone.className =
-            'p-2 max-sm:p-1.5 align-top font-mono text-[10px] max-sm:text-[9px] whitespace-nowrap text-slate-800';
-        tdPhone.textContent = phone;
-        tr.appendChild(tdPhone);
+        const phoneP = document.createElement('p');
+        phoneP.className =
+            'mt-1 font-mono text-[10px] max-sm:text-[9px] text-slate-800 m-0';
+        phoneP.textContent = `Tél. ${phone}`;
+        left.appendChild(phoneP);
 
-        const tdAct = document.createElement('td');
-        tdAct.className = 'p-2 max-sm:p-1.5 max-sm:pr-2 text-right align-top';
-        tdAct.innerHTML = `<button type="button" class="btn btn-ghost btn-xs btn-square border border-slate-200 directory-edit-user" data-user-id="${escapeHtmlAttr(String(r.id || ''))}" aria-label="Modifier l'utilisateur" title="Modifier">
+        const editWrap = document.createElement('div');
+        editWrap.className = 'shrink-0 pt-0.5';
+        editWrap.innerHTML = `<button type="button" class="btn btn-ghost btn-xs btn-square border border-slate-200 directory-edit-user" data-user-id="${escapeHtmlAttr(String(r.id || ''))}" aria-label="Modifier l'utilisateur" title="Modifier">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L8.25 18.463 3 21l2.537-5.25L16.862 3.487z"/></svg>
             </button>`;
-        tr.appendChild(tdAct);
 
-        tr.dataset.userJson = JSON.stringify(r);
-        tb.appendChild(tr);
+        top.appendChild(left);
+        top.appendChild(editWrap);
+        row.appendChild(top);
+        root.appendChild(row);
     }
-    table.appendChild(tb);
-    wrap.appendChild(table);
-    host.appendChild(wrap);
+
+    host.appendChild(root);
 }
 
 async function loadAdminDirectoryIntoModal() {
@@ -340,7 +314,7 @@ async function loadAdminDirectoryIntoModal() {
         const res = await planningAdminInvoke('list_users', {});
         const users = Array.isArray(res?.users) ? res.users : [];
         renderAdminDirectoryTable(users);
-        if (status) status.textContent = `${users.length} utilisateur(s).`;
+        if (status) status.textContent = '';
     } catch (e) {
         /* planningAdminInvoke notifie déjà en cas de session expirée. */
         if (!isLikelySessionErrorMessage(e) && status) {
@@ -396,8 +370,8 @@ export function initDirectoryUsersUi() {
         }
         const editBtn = t.closest('.directory-edit-user');
         if (editBtn instanceof HTMLButtonElement) {
-            const tr = editBtn.closest('tr');
-            const json = tr?.dataset?.userJson || '';
+            const entry = editBtn.closest('[data-user-json]');
+            const json = entry?.dataset?.userJson || '';
             if (!json) return;
             try {
                 openAdminUserModalForEdit(JSON.parse(json));
@@ -411,9 +385,5 @@ export function initDirectoryUsersUi() {
         if (!isAdmin(u)) return;
         if (!document.getElementById('modal_directory_users')?.open) return;
         void loadAdminDirectoryIntoModal();
-    });
-
-    document.getElementById('directory-users-close-btn')?.addEventListener('click', () => {
-        document.getElementById('modal_directory_users')?.close();
     });
 }

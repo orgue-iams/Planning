@@ -9,8 +9,8 @@
     padding: 0.38rem 0.2rem 0.26rem;
     background: #fff;
     border-radius: 0;
-    border: 1px solid rgb(226 232 240);
-    border-bottom: 1px solid rgb(203 213 225);
+    border: none;
+    border-bottom: 1px solid rgb(226 232 240);
     box-shadow: none;
     position: relative;
     z-index: 200;

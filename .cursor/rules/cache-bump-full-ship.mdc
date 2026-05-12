@@ -1,0 +1,19 @@
+---
+description: Si CACHE_NAME incrémenté, enchaîner build, deploy:pages, commit, push et deploy:supabase avant de conclure
+alwaysApply: true
+---
+
+# Livraison quand `CACHE_NAME` change (`js/config/cache-name.js`)
+
+Un **+1** sur `CACHE_NAME` marque une livraison utilisateur (PWA / cache). **Avant de terminer la réponse**, si ce fichier a été incrémenté dans la session :
+
+1. **`npm run build:css`** si des classes Tailwind ont changé et que le build n’a pas déjà été fait (`tailwind-build-before-deploy.mdc`).
+2. **`npm run deploy:pages`** à la racine du repo (prépare `_site/`, comme la CI).
+3. **Git** : `git add` des fichiers livrés (dont `js/config/cache-name.js` et `css/tailwind.generated.css` si touché), **`git commit`**, **`git push`** vers la branche de déploiement (souvent `main`) pour publier sur GitHub / déclencher Pages selon le workflow du dépôt.
+4. **Supabase** : **`npm run deploy:supabase`** une fois (db push + fonctions ; même sans migration nouvelle, une passe idempotente est attendue). Si la CLI échoue, **rapporter l’erreur une fois** (`supabase-edge-auto-deploy.mdc`).
+
+Ne pas remplacer ces étapes par une liste « à faire côté utilisateur » si l’agent peut exécuter les commandes (`agent-executes-ops.mdc`).
+
+**Mémoire / duplication** : ne pas répéter ce paragraphe ailleurs ; les autres règles peuvent renvoyer ici pour « bump cache → ship complet ».
+
+Si `CACHE_NAME` **n’a pas** été modifié dans la session, ne pas forcer push + `deploy:supabase` pour cette seule raison (rester sur les règles habituelles selon les fichiers touchés).

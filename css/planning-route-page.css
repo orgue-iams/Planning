@@ -1,4 +1,4 @@
-/* Modales ouvertes comme une « page » plein écran (retour dans la barre injectée). */
+/* Modales ouvertes comme une « page » plein écran (lien Précédent en haut à gauche). */
 
 dialog.planning-route-page {
     width: 100vw;
@@ -9,6 +9,9 @@ dialog.planning-route-page {
     padding: 0;
     border: none;
     background: rgb(248 250 252);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 [data-theme='dark'] dialog.planning-route-page {
@@ -19,24 +22,25 @@ dialog.planning-route-page::backdrop {
     background: rgb(15 23 42 / 0.35);
 }
 
+dialog.planning-route-page .planning-route-page__bar {
+    flex: 0 0 auto;
+    order: 0;
+}
+
 dialog.planning-route-page .modal-box {
+    order: 1;
     max-height: none;
-    height: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
     max-width: 100%;
     width: 100%;
     margin: 0;
     border-radius: 0;
     border: none;
     box-shadow: none;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-dialog.planning-route-page .modal-box > *:not(.planning-route-page__bar) {
-    flex: 1 1 auto;
-    min-height: 0;
+    overflow-x: hidden;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 [data-theme='dark'] dialog.planning-route-page .planning-route-page__bar {
@@ -44,6 +48,7 @@ dialog.planning-route-page .modal-box > *:not(.planning-route-page__bar) {
     border-color: rgb(51 65 85) !important;
 }
 
-[data-theme='dark'] dialog.planning-route-page .planning-route-page__title {
-    color: rgb(241 245 249) !important;
+/* Ancienne barre avec titre (sessions déjà ouvertes) : masquer le titre doublon. */
+dialog.planning-route-page .planning-route-page__title {
+    display: none !important;
 }

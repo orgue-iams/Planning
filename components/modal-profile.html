@@ -1,78 +1,80 @@
 <dialog id="modal_profile" class="modal">
     <div class="modal-box p-5 w-[96%] max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 shadow-2xl">
-        <p class="text-[10px] text-slate-600 mb-3 leading-snug">
+        <p class="text-[10px] text-slate-600 mb-0 leading-snug">
             Informations de compte. Les liens d’agenda ci-dessous servent uniquement à
             <strong>consulter</strong> le planning dans Google Agenda (abonnement ICS / « Autres agendas ») — pas à modifier les réservations sur ce site.
         </p>
 
-        <dl class="mb-4 border border-slate-100 rounded-xl p-3 bg-slate-50/80 space-y-0 divide-y divide-slate-200/80">
-            <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2 first:pt-0">
-                <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none">Nom</dt>
-                <dd class="m-0 min-w-0">
-                    <input type="text" id="profile-display-name-input" class="input input-xs input-bordered w-full min-w-0 text-[11px] h-8" autocomplete="name" />
-                </dd>
-            </div>
-            <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2">
-                <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none">E-mail</dt>
-                <dd class="m-0 min-w-0">
-                    <input type="email" id="profile-email-input" class="input input-xs input-bordered w-full min-w-0 text-[11px] h-8" autocomplete="email" />
-                    <p id="profile-email-hint" class="text-[9px] text-slate-500 mt-1 hidden">Vérifiez votre boîte e-mail si une confirmation est demandée par Supabase.</p>
-                </dd>
-            </div>
-            <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2">
-                <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none">Profil</dt>
-                <dd id="profile-role-label" class="m-0 min-w-0 text-sm font-medium leading-snug text-slate-800">—</dd>
-            </div>
-            <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-start min-h-[2.75rem] py-2">
-                <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none pt-1">Coordonnées</dt>
-                <dd class="m-0 min-w-0 space-y-2">
-                    <label class="block">
-                        <span class="text-[9px] font-bold text-slate-500">Téléphone</span>
-                        <input
-                            type="tel"
-                            id="profile-phone-input"
-                            class="input input-xs input-bordered w-full text-[11px] h-8 mt-0.5"
-                            autocomplete="tel"
-                            maxlength="40"
-                        />
-                    </label>
-                </dd>
-            </div>
-            <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-start min-h-[2.75rem] py-2">
-                <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none pt-1">Visibilité</dt>
-                <dd class="m-0 min-w-0 space-y-2">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="profile-share-email" class="checkbox checkbox-primary checkbox-sm" />
-                        <span class="text-[10px] text-slate-700">Afficher mon e-mail dans l’annuaire « Utilisateurs »</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="profile-share-phone" class="checkbox checkbox-primary checkbox-sm" />
-                        <span class="text-[10px] text-slate-700">Afficher mon téléphone dans l’annuaire « Utilisateurs »</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="profile-share-calendar" class="checkbox checkbox-primary checkbox-sm" />
-                        <span class="text-[10px] text-slate-700">Afficher le nom de mon planning personnel (calendrier IAMS) dans l’annuaire</span>
-                    </label>
-                </dd>
-            </div>
-            <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2">
-                <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none">Mot de passe</dt>
-                <dd class="m-0 min-w-0">
-                    <div class="flex flex-col gap-1.5">
-                        <input type="password" id="profile-pass-new" class="input input-xs input-bordered w-full text-[11px] h-8" placeholder="Nouveau mot de passe" autocomplete="new-password" />
-                        <input type="password" id="profile-pass-confirm" class="input input-xs input-bordered w-full text-[11px] h-8" placeholder="Confirmer le mot de passe" autocomplete="new-password" />
-                        <p id="profile-pass-hint" class="hidden text-[10px] leading-snug min-h-[1rem]" aria-live="polite"></p>
-                        <label class="label cursor-pointer justify-start gap-2 py-0 min-h-0">
-                            <input type="checkbox" id="profile-pass-show-plain" class="checkbox checkbox-primary checkbox-sm" />
-                            <span class="label-text text-[10px] text-slate-600">Afficher les mots de passe</span>
+        <div class="border-t border-slate-200 pt-4 mt-4">
+            <dl class="space-y-0 divide-y divide-slate-200">
+                <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2.5 first:pt-0">
+                    <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none">Nom</dt>
+                    <dd class="m-0 min-w-0">
+                        <input type="text" id="profile-display-name-input" class="input input-xs input-bordered w-full min-w-0 text-[11px] h-8" autocomplete="name" />
+                    </dd>
+                </div>
+                <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2.5">
+                    <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none">E-mail</dt>
+                    <dd class="m-0 min-w-0">
+                        <input type="email" id="profile-email-input" class="input input-xs input-bordered w-full min-w-0 text-[11px] h-8" autocomplete="email" />
+                        <p id="profile-email-hint" class="text-[9px] text-slate-500 mt-1 hidden">Vérifiez votre boîte e-mail si une confirmation est demandée par Supabase.</p>
+                    </dd>
+                </div>
+                <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2.5">
+                    <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none">Profil</dt>
+                    <dd id="profile-role-label" class="m-0 min-w-0 text-sm font-medium leading-snug text-slate-800">—</dd>
+                </div>
+                <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-start min-h-[2.75rem] py-2.5">
+                    <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none pt-1">Coordonnées</dt>
+                    <dd class="m-0 min-w-0 space-y-2">
+                        <label class="block">
+                            <span class="text-[9px] font-bold text-slate-500">Téléphone</span>
+                            <input
+                                type="tel"
+                                id="profile-phone-input"
+                                class="input input-xs input-bordered w-full text-[11px] h-8 mt-0.5"
+                                autocomplete="tel"
+                                maxlength="40"
+                            />
                         </label>
-                    </div>
-                </dd>
-            </div>
-        </dl>
+                    </dd>
+                </div>
+                <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-start min-h-[2.75rem] py-2.5">
+                    <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none pt-1">Annuaire</dt>
+                    <dd class="m-0 min-w-0 space-y-2">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="profile-share-email" class="checkbox checkbox-primary checkbox-sm" />
+                            <span class="text-[10px] text-slate-700">Mon e-mail dans « Utilisateurs »</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="profile-share-phone" class="checkbox checkbox-primary checkbox-sm" />
+                            <span class="text-[10px] text-slate-700">Mon téléphone dans « Utilisateurs »</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="profile-share-calendar" class="checkbox checkbox-primary checkbox-sm" />
+                            <span class="text-[10px] text-slate-700">Le nom de mon planning personnel (IAMS) dans l’annuaire</span>
+                        </label>
+                    </dd>
+                </div>
+                <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2.5">
+                    <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none">Mot de passe</dt>
+                    <dd class="m-0 min-w-0">
+                        <div class="flex flex-col gap-1.5">
+                            <input type="password" id="profile-pass-new" class="input input-xs input-bordered w-full text-[11px] h-8" placeholder="Nouveau mot de passe" autocomplete="new-password" />
+                            <input type="password" id="profile-pass-confirm" class="input input-xs input-bordered w-full text-[11px] h-8" placeholder="Confirmer le mot de passe" autocomplete="new-password" />
+                            <p id="profile-pass-hint" class="hidden text-[10px] leading-snug min-h-[1rem]" aria-live="polite"></p>
+                            <label class="label cursor-pointer justify-start gap-2 py-0 min-h-0">
+                                <input type="checkbox" id="profile-pass-show-plain" class="checkbox checkbox-primary checkbox-sm" />
+                                <span class="label-text text-[10px] text-slate-600">Montrer les mots de passe</span>
+                            </label>
+                        </div>
+                    </dd>
+                </div>
+            </dl>
+        </div>
 
-        <div class="rounded-xl border border-slate-200 bg-white p-3 mb-4">
-            <p class="text-[10px] font-bold text-slate-700 mb-1">Agendas Google</p>
+        <div class="border-t border-slate-200 pt-4 mt-4">
+            <p class="text-[10px] font-bold text-slate-700 mb-2">Agendas Google</p>
             <p class="text-[11px] text-slate-600 leading-snug mb-3">
                 Dans Google Agenda : <em>Paramètres</em> → <em>Ajouter un agenda</em> → <em>À partir de l’URL</em>, ou utilisez le lien « intégrer » pour un aperçu.
             </p>
@@ -99,8 +101,8 @@
             <p id="profile-personal-cal-none" class="hidden text-[9px] text-slate-500 italic mt-2">Aucun calendrier personnel IAMS n’est attribué à ce compte.</p>
         </div>
 
-        <div id="profile-cours-section" class="hidden rounded-xl border border-slate-200 bg-slate-50/80 p-3 mb-3">
-            <p class="text-[10px] font-bold text-slate-700 mb-1">Cours auxquels je suis inscrit</p>
+        <div id="profile-cours-section" class="hidden border-t border-slate-200 pt-4 mt-4">
+            <p class="text-[10px] font-bold text-slate-700 mb-2">Cours auxquels je suis inscrit</p>
             <ul id="profile-cours-list" class="text-[10px] text-slate-800 space-y-1.5 list-none pl-0"></ul>
             <p id="profile-cours-empty" class="text-[10px] text-slate-500 hidden">Aucun cours à afficher pour votre compte sur la période chargée.</p>
         </div>

@@ -19,7 +19,8 @@ function scaleToIndex(scale) {
 }
 
 function indexToScale(idx) {
-    const n = Math.max(0, Math.min(2, Number(idx) || 1));
+    const parsed = parseInt(String(idx), 10);
+    const n = Number.isFinite(parsed) ? Math.max(0, Math.min(2, parsed)) : 1;
     return SCALE_STEPS[n];
 }
 

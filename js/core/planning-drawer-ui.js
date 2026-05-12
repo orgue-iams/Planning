@@ -98,6 +98,11 @@ export function closePlanningDrawer() {
     closeDrawer();
 }
 
+/** Rouvre le menu principal (ex. retour depuis une page modale plein écran). */
+export function openPlanningDrawer() {
+    openDrawer();
+}
+
 export function resetPlanningDrawerBindings() {
     drawerCalendarRef = null;
 }

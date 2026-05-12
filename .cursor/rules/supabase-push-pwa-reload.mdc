@@ -19,4 +19,5 @@ alwaysApply: true
 # Service worker / cache (`sw.js`, `CACHE_NAME`, liste `ASSETS`)
 
 - Après modification du SW ou du nom de cache : lancer **`npm run build:css`** si des classes Tailwind ont aussi changé dans la même livraison.
+- **Incrément de `CACHE_NAME`** : enchaîner la livraison complète (Pages + git + Supabase) — voir **`cache-bump-full-ship.mdc`** (évite de le réécrire dans le chat).
 - **Rappel utilisateur** (l’agent ne contrôle pas le navigateur) : pour valider le nouveau SW, **recharger la page deux fois** ou forcer la mise à jour du cache pour l’origine du site (sinon l’ancien bundle peut rester servi).

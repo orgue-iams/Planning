@@ -70,8 +70,8 @@ header.app-navbar #calendar-toolbar,
 
 [data-theme='dark'] .calendar-toolbar {
     background: rgba(15, 23, 42, 0.94) !important;
-    border-color: rgb(51 65 85) !important;
-    border-bottom-color: rgb(71 85 105) !important;
+    border-color: transparent !important;
+    border-bottom-color: rgb(51 65 85) !important;
 }
 
 #planning-legend.planning-legend-frosted {
@@ -111,10 +111,16 @@ header.app-navbar #calendar-toolbar,
 }
 
 /* FullCalendar : zones « page » transparentes ; jour courant = même teinte qu’en clair. */
-#calendar .fc,
+#calendar .fc {
+    --fc-page-bg-color: transparent;
+    --fc-today-bg-color: rgba(255, 220, 40, 0.12);
+    --planning-grid-line: rgb(226 232 240);
+}
+
 [data-theme='dark'] #calendar .fc {
     --fc-page-bg-color: transparent;
     --fc-today-bg-color: rgba(255, 220, 40, 0.12);
+    --planning-grid-line: rgb(38 50 71);
 }
 
 #calendar .fc-scrollgrid {
@@ -240,16 +246,16 @@ header.app-navbar #calendar-toolbar,
 }
 
 [data-theme='dark'] #calendar .fc-timegrid-slot {
-    border-bottom-color: rgb(51 65 85) !important;
+    border-bottom: none !important;
 }
 
 [data-theme='dark'] #calendar .fc-timegrid-col-frame,
 [data-theme='dark'] #calendar .fc-timegrid-cols .fc-timegrid-body .fc-timegrid-col {
-    border-color: rgb(51 65 85) !important;
+    border-color: transparent !important;
 }
 
 [data-theme='dark'] #calendar .fc-scrollgrid {
-    border-color: rgb(51 65 85) !important;
+    border-color: transparent !important;
 }
 
 [data-theme='dark'] #calendar .fc-list-event:hover td {
