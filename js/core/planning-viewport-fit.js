@@ -29,6 +29,7 @@ export function applyPlanningPortraitSlotFit(calendarEl) {
     if (!mq.matches) {
         calendarEl.removeAttribute('data-planning-portrait-slot-fit');
         calendarEl.style.removeProperty('--planning-slot-height-fit');
+        calendarEl.style.removeProperty('height');
         return;
     }
     const run = () => {
@@ -51,8 +52,22 @@ export function applyPlanningPortraitSlotFit(calendarEl) {
         calendarEl.setAttribute('data-planning-portrait-slot-fit', 'true');
         calendarEl.style.setProperty('--planning-slot-height-fit', `${slotPx.toFixed(3)}px`);
     };
+    const pinCalendarBoxToFc = () => {
+        const mqp = window.matchMedia('(max-width: 639px) and (orientation: portrait)');
+        if (!mqp.matches) return;
+        const fc = calendarEl.querySelector('.fc');
+        if (fc instanceof HTMLElement) {
+            const h = Math.ceil(fc.getBoundingClientRect().height);
+            if (h > 48) {
+                calendarEl.style.height = `${h}px`;
+            }
+        }
+    };
     requestAnimationFrame(() => {
-        requestAnimationFrame(run);
+        requestAnimationFrame(() => {
+            run();
+            requestAnimationFrame(pinCalendarBoxToFc);
+        });
     });
 }
 

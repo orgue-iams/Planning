@@ -42,6 +42,16 @@ html, body {
 }
 
 /*
+ * Portrait smartphone : ne pas étirer #calendar au-delà du rendu FC (évite bande sous la grille
+ * entre la dernière heure et la légende, avec le fond ::before qui continue).
+ */
+@media (max-width: 639px) and (orientation: portrait) {
+    #app-shell #calendar {
+        flex: 0 1 auto !important;
+    }
+}
+
+/*
  * Mobile : 100vh dépasse souvent la zone visible (barre d’adresse). 100dvh + safe area
  * évite que la légende soit coupée en bas (Chrome Android, Safari).
  */
