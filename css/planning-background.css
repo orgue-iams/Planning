@@ -172,8 +172,8 @@ header.app-navbar #calendar-toolbar,
 [data-theme='dark'] #calendar .fc {
     --fc-page-bg-color: transparent;
     --fc-today-bg-color: rgba(255, 220, 40, 0.12);
-    /* Filets horaires très discrets sur fond sombre. */
-    --planning-grid-line: rgb(6 10 18);
+    /* Filets horaires désactivés en sombre (voir calendar-theme). */
+    --planning-grid-line: transparent;
 }
 
 #calendar .fc-scrollgrid {
@@ -315,7 +315,7 @@ header.app-navbar #calendar-toolbar,
     background: rgb(51 65 85 / 0.55) !important;
 }
 
-/* Pas de filets verticaux sur la grille (semaine / jour / mois) : conserver les lignes horaires. */
+/* Pas de filets verticaux sur la grille (semaine / jour / mois) ; en clair : lignes horaires sous les jours (calendar-theme). */
 #calendar .fc-timegrid-col-frame {
     border-right-width: 0 !important;
     border-left-width: 0 !important;

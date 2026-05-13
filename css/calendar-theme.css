@@ -138,6 +138,25 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     border-bottom: 1px solid var(--planning-grid-line, rgb(226 232 240)) !important;
 }
 
+/* Thème sombre : pas de traits horizontaux entre les heures (test visuel demandé). */
+[data-theme='dark'] #calendar .fc-timegrid-cols .fc-timegrid-slot,
+[data-theme='dark'] #calendar .fc-timegrid-cols .fc-timegrid-slot-lane {
+    border-top: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+    background-image: none !important;
+}
+
+[data-theme='dark'] #calendar .fc-timegrid-body .fc-scrollgrid-sync-table > tbody > tr > td,
+[data-theme='dark'] #calendar .fc-timegrid-body .fc-scrollgrid-sync-table > tbody > tr > th {
+    border-bottom: none !important;
+}
+
+[data-theme='dark'] #calendar .fc-timegrid-cols table td,
+[data-theme='dark'] #calendar .fc-timegrid-cols table th {
+    border-bottom: none !important;
+}
+
 /* Colonnes « jour » : FC pose la hauteur sur .fc-timegrid-slot-lane, pas .fc-timegrid-slot — aligner le pincement + thème. */
 #calendar .fc-timegrid-cols .fc-timegrid-slot-lane {
     height: var(--planning-slot-height) !important;
@@ -491,9 +510,9 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     font-weight: 600;
 }
 
-[data-theme='dark'] .fc .fc-day-head-gcal__dom-badge,
-[data-theme='dark'] .fc .fc-day-head-gcal--today .fc-day-head-gcal__dom-badge {
-    background: rgb(71 85 105) !important;
+/* Pastille jour courant uniquement (les autres jours n’utilisent pas __dom-badge). */
+[data-theme='dark'] .fc .fc-day-head-gcal__dom-badge {
+    background: #2563eb !important;
 }
 
 /* Grille timegrid : aucune ligne verticale (FC peut en poser sur les td du sync-table). */

@@ -36,10 +36,11 @@ export function applyPlanningPortraitSlotFit(calendarEl) {
         const n = countChapelHourSlotsForFit();
         const ch = calendarEl.clientHeight;
         const hh = headerSec instanceof HTMLElement ? headerSec.offsetHeight : 0;
-        const available = Math.max(0, ch - hh - 2);
-        const slotPx = Math.max(22, Math.floor(available / n));
+        const available = Math.max(0, ch - hh);
+        /* Division exacte (pas floor) pour que la dernière ligne d’heure arrive au bas de #calendar, au bord de la légende. */
+        const slotPx = Math.max(22, available / n);
         calendarEl.setAttribute('data-planning-portrait-slot-fit', 'true');
-        calendarEl.style.setProperty('--planning-slot-height-fit', `${slotPx}px`);
+        calendarEl.style.setProperty('--planning-slot-height-fit', `${slotPx.toFixed(3)}px`);
     };
     requestAnimationFrame(run);
 }
