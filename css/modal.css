@@ -234,6 +234,46 @@
     min-height: 6.5rem;
 }
 
+/* Annonces : pas de cadre autour de la zone d’édition (sous la barre d’outils). */
+.planning-quill-mount.planning-quill-mount--announcements .ql-container.ql-snow {
+    border: none !important;
+    border-radius: 0 !important;
+    background: transparent;
+}
+
+[data-theme='dark'] #modal_announcements .planning-quill-mount .ql-toolbar.ql-snow {
+    background: rgb(30 41 59);
+    border-color: rgb(51 65 85);
+}
+
+[data-theme='dark'] #modal_announcements .planning-quill-mount .ql-toolbar .ql-stroke {
+    stroke: #94a3b8;
+}
+
+[data-theme='dark'] #modal_announcements .planning-quill-mount .ql-toolbar .ql-fill {
+    fill: #94a3b8;
+}
+
+[data-theme='dark'] #modal_announcements .planning-quill-mount .ql-toolbar button.ql-bold .ql-stroke {
+    stroke: #60a5fa;
+}
+
+[data-theme='dark'] #modal_announcements .planning-quill-mount .ql-toolbar button.ql-bold.ql-active .ql-stroke {
+    stroke: #93c5fd;
+}
+
+[data-theme='dark'] #modal_announcements .planning-quill-mount .ql-toolbar button:hover:not(.ql-active) .ql-stroke {
+    stroke: #cbd5e1;
+}
+
+[data-theme='dark'] #modal_announcements .planning-quill-mount--announcements .ql-editor {
+    color: #e2e8f0;
+}
+
+[data-theme='dark'] #modal_announcements .planning-quill-mount--announcements .ql-editor.ql-blank::before {
+    color: #64748b;
+}
+
 .planning-quill-mount .ql-snow .ql-picker {
     font-size: 13px;
     font-weight: 700;

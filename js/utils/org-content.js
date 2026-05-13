@@ -102,7 +102,7 @@ export async function replaceLoginAnnouncementRemote({ body, startsAt, endsAt })
         return { ok: true, row: null };
     }
     if (!startsAt || !endsAt) {
-        return { ok: false, error: 'Indiquez début et fin (date + heure).' };
+        return { ok: false, error: 'Indiquez une date de début et une date de fin.' };
     }
     const { data, error } = await sb
         .from('scheduled_messages')
