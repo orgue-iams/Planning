@@ -40,14 +40,17 @@ export function applyPlanningPortraitSlotFit(calendarEl) {
         const hh = headerSec instanceof HTMLElement ? headerSec.offsetHeight : 0;
 
         const calTop = calendarEl.getBoundingClientRect().top;
-        /* Bas de la zone utile : visualViewport (Chrome barre d’adresse) puis #app-shell 100dvh. */
+        /*
+         * Bas cible : le plus bas entre innerHeight, visualViewport et #app-shell.
+         * Sur Pixel / Chrome, Math.min(shell, vv) sous-estimait et laissait du vide sous la légende.
+         */
         let viewportBottom = window.innerHeight;
         const vv = window.visualViewport;
         if (vv) {
-            viewportBottom = vv.offsetTop + vv.height;
+            viewportBottom = Math.max(viewportBottom, vv.offsetTop + vv.height);
         }
         if (shell instanceof HTMLElement) {
-            viewportBottom = Math.min(viewportBottom, shell.getBoundingClientRect().bottom);
+            viewportBottom = Math.max(viewportBottom, shell.getBoundingClientRect().bottom);
         }
 
         let legendH = 0;
@@ -57,7 +60,7 @@ export function applyPlanningPortraitSlotFit(calendarEl) {
 
         /*
          * Hauteur du corps timegrid pour que calendrier + légende remplissent jusqu’au bas de l’écran
-         * (l’espace « ~2 lignes » sous la légende Android est réinjecté ici, réparti sur n créneaux).
+         * (l’espace libre est réparti sur n créneaux).
          */
         const available = Math.max(0, viewportBottom - calTop - hh - legendH);
         const slotPx = Math.max(22, available / n);
@@ -75,10 +78,39 @@ export function applyPlanningPortraitSlotFit(calendarEl) {
             }
         }
     };
+    /** Corrige le few px restants une fois la légende positionnée (arrondis / barre d’adresse). */
+    const nudgeSlotsFromLegendSlack = () => {
+        const mqp = window.matchMedia('(max-width: 639px) and (orientation: portrait)');
+        if (!mqp.matches) return;
+        const legend = document.getElementById('planning-legend');
+        if (!(legend instanceof HTMLElement)) return;
+        const shell = document.getElementById('app-shell');
+        let targetBottom = window.innerHeight;
+        const vv = window.visualViewport;
+        if (vv) {
+            targetBottom = Math.max(targetBottom, vv.offsetTop + vv.height);
+        }
+        if (shell instanceof HTMLElement) {
+            targetBottom = Math.max(targetBottom, shell.getBoundingClientRect().bottom);
+        }
+        const slack = targetBottom - legend.getBoundingClientRect().bottom;
+        if (slack <= 1.5) return;
+        const n = countChapelHourSlotsForFit();
+        const raw = calendarEl.style.getPropertyValue('--planning-slot-height-fit').trim();
+        const prev = parseFloat(raw, 10);
+        if (!Number.isFinite(prev) || prev <= 0) return;
+        calendarEl.style.setProperty('--planning-slot-height-fit', `${(prev + slack / n).toFixed(3)}px`);
+    };
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             run();
-            requestAnimationFrame(pinCalendarBoxToFc);
+            requestAnimationFrame(() => {
+                pinCalendarBoxToFc();
+                requestAnimationFrame(() => {
+                    nudgeSlotsFromLegendSlack();
+                    requestAnimationFrame(pinCalendarBoxToFc);
+                });
+            });
         });
     });
 }
@@ -91,6 +123,10 @@ export function bindPlanningPortraitSlotFit(calendarEl) {
     if (!(calendarEl instanceof HTMLElement)) return () => {};
     const ro = new ResizeObserver(() => applyPlanningPortraitSlotFit(calendarEl));
     ro.observe(calendarEl);
+    const shell = document.getElementById('app-shell');
+    if (shell instanceof HTMLElement) {
+        ro.observe(shell);
+    }
     const mq = window.matchMedia('(max-width: 639px) and (orientation: portrait)');
     const onChange = () => applyPlanningPortraitSlotFit(calendarEl);
     mq.addEventListener('change', onChange);
@@ -98,6 +134,7 @@ export function bindPlanningPortraitSlotFit(calendarEl) {
     const vv = window.visualViewport;
     if (vv) {
         vv.addEventListener('resize', onChange);
+        vv.addEventListener('scroll', onChange);
     }
     return () => {
         ro.disconnect();
@@ -105,6 +142,7 @@ export function bindPlanningPortraitSlotFit(calendarEl) {
         window.removeEventListener('orientationchange', onChange);
         if (vv) {
             vv.removeEventListener('resize', onChange);
+            vv.removeEventListener('scroll', onChange);
         }
     };
 }
