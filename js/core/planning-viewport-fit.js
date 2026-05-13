@@ -33,21 +33,33 @@ export function applyPlanningPortraitSlotFit(calendarEl) {
         return;
     }
     const run = () => {
+        const shell = document.getElementById('app-shell');
+        const legend = document.getElementById('planning-legend');
         const headerSec = calendarEl.querySelector('.fc-scrollgrid-section-header');
-        const bodyScroller = calendarEl.querySelector('.fc-timegrid-body .fc-scroller');
         const n = countChapelHourSlotsForFit();
         const hh = headerSec instanceof HTMLElement ? headerSec.offsetHeight : 0;
-        /*
-         * Chrome Android : préférer la hauteur du scroller timegrid (zone réelle des lignes) ;
-         * évite l’écart sous la dernière heure causé par scrollbar-gutter / mesure avant layout.
-         */
-        let available = 0;
-        if (bodyScroller instanceof HTMLElement && bodyScroller.clientHeight > 48) {
-            available = bodyScroller.clientHeight;
-        } else {
-            available = Math.max(0, calendarEl.getBoundingClientRect().height - hh);
+
+        const calTop = calendarEl.getBoundingClientRect().top;
+        /* Bas de la zone utile : visualViewport (Chrome barre d’adresse) puis #app-shell 100dvh. */
+        let viewportBottom = window.innerHeight;
+        const vv = window.visualViewport;
+        if (vv) {
+            viewportBottom = vv.offsetTop + vv.height;
         }
-        /* Division exacte pour que la dernière heure arrive au bas de la zone utile. */
+        if (shell instanceof HTMLElement) {
+            viewportBottom = Math.min(viewportBottom, shell.getBoundingClientRect().bottom);
+        }
+
+        let legendH = 0;
+        if (legend instanceof HTMLElement) {
+            legendH = legend.offsetHeight;
+        }
+
+        /*
+         * Hauteur du corps timegrid pour que calendrier + légende remplissent jusqu’au bas de l’écran
+         * (l’espace « ~2 lignes » sous la légende Android est réinjecté ici, réparti sur n créneaux).
+         */
+        const available = Math.max(0, viewportBottom - calTop - hh - legendH);
         const slotPx = Math.max(22, available / n);
         calendarEl.setAttribute('data-planning-portrait-slot-fit', 'true');
         calendarEl.style.setProperty('--planning-slot-height-fit', `${slotPx.toFixed(3)}px`);
