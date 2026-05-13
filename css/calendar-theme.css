@@ -350,6 +350,11 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     #calendar[data-planning-portrait-slot-fit='true'] .fc-timegrid-body .fc-scroller {
         overflow-y: hidden !important;
     }
+
+    /* Évite la réserve « scrollbar » qui rétrécit la zone de contenu sur Chrome tout en masquant le scroll. */
+    #calendar[data-planning-portrait-slot-fit='true'] .fc-timegrid-body .fc-scroller-harness-liquid .fc-scroller {
+        scrollbar-gutter: auto !important;
+    }
 }
 
 /* En-têtes colonnes jours : ligne 1 = jour, ligne 2 = numéro dans un rond (toutes largeurs). */
@@ -596,4 +601,64 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
 #calendar td.fc-timegrid-axis {
     border-right-width: 0 !important;
     border-left-width: 0 !important;
+}
+
+/*
+ * Smartphone + thème sombre : traits blancs / cadre FC (scrollgrid, tables, axe).
+ * Spécificité renforcée + --fc-border-color (FullCalendar 6) pour Chrome / WebKit.
+ */
+@media (max-width: 639px) {
+    [data-theme='dark'] #calendar .fc {
+        --fc-border-color: transparent !important;
+        --fc-neutral-border-color: transparent !important;
+    }
+
+    [data-theme='dark'] #calendar .fc-scrollgrid {
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+    }
+
+    [data-theme='dark'] #calendar .fc-scrollgrid-section > td,
+    [data-theme='dark'] #calendar .fc-scrollgrid-section-header > td,
+    [data-theme='dark'] #calendar .fc-scrollgrid-section-body > td {
+        border: none !important;
+        outline: none !important;
+    }
+
+    [data-theme='dark'] #calendar .fc-timegrid .fc-scrollgrid-sync-table td,
+    [data-theme='dark'] #calendar .fc-timegrid .fc-scrollgrid-sync-table th {
+        border: none !important;
+        box-shadow: none !important;
+        background-image: none !important;
+    }
+
+    [data-theme='dark'] #calendar .fc-timegrid-slots table td,
+    [data-theme='dark'] #calendar .fc-timegrid-slots table th,
+    [data-theme='dark'] #calendar .fc-timegrid-cols table td,
+    [data-theme='dark'] #calendar .fc-timegrid-cols table th {
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+    }
+
+    [data-theme='dark'] #calendar .fc-timegrid-cols .fc-timegrid-slot,
+    [data-theme='dark'] #calendar .fc-timegrid-cols .fc-timegrid-slot-lane {
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    [data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-col-header .fc-col-header-cell,
+    [data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-timegrid-axis.fc-col-header-cell,
+    [data-theme='dark'] #calendar .fc-scrollgrid-section-header tr .fc-timegrid-axis {
+        border-bottom: none !important;
+    }
+
+    [data-theme='dark'] #calendar .fc-timegrid-axis,
+    [data-theme='dark'] #calendar td.fc-timegrid-axis,
+    [data-theme='dark'] #calendar th.fc-timegrid-axis {
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+    }
 }

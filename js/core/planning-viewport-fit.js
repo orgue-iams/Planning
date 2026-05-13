@@ -33,16 +33,27 @@ export function applyPlanningPortraitSlotFit(calendarEl) {
     }
     const run = () => {
         const headerSec = calendarEl.querySelector('.fc-scrollgrid-section-header');
+        const bodyScroller = calendarEl.querySelector('.fc-timegrid-body .fc-scroller');
         const n = countChapelHourSlotsForFit();
-        const ch = calendarEl.clientHeight;
         const hh = headerSec instanceof HTMLElement ? headerSec.offsetHeight : 0;
-        const available = Math.max(0, ch - hh);
-        /* Division exacte (pas floor) pour que la dernière ligne d’heure arrive au bas de #calendar, au bord de la légende. */
+        /*
+         * Chrome Android : préférer la hauteur du scroller timegrid (zone réelle des lignes) ;
+         * évite l’écart sous la dernière heure causé par scrollbar-gutter / mesure avant layout.
+         */
+        let available = 0;
+        if (bodyScroller instanceof HTMLElement && bodyScroller.clientHeight > 48) {
+            available = bodyScroller.clientHeight;
+        } else {
+            available = Math.max(0, calendarEl.getBoundingClientRect().height - hh);
+        }
+        /* Division exacte pour que la dernière heure arrive au bas de la zone utile. */
         const slotPx = Math.max(22, available / n);
         calendarEl.setAttribute('data-planning-portrait-slot-fit', 'true');
         calendarEl.style.setProperty('--planning-slot-height-fit', `${slotPx.toFixed(3)}px`);
     };
-    requestAnimationFrame(run);
+    requestAnimationFrame(() => {
+        requestAnimationFrame(run);
+    });
 }
 
 /**
@@ -57,9 +68,16 @@ export function bindPlanningPortraitSlotFit(calendarEl) {
     const onChange = () => applyPlanningPortraitSlotFit(calendarEl);
     mq.addEventListener('change', onChange);
     window.addEventListener('orientationchange', onChange);
+    const vv = window.visualViewport;
+    if (vv) {
+        vv.addEventListener('resize', onChange);
+    }
     return () => {
         ro.disconnect();
         mq.removeEventListener('change', onChange);
         window.removeEventListener('orientationchange', onChange);
+        if (vv) {
+            vv.removeEventListener('resize', onChange);
+        }
     };
 }
