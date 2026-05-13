@@ -480,7 +480,7 @@ export function initStatisticsUi() {
         ev.preventDefault();
         closePlanningDrawer();
         document.getElementById('btn-app-drawer')?.blur();
-        openPlanningRouteDialog('modal_statistics', 'Statistiques');
+        openPlanningRouteDialog('modal_statistics', 'Statistiques', 'Statistiques');
     });
 
     const dlg = document.getElementById('modal_statistics');

@@ -24,10 +24,8 @@ const ELEVE_FIELD_IDS = [
     'config-eleve-cap-hours',
     'config-eleve-horizon-enabled',
     'config-eleve-horizon-amount',
-    'config-eleve-horizon-unit',
     'config-eleve-void-toward-cap',
-    'config-eleve-no-delete-after-start',
-    'config-eleve-tolerance-days'
+    'config-eleve-no-delete-after-start'
 ];
 
 const CONFIG_PERSIST_IDS = [
@@ -39,14 +37,42 @@ const CONFIG_PERSIST_IDS = [
     ...ELEVE_FIELD_IDS
 ];
 
-function timeDbToInput(t) {
-    if (!t) return '08:00';
-    const s = String(t).slice(0, 5);
-    const n = normalizeHHmmInput(s.length === 5 ? s : '');
-    return n || '08:00';
+/** E-mail non vide : format simple type RFC minimal. */
+function isValidNotifyEmail(raw) {
+    const s = String(raw ?? '').trim();
+    if (!s) return true;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+}
+
+function ensureChapelHourSelectsFilled() {
+    for (const id of ['config-chapel-min', 'config-chapel-max']) {
+        const sel = document.getElementById(id);
+        if (!(sel instanceof HTMLSelectElement)) continue;
+        if (sel.dataset.planningChapelOpts === '1') continue;
+        sel.replaceChildren();
+        for (let h = 8; h <= 23; h++) {
+            const v = `${String(h).padStart(2, '0')}:00`;
+            const o = document.createElement('option');
+            o.value = v;
+            o.textContent = v;
+            sel.appendChild(o);
+        }
+        sel.dataset.planningChapelOpts = '1';
+    }
+}
+
+/** Ramène une heure DB / saisie à une option HH:00 entre 08:00 et 23:00. */
+function chapelHourToSelectValue(t) {
+    const s = String(t || '').trim();
+    const base = s.length >= 5 ? s.slice(0, 5) : '08:00';
+    const n = normalizeHHmmInput(base.length === 5 ? base : '');
+    const hh = parseInt((n || '08:00').slice(0, 2), 10);
+    const clamped = Math.min(23, Math.max(8, Number.isFinite(hh) ? hh : 8));
+    return `${String(clamped).padStart(2, '0')}:00`;
 }
 
 async function fillConfigModal() {
+    ensureChapelHourSelectsFilled();
     await fetchOrganSchoolSettings();
     const data = getOrganSchoolSettingsCached();
     const s = document.getElementById('config-school-start');
@@ -55,8 +81,9 @@ async function fillConfigModal() {
     const mx = document.getElementById('config-chapel-max');
     if (s) s.value = data?.school_year_start?.slice(0, 10) || '';
     if (e) e.value = data?.school_year_end?.slice(0, 10) || '';
-    if (mn) mn.value = timeDbToInput(data?.chapel_slot_min);
-    if (mx) mx.value = timeDbToInput(data?.chapel_slot_max);
+    if (mn instanceof HTMLSelectElement) mn.value = chapelHourToSelectValue(data?.chapel_slot_min);
+    if (mx instanceof HTMLSelectElement) mx.value = chapelHourToSelectValue(data?.chapel_slot_max);
+
     const em = document.getElementById('config-planning-error-notify-email');
     if (em) em.value = String(data?.planning_error_notify_email ?? '').trim();
 
@@ -67,15 +94,17 @@ async function fillConfigModal() {
     const hzEn = document.getElementById('config-eleve-horizon-enabled');
     if (hzEn) hzEn.checked = Boolean(data?.eleve_booking_horizon_enabled);
     const hzA = document.getElementById('config-eleve-horizon-amount');
-    if (hzA) hzA.value = String(data?.eleve_booking_horizon_amount ?? '14');
-    const hzU = document.getElementById('config-eleve-horizon-unit');
-    if (hzU) hzU.value = data?.eleve_booking_horizon_unit === 'weeks' ? 'weeks' : 'days';
+    if (hzA) {
+        const unit = data?.eleve_booking_horizon_unit === 'weeks' ? 'weeks' : 'days';
+        const rawAmt = parseInt(String(data?.eleve_booking_horizon_amount ?? '0'), 10) || 0;
+        const days =
+            unit === 'weeks' ? rawAmt * 7 : rawAmt;
+        hzA.value = String(days);
+    }
     const vTow = document.getElementById('config-eleve-void-toward-cap');
     if (vTow) vTow.checked = data?.eleve_count_voided_travail_toward_cap !== false;
     const noDel = document.getElementById('config-eleve-no-delete-after-start');
     if (noDel) noDel.checked = data?.eleve_forbid_delete_after_slot_start !== false;
-    const tol = document.getElementById('config-eleve-tolerance-days');
-    if (tol) tol.value = String(data?.eleve_booking_tolerance_days ?? '0');
 
     configInitialSnapshot = currentConfigSnapshot();
 }
@@ -96,15 +125,41 @@ function currentConfigSnapshot() {
     return JSON.stringify(base);
 }
 
+function minutesFromHHmm(hhmm) {
+    const m = normalizeHHmmInput(String(hhmm || '').slice(0, 5));
+    if (!m || m.length < 5) return null;
+    const h = parseInt(m.slice(0, 2), 10);
+    const min = parseInt(m.slice(3, 5), 10);
+    if (!Number.isFinite(h) || !Number.isFinite(min)) return null;
+    return h * 60 + min;
+}
+
 async function persistConfigIfAdmin() {
     const u = getPlanningSessionUser();
     if (!isAdmin(u)) return;
+
+    const snap = currentConfigSnapshot();
+    if (snap === configInitialSnapshot) return;
+
+    const notifyRaw = document.getElementById('config-planning-error-notify-email')?.value ?? '';
+    if (!isValidNotifyEmail(notifyRaw)) {
+        showToast('E-mail d’alerte infrastructure : format invalide (ex. admin@exemple.fr).', 'error');
+        return;
+    }
+
     const mn = normalizeHHmmInput(document.getElementById('config-chapel-min')?.value);
     const mx = normalizeHHmmInput(document.getElementById('config-chapel-max')?.value);
     if (!mn || !mx) {
-        showToast('Heures chapelle invalides : format 24 h (ex. 08:00, 22:00).', 'error');
+        showToast('Heures chapelle invalides.', 'error');
         return;
     }
+    const minM = minutesFromHHmm(mn);
+    const maxM = minutesFromHHmm(mx);
+    if (minM == null || maxM == null || maxM <= minM) {
+        showToast('La dernière heure affichée doit être après la première heure.', 'error');
+        return;
+    }
+
     const capOn = document.getElementById('config-eleve-cap-enabled')?.checked;
     const hzOn = document.getElementById('config-eleve-horizon-enabled')?.checked;
     const r = await saveOrganSchoolSettingsAdmin({
@@ -112,15 +167,15 @@ async function persistConfigIfAdmin() {
         school_year_end: document.getElementById('config-school-end')?.value || null,
         chapel_slot_min: `${mn}:00`,
         chapel_slot_max: `${mx}:00`,
-        planning_error_notify_email: document.getElementById('config-planning-error-notify-email')?.value ?? '',
+        planning_error_notify_email: notifyRaw,
         eleve_weekly_travail_cap_enabled: capOn,
         eleve_weekly_travail_cap_hours: document.getElementById('config-eleve-cap-hours')?.value,
         eleve_booking_horizon_enabled: hzOn,
         eleve_booking_horizon_amount: document.getElementById('config-eleve-horizon-amount')?.value,
-        eleve_booking_horizon_unit: document.getElementById('config-eleve-horizon-unit')?.value,
+        eleve_booking_horizon_unit: 'days',
         eleve_count_voided_travail_toward_cap: document.getElementById('config-eleve-void-toward-cap')?.checked,
         eleve_forbid_delete_after_slot_start: document.getElementById('config-eleve-no-delete-after-start')?.checked,
-        eleve_booking_tolerance_days: document.getElementById('config-eleve-tolerance-days')?.value
+        eleve_booking_tolerance_days: 0
     });
     if (!r.ok) {
         showToast(r.error || 'Erreur.', 'error');
@@ -133,7 +188,7 @@ async function persistConfigIfAdmin() {
 
 function scheduleConfigPersist() {
     window.clearTimeout(persistTimer);
-    persistTimer = window.setTimeout(() => void persistConfigIfAdmin(), 500);
+    persistTimer = window.setTimeout(() => void persistConfigIfAdmin(), 550);
 }
 
 export function initConfigUi(currentUser) {
@@ -141,6 +196,8 @@ export function initConfigUi(currentUser) {
     document.getElementById('menu-item-config-wrap')?.classList.toggle('hidden', !show);
     if (!show || bound) return;
     bound = true;
+
+    ensureChapelHourSelectsFilled();
 
     const admin = isAdmin(currentUser);
     document.getElementById('config-hint-admin')?.classList.toggle('hidden', !admin);
@@ -173,14 +230,14 @@ export function initConfigUi(currentUser) {
         document.getElementById('btn-app-drawer')?.blur();
         closePlanningDrawer();
         void fillConfigModal().then(() =>
-            openPlanningRouteDialog('modal_config', 'Configuration du planning')
+            openPlanningRouteDialog('modal_config', 'Configuration du planning', 'Configuration')
         );
     });
 
+    /* Un seul événement par champ : `input` + `change` déclenchaient plusieurs sauvegardes (ex. nombre de toasts). */
     for (const id of CONFIG_PERSIST_IDS) {
         const el = document.getElementById(id);
         el?.addEventListener('change', scheduleConfigPersist);
-        el?.addEventListener('input', scheduleConfigPersist);
     }
 }
 

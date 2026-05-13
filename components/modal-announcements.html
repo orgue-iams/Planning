@@ -1,11 +1,10 @@
 <dialog id="modal_announcements" class="modal">
     <div class="modal-box p-5 w-[96%] max-w-md max-h-[90dvh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col">
-        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest shrink-0">Annonce écran de connexion</h3>
-        <p class="text-[10px] text-slate-500 mb-3 leading-snug">
+        <p class="text-[10px] text-slate-500 mb-0 leading-snug shrink-0">
             Laisser le texte vide et publier pour retirer l’annonce de l’écran de connexion.
         </p>
 
-        <div class="rounded-xl border border-slate-200 bg-white p-3 space-y-2 mb-3 shrink-0">
+        <div class="planning-route-section space-y-2 shrink-0">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div class="space-y-1">
                     <span class="text-[9px] font-bold text-slate-500 block">Début</span>
@@ -43,7 +42,7 @@
             <div id="ann-quill-mount" class="planning-quill-mount planning-quill-mount--compact"></div>
         </div>
 
-        <div class="modal-action shrink-0 mt-2 flex gap-2 justify-end">
+        <div class="modal-action shrink-0 mt-2 flex gap-2 justify-end border-t border-slate-200 pt-3">
             <button type="button" id="ann-publish-btn" class="btn btn-primary btn-sm font-black text-[11px]">Publier (remplace l’ancienne)</button>
         </div>
     </div>

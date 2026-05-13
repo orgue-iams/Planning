@@ -1,13 +1,12 @@
 <dialog id="modal_calendar_pool" class="modal">
     <div class="modal-box p-5 w-[96%] max-w-4xl max-h-[90dvh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col">
-        <div class="flex flex-wrap items-center gap-2 justify-between shrink-0 border-b border-slate-100 pb-2 mb-3">
-            <h3 class="font-black text-xs uppercase text-slate-500 tracking-widest m-0">Calendriers des utilisateurs (pool)</h3>
+        <div class="planning-route-section planning-route-section--first flex flex-wrap items-center justify-end gap-2 shrink-0 pb-1">
             <button type="button" id="calendar-pool-open-add" class="btn btn-square btn-sm btn-ghost planning-icon-btn border border-slate-200" title="Ajouter" aria-label="Ajouter un calendrier au pool">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
             </button>
         </div>
 
-        <div class="flex-1 min-h-0 overflow-auto rounded-xl border border-slate-200 mb-3">
+        <div class="planning-route-section flex-1 min-h-0 overflow-auto">
             <table class="table table-xs table-pin-rows w-full">
                 <thead>
                     <tr class="bg-slate-100">

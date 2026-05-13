@@ -616,7 +616,7 @@ export function initAdminUsersUi(currentUser) {
         }
         /* Après fermeture du menu, ouvrir au frame suivant évite un conflit tactiles / focus. */
         requestAnimationFrame(() => {
-            openPlanningRouteDialog('modal_users_admin', 'Gestion des comptes');
+            openPlanningRouteDialog('modal_users_admin', 'Gestion des comptes', 'Comptes');
             void refreshUserList();
         });
     });

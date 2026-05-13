@@ -161,7 +161,7 @@ export function initAdminCalendarPoolUi(currentUser) {
             void refreshCalendarPoolModalTable().catch((err) =>
                 showToast(err instanceof Error ? err.message : String(err), 'error')
             );
-            openPlanningRouteDialog('modal_calendar_pool', 'Calendriers des utilisateurs');
+            openPlanningRouteDialog('modal_calendar_pool', 'Calendriers des utilisateurs', 'Calendriers');
         });
     });
 

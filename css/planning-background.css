@@ -120,8 +120,8 @@ header.app-navbar #calendar-toolbar,
 [data-theme='dark'] #calendar .fc {
     --fc-page-bg-color: transparent;
     --fc-today-bg-color: rgba(255, 220, 40, 0.12);
-    /* Filets horaires plus discrets (plus sombres que l’ancien gris-bleu). */
-    --planning-grid-line: rgb(17 24 39);
+    /* Filets horaires très discrets sur fond sombre. */
+    --planning-grid-line: rgb(6 10 18);
 }
 
 #calendar .fc-scrollgrid {

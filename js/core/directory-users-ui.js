@@ -347,12 +347,12 @@ export function initDirectoryUsersUi() {
             addBtnWrap?.classList.toggle('hidden', !isAdminUser);
             if (isAdminUser) {
                 void loadAdminDirectoryIntoModal().then(() =>
-                    openPlanningRouteDialog('modal_directory_users', 'Utilisateurs')
+                    openPlanningRouteDialog('modal_directory_users', 'Utilisateurs', 'Utilisateurs')
                 );
             } else {
                 document.getElementById('directory-admin-users-wrap')?.classList.add('hidden');
                 void loadDirectoryIntoModal().then(() =>
-                    openPlanningRouteDialog('modal_directory_users', 'Utilisateurs')
+                    openPlanningRouteDialog('modal_directory_users', 'Utilisateurs', 'Utilisateurs')
                 );
             }
         });

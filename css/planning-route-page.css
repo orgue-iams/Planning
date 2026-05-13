@@ -25,6 +25,8 @@ dialog.planning-route-page::backdrop {
 dialog.planning-route-page .planning-route-page__bar {
     flex: 0 0 auto;
     order: 0;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 dialog.planning-route-page .modal-box {
@@ -45,10 +47,34 @@ dialog.planning-route-page .modal-box {
 
 [data-theme='dark'] dialog.planning-route-page .planning-route-page__bar {
     background: rgb(15 23 42) !important;
-    border-color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] dialog.planning-route-page .planning-route-page__back {
+    color: rgb(226 232 240) !important;
+}
+
+[data-theme='dark'] dialog.planning-route-page .planning-route-page__back:hover {
+    color: rgb(255 255 255) !important;
 }
 
 /* Ancienne barre avec titre (sessions déjà ouvertes) : masquer le titre doublon. */
 dialog.planning-route-page .planning-route-page__title {
     display: none !important;
+}
+
+/* Sections « page route » : séparateur horizontal, pas de cartons arrondis. */
+dialog.planning-route-page .planning-route-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgb(226 232 240);
+}
+
+dialog.planning-route-page .planning-route-section--first {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+}
+
+[data-theme='dark'] dialog.planning-route-page .planning-route-section {
+    border-top-color: rgb(51 65 85);
 }

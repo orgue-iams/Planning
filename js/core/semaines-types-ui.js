@@ -745,7 +745,7 @@ async function openSemainesTypesModal(user) {
 
     resetStAnalyzeOutput();
     lastAnalysis = null;
-    openPlanningRouteDialog('modal_semaines_types', 'Semaines A / B');
+    openPlanningRouteDialog('modal_semaines_types', 'Semaines A / B', 'Semaines A / B');
 }
 
 function addEmptyRow(tbody, elevesHtml, user, elevesById, ownerLabels) {

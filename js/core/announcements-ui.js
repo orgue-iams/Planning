@@ -112,7 +112,7 @@ export function initAnnouncementsUi(currentUser) {
             const latest = await fetchLatestLoginAnnouncementForEdit();
             ensureAnnQuill();
             if (!annQuill) {
-                openPlanningRouteDialog('modal_announcements', 'Annonces');
+                openPlanningRouteDialog('modal_announcements', 'Annonces', 'Annonces');
                 return;
             }
             const sd = document.getElementById('ann-start-date');
@@ -128,7 +128,7 @@ export function initAnnouncementsUi(currentUser) {
                 presetAnnouncementDateInputs(true);
                 quillSetHtml(annQuill, '');
             }
-            openPlanningRouteDialog('modal_announcements', 'Annonces');
+            openPlanningRouteDialog('modal_announcements', 'Annonces', 'Annonces');
         },
         { signal }
     );

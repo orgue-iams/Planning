@@ -371,7 +371,9 @@ export function initProfileUi(currentUser) {
         const u = getPlanningSessionUser();
         if (!u?.email) return;
         requestAnimationFrame(() => {
-            void fillProfileModal(u).then(() => openPlanningRouteDialog('modal_profile', 'Mon profil'));
+            void fillProfileModal(u).then(() =>
+                    openPlanningRouteDialog('modal_profile', 'Mon profil', 'Mon profil')
+                );
         });
     });
 
