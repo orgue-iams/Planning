@@ -42,24 +42,33 @@ export function applyPlanningPortraitSlotFit(calendarEl) {
          * #calendar a flex:1 dans #app-shell : sa hauteur allouée pilote le remplissage.
          * On mesure le scroller timegrid (Chrome / scrollbar-gutter) ou repli sur clientHeight − en-tête.
          */
-        let available = 0;
+        const fromCalendar = Math.max(0, calendarEl.clientHeight - hh);
+        let available = fromCalendar;
         if (bodyScroller instanceof HTMLElement && bodyScroller.clientHeight > 48) {
-            available = bodyScroller.clientHeight;
-        } else {
-            available = Math.max(0, calendarEl.clientHeight - hh);
+            /* Scroller parfois plus petit que #calendar − en-tête (gutter) : prendre le max. */
+            available = Math.max(bodyScroller.clientHeight, fromCalendar);
         }
         const slotPx = Math.max(22, available / n);
         calendarEl.setAttribute('data-planning-portrait-slot-fit', 'true');
         calendarEl.style.setProperty('--planning-slot-height-fit', `${slotPx.toFixed(3)}px`);
     };
-    /** Quelques px entre bas légende et bas #app-shell (arrondis). */
+    /** Répartit l’écart sous la légende (shell, fenêtre ou visualViewport — Chrome Android). */
     const nudgeFromLegendVsShell = () => {
         const mqp = window.matchMedia('(max-width: 639px) and (orientation: portrait)');
         if (!mqp.matches) return;
         const legend = document.getElementById('planning-legend');
         const shell = document.getElementById('app-shell');
-        if (!(legend instanceof HTMLElement) || !(shell instanceof HTMLElement)) return;
-        const slack = shell.getBoundingClientRect().bottom - legend.getBoundingClientRect().bottom;
+        if (!(legend instanceof HTMLElement)) return;
+        const legBottom = legend.getBoundingClientRect().bottom;
+        let slack = 0;
+        if (shell instanceof HTMLElement) {
+            slack = Math.max(slack, shell.getBoundingClientRect().bottom - legBottom);
+        }
+        slack = Math.max(slack, window.innerHeight - legBottom);
+        const vv = window.visualViewport;
+        if (vv) {
+            slack = Math.max(slack, vv.offsetTop + vv.height - legBottom);
+        }
         if (slack <= 1.5) return;
         const n = countChapelHourSlotsForFit();
         const raw = calendarEl.style.getPropertyValue('--planning-slot-height-fit').trim();
@@ -70,7 +79,12 @@ export function applyPlanningPortraitSlotFit(calendarEl) {
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             run();
-            requestAnimationFrame(nudgeFromLegendVsShell);
+            requestAnimationFrame(() => {
+                nudgeFromLegendVsShell();
+                requestAnimationFrame(() => {
+                    nudgeFromLegendVsShell();
+                });
+            });
         });
     });
 }
@@ -86,6 +100,10 @@ export function bindPlanningPortraitSlotFit(calendarEl) {
     const shell = document.getElementById('app-shell');
     if (shell instanceof HTMLElement) {
         ro.observe(shell);
+    }
+    const legend = document.getElementById('planning-legend');
+    if (legend instanceof HTMLElement) {
+        ro.observe(legend);
     }
     const mq = window.matchMedia('(max-width: 639px) and (orientation: portrait)');
     const onChange = () => applyPlanningPortraitSlotFit(calendarEl);
