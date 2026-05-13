@@ -95,7 +95,7 @@ let unbindTimeGridColumnSync = null;
 /** @type {(() => void) | null} */
 let unbindPortraitSlotFit = null;
 
-/** Après changement de `--planning-slot-height-fit`, FullCalendar doit refaire son layout. */
+/** Après bascule portrait (attribut + expandRows), FullCalendar doit refaire son layout. */
 function onPlanningCalendarSlotLayout() {
     if (typeof calendar?.updateSize === 'function') {
         calendar.updateSize();

@@ -48,11 +48,17 @@ function selectAllowSingleCalendarDay(selectInfo) {
     );
 }
 
-/** Téléphone étroit ou paysage « court » (hauteur type mobile) : pas d’étirement des lignes (scroll dans le timegrid). */
+/**
+ * Desktop / tablette : étirer les lignes pour remplir la hauteur.
+ * Téléphone paysage (ou fenêtre basse) : pas d’étirement — scroll dans le timegrid.
+ * Téléphone portrait : étirer (expandRows) — les hauteurs CSS fixes empêchaient le remplissage (bande sous la grille, Chrome Android).
+ */
 function shouldUseExpandRows() {
     if (typeof window === 'undefined') return true;
     const narrow = window.matchMedia('(max-width: 639px)').matches;
+    const portrait = window.matchMedia('(orientation: portrait)').matches;
     const phoneLandscape = window.matchMedia('(orientation: landscape) and (max-height: 520px)').matches;
+    if (narrow && portrait) return true;
     return !(narrow || phoneLandscape);
 }
 
@@ -89,7 +95,7 @@ export const getCalendarConfig = (handlers, currentUser) => {
         snapDuration: '00:30:00',
         allDaySlot: false,
         height: '100%',
-        /* Mobile : false évite la bande vide sous la dernière heure (Safari / 100dvh). Desktop : true remplit la hauteur. */
+        /* Voir shouldUseExpandRows() : portrait étroit = true ; paysage étroit = scroll. */
         expandRows: shouldUseExpandRows(),
         nowIndicator: true,
 

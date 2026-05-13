@@ -337,14 +337,19 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     }
 }
 
-/* Portrait mobile : hauteur de ligne par défaut ; surchargée par --planning-slot-height-fit quand le JS a mesuré #calendar. */
+/*
+ * Portrait mobile : expandRows (FC) remplit la hauteur — ne pas imposer height sur les lignes
+ * (sinon conflit avec le liquid harness → bande vide sous la dernière heure, ex. Chrome Pixel).
+ */
 @media (max-width: 639px) and (orientation: portrait) {
     .fc {
         --planning-slot-height: 2.55rem;
     }
 
-    #calendar[data-planning-portrait-slot-fit='true'] .fc {
-        --planning-slot-height: var(--planning-slot-height-fit, 2.55rem);
+    #calendar .fc-timegrid-slot,
+    #calendar .fc-timegrid-cols .fc-timegrid-slot-lane {
+        height: auto !important;
+        min-height: 0 !important;
     }
 
     #calendar[data-planning-portrait-slot-fit='true'] .fc-timegrid-body .fc-scroller {
