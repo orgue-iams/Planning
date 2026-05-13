@@ -92,15 +92,6 @@
     #calendar.planning-calendar-transparent > .fc {
         position: relative;
         z-index: 1;
-        height: auto !important;
-        flex: 0 0 auto !important;
-        min-height: 0 !important;
-    }
-
-    #calendar.planning-calendar-transparent .fc-view-harness,
-    #calendar.planning-calendar-transparent .fc-scrollgrid {
-        flex: 0 0 auto !important;
-        min-height: 0 !important;
     }
 
     [data-theme='dark'] #calendar.planning-calendar-transparent::before {

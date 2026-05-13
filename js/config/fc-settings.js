@@ -60,9 +60,7 @@ function shouldUseExpandRows() {
 export function bindResponsiveCalendarToolbar(calendar) {
     const mqlNarrow = window.matchMedia('(max-width: 639px)');
     const mqlPhoneLand = window.matchMedia('(orientation: landscape) and (max-height: 520px)');
-    const mqlPortrait = window.matchMedia('(max-width: 639px) and (orientation: portrait)');
     const apply = () => {
-        calendar.setOption('height', mqlPortrait.matches ? 'auto' : '100%');
         calendar.setOption('expandRows', shouldUseExpandRows());
         calendar.render();
         calendar.updateSize();
@@ -70,7 +68,6 @@ export function bindResponsiveCalendarToolbar(calendar) {
     };
     mqlNarrow.addEventListener('change', apply);
     mqlPhoneLand.addEventListener('change', apply);
-    mqlPortrait.addEventListener('change', apply);
     apply();
 }
 
@@ -91,11 +88,7 @@ export const getCalendarConfig = (handlers, currentUser) => {
         slotDuration: '01:00:00',
         snapDuration: '00:30:00',
         allDaySlot: false,
-        height:
-            typeof window !== 'undefined' &&
-            window.matchMedia('(max-width: 639px) and (orientation: portrait)').matches
-                ? 'auto'
-                : '100%',
+        height: '100%',
         /* Mobile : false évite la bande vide sous la dernière heure (Safari / 100dvh). Desktop : true remplit la hauteur. */
         expandRows: shouldUseExpandRows(),
         nowIndicator: true,
