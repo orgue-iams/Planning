@@ -302,7 +302,15 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     }
 }
 
-/* Smartphone paysage : scroll vertical dans la grille (légende masquée via main.css). */
+/* Smartphone paysage (hauteur type téléphone, y compris largeur > 639px) : scroll vertical dans la grille. */
+@media (orientation: landscape) and (max-height: 520px) {
+    #calendar .fc-timegrid-body .fc-scroller {
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* Étroit en paysage : même comportement si la hauteur dépasse 520px (cas rare). */
 @media (max-width: 639px) and (orientation: landscape) {
     #calendar .fc-timegrid-body .fc-scroller {
         overflow-y: auto !important;

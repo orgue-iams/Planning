@@ -48,16 +48,26 @@ function selectAllowSingleCalendarDay(selectInfo) {
     );
 }
 
-/** Recalcul grille + barre au changement largeur (mobile / desktop). */
+/** Téléphone étroit ou paysage « court » (hauteur type mobile) : pas d’étirement des lignes (scroll dans le timegrid). */
+function shouldUseExpandRows() {
+    if (typeof window === 'undefined') return true;
+    const narrow = window.matchMedia('(max-width: 639px)').matches;
+    const phoneLandscape = window.matchMedia('(orientation: landscape) and (max-height: 520px)').matches;
+    return !(narrow || phoneLandscape);
+}
+
+/** Recalcul grille + barre au changement largeur / orientation (mobile / desktop). */
 export function bindResponsiveCalendarToolbar(calendar) {
-    const mql = window.matchMedia('(max-width: 639px)');
+    const mqlNarrow = window.matchMedia('(max-width: 639px)');
+    const mqlPhoneLand = window.matchMedia('(orientation: landscape) and (max-height: 520px)');
     const apply = () => {
-        calendar.setOption('expandRows', !mql.matches);
+        calendar.setOption('expandRows', shouldUseExpandRows());
         calendar.render();
         calendar.updateSize();
         applyPlanningPortraitSlotFit(document.getElementById('calendar'));
     };
-    mql.addEventListener('change', apply);
+    mqlNarrow.addEventListener('change', apply);
+    mqlPhoneLand.addEventListener('change', apply);
 }
 
 export const getCalendarConfig = (handlers, currentUser) => {
@@ -79,8 +89,7 @@ export const getCalendarConfig = (handlers, currentUser) => {
         allDaySlot: false,
         height: '100%',
         /* Mobile : false évite la bande vide sous la dernière heure (Safari / 100dvh). Desktop : true remplit la hauteur. */
-        expandRows:
-            typeof window !== 'undefined' && !window.matchMedia('(max-width: 639px)').matches,
+        expandRows: shouldUseExpandRows(),
         nowIndicator: true,
 
         selectable: true,
