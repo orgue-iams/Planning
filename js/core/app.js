@@ -95,6 +95,17 @@ let unbindTimeGridColumnSync = null;
 /** @type {(() => void) | null} */
 let unbindPortraitSlotFit = null;
 
+/** Après changement de `--planning-slot-height-fit`, FullCalendar doit refaire son layout. */
+function onPlanningCalendarSlotLayout() {
+    if (typeof calendar?.updateSize === 'function') {
+        calendar.updateSize();
+    }
+    const el = document.getElementById('calendar');
+    if (el) {
+        scheduleTimeGridColumnSync(el);
+    }
+}
+
 function performLogout() {
     currentUser = null;
     clearProfWeekCycleCache();
@@ -120,6 +131,7 @@ function performLogout() {
         unbindTimeGridColumnSync = null;
         unbindPortraitSlotFit?.();
         unbindPortraitSlotFit = null;
+        document.removeEventListener('planning-calendar-slot-layout', onPlanningCalendarSlotLayout);
         calendar.destroy();
         calendar = null;
     }
@@ -416,6 +428,8 @@ function initCalendarAndRevealUi() {
 
         unbindPortraitSlotFit?.();
         unbindPortraitSlotFit = bindPlanningPortraitSlotFit(calendarEl);
+        document.removeEventListener('planning-calendar-slot-layout', onPlanningCalendarSlotLayout);
+        document.addEventListener('planning-calendar-slot-layout', onPlanningCalendarSlotLayout);
 
         initMessagesUi(currentUser);
         initProfileUi(currentUser);

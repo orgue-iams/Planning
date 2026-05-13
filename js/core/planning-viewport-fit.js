@@ -4,6 +4,16 @@
  */
 import { getChapelSlotBounds } from './organ-settings.js';
 
+/** FullCalendar ne relit pas toujours le conteneur après --planning-slot-height-fit : app.js écoute et appelle updateSize. */
+let layoutNotifyRaf = 0;
+function queuePlanningCalendarLayoutNotify() {
+    if (layoutNotifyRaf) return;
+    layoutNotifyRaf = requestAnimationFrame(() => {
+        layoutNotifyRaf = 0;
+        document.dispatchEvent(new CustomEvent('planning-calendar-slot-layout', { bubbles: false }));
+    });
+}
+
 function slotBoundsToMinutes(hms) {
     const s = String(hms || '00:00:00').trim();
     const m = s.match(/^(\d{1,2}):(\d{2})/);
@@ -34,20 +44,30 @@ export function applyPlanningPortraitSlotFit(calendarEl) {
         return;
     }
     const run = () => {
+        const legend = document.getElementById('planning-legend');
         const headerSec = calendarEl.querySelector('.fc-scrollgrid-section-header');
         const bodyScroller = calendarEl.querySelector('.fc-timegrid-body .fc-scroller');
         const n = countChapelHourSlotsForFit();
         const hh = headerSec instanceof HTMLElement ? headerSec.offsetHeight : 0;
-        /*
-         * #calendar a flex:1 dans #app-shell : sa hauteur allouée pilote le remplissage.
-         * On mesure le scroller timegrid (Chrome / scrollbar-gutter) ou repli sur clientHeight − en-tête.
-         */
+
         const fromCalendar = Math.max(0, calendarEl.clientHeight - hh);
-        let available = fromCalendar;
+        let fromScroller = 0;
         if (bodyScroller instanceof HTMLElement && bodyScroller.clientHeight > 48) {
-            /* Scroller parfois plus petit que #calendar − en-tête (gutter) : prendre le max. */
-            available = Math.max(bodyScroller.clientHeight, fromCalendar);
+            fromScroller = bodyScroller.clientHeight;
         }
+        /*
+         * Bande utile : du bas de l’en-tête jours jusqu’au haut de la légende (mesure réelle dans le flex).
+         * Sur Chrome Pixel, plus fiable que le seul clientHeight du scroller.
+         */
+        let fromLegendBand = 0;
+        if (legend instanceof HTMLElement) {
+            const cr = calendarEl.getBoundingClientRect();
+            const lr = legend.getBoundingClientRect();
+            if (lr.top >= cr.top - 0.5) {
+                fromLegendBand = Math.max(0, lr.top - cr.top - hh);
+            }
+        }
+        const available = Math.max(fromCalendar, fromScroller, fromLegendBand);
         const slotPx = Math.max(22, available / n);
         calendarEl.setAttribute('data-planning-portrait-slot-fit', 'true');
         calendarEl.style.setProperty('--planning-slot-height-fit', `${slotPx.toFixed(3)}px`);
@@ -72,17 +92,19 @@ export function applyPlanningPortraitSlotFit(calendarEl) {
         if (slack <= 1.5) return;
         const n = countChapelHourSlotsForFit();
         const raw = calendarEl.style.getPropertyValue('--planning-slot-height-fit').trim();
-        const prev = parseFloat(raw, 10);
+        const prev = parseFloat(raw);
         if (!Number.isFinite(prev) || prev <= 0) return;
         calendarEl.style.setProperty('--planning-slot-height-fit', `${(prev + slack / n).toFixed(3)}px`);
     };
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             run();
+            queuePlanningCalendarLayoutNotify();
             requestAnimationFrame(() => {
                 nudgeFromLegendVsShell();
                 requestAnimationFrame(() => {
                     nudgeFromLegendVsShell();
+                    queuePlanningCalendarLayoutNotify();
                 });
             });
         });
@@ -95,7 +117,15 @@ export function applyPlanningPortraitSlotFit(calendarEl) {
  */
 export function bindPlanningPortraitSlotFit(calendarEl) {
     if (!(calendarEl instanceof HTMLElement)) return () => {};
-    const ro = new ResizeObserver(() => applyPlanningPortraitSlotFit(calendarEl));
+    let roTimer = 0;
+    const scheduleFit = () => {
+        if (roTimer) window.clearTimeout(roTimer);
+        roTimer = window.setTimeout(() => {
+            roTimer = 0;
+            applyPlanningPortraitSlotFit(calendarEl);
+        }, 48);
+    };
+    const ro = new ResizeObserver(() => scheduleFit());
     ro.observe(calendarEl);
     const shell = document.getElementById('app-shell');
     if (shell instanceof HTMLElement) {
@@ -111,16 +141,17 @@ export function bindPlanningPortraitSlotFit(calendarEl) {
     window.addEventListener('orientationchange', onChange);
     const vv = window.visualViewport;
     if (vv) {
-        vv.addEventListener('resize', onChange);
-        vv.addEventListener('scroll', onChange);
+        vv.addEventListener('resize', scheduleFit);
+        vv.addEventListener('scroll', scheduleFit);
     }
     return () => {
+        if (roTimer) window.clearTimeout(roTimer);
         ro.disconnect();
         mq.removeEventListener('change', onChange);
         window.removeEventListener('orientationchange', onChange);
         if (vv) {
-            vv.removeEventListener('resize', onChange);
-            vv.removeEventListener('scroll', onChange);
+            vv.removeEventListener('resize', scheduleFit);
+            vv.removeEventListener('scroll', scheduleFit);
         }
     };
 }
