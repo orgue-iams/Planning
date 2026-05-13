@@ -6,8 +6,7 @@ import { isBackendAuthConfigured } from './supabase-client.js';
 import {
     fetchOrganSchoolSettings,
     getOrganSchoolSettingsCached,
-    saveOrganSchoolSettingsAdmin,
-    invalidateOrganSchoolSettingsCache
+    saveOrganSchoolSettingsAdmin
 } from './organ-settings.js';
 import { showToast } from '../utils/toast.js';
 import { normalizeHHmmInput } from '../utils/time-helpers.js';
@@ -181,9 +180,9 @@ async function persistConfigIfAdmin() {
         showToast(r.error || 'Erreur.', 'error');
         return;
     }
-    invalidateOrganSchoolSettingsCache();
     showToast('Configuration enregistrée.', 'success', 2800);
     configInitialSnapshot = currentConfigSnapshot();
+    document.dispatchEvent(new CustomEvent('planning-organ-settings-updated'));
 }
 
 function scheduleConfigPersist() {

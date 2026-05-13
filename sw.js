@@ -79,6 +79,7 @@ const ASSETS = [
   './js/core/config-ui.js',
   './js/core/semaines-types-ui.js',
   './js/core/organ-settings.js',
+  './js/core/planning-viewport-fit.js',
   './js/core/template-apply-engine.js',
   './js/core/week-cycle.js',
   './js/core/planning-courses.js',

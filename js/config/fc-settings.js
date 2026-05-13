@@ -18,6 +18,7 @@ import {
 import { fetchPlanningEventsForFullCalendar } from '../core/planning-events-db.js';
 import { scheduleTimeGridColumnSync } from '../utils/timegrid-column-sync.js';
 import { getChapelSlotBounds } from '../core/organ-settings.js';
+import { applyPlanningPortraitSlotFit } from '../core/planning-viewport-fit.js';
 
 function escapeHtmlText(s) {
     return String(s)
@@ -54,6 +55,7 @@ export function bindResponsiveCalendarToolbar(calendar) {
         calendar.setOption('expandRows', !mql.matches);
         calendar.render();
         calendar.updateSize();
+        applyPlanningPortraitSlotFit(document.getElementById('calendar'));
     };
     mql.addEventListener('change', apply);
 }

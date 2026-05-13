@@ -79,6 +79,7 @@ import { fetchWeekCycleAnchor, clearProfWeekCycleCache } from './week-cycle.js';
 import { fetchOrganSchoolSettings, getChapelSlotBounds, invalidateOrganSchoolSettingsCache } from './organ-settings.js';
 import { CACHE_NAME } from '../config/cache-name.js';
 import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
+import { applyPlanningPortraitSlotFit, bindPlanningPortraitSlotFit } from './planning-viewport-fit.js';
 
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker
@@ -91,6 +92,8 @@ let currentEvent = null;
 let currentUser = null;
 /** @type {(() => void) | null} */
 let unbindTimeGridColumnSync = null;
+/** @type {(() => void) | null} */
+let unbindPortraitSlotFit = null;
 
 function performLogout() {
     currentUser = null;
@@ -115,6 +118,8 @@ function performLogout() {
     if (calendar) {
         unbindTimeGridColumnSync?.();
         unbindTimeGridColumnSync = null;
+        unbindPortraitSlotFit?.();
+        unbindPortraitSlotFit = null;
         calendar.destroy();
         calendar = null;
     }
@@ -345,6 +350,7 @@ function initCalendarAndRevealUi() {
             calendar.setOption('slotMaxTime', b.slotMaxTime);
             toolbarCtl?.refreshTitle();
             updatePlanningSundayColumnVisibility(calendar, currentUser);
+            applyPlanningPortraitSlotFit(calendarEl);
         };
         handlers.onEventsSet = () => {
             updatePlanningSundayColumnVisibility(calendar, currentUser);
@@ -357,6 +363,28 @@ function initCalendarAndRevealUi() {
                 /* */
             });
         });
+        const onOrganSettingsUpdated = async () => {
+            if (!calendar) return;
+            await fetchOrganSchoolSettings();
+            const b = getChapelSlotBounds();
+            calendar.setOption('slotMinTime', b.slotMinTime);
+            calendar.setOption('slotMaxTime', b.slotMaxTime);
+            calendar.render();
+            populateTimeSelects('event-start', 'event-end');
+            populateTimeSelects('event-recur-start', 'event-recur-end');
+            invalidateCalendarListCache();
+            await refetchPlanningGrid(calendar).catch(() => {
+                /* */
+            });
+            updatePlanningSundayColumnVisibility(calendar, currentUser);
+            calendar.updateSize();
+            requestAnimationFrame(() => {
+                calendar.updateSize();
+                scheduleTimeGridColumnSync(calendarEl);
+                applyPlanningPortraitSlotFit(calendarEl);
+            });
+        };
+        document.addEventListener('planning-organ-settings-updated', () => void onOrganSettingsUpdated());
         bindResponsiveCalendarToolbar(calendar);
 
         initSwipe(calendarEl, calendar);
@@ -377,12 +405,17 @@ function initCalendarAndRevealUi() {
         requestAnimationFrame(() => {
             calendar.updateSize();
             scheduleTimeGridColumnSync(calendarEl);
+            applyPlanningPortraitSlotFit(calendarEl);
         });
 
         unbindTimeGridColumnSync?.();
         unbindTimeGridColumnSync = bindTimeGridColumnSync(calendarEl, () => {
             if (typeof calendar?.updateSize === 'function') calendar.updateSize();
+            applyPlanningPortraitSlotFit(calendarEl);
         });
+
+        unbindPortraitSlotFit?.();
+        unbindPortraitSlotFit = bindPlanningPortraitSlotFit(calendarEl);
 
         initMessagesUi(currentUser);
         initProfileUi(currentUser);

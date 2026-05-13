@@ -302,10 +302,26 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     }
 }
 
-/* Portrait mobile : créneaux un peu moins hauts pour limiter le scroll vertical dans la fenêtre. */
-@media (max-width: 640px) and (orientation: portrait) {
+/* Smartphone paysage : scroll vertical dans la grille (légende masquée via main.css). */
+@media (max-width: 639px) and (orientation: landscape) {
+    #calendar .fc-timegrid-body .fc-scroller {
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* Portrait mobile : hauteur de ligne par défaut ; surchargée par --planning-slot-height-fit quand le JS a mesuré #calendar. */
+@media (max-width: 639px) and (orientation: portrait) {
     .fc {
         --planning-slot-height: 2.55rem;
+    }
+
+    #calendar[data-planning-portrait-slot-fit='true'] .fc {
+        --planning-slot-height: var(--planning-slot-height-fit, 2.55rem);
+    }
+
+    #calendar[data-planning-portrait-slot-fit='true'] .fc-timegrid-body .fc-scroller {
+        overflow-y: hidden !important;
     }
 }
 

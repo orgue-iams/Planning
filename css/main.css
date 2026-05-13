@@ -64,7 +64,19 @@ html, body {
     }
 }
 
-/* Téléphone en paysage : gagner de la hauteur pour la grille (pas de menu dans cette configuration). */
+/* Téléphone en paysage : légende masquée (la grille scroll en hauteur). */
+@media (max-width: 639px) and (orientation: landscape) {
+    body:not(.auth-pending) #planning-legend {
+        display: none !important;
+    }
+
+    /* Réduit légèrement le padding sous le bandeau fixe pour coller l’en-tête des jours au toolbar. */
+    body:not(.auth-pending) #app-shell.planning-app-shell {
+        padding-top: calc(3rem + env(safe-area-inset-top, 0px)) !important;
+    }
+}
+
+/* Téléphone en paysage court : gagner de la hauteur pour la grille. */
 @media (orientation: landscape) and (max-height: 520px) {
     body:not(.auth-pending) #app-header {
         display: none !important;
