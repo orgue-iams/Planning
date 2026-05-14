@@ -12,7 +12,7 @@ import { showToast } from '../utils/toast.js';
 import { normalizeHHmmInput } from '../utils/time-helpers.js';
 import { getPlanningSessionUser } from './session-user.js';
 import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
-import { closePlanningDrawer } from './planning-drawer-ui.js';
+import { closePlanningDrawer, syncPlanningDrawerGroupedSections } from './planning-drawer-ui.js';
 
 let bound = false;
 let configInitialSnapshot = '';
@@ -193,6 +193,7 @@ function scheduleConfigPersist() {
 export function initConfigUi(currentUser) {
     const show = isBackendAuthConfigured() && (currentUser?.role === 'admin' || currentUser?.role === 'prof');
     document.getElementById('menu-item-config-wrap')?.classList.toggle('hidden', !show);
+    syncPlanningDrawerGroupedSections();
     if (!show || bound) return;
     bound = true;
 

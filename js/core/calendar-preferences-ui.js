@@ -1,5 +1,5 @@
 /**
- * Préférences d’affichage (thème + taille du texte FC) — contrôles dans le tiroir menu.
+ * Préférences d’affichage (thème + échelle du texte des créneaux FC) — contrôles dans le tiroir menu.
  */
 import { getPlanningSessionUser } from './session-user.js';
 import {

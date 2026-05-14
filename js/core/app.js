@@ -2,7 +2,11 @@ import { loadUIComponents } from '../utils/loader.js';
 import { applyPlanningThemeFromStorage, applyPlanningFcTextScaleFromStorage } from '../utils/planning-theme.js';
 import { getCalendarConfig, bindResponsiveCalendarToolbar } from '../config/fc-settings.js';
 import { initCalendarToolbar } from './calendar-toolbar.js';
-import { initPlanningDrawer, resetPlanningDrawerBindings } from './planning-drawer-ui.js';
+import {
+    initPlanningDrawer,
+    resetPlanningDrawerBindings,
+    syncPlanningDrawerGroupedSections
+} from './planning-drawer-ui.js';
 import { populateTimeSelects } from '../utils/time-helpers.js';
 import { initSwipe } from '../utils/touch-handler.js';
 import { bindTimeGridColumnSync, scheduleTimeGridColumnSync } from '../utils/timegrid-column-sync.js';
@@ -45,7 +49,6 @@ import {
     tryRestoreSession,
     getRememberMePreference,
     isPrivilegedUser,
-    roleLabelFr,
     PASSWORD_POLICY_LINES,
     hasSupabaseRecoveryInUrl,
     subscribeSupabasePasswordRecovery,
@@ -165,15 +168,10 @@ function performLogout() {
 }
 
 function refreshHeaderUser(user) {
-    const nameEl = document.getElementById('user-display-name');
-    const roleEl = document.getElementById('user-display-role');
+    const drawerName = document.getElementById('drawer-profile-name');
     const shell = document.getElementById('app-shell');
     if (!user?.email) {
-        if (nameEl) nameEl.textContent = 'Invité';
-        if (roleEl) {
-            roleEl.textContent = '';
-            roleEl.classList.add('hidden');
-        }
+        if (drawerName) drawerName.textContent = 'Invité';
         document.getElementById('menu-item-display-prefs-wrap')?.classList.add('hidden');
         document.getElementById('menu-item-profile-wrap')?.classList.add('hidden');
         document.getElementById('menu-item-logout-wrap')?.classList.add('hidden');
@@ -182,14 +180,10 @@ function refreshHeaderUser(user) {
         document.getElementById('menu-item-statistics-wrap')?.classList.add('hidden');
         shell?.classList.remove('planning-shell--weekstrip');
         document.getElementById('btn-admin-clear-week')?.classList.add('hidden');
+        syncPlanningDrawerGroupedSections();
         return;
     }
-    if (nameEl) nameEl.textContent = String(user.name || '').trim() || user.email.split('@')[0];
-    if (roleEl) {
-        const label = roleLabelFr(user.role);
-        roleEl.textContent = label || '';
-        roleEl.classList.toggle('hidden', !label);
-    }
+    if (drawerName) drawerName.textContent = String(user.name || '').trim() || user.email.split('@')[0];
     const r = String(user.role || '').toLowerCase();
     const staff = isBackendAuthConfigured() && (r === 'prof' || r === 'admin');
     document.getElementById('menu-item-display-prefs-wrap')?.classList.remove('hidden');
@@ -204,6 +198,7 @@ function refreshHeaderUser(user) {
         shell?.classList.remove('planning-shell--weekstrip');
     }
     void refreshHeaderWeekStrip(user);
+    syncPlanningDrawerGroupedSections();
 }
 
 function initCalendarAndRevealUi() {

@@ -93,6 +93,29 @@ export function initPlanningDrawer(calendar) {
     }
 }
 
+/** Affiche ou masque les blocs groupés « Configuration » et « Utilisateurs / Cours » selon les entrées visibles. */
+export function syncPlanningDrawerGroupedSections() {
+    const configSec = document.getElementById('menu-drawer-section-configuration');
+    if (configSec) {
+        const c1 = document.getElementById('menu-item-config-wrap');
+        const c2 = document.getElementById('menu-item-announcements-wrap');
+        const c3 = document.getElementById('menu-item-calendar-pool-wrap');
+        const any =
+            Boolean(c1 && !c1.classList.contains('hidden')) ||
+            Boolean(c2 && !c2.classList.contains('hidden')) ||
+            Boolean(c3 && !c3.classList.contains('hidden'));
+        configSec.classList.toggle('hidden', !any);
+    }
+    const usersSec = document.getElementById('menu-drawer-section-users-courses');
+    if (usersSec) {
+        const u1 = document.getElementById('menu-item-directory-wrap');
+        const u2 = document.getElementById('menu-item-semaines-types-wrap');
+        const any =
+            Boolean(u1 && !u1.classList.contains('hidden')) || Boolean(u2 && !u2.classList.contains('hidden'));
+        usersSec.classList.toggle('hidden', !any);
+    }
+}
+
 /** Ferme le tiroir (ex. ouverture des préférences depuis une entrée menu). */
 export function closePlanningDrawer() {
     closeDrawer();

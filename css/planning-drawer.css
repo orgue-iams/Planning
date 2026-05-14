@@ -64,6 +64,59 @@
     padding-top: 0;
 }
 
+/* Profil en tête du tiroir (sans titre de section) */
+.planning-drawer__block--profile {
+    border-top: 0;
+    margin-top: 0;
+    padding-top: 0;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid rgb(226 232 240);
+}
+
+[data-theme='dark'] .planning-drawer__block--profile {
+    border-bottom-color: rgb(51 65 85);
+}
+
+.planning-drawer__view-btn--profile {
+    width: 100%;
+    justify-content: flex-start;
+}
+
+.planning-drawer__profile-chip-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.06rem;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.planning-drawer__profile-name {
+    font-size: 0.875rem;
+    font-weight: 700;
+    line-height: 1.2;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.planning-drawer__profile-sub {
+    font-size: 0.5625rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgb(100 116 139);
+}
+
+[data-theme='dark'] .planning-drawer__profile-name {
+    color: rgb(248 250 252);
+}
+
+[data-theme='dark'] .planning-drawer__profile-sub {
+    color: rgb(148 163 184);
+}
+
 [data-theme='dark'] .planning-drawer__block {
     border-top-color: rgb(51 65 85);
 }

@@ -177,14 +177,6 @@ html, body {
     box-shadow: none;
 }
 
-[data-theme='dark'] #app-header #user-display-name {
-    color: rgb(248 250 252) !important;
-}
-
-[data-theme='dark'] #app-header #user-display-role {
-    color: rgb(203 213 225) !important;
-}
-
 [data-theme='dark'] #app-header #header-build-version {
     color: rgb(148 163 184) !important;
 }

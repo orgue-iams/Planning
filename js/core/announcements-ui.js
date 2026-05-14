@@ -17,7 +17,7 @@ import {
     quillSetHtml
 } from '../utils/planning-quill.js';
 import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
-import { closePlanningDrawer } from './planning-drawer-ui.js';
+import { closePlanningDrawer, syncPlanningDrawerGroupedSections } from './planning-drawer-ui.js';
 
 function pad2(n) {
     return String(n).padStart(2, '0');
@@ -151,6 +151,7 @@ export function resetAnnouncementsUiBindings() {
 export function initAnnouncementsUi(currentUser) {
     const show = isBackendAuthConfigured() && isPrivilegedUser(currentUser);
     document.getElementById('menu-item-announcements-wrap')?.classList.toggle('hidden', !show);
+    syncPlanningDrawerGroupedSections();
     if (!show) return;
 
     annUiAbort?.abort();

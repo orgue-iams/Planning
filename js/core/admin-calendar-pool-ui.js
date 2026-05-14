@@ -9,7 +9,7 @@ import { normalizeGoogleCalendarId } from '../utils/google-calendar-id.js';
 import { googleCalendarEmbedUrl } from '../utils/google-calendar-url.js';
 import { formatProfileFullName } from '../utils/profile-full-name.js';
 import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
-import { closePlanningDrawer } from './planning-drawer-ui.js';
+import { closePlanningDrawer, syncPlanningDrawerGroupedSections } from './planning-drawer-ui.js';
 
 function escapeTd(s) {
     const d = document.createElement('div');
@@ -144,6 +144,7 @@ export function resetAdminCalendarPoolBindings() {
 export function initAdminCalendarPoolUi(currentUser) {
     const show = isBackendAuthConfigured() && isAdmin(currentUser);
     document.getElementById('menu-item-calendar-pool-wrap')?.classList.toggle('hidden', !show);
+    syncPlanningDrawerGroupedSections();
     if (!show || poolUiBound) return;
     poolUiBound = true;
 
