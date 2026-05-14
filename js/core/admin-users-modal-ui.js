@@ -6,6 +6,7 @@ import { isBackendAuthConfigured } from './supabase-client.js';
 import { planningAdminInvoke } from './admin-api.js';
 import { showToast } from '../utils/toast.js';
 import { PLANNING_ROLE_OPTIONS, isPlanningRole, normalizePlanningRole } from './planning-roles.js';
+import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
 
 let bound = false;
 /** @type {{ id: string; nom: string; prenom: string; email: string; telephone: string; role: string } | null} */
@@ -43,6 +44,7 @@ function confirmAdminAsync(message) {
         dlg.addEventListener('cancel', onCancel);
         dlg.addEventListener('click', onBackdrop);
         dlg.showModal();
+        focusPlanningDialogRoot(dlg instanceof HTMLDialogElement ? dlg : null);
     });
 }
 

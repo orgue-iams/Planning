@@ -4,6 +4,7 @@
  */
 
 import { showToast } from '../utils/toast.js';
+import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
 
 /** @param {EleveRow} e */
 function eleveLabel(e) {
@@ -178,5 +179,6 @@ export function openCourseStudentsPicker(opts) {
         btnCancel.addEventListener('click', onCancel);
         dlg.addEventListener('close', onClose, { once: true });
         if (typeof dlg.showModal === 'function') dlg.showModal();
+        focusPlanningDialogRoot(dlg instanceof HTMLDialogElement ? dlg : null);
     });
 }

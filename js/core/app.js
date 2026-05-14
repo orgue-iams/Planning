@@ -84,6 +84,7 @@ import { fetchOrganSchoolSettings, getChapelSlotBounds, invalidateOrganSchoolSet
 import { CACHE_NAME } from '../config/cache-name.js';
 import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
 import { applyPlanningPortraitSlotFit, bindPlanningPortraitSlotFit } from './planning-viewport-fit.js';
+import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
 
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker
@@ -619,9 +620,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         setPasswordModalMode(true);
         document.getElementById('modal_login')?.close();
         document.getElementById('modal_forgot')?.close();
-        document.getElementById('modal_password')?.showModal();
+        const passDlg = document.getElementById('modal_password');
+        passDlg?.showModal();
         stripSupabaseAuthFromUrl();
-        requestAnimationFrame(() => document.getElementById('new-pass')?.focus());
+        focusPlanningDialogRoot(passDlg instanceof HTMLDialogElement ? passDlg : null);
     });
 
     // Laisser le client traiter #access_token / ?code= avant getSession() (évite la course avec la modale login).
@@ -662,8 +664,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         setPasswordModalMode(true);
         document.getElementById('modal_login')?.close();
         document.getElementById('modal_forgot')?.close();
-        document.getElementById('modal_password')?.showModal();
-        requestAnimationFrame(() => document.getElementById('new-pass')?.focus());
+        const passDlg2 = document.getElementById('modal_password');
+        passDlg2?.showModal();
+        focusPlanningDialogRoot(passDlg2 instanceof HTMLDialogElement ? passDlg2 : null);
     }
 
     document.getElementById('btn-password-cancel')?.addEventListener('click', async () => {
@@ -719,7 +722,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     window.openForgotPassword = () => {
         document.getElementById('modal_login').close();
-        document.getElementById('modal_forgot').showModal();
+        const forgot = document.getElementById('modal_forgot');
+        forgot?.showModal();
+        focusPlanningDialogRoot(forgot instanceof HTMLDialogElement ? forgot : null);
     };
 
     document.getElementById('btn-send-token').onclick = () => {

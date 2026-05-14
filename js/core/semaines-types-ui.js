@@ -20,6 +20,7 @@ import { saveProfWeekCycleFromApply } from './week-cycle.js';
 import { openCourseStudentsPicker } from './course-students-picker.js';
 import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
 import { closePlanningDrawer } from './planning-drawer-ui.js';
+import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
 
 const ST_DRAG_GRIP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>`;
 
@@ -517,6 +518,7 @@ function openStLineEditModal(tr) {
 
     document.getElementById('stle-students-wrap')?.classList.toggle('hidden', typ !== 'cours');
     dlg.showModal();
+    focusPlanningDialogRoot(dlg instanceof HTMLDialogElement ? dlg : null);
 }
 
 

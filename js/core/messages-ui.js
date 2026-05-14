@@ -21,6 +21,7 @@ import {
     quillSetHtml
 } from '../utils/planning-quill.js';
 import { getPlanningSessionUser } from './session-user.js';
+import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
 
 function renderRulesView(text) {
     const el = document.getElementById('rules-view');
@@ -38,6 +39,7 @@ function ensureFallbackRulesModal() {
         dlg = document.createElement('dialog');
         dlg.id = 'modal_rules_fallback';
         dlg.className = 'modal';
+        dlg.setAttribute('tabindex', '-1');
         dlg.innerHTML = `
             <div class="modal-box max-w-2xl w-[94%] max-h-[90dvh] flex flex-col border border-slate-200 rounded-2xl">
                 <h3 class="font-black text-sm uppercase tracking-wide text-slate-600 border-b pb-2 shrink-0">Consignes</h3>
@@ -144,6 +146,7 @@ export function initMessagesUi(_ignored) {
                 fallbackView.innerHTML = `<div class="organ-rich">${inner}</div>`;
             }
             fallback?.showModal();
+            focusPlanningDialogRoot(fallback instanceof HTMLDialogElement ? fallback : null);
             return;
         }
         renderRulesView(text);
@@ -153,6 +156,7 @@ export function initMessagesUi(_ignored) {
         const uOpen = getPlanningSessionUser();
         btnEdit?.classList.toggle('hidden', !isPrivilegedUser(uOpen));
         modalRules?.showModal();
+        focusPlanningDialogRoot(modalRules instanceof HTMLDialogElement ? modalRules : null);
     };
 
     btnRulesFab?.addEventListener('click', () => void openRulesFromUserAction(), { signal });

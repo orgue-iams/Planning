@@ -10,6 +10,7 @@ import { googleCalendarEmbedUrl } from '../utils/google-calendar-url.js';
 import { formatProfileFullName } from '../utils/profile-full-name.js';
 import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
 import { closePlanningDrawer, syncPlanningDrawerGroupedSections } from './planning-drawer-ui.js';
+import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
 
 function escapeTd(s) {
     const d = document.createElement('div');
@@ -170,7 +171,8 @@ export function initAdminCalendarPoolUi(currentUser) {
         if (gid instanceof HTMLInputElement) gid.value = '';
         if (lb instanceof HTMLInputElement) lb.value = '';
         document.getElementById('modal_calendar_pool_add')?.showModal();
-        requestAnimationFrame(() => gid?.focus());
+        const addDlg = document.getElementById('modal_calendar_pool_add');
+        focusPlanningDialogRoot(addDlg instanceof HTMLDialogElement ? addDlg : null);
     };
 
     document.getElementById('calendar-pool-open-add')?.addEventListener('click', () => openPoolAddModal());

@@ -10,6 +10,7 @@ import { getPlanningSessionUser } from './session-user.js';
 import { googleCalendarEmbedUrl } from '../utils/google-calendar-url.js';
 import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
 import { closePlanningDrawer } from './planning-drawer-ui.js';
+import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
 
 /** @type {string | null} */
 let adminPlanningViewerId = null;
@@ -78,6 +79,7 @@ function confirmAdminAsync(message) {
         dlg.addEventListener('cancel', onCancel);
         dlg.addEventListener('click', onBackdrop);
         dlg.showModal();
+        focusPlanningDialogRoot(dlg instanceof HTMLDialogElement ? dlg : null);
     });
 }
 
@@ -801,6 +803,8 @@ export function initAdminUsersUi(currentUser) {
             document.getElementById('admin-pw-new2').value = '';
             resetAdminPwModalToggles();
             document.getElementById('modal_admin_password')?.showModal();
+            const pwdDlg = document.getElementById('modal_admin_password');
+            focusPlanningDialogRoot(pwdDlg instanceof HTMLDialogElement ? pwdDlg : null);
         }
     });
     document.getElementById('admin-users-tbody')?.addEventListener('focusout', (ev) => {

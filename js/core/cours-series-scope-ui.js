@@ -1,3 +1,5 @@
+import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
+
 /** @type {((v: 'single' | 'future' | null) => void) | null} */
 let pendingResolve = null;
 
@@ -32,6 +34,7 @@ export function openCoursSeriesScopeModal() {
         pendingResolve = resolve;
         dialogOutcome = null;
         dlg.showModal();
+        focusPlanningDialogRoot(dlg);
     });
 }
 

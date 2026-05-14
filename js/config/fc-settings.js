@@ -19,6 +19,7 @@ import { fetchPlanningEventsForFullCalendar } from '../core/planning-events-db.j
 import { scheduleTimeGridColumnSync } from '../utils/timegrid-column-sync.js';
 import { getChapelSlotBounds } from '../core/organ-settings.js';
 import { applyPlanningPortraitSlotFit } from '../core/planning-viewport-fit.js';
+import { syncPlanningGridCornerHud } from '../core/calendar-toolbar.js';
 
 function escapeHtmlText(s) {
     return String(s)
@@ -71,6 +72,7 @@ export function bindResponsiveCalendarToolbar(calendar) {
         calendar.render();
         calendar.updateSize();
         applyPlanningPortraitSlotFit(document.getElementById('calendar'));
+        syncPlanningGridCornerHud(calendar);
     };
     mqlNarrow.addEventListener('change', apply);
     mqlPhoneLand.addEventListener('change', apply);

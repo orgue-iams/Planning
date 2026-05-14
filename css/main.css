@@ -77,20 +77,15 @@ html, body {
     body:not(.auth-pending) #planning-legend {
         display: none !important;
     }
-
-    /* Réduit légèrement le padding sous le bandeau fixe pour coller l’en-tête des jours au toolbar. */
-    body:not(.auth-pending) #app-shell.planning-app-shell {
-        padding-top: calc(3rem + env(safe-area-inset-top, 0px)) !important;
-    }
 }
 
-/* Téléphone en paysage court : gagner de la hauteur pour la grille. */
+/* Téléphone en paysage court : pas de barre app — la grille commence sous la safe area. */
 @media (orientation: landscape) and (max-height: 520px) {
     body:not(.auth-pending) #app-header {
         display: none !important;
     }
     body:not(.auth-pending) #app-shell {
-        padding-top: 0.35rem !important;
+        padding-top: env(safe-area-inset-top, 0px) !important;
     }
     body:not(.auth-pending) #planning-legend {
         display: none !important;

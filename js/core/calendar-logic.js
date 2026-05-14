@@ -39,6 +39,7 @@ import {
 } from './planning-eleve-quota.js';
 import { openCourseStudentsPicker } from './course-students-picker.js';
 import { openCoursSeriesScopeModal } from './cours-series-scope-ui.js';
+import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
 
 let saveReservationInFlight = false;
 let deleteReservationInFlight = false;
@@ -2406,14 +2407,7 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     captureReservationModalFormBaseline();
 
     modal.showModal();
-    requestAnimationFrame(() => {
-        if (normalizeRole(currentUser?.role) === 'eleve') {
-            document.getElementById('event-date-start')?.focus();
-            return;
-        }
-        const titleEl = document.getElementById('event-title-input');
-        if (titleEl && !titleEl.disabled) titleEl.focus();
-    });
+    focusPlanningDialogRoot(modal instanceof HTMLDialogElement ? modal : null);
 }
 
 function inscritsEmailsCsvFromRpcRow(row) {

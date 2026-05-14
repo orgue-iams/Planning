@@ -222,3 +222,130 @@
 [data-theme='dark'] .calendar-toolbar__nav-cluster {
     border-left-color: rgb(51 65 85) !important;
 }
+
+/*
+ * Paysage étroit : menu + période + semaine A/B dans la cellule coin (axe) de l’en-tête FullCalendar.
+ * Évite le doublon avec la barre d’outils (titre centré + bouton menu).
+ */
+@media (orientation: landscape) {
+    @media (max-width: 639px), (max-height: 520px) {
+        #calendar-toolbar #btn-app-drawer {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            padding: 0 !important;
+            margin: -1px !important;
+            overflow: hidden !important;
+            clip: rect(0, 0, 0, 0) !important;
+            white-space: nowrap !important;
+            border: 0 !important;
+        }
+
+        #cal-toolbar-title {
+            display: none !important;
+        }
+
+        #calendar.planning-calendar-transparent .fc {
+            --planning-axis-col-width: 5.35rem;
+        }
+    }
+}
+
+.planning-fc-corner-hud {
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 0.2rem;
+    min-width: 0;
+    width: 100%;
+    padding: 0.15rem 0.12rem 0.12rem;
+    box-sizing: border-box;
+}
+
+@media (orientation: landscape) {
+    @media (max-width: 639px), (max-height: 520px) {
+        .planning-fc-corner-hud {
+            display: flex;
+        }
+    }
+}
+
+.planning-fc-corner-hud__menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: flex-start;
+    width: 2.25rem;
+    height: 2.25rem;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+    margin: 0;
+    padding: 0;
+    border-radius: 0.45rem;
+    border: 1px solid rgb(203 213 225);
+    background: rgb(226 232 240);
+    color: rgb(51 65 85);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.planning-fc-corner-hud__menu-btn:active {
+    background: rgb(203 213 225);
+}
+
+.planning-fc-corner-hud__menu-icon {
+    width: 1.15rem;
+    height: 1.15rem;
+    flex-shrink: 0;
+}
+
+.planning-fc-corner-hud__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.06rem;
+    min-width: 0;
+    line-height: 1.15;
+}
+
+.planning-fc-corner-hud__period {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #0f172a;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow-wrap: anywhere;
+}
+
+.planning-fc-corner-hud__week {
+    font-size: 0.58rem;
+    font-weight: 700;
+    color: #475569;
+    text-transform: none;
+}
+
+[data-theme='dark'] .planning-fc-corner-hud__menu-btn {
+    background: rgb(51 65 85) !important;
+    border-color: rgb(71 85 105) !important;
+    color: rgb(226 232 240) !important;
+}
+
+[data-theme='dark'] .planning-fc-corner-hud__period {
+    color: rgb(241 245 249) !important;
+}
+
+[data-theme='dark'] .planning-fc-corner-hud__week {
+    color: rgb(186 198 216) !important;
+}
+
+/* Cellule coin : laisser la hauteur d’en-tête respirer (contenu empilé). */
+@media (orientation: landscape) {
+    @media (max-width: 639px), (max-height: 520px) {
+        #calendar .fc-scrollgrid-section-header .fc-timegrid-axis {
+            vertical-align: top !important;
+        }
+    }
+}

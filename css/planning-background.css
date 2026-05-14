@@ -160,6 +160,8 @@ header.app-navbar #calendar-toolbar,
 #calendar .fc-view-harness {
     flex: 1 1 auto;
     min-height: 0;
+    outline: none !important;
+    box-shadow: none !important;
 }
 
 /* FullCalendar : zones « page » transparentes ; jour courant = même teinte qu’en clair. */
@@ -167,6 +169,8 @@ header.app-navbar #calendar-toolbar,
     --fc-page-bg-color: transparent;
     --fc-today-bg-color: rgba(255, 220, 40, 0.12);
     --planning-grid-line: rgb(226 232 240);
+    --fc-border-color: transparent;
+    --fc-neutral-border-color: transparent;
 }
 
 [data-theme='dark'] #calendar .fc {
@@ -183,6 +187,8 @@ header.app-navbar #calendar-toolbar,
     background: transparent !important;
     flex: 1 1 auto;
     min-height: 0;
+    outline: none !important;
+    box-shadow: none !important;
 }
 
 #calendar .fc-scrollgrid table,

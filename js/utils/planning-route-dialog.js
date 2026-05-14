@@ -2,6 +2,7 @@
  * Ouvre une <dialog> en plein écran façon « page » avec retour « < {nom} » en haut à gauche.
  */
 import { openPlanningDrawer } from '../core/planning-drawer-ui.js';
+import { focusPlanningDialogRoot } from './focus-planning-dialog.js';
 
 const ROUTE_CLASS = 'planning-route-page';
 
@@ -50,4 +51,5 @@ export function openPlanningRouteDialog(dialogId, ariaLabel, backLabel) {
     };
     el.addEventListener('close', onClose, { once: true });
     el.showModal();
+    focusPlanningDialogRoot(el);
 }
