@@ -60,23 +60,24 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
     ];
 
     const root = document.createElement('div');
-    root.className = 'directory-users-stack min-w-0 text-[11px] max-sm:text-[10px]';
+    root.className =
+        'directory-users-stack min-w-0 text-[12px] sm:text-[13px] space-y-2';
 
     let firstSection = true;
     for (const { title, rows } of sections) {
         const block = document.createElement('div');
-        if (!firstSection) block.className = 'mt-4 pt-3 border-t border-slate-200';
+        if (!firstSection) block.className = 'mt-4 pt-3 border-t border-slate-200 dark:border-slate-600';
         firstSection = false;
 
         const head = document.createElement('p');
         head.className =
-            'text-[9px] font-black uppercase tracking-wide text-slate-500 mb-2 m-0';
+            'text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300 mb-2 m-0';
         head.textContent = title;
         block.appendChild(head);
 
         if (!rows.length) {
             const empty = document.createElement('p');
-            empty.className = 'text-[10px] text-slate-500 italic m-0';
+            empty.className = 'text-sm text-slate-500 dark:text-slate-400 italic m-0';
             empty.textContent = 'Aucun compte.';
             block.appendChild(empty);
             root.appendChild(block);
@@ -84,10 +85,11 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
         }
 
         const list = document.createElement('div');
-        list.className = 'divide-y divide-slate-200';
+        list.className = 'space-y-2';
         for (const r of rows) {
             const item = document.createElement('div');
-            item.className = 'py-2.5 min-w-0';
+            item.className =
+                'py-3 px-3 min-w-0 rounded-xl border border-slate-200 bg-slate-50/80 dark:border-slate-600 dark:bg-slate-800/70';
 
             const name = directoryDisplayName(r);
             const em = String(r.email || '').trim();
@@ -95,13 +97,15 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
             const cal = String(r.calendar_label || '').trim();
 
             const nameEl = document.createElement('p');
-            nameEl.className = 'font-semibold text-slate-900 leading-snug m-0 break-words';
+            nameEl.className =
+                'font-semibold text-slate-900 dark:text-slate-100 leading-snug m-0 break-words';
             nameEl.style.overflowWrap = 'anywhere';
             nameEl.textContent = name;
             item.appendChild(nameEl);
 
             const emailRow = document.createElement('div');
-            emailRow.className = 'mt-0.5 text-[10px] max-sm:text-[9px] leading-snug break-words min-w-0';
+            emailRow.className =
+                'mt-0.5 text-[12px] sm:text-[13px] leading-snug break-words min-w-0 text-slate-700 dark:text-slate-200';
             emailRow.style.overflowWrap = 'anywhere';
             if (em.includes('@')) {
                 const a = document.createElement('a');
@@ -117,7 +121,7 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
             if (cal) {
                 const sub = document.createElement('p');
                 sub.className =
-                    'mt-1 text-[10px] max-sm:text-[9px] text-slate-600 leading-snug m-0 break-words';
+                    'mt-1 text-[12px] sm:text-[13px] text-slate-600 dark:text-slate-300 leading-snug m-0 break-words';
                 sub.style.overflowWrap = 'anywhere';
                 sub.textContent = cal;
                 item.appendChild(sub);
@@ -125,7 +129,7 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
 
             const phoneRow = document.createElement('p');
             phoneRow.className =
-                'mt-1 font-mono text-[10px] max-sm:text-[9px] text-slate-700 m-0';
+                'mt-1 font-mono text-[12px] sm:text-[13px] text-slate-800 dark:text-slate-200 m-0';
             phoneRow.textContent = ph ? `Tél. ${ph}` : 'Tél. —';
             item.appendChild(phoneRow);
 
@@ -207,7 +211,7 @@ function renderAdminDirectoryTable(users) {
     host.replaceChildren();
 
     const root = document.createElement('div');
-    root.className = 'directory-users-stack divide-y divide-slate-200 min-w-0 text-[11px] max-sm:text-[10px]';
+    root.className = 'directory-users-stack divide-y divide-slate-200 dark:divide-slate-600 min-w-0 text-[12px] sm:text-[13px]';
 
     const sorted = [...users].sort((a, b) =>
         `${String(a.nom || '')} ${String(a.prenom || '')}`.localeCompare(
@@ -218,7 +222,8 @@ function renderAdminDirectoryTable(users) {
 
     for (const r of sorted) {
         const row = document.createElement('div');
-        row.className = 'py-3 min-w-0';
+        row.className =
+            'directory-admin-user-card py-3 px-3 min-w-0 rounded-xl border border-slate-200 bg-slate-50/80 mb-2 last:mb-0 dark:border-slate-600 dark:bg-slate-800/70';
         row.dataset.userJson = JSON.stringify(r);
 
         const label =
@@ -238,14 +243,14 @@ function renderAdminDirectoryTable(users) {
 
         const nameP = document.createElement('p');
         nameP.className =
-            'font-semibold text-slate-900 leading-snug m-0 break-words';
+            'font-semibold text-slate-900 leading-snug m-0 break-words dark:text-slate-100';
         nameP.style.overflowWrap = 'anywhere';
         nameP.textContent = label;
         left.appendChild(nameP);
 
         const emailBlock = document.createElement('div');
         emailBlock.className =
-            'mt-0.5 text-[10px] max-sm:text-[9px] leading-snug break-words min-w-0';
+            'mt-0.5 text-[12px] sm:text-[13px] leading-snug break-words min-w-0 text-slate-700 dark:text-slate-200';
         emailBlock.style.overflowWrap = 'anywhere';
         if (email.includes('@')) {
             const a = document.createElement('a');
@@ -260,7 +265,7 @@ function renderAdminDirectoryTable(users) {
 
         const calLine = document.createElement('div');
         calLine.className =
-            'mt-1 flex flex-wrap items-center gap-1 text-[10px] max-sm:text-[9px] text-slate-600 leading-snug min-w-0';
+            'mt-1 flex flex-wrap items-center gap-1 text-[12px] sm:text-[13px] text-slate-600 leading-snug min-w-0 dark:text-slate-300';
         const calText = document.createElement('span');
         calText.className = 'break-words min-w-0';
         calText.style.overflowWrap = 'anywhere';
@@ -282,7 +287,7 @@ function renderAdminDirectoryTable(users) {
 
         const phoneP = document.createElement('p');
         phoneP.className =
-            'mt-1 font-mono text-[10px] max-sm:text-[9px] text-slate-800 m-0';
+            'mt-1 font-mono text-[12px] sm:text-[13px] text-slate-800 m-0 dark:text-slate-200';
         phoneP.textContent = `Tél. ${phone}`;
         left.appendChild(phoneP);
 

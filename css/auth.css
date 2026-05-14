@@ -219,3 +219,69 @@
     height: 0 !important;
     margin: 0 !important;
 }
+
+/* Connexion : plein viewport (le shell est masqué en auth-pending — pas d’effet « carte » au-dessus du planning). */
+body.auth-pending #modal_login.modal.modal-login-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    padding: 1rem;
+    overflow: auto;
+    border: 0;
+    background: rgb(241 245 249);
+}
+
+body.auth-pending #modal_login.modal.modal-login-shell::backdrop {
+    background: rgb(241 245 249);
+}
+
+[data-theme='dark'] body.auth-pending #modal_login.modal.modal-login-shell,
+[data-theme='dark'] body.auth-pending #modal_login.modal.modal-login-shell::backdrop {
+    background: rgb(15 23 42);
+}
+
+[data-theme='dark'] #modal_login .modal-box.modal-login-box {
+    background: linear-gradient(to bottom, rgb(30 41 59), rgb(15 23 42)) !important;
+    color: rgb(226 232 240);
+    border-color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] #modal_login #login-email:-webkit-autofill,
+[data-theme='dark'] #modal_login #login-pass:-webkit-autofill {
+    -webkit-text-fill-color: rgb(241 245 249);
+    box-shadow: 0 0 0 1000px rgb(30 41 59) inset;
+    font-weight: 400;
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+[data-theme='dark'] #modal_login .login-pass-toggle {
+    background: rgb(30 41 59 / 0.98);
+    color: rgb(226 232 240);
+    box-shadow: inset 0 0 0 1px rgb(71 85 105 / 0.85);
+}
+
+[data-theme='dark'] #modal_login .login-pass-toggle:hover {
+    background: rgb(51 65 85);
+    color: #fff;
+}
+
+[data-theme='dark'] #modal_users_admin .planning-pass-toggle,
+[data-theme='dark'] #modal_admin_password .planning-pass-toggle {
+    background: rgb(30 41 59 / 0.98);
+    color: rgb(226 232 240);
+    box-shadow: inset 0 0 0 1px rgb(71 85 105 / 0.85);
+}
+
+[data-theme='dark'] #modal_users_admin .planning-pass-toggle:hover,
+[data-theme='dark'] #modal_admin_password .planning-pass-toggle:hover {
+    background: rgb(51 65 85);
+    color: #fff;
+}

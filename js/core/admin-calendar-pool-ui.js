@@ -84,7 +84,7 @@ function renderPoolTableRows(rows) {
     if (list.length === 0) {
         const tr = document.createElement('tr');
         tr.innerHTML =
-            '<td colspan="4" class="text-[10px] text-slate-500 text-center py-4">Aucune entrée. Utilisez le bouton + pour ajouter un calendrier.</td>';
+            '<td colspan="3" class="text-[11px] text-slate-500 text-center py-4 dark:text-slate-400">Aucune entrée. Utilisez « Rajouter un agenda Google ».</td>';
         tb.appendChild(tr);
         updatePoolSortButtonsUi();
         return;
@@ -92,29 +92,24 @@ function renderPoolTableRows(rows) {
     const sorted = [...list].sort(cmpPoolRows);
     for (const r of sorted) {
         const tr = document.createElement('tr');
-        const free = !r.assigned_user_id;
-        const st = free
-            ? '<span class="text-emerald-700 font-medium text-[10px]">Libre</span>'
-            : '<span class="text-amber-800 font-medium text-[10px]">Assigné</span>';
         const gid = String(r.google_calendar_id ?? '').trim();
         const calUrl = googleCalendarEmbedUrl(gid);
         const nom = String(r.assignee_nom ?? '').trim();
         const prenom = String(r.assignee_prenom ?? '').trim();
-        const assignee = free ? '—' : formatProfileFullName(nom, prenom) || '—';
+        const assignee = formatProfileFullName(nom, prenom) || '—';
         tr.innerHTML = `
-            <td class="text-[10px] max-w-[11rem] truncate align-middle" title="${escapeAttr(r.label || '')}">${escapeTd(r.label || '—')}</td>
-            <td class="align-middle p-1 min-w-0 max-w-[9.5rem] sm:max-w-[10.5rem]">
-                <div class="flex items-center gap-0.5 min-w-0">
-                    <span class="text-[9px] truncate flex-1 min-w-0" title="${escapeAttr(calUrl)}">${escapeTd(calUrl || '—')}</span>
+            <td class="text-[11px] max-w-[10rem] sm:max-w-[14rem] truncate align-middle py-2" title="${escapeAttr(r.label || '')}">${escapeTd(r.label || '—')}</td>
+            <td class="align-middle py-2 min-w-0 p-1">
+                <div class="flex items-center gap-1 min-w-0">
+                    <span class="text-[10px] sm:text-[11px] truncate flex-1 min-w-0 font-mono text-slate-700 dark:text-slate-300" title="${escapeAttr(calUrl)}">${escapeTd(calUrl || '—')}</span>
                     ${
                         calUrl
-                            ? `<button type="button" class="btn btn-ghost btn-xs btn-square h-7 w-7 min-h-7 min-w-7 p-0 shrink-0 calendar-pool-copy-url border border-slate-200 text-slate-700 hover:bg-slate-200/90 hover:text-slate-900" data-calendar-url="${escapeAttr(calUrl)}" title="Copier dans le presse-papiers" aria-label="Copier l’URL du calendrier">${POOL_COPY_URL_SVG}</button>`
+                            ? `<button type="button" class="btn btn-ghost btn-xs btn-square h-8 w-8 min-h-8 min-w-8 p-0 shrink-0 calendar-pool-copy-url border border-slate-200 dark:border-slate-600" data-calendar-url="${escapeAttr(calUrl)}" title="Copier dans le presse-papiers" aria-label="Copier l’URL du calendrier">${POOL_COPY_URL_SVG}</button>`
                             : ''
                     }
                 </div>
             </td>
-            <td class="text-[10px] align-middle">${escapeTd(assignee)}</td>
-            <td class="text-[10px] align-middle">${st}</td>`;
+            <td class="text-[11px] align-middle py-2 break-words">${escapeTd(assignee)}</td>`;
         tb.appendChild(tr);
     }
     updatePoolSortButtonsUi();

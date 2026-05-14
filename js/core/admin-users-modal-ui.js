@@ -267,6 +267,7 @@ export function openAdminUserModalForCreate() {
     setMode(false);
     applyForm({ role: 'eleve' });
     dlg.showModal();
+    requestAnimationFrame(() => dlg.focus());
 }
 
 export function openAdminUserModalForEdit(userRow) {
@@ -285,6 +286,7 @@ export function openAdminUserModalForEdit(userRow) {
     applyForm(editSnapshot);
     syncCreateModePasswordField();
     dlg.showModal();
+    requestAnimationFrame(() => dlg.focus());
 }
 
 export function resetAdminUsersUiBindings() {
@@ -295,7 +297,7 @@ export function resetAdminUsersUiBindings() {
 
 export function initAdminUsersUi(currentUser) {
     const show = isBackendAuthConfigured() && isAdmin(currentUser);
-    document.getElementById('menu-item-users-admin-wrap')?.classList.add('hidden');
+    document.getElementById('menu-item-users-admin-wrap')?.classList.toggle('hidden', !show);
     if (!show || bound) return;
     bound = true;
 

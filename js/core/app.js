@@ -56,7 +56,8 @@ import {
     isBackendAuthConfigured,
     markSupabasePasswordRecoveryPending,
     isSupabasePasswordRecoveryPending,
-    shouldResumeSupabasePasswordRecovery
+    shouldResumeSupabasePasswordRecovery,
+    roleLabelFr
 } from './auth-logic.js';
 import { initMessagesUi, resetMessagesUiBindings, tryShowBroadcastPopup } from './messages-ui.js';
 import { destroyPlanningQuillMount } from '../utils/planning-quill.js';
@@ -169,9 +170,11 @@ function performLogout() {
 
 function refreshHeaderUser(user) {
     const drawerName = document.getElementById('drawer-profile-name');
+    const drawerRole = document.getElementById('drawer-profile-role');
     const shell = document.getElementById('app-shell');
     if (!user?.email) {
         if (drawerName) drawerName.textContent = 'Invité';
+        if (drawerRole) drawerRole.textContent = '—';
         document.getElementById('menu-item-display-prefs-wrap')?.classList.add('hidden');
         document.getElementById('menu-item-profile-wrap')?.classList.add('hidden');
         document.getElementById('menu-item-logout-wrap')?.classList.add('hidden');
@@ -184,6 +187,10 @@ function refreshHeaderUser(user) {
         return;
     }
     if (drawerName) drawerName.textContent = String(user.name || '').trim() || user.email.split('@')[0];
+    if (drawerRole) {
+        const rl = roleLabelFr(user.role);
+        drawerRole.textContent = rl || String(user.role || '').trim() || '—';
+    }
     const r = String(user.role || '').toLowerCase();
     const staff = isBackendAuthConfigured() && (r === 'prof' || r === 'admin');
     document.getElementById('menu-item-display-prefs-wrap')?.classList.remove('hidden');

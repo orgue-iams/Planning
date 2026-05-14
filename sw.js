@@ -16,6 +16,7 @@ const ASSETS = [
   './css/modal.css',
   './css/directory-rules-dark.css',
   './css/auth.css',
+  './css/planning-modals-theme.css',
   './js/core/app.js',
   './js/core/calendar-toolbar.js',
   './js/core/calendar-logic.js',

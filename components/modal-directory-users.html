@@ -8,11 +8,13 @@
         <div id="directory-section-admins" class="hidden" aria-hidden="true"></div>
         <div id="directory-section-profs" class="hidden" aria-hidden="true"></div>
         <div id="directory-section-eleves" class="hidden" aria-hidden="true"></div>
-        <div id="directory-add-user-wrap" class="hidden mt-4 pt-3 border-t border-slate-200">
-            <button type="button" id="directory-add-user-btn" class="planning-drawer__link w-full max-w-none justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
-                + Ajouter
-            </button>
+        <div id="directory-add-user-wrap" class="hidden mt-4 pt-3 border-t border-slate-200 dark:border-slate-600">
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button" id="directory-add-user-btn" class="btn btn-primary btn-sm btn-square shrink-0" title="Ajouter un utilisateur" aria-label="Ajouter un utilisateur">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
+                </button>
+                <span class="text-sm font-medium text-slate-700 dark:text-slate-200">Ajouter un utilisateur</span>
+            </div>
         </div>
     </div>
 </dialog>

@@ -16,6 +16,14 @@ body {
 }
 
 /* Avant connexion : pas d’en-tête ni de calendrier (évite le rendu « en dessous » de la modale) */
+body.auth-pending {
+    background-color: rgb(241 245 249);
+}
+
+[data-theme='dark'] body.auth-pending {
+    background-color: rgb(15 23 42) !important;
+}
+
 body.auth-pending #app-header,
 body.auth-pending #app-shell {
     display: none !important;

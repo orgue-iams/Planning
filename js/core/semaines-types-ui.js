@@ -336,13 +336,30 @@ function dowLongLabel(dow) {
 function syncRowReadonlyDisplay(tr, elevesById) {
     const typ = tr.dataset.stSlotType || 'cours';
     const dow = parseInt(tr.dataset.stDow || '1', 10);
-    tr.querySelector('.st-ro-type')?.replaceChildren(document.createTextNode(slotTypeLabel(typ)));
-    tr.querySelector('.st-ro-dow')?.replaceChildren(document.createTextNode(dowLongLabel(dow)));
-    tr.querySelector('.st-ro-start')?.replaceChildren(document.createTextNode(padTime(tr.dataset.stStart)));
-    tr.querySelector('.st-ro-end')?.replaceChildren(document.createTextNode(padTime(tr.dataset.stEnd)));
-    const title = String(tr.dataset.stTitle || '').trim();
-    const titleEl = tr.querySelector('.st-ro-title');
-    if (titleEl) titleEl.textContent = title || '—';
+    const periodEl = tr.querySelector('.st-ro-period');
+    if (periodEl) {
+        periodEl.replaceChildren();
+        const l1 = document.createElement('div');
+        l1.className = 'font-semibold leading-snug';
+        l1.textContent = dowLongLabel(dow);
+        const l2 = document.createElement('div');
+        l2.className = 'font-mono text-[10px] opacity-90 mt-0.5';
+        l2.textContent = `${padTime(tr.dataset.stStart)} – ${padTime(tr.dataset.stEnd)}`;
+        periodEl.appendChild(l1);
+        periodEl.appendChild(l2);
+    }
+    const typeTitleEl = tr.querySelector('.st-ro-type-title');
+    if (typeTitleEl) {
+        typeTitleEl.replaceChildren();
+        const t1 = document.createElement('div');
+        t1.className = 'font-medium leading-snug';
+        t1.textContent = slotTypeLabel(typ);
+        const t2 = document.createElement('div');
+        t2.className = 'mt-0.5 text-[10px] opacity-95 leading-snug break-words';
+        t2.textContent = String(tr.dataset.stTitle || '').trim() || '—';
+        typeTitleEl.appendChild(t1);
+        typeTitleEl.appendChild(t2);
+    }
     const roStudents = tr.querySelector('.st-ro-students');
     if (!roStudents) return;
     if (typ !== 'cours') {
@@ -592,13 +609,10 @@ function appendTemplateRow(tbody, line, _optHtml, ctx) {
 
     tr.innerHTML = `
         ${dragCell}
+        <td class="align-top p-2 min-w-0 max-w-[11rem]"><div class="st-ro-period text-[10px] text-slate-800 leading-snug"></div></td>
         <td class="text-[10px] font-bold font-sans text-slate-800 align-top p-2 break-words max-w-[9rem]">${escapeAttr(ownerLabel)}</td>
-        <td class="align-top p-2 text-[10px] text-slate-800 leading-snug"><span class="st-ro-type"></span></td>
-        <td class="align-top p-2 text-[10px] text-slate-800 leading-snug"><span class="st-ro-dow"></span></td>
-        <td class="align-top p-2 text-[10px] font-mono text-slate-800 leading-snug whitespace-nowrap"><span class="st-ro-start"></span></td>
-        <td class="align-top p-2 text-[10px] font-mono text-slate-800 leading-snug whitespace-nowrap"><span class="st-ro-end"></span></td>
-        <td class="align-top p-2 text-[10px] text-slate-800 leading-snug min-w-[6rem] max-w-[14rem] break-words"><span class="st-ro-title"></span></td>
-        <td class="st-students-cell align-top p-2 min-w-[9rem] max-w-[20rem]"><span class="st-ro-students text-[10px] font-normal font-sans text-slate-700 leading-snug"></span></td>
+        <td class="align-top p-2 min-w-0 max-w-[12rem]"><div class="st-ro-type-title text-[10px] text-slate-800 leading-snug"></div></td>
+        <td class="st-students-cell align-top p-2 min-w-0 max-w-[14rem]"><span class="st-ro-students text-[10px] font-normal font-sans text-slate-700 leading-snug"></span></td>
         ${actionsCell}
     `;
     tbody.appendChild(tr);

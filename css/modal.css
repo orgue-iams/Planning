@@ -484,6 +484,10 @@
     background: rgb(15 23 42 / 0.45);
     border: none;
 }
+
+[data-theme='dark'] #modal_users_admin[open] {
+    background: rgb(15 23 42 / 0.92);
+}
 #modal_users_admin[open] .modal-box {
     position: relative;
     z-index: 1;

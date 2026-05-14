@@ -1,0 +1,133 @@
+/**
+ * Thème sombre / cohérence modales : surfaces, textes, champs (complète DaisyUI winter + data-theme=dark).
+ */
+
+[data-theme='dark'] dialog.modal .modal-box {
+    background-color: rgb(30 41 59);
+    color: rgb(226 232 240);
+    border-color: rgb(51 65 85);
+}
+
+/* Textes souvent trop foncés sur fond sombre */
+[data-theme='dark'] dialog.modal .modal-box .text-slate-400,
+[data-theme='dark'] dialog.modal .modal-box .text-slate-500 {
+    color: rgb(186 198 216) !important;
+}
+
+[data-theme='dark'] dialog.modal .modal-box .text-slate-600,
+[data-theme='dark'] dialog.modal .modal-box .text-slate-700,
+[data-theme='dark'] dialog.modal .modal-box .text-slate-800,
+[data-theme='dark'] dialog.modal .modal-box .text-slate-900 {
+    color: rgb(226 232 240) !important;
+}
+
+[data-theme='dark'] dialog.modal .modal-box .border-slate-100,
+[data-theme='dark'] dialog.modal .modal-box .border-slate-200 {
+    border-color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] dialog.modal .modal-box .divide-slate-200 {
+    border-color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] dialog.modal .modal-box dl.divide-slate-200 > div {
+    border-color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] dialog.modal .input,
+[data-theme='dark'] dialog.modal .select,
+[data-theme='dark'] dialog.modal .textarea {
+    background-color: rgb(15 23 42) !important;
+    color: rgb(241 245 249) !important;
+    border-color: rgb(71 85 105) !important;
+}
+
+[data-theme='dark'] dialog.modal .input::placeholder,
+[data-theme='dark'] dialog.modal .textarea::placeholder {
+    color: rgb(148 163 184);
+}
+
+[data-theme='dark'] dialog.modal .input-bordered:focus,
+[data-theme='dark'] dialog.modal .select:focus {
+    outline: none;
+    border-color: rgb(96 165 250);
+    box-shadow: 0 0 0 2px rgb(59 130 246 / 0.25);
+}
+
+[data-theme='dark'] dialog.modal .label-text,
+[data-theme='dark'] dialog.modal .label-text-alt {
+    color: rgb(203 213 225);
+}
+
+/* Semaines types : page plein écran */
+[data-theme='dark'] #modal_semaines_types .semaines-types-modal-box {
+    background-color: rgb(15 23 42) !important;
+    color: rgb(226 232 240);
+}
+
+[data-theme='dark'] #modal_semaines_types .semaines-types-modal-box header,
+[data-theme='dark'] #modal_semaines_types .semaines-types-modal-box footer {
+    background-color: rgb(30 41 59) !important;
+    border-color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] #modal_semaines_types .semaines-types-modal-box .border-slate-200 {
+    border-color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] #modal_semaines_types .rounded-xl.border.border-slate-200.bg-white {
+    background-color: rgb(30 41 59) !important;
+    border-color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] #modal_semaines_types .table :where(th, td) {
+    border-color: rgb(51 65 85);
+}
+
+[data-theme='dark'] #modal_semaines_types .table thead {
+    background-color: rgb(15 23 42);
+}
+
+[data-theme='dark'] #modal_semaines_types .text-slate-500,
+[data-theme='dark'] #modal_semaines_types .text-slate-600,
+[data-theme='dark'] #modal_semaines_types .text-slate-700,
+[data-theme='dark'] #modal_semaines_types .text-slate-800 {
+    color: rgb(203 213 225) !important;
+}
+
+[data-theme='dark'] #modal_semaines_types .bg-slate-50,
+[data-theme='dark'] #modal_semaines_types .bg-white {
+    background-color: rgb(30 41 59) !important;
+}
+
+[data-theme='dark'] #modal_semaines_types .input,
+[data-theme='dark'] #modal_semaines_types .select {
+    background-color: rgb(15 23 42) !important;
+    color: rgb(241 245 249) !important;
+    border-color: rgb(71 85 105) !important;
+}
+
+/* Calendriers pool : tableau */
+[data-theme='dark'] #modal_calendar_pool .pool-cal-table thead {
+    background-color: rgb(15 23 42);
+}
+
+[data-theme='dark'] #modal_calendar_pool .pool-cal-table :where(th, td) {
+    border-color: rgb(51 65 85);
+    color: rgb(226 232 240);
+}
+
+[data-theme='dark'] #modal_calendar_pool .pool-cal-table tbody tr {
+    border-bottom: 1px solid rgb(51 65 85);
+}
+
+/* Gestion comptes — overlay plein écran (showModal custom) */
+[data-theme='dark'] #modal_users_admin[open] {
+    background: rgb(15 23 42 / 0.72);
+}
+
+[data-theme='dark'] #modal_users_admin[open] .modal-box {
+    background-color: rgb(30 41 59) !important;
+    color: rgb(226 232 240);
+    border-color: rgb(51 65 85);
+}
