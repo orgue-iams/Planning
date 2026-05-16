@@ -1,45 +1,36 @@
 <dialog id="modal_calendar_pool" class="modal">
-    <div class="modal-box p-0 w-[96%] max-w-4xl max-h-[90dvh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden dark:border-slate-600">
-        <header class="shrink-0 px-4 py-3 border-b border-slate-200 bg-slate-50 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between dark:bg-slate-800/80 dark:border-slate-600">
-            <div class="min-w-0">
-                <h3 class="text-sm font-bold text-slate-800 m-0 leading-tight dark:text-slate-100">Calendriers Google (pool)</h3>
-                <p class="text-[11px] sm:text-xs text-slate-600 m-0 mt-0.5 leading-snug dark:text-slate-300">Agendas secondaires rattachés aux comptes — copiez l’URL pour intégration.</p>
-            </div>
-            <button type="button" id="calendar-pool-open-add" class="btn btn-primary btn-sm gap-1.5 self-start sm:self-center shrink-0" title="Ajouter un calendrier au pool">
+    <div class="modal-box p-0 w-[96%] max-w-2xl max-h-[90dvh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden dark:border-slate-600">
+        <header class="shrink-0 px-4 py-2 border-b border-slate-200 bg-slate-50 flex justify-end dark:bg-slate-800/80 dark:border-slate-600">
+            <button type="button" id="calendar-pool-open-add" class="btn btn-primary btn-sm gap-1.5 shrink-0" title="Ajouter un calendrier au pool">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4 shrink-0" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
                 <span class="text-left leading-snug">Rajouter un agenda Google</span>
             </button>
         </header>
 
-        <div class="planning-route-section flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 sm:px-4 py-3">
-            <table class="table table-sm w-full text-[11px] sm:text-xs pool-cal-table">
-                <thead>
-                    <tr>
-                        <th class="text-left font-semibold text-slate-700 dark:text-slate-200 align-bottom py-2">
-                            <button
-                                type="button"
-                                id="calendar-pool-sort-label"
-                                class="btn btn-ghost btn-xs h-auto min-h-0 py-1 px-2 font-semibold text-inherit hover:bg-slate-200/80 dark:hover:bg-slate-600/80"
-                            >
-                                Libellé
-                            </button>
-                        </th>
-                        <th class="text-left font-semibold text-slate-700 dark:text-slate-200 align-bottom py-2 min-w-0">
-                            URL agenda
-                        </th>
-                        <th class="text-left font-semibold text-slate-700 dark:text-slate-200 align-bottom py-2 min-w-0">
-                            <button
-                                type="button"
-                                id="calendar-pool-sort-assignee"
-                                class="btn btn-ghost btn-xs h-auto min-h-0 py-1 px-2 font-semibold text-inherit hover:bg-slate-200/80 dark:hover:bg-slate-600/80"
-                            >
-                                Assigné à
-                            </button>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody id="calendar-pool-tbody"></tbody>
-            </table>
+        <div class="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 py-2">
+            <div id="calendar-pool-list-panel" class="min-w-0">
+                <div id="calendar-pool-status" class="text-[11px] text-slate-500 dark:text-slate-400 empty:hidden mb-1"></div>
+<div id="calendar-pool-list" class="space-y-1.5 min-w-0"></div>
+            </div>
+
+            <div id="calendar-pool-edit-panel" class="hidden min-w-0 space-y-3" aria-hidden="true">
+                <input type="hidden" id="calendar-pool-edit-id" value="" />
+                <label class="flex flex-col gap-1 min-w-0">
+                    <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Libellé</span>
+                    <input type="text" id="calendar-pool-edit-label" class="input input-bordered input-sm w-full dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600" autocomplete="off" />
+                </label>
+                <label class="flex flex-col gap-1 min-w-0">
+                    <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">ID calendrier Google</span>
+                    <input type="text" id="calendar-pool-edit-google-id" class="input input-bordered input-sm w-full font-mono dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600" autocomplete="off" placeholder="ex. xxx@group.calendar.google.com" />
+                    <span class="text-[10px] text-slate-500 dark:text-slate-400 leading-snug">Identifiant à saisir dans Google Agenda (« Autres agendas » → « S’abonner à un agenda »).</span>
+                </label>
+                <div>
+                    <p class="text-xs font-semibold text-slate-600 dark:text-slate-300 m-0 mb-1">Utilisateur lié</p>
+                    <p id="calendar-pool-edit-assignee-readonly" class="text-sm text-slate-800 dark:text-slate-200 m-0">—</p>
+                </div>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 m-0">Les modifications sont enregistrées à la sortie de chaque champ.</p>
+                <button type="button" id="calendar-pool-edit-delete" class="btn btn-error btn-sm btn-outline w-full sm:w-auto">Supprimer l’agenda</button>
+            </div>
         </div>
     </div>
 </dialog>
@@ -49,11 +40,11 @@
         <h3 class="font-bold text-sm mb-3 text-slate-800 border-b border-slate-200 pb-2 dark:text-slate-100 dark:border-slate-600">Ajouter un calendrier</h3>
         <label class="flex flex-col gap-0 min-w-0 mb-2">
             <span class="text-[11px] font-semibold text-slate-600 dark:text-slate-300">ID calendrier Google <span class="font-normal text-slate-400">(oblig.)</span></span>
-            <input type="text" id="calendar-pool-add-google-id" placeholder="ID ou lien (?src=…)" class="input input-bordered w-full text-sm h-10 min-h-0 font-mono mt-1" autocomplete="off" />
+            <input type="text" id="calendar-pool-add-google-id" placeholder="ID ou lien (?src=…)" class="input input-bordered w-full text-sm h-10 min-h-0 font-mono mt-1 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600" autocomplete="off" />
         </label>
         <label class="flex flex-col gap-0 min-w-0 mb-4">
             <span class="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Libellé</span>
-            <input type="text" id="calendar-pool-add-label" placeholder="Nom affiché dans l’admin" class="input input-bordered w-full text-sm h-10 min-h-0 mt-1" autocomplete="off" />
+            <input type="text" id="calendar-pool-add-label" placeholder="Nom affiché dans l’admin" class="input input-bordered w-full text-sm h-10 min-h-0 mt-1 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600" autocomplete="off" />
         </label>
         <div class="modal-action mt-0 flex justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-600">
             <button type="button" id="calendar-pool-add-cancel" class="btn btn-ghost btn-sm">Annuler</button>

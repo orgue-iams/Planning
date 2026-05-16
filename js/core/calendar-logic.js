@@ -40,6 +40,40 @@ import {
 import { openCourseStudentsPicker } from './course-students-picker.js';
 import { openCoursSeriesScopeModal } from './cours-series-scope-ui.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
+import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
+
+/** @type {{ getCalendar: () => import('@fullcalendar/core').Calendar | null, getUser: () => object | null, getEvent: () => import('@fullcalendar/core').EventApi | null, setEvent: (ev: import('@fullcalendar/core').EventApi | null) => void } | null} */
+let reservationAutoSaveDeps = null;
+
+let reservationAutoSaveTimer = null;
+
+/** Auto-enregistrement modale route (sans fermer). */
+let reservationAutoSaveMode = false;
+
+/**
+ * @param {typeof reservationAutoSaveDeps} deps
+ */
+export function setReservationAutoSaveDeps(deps) {
+    reservationAutoSaveDeps = deps;
+}
+
+function scheduleReservationAutoSave() {
+    const deps = reservationAutoSaveDeps;
+    const cal = deps?.getCalendar?.();
+    if (!deps || !cal) return;
+    if (reservationAutoSaveTimer) clearTimeout(reservationAutoSaveTimer);
+    reservationAutoSaveTimer = setTimeout(() => {
+        if (!isReservationModalDirty()) return;
+        reservationAutoSaveMode = true;
+        void saveReservation(cal, deps.getUser(), deps.getEvent())
+            .then(() => {
+                captureReservationModalFormBaseline();
+            })
+            .finally(() => {
+                reservationAutoSaveMode = false;
+            });
+    }, 850);
+}
 
 let saveReservationInFlight = false;
 let deleteReservationInFlight = false;
@@ -153,7 +187,6 @@ function normalizeRole(role) {
 let reservationModalUserRef = /** @type {object | null} */ (null);
 let reservationModalCanEditRef = false;
 
-const MAX_COURS_STUDENTS = 5;
 let reservationInscritsUiBound = false;
 
 function canManageReservationInscrits(currentUser) {
@@ -241,13 +274,6 @@ function reservationInscritsMoveStudent(id, toSelected) {
     if (!sid) return;
     const opt = [...multi.options].find((o) => String(o.value) === sid);
     if (!opt) return;
-    if (toSelected && !opt.selected) {
-        const chosenCount = [...multi.options].filter((o) => o.selected).length;
-        if (chosenCount >= MAX_COURS_STUDENTS) {
-            showToast(`Maximum ${MAX_COURS_STUDENTS} élèves pour un créneau Cours.`, 'error');
-            return;
-        }
-    }
     opt.selected = toSelected;
     renderReservationInscritsDnD(multi, true);
 }
@@ -341,7 +367,6 @@ async function prepareReservationInscritsSelect(currentUser, event, canEdit) {
             const selected = [...multi.selectedOptions].map((o) => o.value).filter(Boolean);
             const picked = await openCourseStudentsPicker({
                 title: 'Inscriptions au cours',
-                maxStudents: MAX_COURS_STUDENTS,
                 eleves: rowsSorted,
                 selectedUserIds: selected
             });
@@ -1841,19 +1866,10 @@ function applyReservationEditorShellForRole(
     const r = normalizeRole(currentUser?.role);
     const owner = ownerInfoFromEvent(event, currentUser);
     if (r === 'eleve') {
-        if (editorOwnerEl) {
-            if (event) {
-                editorOwnerEl.classList.add('hidden');
-            } else {
-                editorOwnerEl.textContent = reservationDisplayTitleForCurrentUser(currentUser);
-                editorOwnerEl.classList.remove('hidden');
-            }
-        }
-        wrapTitle?.classList.add('hidden');
+        editorOwnerEl?.classList.add('hidden');
+        wrapTitle?.classList.remove('hidden');
+        wrapMotif?.classList.add('hidden');
         hintFerm?.classList.add('hidden');
-        const nOpt = sel?.options?.length ?? 0;
-        if (nOpt <= 1) wrapMotif?.classList.add('hidden');
-        else wrapMotif?.classList.remove('hidden');
     } else {
         editorOwnerEl?.classList.add('hidden');
         wrapTitle?.classList.remove('hidden');
@@ -2245,10 +2261,7 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         wrapRead.classList.add('hidden');
         wrapEdit.classList.remove('hidden');
     }
-    if (wrapInfo) {
-        if (event) wrapInfo.classList.remove('hidden');
-        else wrapInfo.classList.add('hidden');
-    }
+    if (wrapInfo) wrapInfo.classList.add('hidden');
     modalActions?.classList.remove('justify-end');
     modalActions?.classList.add('justify-between');
 
@@ -2416,7 +2429,9 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         if (cb) cb.disabled = !canEditEvent;
     }
 
-    document.getElementById('btn-save').classList.toggle('hidden', !canEditEvent);
+    document.getElementById('btn-save')?.classList.add('hidden');
+    const cancelBtn = document.getElementById('btn-cancel-reservation');
+    if (cancelBtn) cancelBtn.textContent = 'Annuler';
     const showDelete =
         Boolean(event) &&
         canCurrentUserEditEventIgnoringPast(currentUser, event) &&
@@ -2428,7 +2443,21 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
 
     captureReservationModalFormBaseline();
 
-    modal.showModal();
+    const autoFields = [
+        'event-date-start',
+        'event-start',
+        'event-end',
+        'event-motif-select',
+        'event-title-input'
+    ];
+    for (const fid of autoFields) {
+        const el = document.getElementById(fid);
+        el?.addEventListener('change', () => {
+            if (canEditEvent) scheduleReservationAutoSave();
+        }, { signal: modalSignal });
+    }
+
+    openPlanningRouteDialog('modal_reservation', 'Réservation', 'Réservation');
     focusPlanningDialogRoot(modal instanceof HTMLDialogElement ? modal : null);
 }
 
@@ -2750,8 +2779,10 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
                 ...(enrollR.emailsCsv ? { inscrits: enrollR.emailsCsv } : {})
             });
         }
-        document.getElementById('modal_reservation').close();
-        showToast(`${days.length} créneau${days.length > 1 ? 'x' : ''} enregistré${days.length > 1 ? 's' : ''}.`);
+        if (!reservationAutoSaveMode) {
+            document.getElementById('modal_reservation').close();
+            showToast(`${days.length} créneau${days.length > 1 ? 'x' : ''} enregistré${days.length > 1 ? 's' : ''}.`);
+        }
         document.getElementById('event-recurring').checked = false;
         resetRecurringFormDefaults();
         setRecurringOptionsVisible(false);
@@ -2938,13 +2969,17 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         ...(poolLinkExisting ? { poolGoogleEventId: poolLinkExisting } : {}),
         ...(enrollSync.emailsCsv ? { inscrits: enrollSync.emailsCsv } : {})
     };
-    document.getElementById('modal_reservation').close();
+    if (!reservationAutoSaveMode) {
+        document.getElementById('modal_reservation').close();
+    }
     /** @type {ReturnType<typeof showPersistentToast> | null} */
     let updateProgressToast = null;
-    if (liveEventRef) {
-        updateProgressToast = showPersistentToast('Mise à jour…', 'info');
-    } else {
-        showToast('Réservation enregistrée.');
+    if (!reservationAutoSaveMode) {
+        if (liveEventRef) {
+            updateProgressToast = showPersistentToast('Mise à jour…', 'info');
+        } else {
+            showToast('Réservation enregistrée.');
+        }
     }
     if (liveEventRef) {
         const localInscritsEmails =

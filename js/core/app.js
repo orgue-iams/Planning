@@ -15,6 +15,7 @@ import {
     getEventContent,
     openModal,
     saveReservation,
+    setReservationAutoSaveDeps,
     deleteReservation,
     quickCreateFromSelection,
     quickCreateFromDateClick,
@@ -414,6 +415,15 @@ function initCalendarAndRevealUi() {
         initSwipe(calendarEl, calendar);
 
         initPlanningDrawer(calendar);
+
+        setReservationAutoSaveDeps({
+            getCalendar: () => calendar,
+            getUser: () => currentUser,
+            getEvent: () => currentEvent,
+            setEvent: (ev) => {
+                currentEvent = ev;
+            }
+        });
 
         document.getElementById('btn-save').onclick = () =>
             void saveReservation(calendar, currentUser, currentEvent).catch((err) =>

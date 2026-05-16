@@ -185,16 +185,31 @@ export function initCalendarToolbar(calendar) {
     const wrap = document.getElementById('calendar-toolbar');
     if (!titleEl || !btnToday || !btnPrev || !btnNext || !wrap) return;
 
+    titleEl.classList.add('calendar-toolbar__title-chip', 'calendar-toolbar__click-chip');
+    titleEl.setAttribute('role', 'button');
+    titleEl.tabIndex = 0;
+    titleEl.title = 'Revenir à la date du jour';
+
     const refreshTitle = () => {
         titleEl.textContent = formatCalendarToolbarTitle(calendar);
         syncDrawerViewSelection(calendar);
         syncPlanningGridCornerHud(calendar);
     };
 
-    btnToday.addEventListener('click', () => {
+    const goToday = () => {
         calendar.today();
         refreshTitle();
+    };
+
+    titleEl.addEventListener('click', goToday);
+    titleEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            goToday();
+        }
     });
+
+    btnToday.addEventListener('click', goToday);
     btnPrev.addEventListener('click', () => {
         calendar.prev();
         refreshTitle();

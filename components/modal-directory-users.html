@@ -51,7 +51,50 @@
                 </label>
             </div>
             <p id="directory-edit-agenda-readonly" class="text-sm text-slate-700 dark:text-slate-200 m-0 break-words"></p>
-            <p id="directory-edit-save-hint" class="text-[11px] text-slate-500 dark:text-slate-400 m-0">Les modifications sont enregistrées à la sortie de chaque champ.</p>
+        </div>
+
+        <div id="directory-user-create-panel" class="hidden min-w-0 space-y-3" aria-hidden="true">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label class="flex flex-col gap-1 min-w-0">
+                    <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Nom</span>
+                    <input type="text" id="directory-create-nom" class="input input-bordered input-sm w-full bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600" autocomplete="family-name" />
+                </label>
+                <label class="flex flex-col gap-1 min-w-0">
+                    <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Prénom</span>
+                    <input type="text" id="directory-create-prenom" class="input input-bordered input-sm w-full bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600" autocomplete="given-name" />
+                </label>
+                <label class="flex flex-col gap-1 min-w-0 sm:col-span-2">
+                    <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">E-mail</span>
+                    <input type="email" id="directory-create-email" class="input input-bordered input-sm w-full bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600" autocomplete="email" />
+                </label>
+                <label class="flex flex-col gap-1 min-w-0 sm:col-span-2">
+                    <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Téléphone</span>
+                    <input type="tel" id="directory-create-phone" class="input input-bordered input-sm w-full bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600" maxlength="40" autocomplete="tel" />
+                </label>
+                <label class="flex flex-col gap-1 min-w-0 sm:col-span-2">
+                    <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Rôle</span>
+                    <select id="directory-create-role" class="select select-bordered select-sm w-max max-w-full dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600">
+                        <option value="admin">Admin</option>
+                        <option value="prof">Prof</option>
+                        <option value="eleve" selected>Élève</option>
+                    </select>
+                </label>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-slate-50/90 p-3 space-y-2 dark:border-slate-600 dark:bg-slate-900/50">
+                <label class="flex items-start gap-2.5 cursor-pointer text-sm font-medium text-slate-800 dark:text-slate-100 leading-snug">
+                    <input type="radio" name="directory-user-create-mode" value="invite" class="radio radio-sm radio-primary shrink-0 mt-0.5" checked />
+                    Inviter par e-mail (sans mot de passe)
+                </label>
+                <label class="flex items-start gap-2.5 cursor-pointer text-sm font-medium text-slate-800 dark:text-slate-100 leading-snug">
+                    <input type="radio" name="directory-user-create-mode" value="create" class="radio radio-sm radio-primary shrink-0 mt-0.5" />
+                    Créer le compte tout de suite (mot de passe requis)
+                </label>
+            </div>
+            <label class="flex flex-col gap-1 min-w-0">
+                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Mot de passe</span>
+                <input type="password" id="directory-create-password" class="input input-bordered input-sm w-full bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600" autocomplete="new-password" disabled />
+            </label>
+            <button type="button" id="directory-create-submit" class="btn btn-primary btn-sm w-full sm:w-auto">Créer l’utilisateur</button>
         </div>
     </div>
 </dialog>

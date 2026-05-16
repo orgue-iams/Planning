@@ -780,33 +780,33 @@
 }
 
 .directory-admin-user-card--role-admin {
-    background: rgb(254 243 199 / 0.55);
-    border-color: rgb(251 191 36 / 0.55);
+    background: rgb(254 226 226 / 0.72);
+    border-color: rgb(185 28 28 / 0.4);
 }
 
 .directory-admin-user-card--role-prof {
+    background: rgb(254 243 199 / 0.65);
+    border-color: rgb(251 191 36 / 0.55);
+}
+
+.directory-admin-user-card--role-eleve {
     background: rgb(219 234 254 / 0.55);
     border-color: rgb(147 197 253 / 0.65);
 }
 
-.directory-admin-user-card--role-eleve {
-    background: rgb(241 245 249 / 0.9);
-    border-color: rgb(203 213 225);
-}
-
 [data-theme='dark'] .directory-admin-user-card--role-admin {
-    background: rgb(120 53 15 / 0.35);
-    border-color: rgb(180 83 9 / 0.5);
+    background: rgb(127 29 29 / 0.45);
+    border-color: rgb(185 28 28 / 0.55);
 }
 
 [data-theme='dark'] .directory-admin-user-card--role-prof {
-    background: rgb(30 58 138 / 0.35);
-    border-color: rgb(59 130 246 / 0.45);
+    background: rgb(120 53 15 / 0.4);
+    border-color: rgb(180 83 9 / 0.5);
 }
 
 [data-theme='dark'] .directory-admin-user-card--role-eleve {
-    background: rgb(30 41 59 / 0.7);
-    border-color: rgb(71 85 105);
+    background: rgb(30 58 138 / 0.35);
+    border-color: rgb(59 130 246 / 0.45);
 }
 
 #modal_semaines_types .st-closure-card .st-closure-start,

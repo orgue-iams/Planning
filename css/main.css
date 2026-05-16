@@ -67,7 +67,7 @@ html, body {
 /* Smartphone : navbar — hauteur alignée avec le padding du #app-shell (évite chevauchement barre calendrier). */
 @media (max-width: 639px) {
     #app-header .app-navbar {
-        min-height: calc(3.25rem + env(safe-area-inset-top, 0px));
+        min-height: calc(2.85rem + env(safe-area-inset-top, 0px));
         align-content: center;
     }
 }
@@ -110,8 +110,9 @@ html, body {
     color: #fff !important;
 }
 
-/* Bouton flottant « Consignes » (calque fixe au-dessus du planning). */
+/* Bouton flottant « Consignes » retiré — ouverture via #btn-org-brand-rules. */
 .planning-rules-fab {
+    display: none !important;
     position: fixed;
     right: max(0.65rem, env(safe-area-inset-right, 0px));
     bottom: max(0.65rem, env(safe-area-inset-bottom, 0px));

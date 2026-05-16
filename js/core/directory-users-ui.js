@@ -7,7 +7,8 @@ import { getPlanningSessionUser } from './session-user.js';
 import { showToast } from '../utils/toast.js';
 import { isAdmin, isProf, PASSWORD_MIN_LENGTH } from './auth-logic.js';
 import { planningAdminInvoke } from './admin-api.js';
-import { openAdminUserModalForCreate } from './admin-users-modal-ui.js';
+import { PASSWORD_MIN_LENGTH } from './auth-logic.js';
+import { isPlanningRole } from './planning-roles.js';
 import {
     openPlanningRouteFromDrawer,
     setPlanningRouteBackHandler,
@@ -26,6 +27,64 @@ let privilegedUsersCache = null;
 
 const DELETE_USER_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m2-3h6a1 1 0 011 1v1H8V5a1 1 0 011-1z"/></svg>';
+
+function directoryRoleCardClass(role) {
+    const key = normalizePlanningRole(role);
+    if (key === 'admin') return 'directory-admin-user-card--role-admin';
+    if (key === 'prof') return 'directory-admin-user-card--role-prof';
+    return 'directory-admin-user-card--role-eleve';
+}
+
+/** @returns {string[]} lignes contact droite (email, tél., planning) */
+function directoryUserContactLines(r) {
+    const email = String(r?.email || '').trim();
+    const phone = formatFrPhone(String(r?.telephone || '').trim());
+    const planning = String(r?.personal_calendar_label || r?.calendar_label || '').trim();
+    const shown = new Set();
+    const lines = [];
+    if (email) {
+        lines.push(email);
+        shown.add('email');
+    } else if (phone) {
+        lines.push(phone);
+        shown.add('phone');
+    } else if (planning) {
+        lines.push(planning);
+        shown.add('planning');
+    }
+    if (!shown.has('phone') && phone) {
+        lines.push(phone);
+        shown.add('phone');
+    } else if (!shown.has('planning') && planning) {
+        lines.push(planning);
+        shown.add('planning');
+    }
+    if (!shown.has('planning') && planning) lines.push(planning);
+    return lines;
+}
+
+function appendDirectoryContactColumn(parent, r) {
+    const col = document.createElement('div');
+    col.className = 'directory-user-card__contact shrink-0 max-w-[46%] text-right min-w-0 flex flex-col gap-0.5';
+    for (const line of directoryUserContactLines(r)) {
+        if (line.includes('@')) {
+            const a = document.createElement('a');
+            a.href = `mailto:${encodeURIComponent(line)}`;
+            a.className =
+                'directory-user-mailto-link text-[11px] sm:text-xs font-medium text-sky-700 hover:underline break-all leading-snug';
+            a.textContent = line;
+            col.appendChild(a);
+        } else {
+            const p = document.createElement('p');
+            p.className =
+                'text-[11px] sm:text-xs text-slate-700 dark:text-slate-200 m-0 break-words leading-snug';
+            p.style.overflowWrap = 'anywhere';
+            p.textContent = line;
+            col.appendChild(p);
+        }
+    }
+    if (col.childElementCount) parent.appendChild(col);
+}
 
 function roleLabel(role) {
     const key = normalizePlanningRole(role);
@@ -101,8 +160,9 @@ function isDirectoryPrivileged(u) {
  */
 function buildPrivilegedUserCard(r, opts) {
     const card = document.createElement('div');
+    const roleKey = normalizePlanningRole(r.profile_role || r.role);
     card.className =
-        'directory-admin-user-card flex items-stretch gap-2 py-2.5 px-3 min-w-0 rounded-xl border border-slate-200 bg-slate-50/80 dark:border-slate-600 dark:bg-slate-800/70';
+        `directory-admin-user-card ${directoryRoleCardClass(roleKey)} flex items-stretch gap-2 py-2.5 px-3 min-w-0 rounded-xl border`;
     card.dataset.userJson = JSON.stringify(r);
 
     const main = document.createElement('div');
@@ -125,25 +185,8 @@ function buildPrivilegedUserCard(r, opts) {
     roleP.textContent = roleLabel(r.profile_role || r.role);
     left.appendChild(nameP);
     left.appendChild(roleP);
-
-    const right = document.createElement('div');
-    right.className = 'shrink-0 max-w-[46%] text-right min-w-0';
-    const phoneP = document.createElement('p');
-    phoneP.className =
-        'text-[12px] sm:text-[13px] text-slate-700 dark:text-slate-200 leading-snug m-0 break-words';
-    phoneP.style.overflowWrap = 'anywhere';
-    phoneP.textContent = formatFrPhone(String(r.telephone || '').trim()) || '—';
-    const agendaP = document.createElement('p');
-    agendaP.className =
-        'directory-user-card__agenda text-[11px] sm:text-xs leading-snug m-0 mt-0.5 truncate';
-    agendaP.title = String(r.personal_calendar_label || r.calendar_label || '').trim();
-    agendaP.textContent =
-        String(r.personal_calendar_label || r.calendar_label || '').trim() || '—';
-    right.appendChild(phoneP);
-    right.appendChild(agendaP);
-
     main.appendChild(left);
-    main.appendChild(right);
+    appendDirectoryContactColumn(main, r);
     card.appendChild(main);
 
     if (opts.canDelete) {
@@ -203,30 +246,19 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
             item.className =
                 'py-3 px-3 min-w-0 rounded-xl border border-slate-200 bg-slate-50/80 dark:border-slate-600 dark:bg-slate-800/70';
 
+            const row = document.createElement('div');
+            row.className = 'flex items-start gap-2';
+            const left = document.createElement('div');
+            left.className = 'flex-1 min-w-0';
             const nameEl = document.createElement('p');
             nameEl.className =
                 'font-semibold text-slate-900 dark:text-slate-100 leading-snug m-0 break-words';
             nameEl.style.overflowWrap = 'anywhere';
             nameEl.textContent = directoryDisplayName(r);
-            item.appendChild(nameEl);
-
-            const em = String(r.email || '').trim();
-            const ph = formatFrPhone(String(r.telephone || '').trim());
-            const emailRow = document.createElement('p');
-            emailRow.className =
-                'mt-0.5 text-[12px] sm:text-[13px] leading-snug break-words min-w-0 text-slate-700 dark:text-slate-200 m-0';
-            emailRow.style.overflowWrap = 'anywhere';
-            if (em.includes('@')) {
-                const a = document.createElement('a');
-                a.href = `mailto:${em}`;
-                a.className = 'directory-user-email-link';
-                a.textContent = em;
-                emailRow.appendChild(a);
-            } else {
-                emailRow.appendChild(document.createTextNode(em || '—'));
-            }
-            if (ph) emailRow.appendChild(document.createTextNode(` · Tél. ${ph}`));
-            item.appendChild(emailRow);
+            left.appendChild(nameEl);
+            row.appendChild(left);
+            appendDirectoryContactColumn(row, r);
+            item.appendChild(row);
             list.appendChild(item);
         }
         block.appendChild(list);
@@ -366,10 +398,113 @@ function showDirectoryListPanel() {
     const edit = document.getElementById('directory-user-edit-panel');
     edit?.classList.add('hidden');
     edit?.setAttribute('aria-hidden', 'true');
+    const create = document.getElementById('directory-user-create-panel');
+    create?.classList.add('hidden');
+    create?.setAttribute('aria-hidden', 'true');
     editingUser = null;
     editSnapshot = null;
     setPlanningRouteBackHandler('modal_directory_users', null);
     updatePlanningRouteDialog('modal_directory_users', 'Utilisateurs', 'Utilisateurs');
+}
+
+function getDirectoryCreateMode() {
+    const el = document.querySelector('input[name="directory-user-create-mode"]:checked');
+    return el instanceof HTMLInputElement && el.value === 'create' ? 'create' : 'invite';
+}
+
+function syncDirectoryCreatePasswordField() {
+    const invite = getDirectoryCreateMode() === 'invite';
+    const pw = document.getElementById('directory-create-password');
+    if (pw instanceof HTMLInputElement) {
+        pw.disabled = invite;
+        if (invite) pw.value = '';
+    }
+}
+
+function readDirectoryCreateForm() {
+    return {
+        nom: String(document.getElementById('directory-create-nom')?.value || '').trim(),
+        prenom: String(document.getElementById('directory-create-prenom')?.value || '').trim(),
+        email: String(document.getElementById('directory-create-email')?.value || '').trim(),
+        telephone: formatFrPhone(document.getElementById('directory-create-phone')?.value || ''),
+        role: normalizePlanningRole(document.getElementById('directory-create-role')?.value || 'eleve'),
+        password: String(document.getElementById('directory-create-password')?.value || '')
+    };
+}
+
+function resetDirectoryCreateForm() {
+    for (const id of [
+        'directory-create-nom',
+        'directory-create-prenom',
+        'directory-create-email',
+        'directory-create-phone',
+        'directory-create-password'
+    ]) {
+        const el = document.getElementById(id);
+        if (el instanceof HTMLInputElement) el.value = '';
+    }
+    const role = document.getElementById('directory-create-role');
+    if (role instanceof HTMLSelectElement) role.value = 'eleve';
+    const ir = document.querySelector('input[name="directory-user-create-mode"][value="invite"]');
+    if (ir instanceof HTMLInputElement) ir.checked = true;
+    syncDirectoryCreatePasswordField();
+}
+
+async function submitDirectoryCreateUser() {
+    const f = readDirectoryCreateForm();
+    if (!f.nom || !f.prenom) return showToast('Le nom et le prénom sont obligatoires.', 'error');
+    if (!f.email.includes('@')) return showToast('E-mail invalide.', 'error');
+    if (!isPlanningRole(f.role)) return showToast('Rôle invalide.', 'error');
+    try {
+        if (getDirectoryCreateMode() === 'create') {
+            if (f.password.length < PASSWORD_MIN_LENGTH) {
+                return showToast(`Mot de passe : au moins ${PASSWORD_MIN_LENGTH} caractères.`, 'error');
+            }
+            await planningAdminInvoke('create_user', {
+                email: f.email,
+                nom: f.nom,
+                prenom: f.prenom,
+                telephone: f.telephone,
+                role: f.role,
+                password: f.password
+            });
+            showToast('Compte créé.');
+        } else {
+            await planningAdminInvoke('invite', {
+                email: f.email,
+                nom: f.nom,
+                prenom: f.prenom,
+                telephone: f.telephone,
+                role: f.role,
+                redirect_to: new URL('.', window.location.href).href
+            });
+            showToast('Invitation envoyée.');
+        }
+        resetDirectoryCreateForm();
+        showDirectoryListPanel();
+        privilegedUsersCache = null;
+        await loadPrivilegedDirectoryIntoModal();
+    } catch (err) {
+        showToast(err instanceof Error ? err.message : String(err), 'error');
+    }
+}
+
+function openDirectoryUserCreate() {
+    if (!isAdmin(getPlanningSessionUser())) return;
+    document.getElementById('directory-users-list-panel')?.classList.add('hidden');
+    document.getElementById('directory-user-edit-panel')?.classList.add('hidden');
+    const create = document.getElementById('directory-user-create-panel');
+    create?.classList.remove('hidden');
+    create?.setAttribute('aria-hidden', 'false');
+    resetDirectoryCreateForm();
+    setPlanningRouteBackHandler('modal_directory_users', () => {
+        showDirectoryListPanel();
+    });
+    updatePlanningRouteDialog(
+        'modal_directory_users',
+        'Utilisateurs / Nouvel utilisateur',
+        'Utilisateurs'
+    );
 }
 
 function readDirectoryEditForm() {
@@ -478,19 +613,22 @@ function openDirectoryUserEdit(userRow) {
     ).trim();
     const agendaEl = document.getElementById('directory-edit-agenda-readonly');
     if (agendaEl) {
-        agendaEl.textContent = calLabel || '— (aucun agenda assigné)';
+        agendaEl.innerHTML = '';
+        const dt = document.createElement('span');
+        dt.className = 'font-semibold text-slate-600 dark:text-slate-300';
+        dt.textContent = 'Planning perso. ';
+        const dd = document.createElement('span');
+        dd.textContent = calLabel || '— (aucun agenda assigné)';
+        agendaEl.append(dt, dd);
     }
+    document.getElementById('directory-edit-save-hint')?.remove();
 
     const titleName = directoryDisplayName(userRow);
     setPlanningRouteBackHandler('modal_directory_users', () => {
         showDirectoryListPanel();
         void reloadDirectoryAfterEdit();
     });
-    updatePlanningRouteDialog(
-        'modal_directory_users',
-        `Utilisateurs / ${titleName}`,
-        `Utilisateurs / ${titleName}`
-    );
+    updatePlanningRouteDialog('modal_directory_users', `Utilisateurs / ${titleName}`, 'Utilisateurs');
 }
 
 async function reloadDirectoryAfterEdit() {
@@ -563,7 +701,14 @@ export function initDirectoryUsersUi() {
     });
 
     document.getElementById('directory-add-user-btn')?.addEventListener('click', () => {
-        openAdminUserModalForCreate();
+        openDirectoryUserCreate();
+    });
+
+    document.querySelectorAll('input[name="directory-user-create-mode"]').forEach((el) => {
+        el.addEventListener('change', () => syncDirectoryCreatePasswordField());
+    });
+    document.getElementById('directory-create-submit')?.addEventListener('click', () => {
+        void submitDirectoryCreateUser();
     });
 
     document.getElementById('directory-admin-users-table')?.addEventListener('click', (e) => {
@@ -610,12 +755,6 @@ export function initDirectoryUsersUi() {
     document.getElementById('directory-edit-role')?.addEventListener('change', () =>
         void saveDirectoryField('role')
     );
-
-    document.getElementById('modal_users_admin')?.addEventListener('close', () => {
-        if (!document.getElementById('modal_directory_users')?.open) return;
-        showDirectoryListPanel();
-        void reloadDirectoryAfterEdit();
-    });
 
     document.getElementById('modal_directory_users')?.addEventListener('close', () => {
         showDirectoryListPanel();

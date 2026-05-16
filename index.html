@@ -37,7 +37,7 @@
     <div id="app-header"></div>
     <div id="planning-drawer-mount"></div>
 
-    <main id="app-shell" class="planning-app-shell pt-[3.25rem] max-sm:pt-[calc(3.25rem+env(safe-area-inset-top,0px))] px-0 sm:px-1 w-full sm:max-w-5xl sm:mx-auto flex flex-col gap-0 max-sm:gap-0 min-h-0">
+    <main id="app-shell" class="planning-app-shell pt-[2.85rem] max-sm:pt-[calc(2.85rem+env(safe-area-inset-top,0px))] px-0 sm:px-1 w-full sm:max-w-5xl sm:mx-auto flex flex-col gap-0 max-sm:gap-0 min-h-0">
         <div class="planning-page-bg" aria-hidden="true"></div>
         <div id="calendar" class="planning-calendar-transparent w-full"></div>
         <div id="planning-legend" class="planning-legend planning-legend-frosted planning-legend--mobile-flush flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 shrink-0" aria-label="Légende des créneaux">
@@ -47,17 +47,8 @@
             <span class="legend-item"><span class="legend-swatch legend-swatch--concert" aria-hidden="true"></span>Concert</span>
             <span class="legend-item"><span class="legend-swatch legend-swatch--autre" aria-hidden="true"></span>Autre</span>
             <span class="legend-item"><span class="legend-swatch legend-swatch--fermeture" aria-hidden="true"></span>Ferm.</span>
-            <span id="app-build-badge" class="text-[9px] text-slate-400 font-mono w-full sm:w-auto sm:ml-auto" title=""></span>
+            <span id="app-build-badge" class="text-[9px] text-slate-400 font-mono w-full sm:w-auto sm:ml-auto lg:ml-0" title=""></span>
         </div>
-        <button type="button" id="btn-rules-fab" class="planning-rules-fab" aria-label="Consignes" title="Consignes">
-            <span class="planning-rules-fab__inner" aria-hidden="true">
-                <svg class="planning-rules-fab__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                    <path d="M8 7h8M8 11h6" />
-                </svg>
-            </span>
-        </button>
     </main>
 
     <div id="app-modals"></div>

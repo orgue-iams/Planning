@@ -5,8 +5,8 @@
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     column-gap: 0.25rem;
-    min-height: 2.4rem;
-    padding: 0.38rem 0.2rem 0.26rem;
+    min-height: 2.05rem;
+    padding: 0.22rem 0.2rem 0.18rem;
     background: #fff;
     border-radius: 0;
     border: none;
@@ -376,4 +376,86 @@
     position: relative;
     z-index: 2;
     pointer-events: auto;
+}
+
+.calendar-toolbar__brand-gap {
+    display: inline-block;
+    width: 0.65rem;
+}
+
+@media (min-width: 640px) {
+    .calendar-toolbar__brand-gap {
+        width: 0.85rem;
+    }
+}
+
+.calendar-toolbar__brand-btn {
+    cursor: pointer;
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease;
+}
+
+.calendar-toolbar__brand-btn:hover,
+.calendar-toolbar__brand-btn:focus-visible {
+    background: rgb(219 234 254);
+    border-color: rgb(147 197 253);
+}
+
+[data-theme='dark'] .calendar-toolbar__brand-btn:hover,
+[data-theme='dark'] .calendar-toolbar__brand-btn:focus-visible {
+    background: rgb(30 58 138 / 0.45);
+    border-color: rgb(59 130 246);
+}
+
+.calendar-toolbar__click-chip {
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.calendar-toolbar__title-chip {
+    border: 1px solid rgb(203 213 225 / 0.9);
+    border-radius: 0.75rem;
+    background: rgb(255 255 255 / 0.85);
+    padding: 0.2rem 0.65rem;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.06);
+}
+
+.calendar-toolbar__title-chip:hover {
+    background: rgb(248 250 252);
+    border-color: rgb(148 163 184);
+}
+
+[data-theme='dark'] .calendar-toolbar__title-chip {
+    background: rgb(30 41 59 / 0.9);
+    border-color: rgb(71 85 105);
+    color: rgb(226 232 240);
+}
+
+#modal_rules .rules-modal-box {
+    background: rgb(255 255 255);
+    color: rgb(51 65 85);
+}
+
+[data-theme='dark'] #modal_rules .rules-modal-box {
+    background: rgb(30 41 59);
+    color: rgb(226 232 240);
+}
+
+#modal_rules .rules-modal-body.organ-rich {
+    color: inherit;
+}
+
+#modal_reservation.planning-route-page .reservation-route-box {
+    background: rgb(248 250 252);
+}
+
+[data-theme='dark'] #modal_reservation.planning-route-page .reservation-route-box {
+    background: rgb(15 23 42);
+}
+
+.calendar-pool-card__left {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: calc(100% - 2.5rem);
 }
