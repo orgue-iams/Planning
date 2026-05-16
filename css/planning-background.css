@@ -57,13 +57,16 @@
     filter: invert(1) hue-rotate(180deg) grayscale(0.35) contrast(0.92) brightness(1.02);
 }
 
-/* Photo de fond : colonnes jour/heure (créneaux), pas l’axe des heures ni les bandeaux. */
-#calendar .fc-timegrid-body .fc-timegrid-cols {
+/*
+ * Photo de fond : couche FC sous les événements (.fc-timegrid-col-bg), pas sur tout le conteneur
+ * (sinon les ::before/::after masquent les créneaux).
+ */
+#calendar .fc-timegrid-body .fc-timegrid-col-bg {
     position: relative;
-    isolation: isolate;
+    overflow: hidden;
 }
 
-#calendar .fc-timegrid-body .fc-timegrid-cols::before {
+#calendar .fc-timegrid-body .fc-timegrid-col-bg::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -76,26 +79,21 @@
     filter: grayscale(0.45) brightness(1.08) contrast(0.9) saturate(0.75);
 }
 
-#calendar .fc-timegrid-body .fc-timegrid-cols::after {
+#calendar .fc-timegrid-body .fc-timegrid-col-bg::after {
     content: '';
     position: absolute;
     inset: 0;
-    z-index: 0;
+    z-index: 1;
     pointer-events: none;
     background: rgba(248, 250, 252, 0.78);
     backdrop-filter: saturate(0.7) blur(0.5px);
 }
 
-#calendar .fc-timegrid-body .fc-timegrid-cols > table {
-    position: relative;
-    z-index: 1;
-}
-
-[data-theme='dark'] #calendar .fc-timegrid-body .fc-timegrid-cols::before {
+[data-theme='dark'] #calendar .fc-timegrid-body .fc-timegrid-col-bg::before {
     filter: invert(1) hue-rotate(180deg) grayscale(0.35) contrast(0.92) brightness(1.02);
 }
 
-[data-theme='dark'] #calendar .fc-timegrid-body .fc-timegrid-cols::after {
+[data-theme='dark'] #calendar .fc-timegrid-body .fc-timegrid-col-bg::after {
     background: rgba(15, 23, 42, 0.38);
     backdrop-filter: saturate(0.8) blur(0.5px);
 }
