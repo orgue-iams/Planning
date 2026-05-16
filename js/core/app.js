@@ -72,6 +72,7 @@ import {
     initDrawerProfileExtrasUi,
     refreshDrawerProfileExtras
 } from './drawer-profile-extras-ui.js';
+import { initDrawerHelpUi, resetDrawerHelpUiBindings } from './drawer-help-ui.js';
 import {
     initCalendarPreferencesUi,
     resetCalendarPreferencesUiBindings,
@@ -88,6 +89,7 @@ import { fetchOrganSchoolSettings, getChapelSlotBounds, invalidateOrganSchoolSet
 import { CACHE_NAME } from '../config/cache-name.js';
 import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
 import { applyPlanningPortraitSlotFit, bindPlanningPortraitSlotFit } from './planning-viewport-fit.js';
+import { closePlanningDrawer } from './planning-drawer-ui.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
 
 if ('serviceWorker' in navigator) {
@@ -131,7 +133,9 @@ function performLogout() {
     resetDirectoryUsersUiBindings();
     resetCoursSeriesScopeUiBindings();
     resetConfigUiBindings();
-    resetPlanningDrawerBindings();
+        resetPlanningDrawerBindings();
+        resetDrawerHelpUiBindings();
+    closePlanningDrawer();
     invalidateOrganSchoolSettingsCache();
     invalidateCalendarListCache();
     currentEvent = null;
@@ -349,6 +353,7 @@ function initCalendarAndRevealUi() {
 
     // FullCalendar mesure le conteneur au render : il doit être visible (plus auth-pending).
     document.body.classList.remove('auth-pending');
+    closePlanningDrawer();
 
     const mount = async () => {
         if (isBackendAuthConfigured()) {
@@ -441,6 +446,7 @@ function initCalendarAndRevealUi() {
         initMessagesUi(currentUser);
         initProfileUi(currentUser);
         initDrawerProfileExtrasUi();
+        initDrawerHelpUi();
         void refreshDrawerProfileExtras(currentUser);
         initCalendarPreferencesUi({ getCalendar: () => calendar });
         document.addEventListener('planning-profile-saved', () => {

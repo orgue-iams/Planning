@@ -61,7 +61,8 @@ export async function fetchOrganSchoolSettings() {
             eleve_booking_horizon_unit: 'days',
             eleve_count_voided_travail_toward_cap: true,
             eleve_forbid_delete_after_slot_start: true,
-            eleve_booking_tolerance_days: 0
+            eleve_booking_tolerance_days: 0,
+            template_apply_closure_ranges: []
         };
         return cache;
     }
@@ -109,7 +110,7 @@ export async function saveOrganSchoolSettingsAdmin(row) {
     const capHours =
         capH === '' || capH === null || capH === undefined
             ? null
-            : Math.min(10, Math.max(1, parseInt(String(capH), 10) || 0)) || null;
+            : Math.max(1, Math.round(parseFloat(String(capH).replace(',', '.')) || 0)) || null;
     const { error } = await sb
         .from('organ_school_settings')
         .update({
@@ -126,12 +127,43 @@ export async function saveOrganSchoolSettingsAdmin(row) {
                 : null,
             eleve_booking_horizon_unit:
                 String(row.eleve_booking_horizon_unit || 'days') === 'weeks' ? 'weeks' : 'days',
-            eleve_count_voided_travail_toward_cap: Boolean(row.eleve_count_voided_travail_toward_cap),
+            eleve_count_voided_travail_toward_cap: Boolean(
+                row.eleve_count_voided_travail_toward_cap ??
+                    getOrganSchoolSettingsCached()?.eleve_count_voided_travail_toward_cap ??
+                    true
+            ),
             eleve_forbid_delete_after_slot_start: Boolean(row.eleve_forbid_delete_after_slot_start),
             eleve_booking_tolerance_days: Math.max(
                 0,
                 parseInt(String(row.eleve_booking_tolerance_days ?? '0'), 10) || 0
             ),
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', 1);
+    if (error) return { ok: false, error: error.message };
+    invalidateOrganSchoolSettingsCache();
+    await fetchOrganSchoolSettings();
+    return { ok: true };
+}
+
+/**
+ * @param {{ startYmd: string, endYmd: string }[]} ranges
+ */
+export async function saveTemplateClosureRanges(ranges) {
+    const sb = getSupabaseClient();
+    if (!sb) return { ok: false, error: 'Session indisponible.' };
+    const safe = Array.isArray(ranges)
+        ? ranges
+              .map((r) => ({
+                  startYmd: String(r?.startYmd || '').trim(),
+                  endYmd: String(r?.endYmd || '').trim()
+              }))
+              .filter((r) => r.startYmd && r.endYmd && r.endYmd >= r.startYmd)
+        : [];
+    const { error } = await sb
+        .from('organ_school_settings')
+        .update({
+            template_apply_closure_ranges: safe,
             updated_at: new Date().toISOString()
         })
         .eq('id', 1);

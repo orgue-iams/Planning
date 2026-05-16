@@ -1,199 +1,161 @@
 <dialog id="modal_semaines_types" class="modal modal-semaines-types">
     <div class="modal-box semaines-types-modal-box flex flex-col w-full max-w-none h-full max-h-none min-h-0 rounded-none p-0 border-0 shadow-none bg-slate-50">
-        <header class="shrink-0 px-4 sm:px-6 py-3 border-b border-slate-200 bg-white shadow-sm">
-            <div class="max-w-[1600px] mx-auto w-full">
-                <h3 class="font-black text-sm sm:text-base uppercase text-slate-700 tracking-wide">Semaines types A / B</h3>
-                <p class="text-[11px] sm:text-xs text-slate-500 mt-0.5 max-w-3xl">Définissez deux gabarits (A et B), puis sur une <strong>période</strong> indiquez quelle semaine type correspond à la <strong>semaine du jour de début</strong> : l’app alterne automatiquement chaque lundi jusqu’à la date de fin.</p>
-            </div>
-        </header>
-
         <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-4">
-            <div class="max-w-[1600px] mx-auto w-full space-y-4">
+            <div class="max-w-[1600px] mx-auto w-full">
 
-        <section id="st-gabarit-section">
-            <p class="text-[10px] font-black uppercase text-slate-600 mb-2">Gabarit</p>
-            <p id="st-gabarit-readonly-hint" class="hidden text-[9px] text-amber-800 bg-amber-50 border border-amber-100 rounded-lg p-2 mb-2">
-                Consultation seule : vous voyez les lignes de tous les professeurs. Seuls les profs modifient leurs créneaux ; les changements d’application ne portent que sur votre propre gabarit.
-            </p>
-            <div class="grid grid-cols-1 gap-4">
-                <div class="rounded-xl border border-slate-200 bg-white p-2 sm:p-3 min-w-0">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-[11px] font-bold text-slate-700">Semaine type A</span>
-                        <button type="button" id="st-add-row-a" class="btn btn-ghost btn-xs font-black text-[10px] hidden">+ Ligne</button>
-                    </div>
-                    <div class="overflow-x-hidden -mx-1">
-                        <table class="table table-sm w-full text-[10px] sm:text-[11px] st-week-table">
-                            <thead>
-                                <tr class="text-slate-500 bg-slate-100">
-                                    <th class="w-7 p-0" aria-label="Déplacer"></th>
-                                    <th class="min-w-0 text-[10px] sm:text-[11px] font-semibold font-sans normal-case tracking-normal">Période</th>
-                                    <th class="min-w-0 max-w-[9rem] text-[10px] sm:text-[11px] font-semibold font-sans normal-case tracking-normal">Prof</th>
-                                    <th class="min-w-0 text-[10px] sm:text-[11px] font-semibold font-sans normal-case tracking-normal">Type &amp; titre</th>
-                                    <th class="min-w-0 text-[10px] sm:text-[11px] font-semibold font-sans normal-case tracking-normal">Élèves</th>
-                                    <th class="w-14 p-1 text-[10px] font-normal font-sans text-right" aria-label="Actions"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="st-tbody-a"></tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="rounded-xl border border-slate-200 bg-white p-2 sm:p-3 min-w-0">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-[11px] font-bold text-slate-700">Semaine type B</span>
-                        <button type="button" id="st-add-row-b" class="btn btn-ghost btn-xs font-black text-[10px] hidden">+ Ligne</button>
-                    </div>
-                    <div class="overflow-x-hidden -mx-1">
-                        <table class="table table-sm w-full text-[10px] sm:text-[11px] st-week-table">
-                            <thead>
-                                <tr class="text-slate-500 bg-slate-100">
-                                    <th class="w-7 p-0" aria-label="Déplacer"></th>
-                                    <th class="min-w-0 text-[10px] sm:text-[11px] font-semibold font-sans normal-case tracking-normal">Période</th>
-                                    <th class="min-w-0 max-w-[9rem] text-[10px] sm:text-[11px] font-semibold font-sans normal-case tracking-normal">Prof</th>
-                                    <th class="min-w-0 text-[10px] sm:text-[11px] font-semibold font-sans normal-case tracking-normal">Type &amp; titre</th>
-                                    <th class="min-w-0 text-[10px] sm:text-[11px] font-semibold font-sans normal-case tracking-normal">Élèves</th>
-                                    <th class="w-14 p-1 text-[10px] font-normal font-sans text-right" aria-label="Actions"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="st-tbody-b"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            <div id="st-gabarit-actions" class="mt-3 hidden">
-                <button type="button" id="st-save-gabarit" class="btn btn-primary btn-sm font-black text-[11px]">Enregistrer le gabarit</button>
-            </div>
-        </section>
-
-        <section id="st-apply-section" class="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
-            <p class="text-[10px] font-black uppercase text-slate-600 mb-1">Appliquer le gabarit sur Google Agenda</p>
-            <p id="st-apply-admin-hint" class="hidden text-[9px] text-amber-900 bg-amber-50 border border-amber-100 rounded-lg p-2 mb-2">
-                En tant qu’<strong>administrateur</strong>, vous consultez les gabarits. La <strong>préparation</strong> et l’<strong>écriture</strong> dans les agendas sont réservées aux comptes <strong>professeur</strong> (connectez-vous avec un prof pour lancer l’application).
-            </p>
-            <div id="st-apply-controls" class="space-y-2">
-                <p class="text-[9px] text-slate-500">Étape 1 : préparer (compte des créations / suppressions). Étape 2 : appliquer sur le planning général et les agendas pool concernés.</p>
-                <div class="flex flex-wrap gap-3 items-end">
-                    <div>
-                        <label class="text-[9px] font-bold text-slate-500 block" for="st-apply-start">Date de début (inclus)</label>
-                        <input type="date" id="st-apply-start" class="input input-sm h-9 font-mono text-sm bg-white border border-slate-200 rounded-lg" />
-                    </div>
-                    <div>
-                        <label class="text-[9px] font-bold text-slate-500 block" for="st-apply-end">Date de fin (inclus)</label>
-                        <input type="date" id="st-apply-end" class="input input-sm h-9 font-mono text-sm bg-white border border-slate-200 rounded-lg" />
-                    </div>
-                    <fieldset class="min-w-0 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50/80">
-                        <legend class="text-[9px] font-bold text-slate-500 px-1">Semaine type de la semaine du jour de début</legend>
-                        <div class="flex flex-wrap gap-3 text-[11px] font-bold text-slate-700">
-                            <label class="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="st-apply-first-week" id="st-apply-week-a" value="A" class="radio radio-xs" checked /> A</label>
-                            <label class="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="st-apply-first-week" id="st-apply-week-b" value="B" class="radio radio-xs" /> B</label>
+                <div id="st-main-panel" class="st-main-panel-stack">
+                    <section id="st-gabarit-section" class="st-section">
+                        <p class="st-section-title">Semaines types A / B</p>
+                        <div class="st-section-split">
+                            <div class="st-section-col">
+                                <div class="st-section-col-head">
+                                    <span class="font-bold text-slate-700">Semaine type A</span>
+                                    <button type="button" id="st-add-row-a" class="btn btn-ghost btn-xs font-black text-[10px] hidden">+ Créneau</button>
+                                </div>
+                                <div id="st-list-a" class="st-slot-list"></div>
+                            </div>
+                            <div class="st-section-col">
+                                <div class="st-section-col-head">
+                                    <span class="font-bold text-slate-700">Semaine type B</span>
+                                    <button type="button" id="st-add-row-b" class="btn btn-ghost btn-xs font-black text-[10px] hidden">+ Créneau</button>
+                                </div>
+                                <div id="st-list-b" class="st-slot-list"></div>
+                            </div>
                         </div>
-                    </fieldset>
+                    </section>
+
+                    <section id="st-closure-section" class="st-section">
+                        <div class="st-section-col-head">
+                            <p class="st-section-title m-0">Semaines de fermeture (non appliquées)</p>
+                            <button type="button" id="st-add-closure" class="btn btn-ghost btn-xs font-black text-[10px]">+ Fermeture</button>
+                        </div>
+                        <div id="st-closure-list" class="st-closure-list"></div>
+                    </section>
+
+                    <section id="st-apply-section" class="st-section">
+                        <p class="st-section-title">Appliquer le gabarit sur Google Agenda</p>
+                        <p id="st-apply-admin-hint" class="hidden text-[9px] text-amber-900 bg-amber-50 border-b border-amber-100 py-2 mb-2">
+                            En tant qu’<strong>administrateur</strong>, vous consultez les gabarits. La <strong>préparation</strong> et l’<strong>écriture</strong> dans les agendas sont réservées aux comptes <strong>professeur</strong> (connectez-vous avec un prof pour lancer l’application).
+                        </p>
+                        <div id="st-apply-controls" class="space-y-3">
+                            <p class="text-[9px] text-slate-500 m-0">Étape 1 : préparer (compte des créations / suppressions). Étape 2 : appliquer sur le planning général et les agendas pool concernés.</p>
+                            <div class="st-apply-period space-y-2 pt-2 border-t border-slate-200">
+                                <p class="text-[9px] font-bold text-slate-600 m-0">Période et semaine type de départ</p>
+                                <div class="flex flex-wrap gap-3 items-end">
+                                    <div>
+                                        <label class="text-[9px] font-bold text-slate-500 block" for="st-apply-start">Date de début (inclus)</label>
+                                        <input type="date" id="st-apply-start" class="input input-sm h-9 font-mono text-sm bg-white border border-slate-200 rounded-lg" />
+                                    </div>
+                                    <div>
+                                        <label class="text-[9px] font-bold text-slate-500 block" for="st-apply-end">Date de fin (inclus)</label>
+                                        <input type="date" id="st-apply-end" class="input input-sm h-9 font-mono text-sm bg-white border border-slate-200 rounded-lg" />
+                                    </div>
+                                </div>
+                                <p class="text-[9px] font-bold text-slate-500 m-0">Semaine type de la semaine du jour de début</p>
+                                <div class="flex flex-wrap gap-3 text-[11px] font-bold text-slate-700">
+                                    <label class="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="st-apply-first-week" id="st-apply-week-a" value="A" class="radio radio-xs" checked /> A</label>
+                                    <label class="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="st-apply-first-week" id="st-apply-week-b" value="B" class="radio radio-xs" /> B</label>
+                                </div>
+                            </div>
+                            <p class="text-[9px] text-slate-500 leading-snug m-0">La semaine type porte sur la semaine <strong>lundi → dimanche</strong> qui <strong>contient</strong> la date de début. Le <strong>lundi suivant</strong> bascule A ↔ B, etc. Ce repère est <strong>personnel</strong> (chaque prof le sien).</p>
+                            <div class="flex flex-wrap gap-2 items-center pt-2 border-t border-slate-200">
+                                <button type="button" id="st-btn-analyze" class="btn btn-outline btn-sm font-black text-[11px]">1. Préparer l’application</button>
+                                <button
+                                    type="button"
+                                    id="st-btn-apply"
+                                    disabled
+                                    class="btn btn-error btn-sm font-black text-[11px]"
+                                    title="Terminez d’abord l’étape 1 (Préparer l’application)."
+                                >
+                                    2. Appliquer sur Google Agenda
+                                </button>
+                                <span
+                                    id="st-google-sync-hint"
+                                    class="hidden text-[9px] text-amber-900 max-w-md leading-snug self-center"
+                                    role="status"
+                                >
+                                    Synchro Google en cours — Préparer / Appliquer indisponibles jusqu’à la fin.
+                                </span>
+                            </div>
+                            <p id="st-btn-apply-hint" class="text-[9px] text-slate-500 m-0 max-w-4xl leading-snug">
+                                Le bouton <strong>2</strong> reste inactif tant que la préparation n’a pas réussi ; le résumé s’affiche dans l’encadré ci-dessous.
+                            </p>
+                            <div id="st-apply-progress-wrap" class="hidden mt-3 max-w-4xl space-y-1" aria-live="polite">
+                                <progress id="st-apply-progress" class="progress progress-primary w-full h-2.5" max="100" value="0"></progress>
+                                <p id="st-apply-progress-text" class="text-[9px] text-slate-600 m-0 leading-snug"></p>
+                            </div>
+                            <div id="st-analyze-out-wrap" class="border-t border-slate-200 pt-3 max-w-4xl min-h-[3.5rem] mt-2" aria-live="polite" aria-atomic="true">
+                                <p id="st-analyze-placeholder" class="text-[9px] text-slate-500 m-0 leading-relaxed" style="display: block">
+                                    Cliquez sur <strong>1. Préparer l’application</strong> : le résumé (bilan, conflits) s’affiche dans cet encadré. Ensuite activez <strong>2. Appliquer sur Google Agenda</strong> (à droite du bouton 1).
+                                </p>
+                                <pre
+                                    id="st-analyze-out"
+                                    class="text-[10px] sm:text-xs text-slate-800 whitespace-pre-wrap font-sans m-0 leading-relaxed"
+                                    style="display: none"
+                                ></pre>
+                            </div>
+                        </div>
+                    </section>
                 </div>
-                <p class="text-[9px] text-slate-500 leading-snug">La semaine type porte sur la semaine <strong>lundi → dimanche</strong> qui <strong>contient</strong> la date de début (ex. début le <strong>dimanche 12</strong> = semaine du <strong>lundi 6</strong> au dimanche 12, pas la semaine suivante). Le <strong>lundi suivant</strong> bascule A ↔ B, etc. Ce repère est <strong>personnel</strong> (chaque prof le sien). Après <strong>Appliquer</strong>, le libellé « Semaine A/B » dans le planning n’apparaît qu’en vue <strong>Semaine</strong>, <strong>Jour</strong> ou <strong>Planning</strong> (liste), pas en vue Mois.</p>
-                <div class="flex flex-wrap gap-2 items-center">
-                    <button type="button" id="st-btn-analyze" class="btn btn-outline btn-sm font-black text-[11px]">1. Préparer l’application</button>
-                    <button
-                        type="button"
-                        id="st-btn-apply"
-                        disabled
-                        class="btn btn-error btn-sm font-black text-[11px]"
-                        title="Terminez d’abord l’étape 1 (Préparer l’application)."
-                    >
-                        2. Appliquer sur Google Agenda
-                    </button>
-                    <span
-                        id="st-google-sync-hint"
-                        class="hidden text-[9px] text-amber-900 max-w-md leading-snug self-center"
-                        role="status"
-                    >
-                        Synchro Google en cours — Préparer / Appliquer indisponibles jusqu’à la fin.
-                    </span>
-                </div>
-                <p id="st-btn-apply-hint" class="text-[9px] text-slate-500 m-0 mt-1 max-w-4xl leading-snug">
-                    Le bouton <strong>2</strong> reste inactif tant que la préparation n’a pas réussi ; le résumé s’affiche dans l’encadré ci-dessous.
-                </p>
-                <div id="st-apply-progress-wrap" class="hidden mt-3 max-w-4xl space-y-1" aria-live="polite">
-                    <progress id="st-apply-progress" class="progress progress-primary w-full h-2.5" max="100" value="0"></progress>
-                    <p id="st-apply-progress-text" class="text-[9px] text-slate-600 m-0 leading-snug"></p>
-                </div>
-                <div id="st-analyze-out-wrap" class="rounded-lg border border-slate-200 bg-slate-50 p-3 max-w-4xl min-h-[3.5rem] mt-2" aria-live="polite" aria-atomic="true">
-                    <p id="st-analyze-placeholder" class="text-[9px] text-slate-500 m-0 leading-relaxed" style="display: block">
-                        Cliquez sur <strong>1. Préparer l’application</strong> : le résumé (bilan, conflits) s’affiche dans cet encadré. Ensuite activez <strong>2. Appliquer sur Google Agenda</strong> (à droite du bouton 1).
-                    </p>
-                    <pre
-                        id="st-analyze-out"
-                        class="text-[10px] sm:text-xs text-slate-800 whitespace-pre-wrap font-sans m-0 leading-relaxed"
-                        style="display: none"
-                    ></pre>
-                </div>
-            </div>
-            <p class="text-[9px] text-slate-500 mt-2">TODO (hors V1) : e-mail récapitulatif par élève après changements.</p>
-        </section>
+
+                <section id="st-slot-edit-panel" class="hidden max-w-lg st-edit-panel" aria-hidden="true">
+                    <div class="space-y-3 text-[11px] text-slate-800">
+                        <div class="st-edit-field">
+                            <span class="st-edit-label">Type</span>
+                            <div class="flex flex-wrap gap-3 mt-1">
+                                <label class="flex items-center gap-1.5 cursor-pointer font-medium">
+                                    <input type="radio" name="stle-slot-type" id="stle-type-cours" value="cours" class="radio radio-xs" checked />
+                                    Cours
+                                </label>
+                                <label class="flex items-center gap-1.5 cursor-pointer font-medium">
+                                    <input type="radio" name="stle-slot-type" id="stle-type-reservation" value="reservation" class="radio radio-xs" />
+                                    Travail perso.
+                                </label>
+                            </div>
+                        </div>
+                        <label class="st-edit-field block" for="stle-dow">
+                            <span class="st-edit-label">Jour</span>
+                            <select id="stle-dow" class="select select-bordered select-sm w-full text-[11px] bg-white mt-0.5">
+                                <option value="1">Lundi</option>
+                                <option value="2">Mardi</option>
+                                <option value="3">Mercredi</option>
+                                <option value="4">Jeudi</option>
+                                <option value="5">Vendredi</option>
+                                <option value="6">Samedi</option>
+                                <option value="7">Dimanche</option>
+                            </select>
+                        </label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="stle-start">Début</label>
+                                <input type="time" id="stle-start" step="300" class="input input-bordered input-sm w-full font-mono text-[11px] bg-white" />
+                            </div>
+                            <div>
+                                <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="stle-end">Fin</label>
+                                <input type="time" id="stle-end" step="300" class="input input-bordered input-sm w-full font-mono text-[11px] bg-white" />
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="stle-title">Titre</label>
+                            <input type="text" id="stle-title" class="input input-bordered input-sm w-full text-[11px] bg-white" maxlength="200" />
+                        </div>
+                        <button
+                            type="button"
+                            id="stle-students-wrap"
+                            class="stle-students-trigger st-edit-field st-edit-field--clickable w-full text-left hidden"
+                        >
+                            <span class="st-edit-label">Élèves inscrits</span>
+                            <span id="stle-students-summary" class="block text-[11px] text-slate-800 leading-snug mt-1 min-h-[1.25rem]">Aucun inscrit</span>
+                        </button>
+                    </div>
+                </section>
+
+                <section id="st-students-edit-panel" class="hidden max-w-lg st-edit-panel" aria-hidden="true">
+                    <div id="st-students-list-in" class="st-students-pick-stack space-y-1"></div>
+                    <div id="st-students-list-out" class="st-students-pick-stack space-y-1 mt-2"></div>
+                </section>
 
             </div>
-        </div>
-
-        <footer class="shrink-0 border-t border-slate-200 bg-white px-4 sm:px-6 py-3 shadow-[0_-4px_14px_-6px_rgba(15,23,42,0.08)]">
-            <div class="max-w-[1600px] mx-auto w-full flex flex-wrap justify-end gap-2">
-                <button type="button" id="st-goto-cal" class="btn btn-primary btn-sm font-black text-[11px]">Fermer</button>
-            </div>
-        </footer>
-    </div>
-</dialog>
-
-<dialog id="modal_st_line_edit" class="modal" tabindex="-1">
-    <div class="modal-box p-5 w-[96%] max-w-md rounded-2xl border border-slate-200 shadow-2xl">
-        <h3 class="font-black text-xs mb-3 uppercase text-slate-500 border-b pb-2 tracking-widest">Modifier le créneau</h3>
-        <div class="space-y-3 text-[11px] text-slate-800">
-            <fieldset class="border border-slate-200 rounded-xl p-2 bg-slate-50/80">
-                <legend class="text-[9px] font-bold text-slate-500 px-1">Type</legend>
-                <div class="flex flex-wrap gap-3 mt-1">
-                    <label class="flex items-center gap-1.5 cursor-pointer font-medium">
-                        <input type="radio" name="stle-slot-type" id="stle-type-cours" value="cours" class="radio radio-xs" checked />
-                        Cours
-                    </label>
-                    <label class="flex items-center gap-1.5 cursor-pointer font-medium">
-                        <input type="radio" name="stle-slot-type" id="stle-type-reservation" value="reservation" class="radio radio-xs" />
-                        Travail perso.
-                    </label>
-                </div>
-            </fieldset>
-            <div>
-                <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="stle-dow">Jour</label>
-                <select id="stle-dow" class="select select-bordered select-sm w-full text-[11px] bg-white">
-                    <option value="1">Lundi</option>
-                    <option value="2">Mardi</option>
-                    <option value="3">Mercredi</option>
-                    <option value="4">Jeudi</option>
-                    <option value="5">Vendredi</option>
-                    <option value="6">Samedi</option>
-                    <option value="7">Dimanche</option>
-                </select>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="stle-start">Début</label>
-                    <input type="time" id="stle-start" step="300" class="input input-bordered input-sm w-full font-mono text-[11px] bg-white" />
-                </div>
-                <div>
-                    <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="stle-end">Fin</label>
-                    <input type="time" id="stle-end" step="300" class="input input-bordered input-sm w-full font-mono text-[11px] bg-white" />
-                </div>
-            </div>
-            <div>
-                <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="stle-title">Titre</label>
-                <input type="text" id="stle-title" class="input input-bordered input-sm w-full text-[11px] bg-white" maxlength="200" />
-            </div>
-            <div id="stle-students-wrap" class="rounded-xl border border-slate-200 bg-slate-50/80 p-2">
-                <p class="text-[9px] font-bold text-slate-600 mb-1">Élèves inscrits</p>
-                <p id="stle-students-summary" class="text-[10px] text-slate-700 leading-snug mb-2 min-h-[2.5rem]"></p>
-                <button type="button" id="stle-btn-students" class="btn btn-outline btn-xs font-black text-[10px] w-full sm:w-auto">
-                    Inscriptions (glisser-déposer)
-                </button>
-            </div>
-        </div>
-        <div class="modal-action mt-4 pt-2 border-t border-slate-100 flex flex-wrap justify-end gap-2">
-            <button type="button" id="stle-btn-cancel" class="btn btn-ghost btn-sm font-black text-[11px]">Annuler</button>
-            <button type="button" id="stle-btn-ok" class="btn btn-primary btn-sm font-black text-[11px]">Valider</button>
         </div>
     </div>
 </dialog>

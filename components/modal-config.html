@@ -34,43 +34,34 @@
             </div>
         </div>
 
-        <div class="planning-route-section space-y-3">
-            <p class="text-[10px] font-bold text-slate-700">Règles élèves (travail perso)</p>
-            <p class="text-[9px] text-slate-500 leading-snug">
-                Plafond hebdomadaire (lundi–dimanche, fuseau du navigateur) et fenêtre de réservation dans le futur (nombre de jours). Le journal d’annulations comptabilise les créneaux supprimés pour limiter le contournement du plafond.
-            </p>
-            <label class="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" id="config-eleve-cap-enabled" class="checkbox checkbox-sm checkbox-primary mt-0.5 shrink-0" />
-                <span class="text-[10px] font-bold text-slate-700 leading-snug">Limiter les heures de travail perso par semaine</span>
-            </label>
-            <div class="flex flex-wrap items-end gap-2 pl-1">
-                <div>
-                    <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="config-eleve-cap-hours">Heures max / semaine (1–10)</label>
-                    <input type="number" id="config-eleve-cap-hours" min="1" max="10" step="1" class="input input-sm h-9 w-20 text-sm font-mono bg-white border border-slate-200 rounded-lg" />
-                </div>
+        <div class="planning-route-section space-y-0">
+            <p class="text-[10px] font-bold text-slate-700 mb-2">Règles élèves (travail perso)</p>
+
+            <div class="config-rule-row" data-config-rule="cap">
+                <span class="config-rule-title">Limite d’heures par sem.</span>
+                <input type="checkbox" id="config-eleve-cap-enabled" class="config-rule-toggle-input sr-only" role="switch" />
+                <label for="config-eleve-cap-enabled" class="config-rule-toggle" aria-hidden="true"></label>
+                <input type="number" id="config-eleve-cap-hours" class="config-rule-field input input-sm h-9 w-20 text-sm font-mono bg-white border border-slate-200 rounded-lg hidden" min="1" step="0.5" />
             </div>
-            <label class="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" id="config-eleve-horizon-enabled" class="checkbox checkbox-sm checkbox-primary mt-0.5 shrink-0" />
-                <span class="text-[10px] font-bold text-slate-700 leading-snug">Limiter les réservations dans le futur</span>
-            </label>
-            <div class="pl-1">
-                <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="config-eleve-horizon-amount">Nombre de jours maximum</label>
-                <input type="number" id="config-eleve-horizon-amount" min="0" max="366" step="1" class="input input-sm h-9 w-24 text-sm font-mono bg-white border border-slate-200 rounded-lg" title="Au-delà de cette fenêtre (à partir d’aujourd’hui), un élève ne peut pas réserver." />
+
+            <div class="config-rule-row" data-config-rule="horizon">
+                <span class="config-rule-title">Réservabilité dans le futur</span>
+                <input type="checkbox" id="config-eleve-horizon-enabled" class="config-rule-toggle-input sr-only" role="switch" />
+                <label for="config-eleve-horizon-enabled" class="config-rule-toggle" aria-hidden="true"></label>
+                <input type="number" id="config-eleve-horizon-amount" class="config-rule-field input input-sm h-9 w-24 text-sm font-mono bg-white border border-slate-200 rounded-lg hidden" min="0" max="366" step="1" />
             </div>
-            <label class="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" id="config-eleve-void-toward-cap" class="checkbox checkbox-sm checkbox-primary mt-0.5 shrink-0" checked />
-                <span class="text-[10px] font-bold text-slate-700 leading-snug">Compter les annulations dans le plafond hebdo</span>
-            </label>
-            <label class="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" id="config-eleve-no-delete-after-start" class="checkbox checkbox-sm checkbox-primary mt-0.5 shrink-0" checked />
-                <span class="text-[10px] font-bold text-slate-700 leading-snug">Interdire la suppression après l’heure de début du créneau</span>
-            </label>
+
+            <div class="config-rule-row" data-config-rule="nodelete">
+                <span class="config-rule-title">Interdire la suppression après l’heure de début du créneau</span>
+                <input type="checkbox" id="config-eleve-no-delete-after-start" class="config-rule-toggle-input sr-only" role="switch" />
+                <label for="config-eleve-no-delete-after-start" class="config-rule-toggle" aria-hidden="true"></label>
+            </div>
         </div>
 
         <div id="config-planning-notify-wrap" class="hidden planning-route-section space-y-2">
-            <p class="text-[10px] font-bold text-slate-700">Alertes infrastructure (planning)</p>
+            <p class="text-[10px] font-bold text-slate-700">Support Technique</p>
             <p class="text-[9px] text-slate-600 leading-snug">
-                E-mail pour le digest nocturne des erreurs techniques (base, bridge, envoi mail) — pas les messages métier de l’application.
+                E-mail pour les demandes de support utilisateurs, et destinataire des contrôles automatiques.
             </p>
             <div>
                 <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="config-planning-error-notify-email">Destinataire</label>

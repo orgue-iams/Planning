@@ -23,8 +23,13 @@ const ELEVE_FIELD_IDS = [
     'config-eleve-cap-hours',
     'config-eleve-horizon-enabled',
     'config-eleve-horizon-amount',
-    'config-eleve-void-toward-cap',
     'config-eleve-no-delete-after-start'
+];
+
+const CONFIG_RULES = [
+    { toggleId: 'config-eleve-cap-enabled', fieldId: 'config-eleve-cap-hours' },
+    { toggleId: 'config-eleve-horizon-enabled', fieldId: 'config-eleve-horizon-amount' },
+    { toggleId: 'config-eleve-no-delete-after-start', fieldId: null }
 ];
 
 const CONFIG_PERSIST_IDS = [
@@ -100,12 +105,25 @@ async function fillConfigModal() {
             unit === 'weeks' ? rawAmt * 7 : rawAmt;
         hzA.value = String(days);
     }
-    const vTow = document.getElementById('config-eleve-void-toward-cap');
-    if (vTow) vTow.checked = data?.eleve_count_voided_travail_toward_cap !== false;
     const noDel = document.getElementById('config-eleve-no-delete-after-start');
     if (noDel) noDel.checked = data?.eleve_forbid_delete_after_slot_start !== false;
 
     configInitialSnapshot = currentConfigSnapshot();
+    syncConfigRuleRows();
+}
+
+function syncConfigRuleRows() {
+    for (const rule of CONFIG_RULES) {
+        const toggle = document.getElementById(rule.toggleId);
+        const field = rule.fieldId ? document.getElementById(rule.fieldId) : null;
+        const on = toggle instanceof HTMLInputElement && toggle.checked;
+        if (field) field.classList.toggle('hidden', !on);
+        if (toggle) {
+            toggle.setAttribute('aria-checked', on ? 'true' : 'false');
+            const lab = document.querySelector(`label.config-rule-toggle[for="${rule.toggleId}"]`);
+            if (lab) lab.classList.toggle('config-rule-toggle--on', on);
+        }
+    }
 }
 
 function currentConfigSnapshot() {
@@ -172,7 +190,6 @@ async function persistConfigIfAdmin() {
         eleve_booking_horizon_enabled: hzOn,
         eleve_booking_horizon_amount: document.getElementById('config-eleve-horizon-amount')?.value,
         eleve_booking_horizon_unit: 'days',
-        eleve_count_voided_travail_toward_cap: document.getElementById('config-eleve-void-toward-cap')?.checked,
         eleve_forbid_delete_after_slot_start: document.getElementById('config-eleve-no-delete-after-start')?.checked,
         eleve_booking_tolerance_days: 0
     });
@@ -236,7 +253,17 @@ export function initConfigUi(currentUser) {
     /* Un seul événement par champ : `input` + `change` déclenchaient plusieurs sauvegardes (ex. nombre de toasts). */
     for (const id of CONFIG_PERSIST_IDS) {
         const el = document.getElementById(id);
-        el?.addEventListener('change', scheduleConfigPersist);
+        el?.addEventListener('change', () => {
+            syncConfigRuleRows();
+            scheduleConfigPersist();
+        });
+    }
+    for (const rule of CONFIG_RULES) {
+        const toggle = document.getElementById(rule.toggleId);
+        toggle?.addEventListener('change', () => {
+            syncConfigRuleRows();
+            scheduleConfigPersist();
+        });
     }
 }
 

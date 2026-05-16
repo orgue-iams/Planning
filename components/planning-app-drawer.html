@@ -1,8 +1,8 @@
 <div id="planning-drawer-backdrop" class="planning-drawer-backdrop" aria-hidden="true"></div>
 <aside id="planning-app-drawer" class="planning-app-drawer" aria-label="Menu principal" aria-hidden="true">
-    <div class="planning-drawer__scroll">
+    <div id="planning-drawer-main-scroll" class="planning-drawer__scroll">
         <div id="menu-item-profile-wrap" class="planning-drawer__block planning-drawer__block--profile hidden">
-            <button type="button" id="menu-item-profile" class="planning-drawer__view-btn planning-drawer__view-btn--profile" aria-label="Ouvrir mon profil">
+            <button type="button" id="menu-item-profile" class="planning-drawer__view-btn planning-drawer__view-btn--profile planning-drawer__profile-chip" aria-label="Ouvrir mon profil">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
                 <span class="planning-drawer__profile-chip-text">
                     <span id="drawer-profile-name" class="planning-drawer__profile-name">Invité</span>
@@ -27,22 +27,6 @@
                     Mois
                 </button>
             </div>
-        </div>
-
-        <div id="drawer-section-agendas" class="planning-drawer__block hidden">
-            <div class="flex items-center gap-1.5 mb-1">
-                <p class="planning-drawer__section-title m-0 flex-1">Agendas</p>
-                <button type="button" id="drawer-agenda-help-btn" class="planning-drawer__help-btn" title="À quoi servent ces agendas ?" aria-label="Aide agendas Google">?</button>
-            </div>
-            <button type="button" id="drawer-agenda-main-btn" class="planning-drawer__agenda-row hidden">
-                <span id="drawer-agenda-main-label" class="planning-drawer__agenda-label">Planning général</span>
-                <span class="planning-drawer__agenda-hint">Copier l’URL</span>
-            </button>
-            <button type="button" id="drawer-agenda-personal-btn" class="planning-drawer__agenda-row hidden">
-                <span id="drawer-agenda-personal-label" class="planning-drawer__agenda-label">Planning personnel</span>
-                <span class="planning-drawer__agenda-hint">Copier l’URL</span>
-            </button>
-            <p id="drawer-agenda-personal-none" class="planning-drawer__hint hidden">Aucun agenda personnel IAMS associé à ce compte.</p>
         </div>
 
         <div id="drawer-section-cours" class="planning-drawer__block hidden">
@@ -131,11 +115,50 @@
             </button>
         </div>
 
+        <div id="menu-item-help-wrap" class="planning-drawer__block">
+            <button type="button" id="menu-item-help" class="planning-drawer__link">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712 3.712 0 1.025-1.171 2.687-1.025 4.242 0M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                Aide
+            </button>
+        </div>
+
         <div id="menu-item-logout-wrap" class="planning-drawer__block hidden">
             <button type="button" id="menu-item-logout" class="planning-drawer__link planning-drawer__link--danger">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" /></svg>
                 Déconnexion
             </button>
+        </div>
+    </div>
+
+    <div id="planning-drawer-help-panel" class="planning-drawer__scroll hidden" aria-hidden="true">
+        <div class="planning-drawer__block planning-drawer__block--help-head">
+            <button type="button" id="drawer-help-back" class="planning-drawer__help-back text-left text-sm font-semibold text-slate-700 hover:text-slate-900 hover:underline py-1 px-0 border-0 bg-transparent cursor-pointer dark:text-slate-200">
+                &lt; Aide
+            </button>
+        </div>
+        <div class="planning-drawer__block space-y-3">
+            <p id="drawer-help-version" class="text-[11px] font-semibold text-slate-800 m-0"></p>
+            <div>
+                <p class="text-[10px] font-bold uppercase text-slate-600 tracking-wide m-0 mb-0.5">Support Technique</p>
+                <p id="drawer-help-support-email" class="text-[11px] text-slate-700 m-0 break-words"></p>
+            </div>
+            <form id="drawer-help-contact-form" class="drawer-help-contact rounded-xl border border-slate-200 bg-white p-3 space-y-2" method="get" action="#">
+                <p class="text-[10px] font-bold text-slate-700 m-0">Nous contacter</p>
+                <label class="block">
+                    <span class="text-[9px] font-bold text-slate-500">Objet</span>
+                    <input type="text" id="drawer-help-subject" name="subject" class="input input-bordered input-sm w-full mt-0.5 bg-white text-[11px]" maxlength="200" />
+                </label>
+                <label class="block">
+                    <span class="text-[9px] font-bold text-slate-500">Message</span>
+                    <textarea id="drawer-help-message" name="body" rows="4" class="textarea textarea-bordered w-full mt-0.5 bg-white text-[11px]" maxlength="4000"></textarea>
+                </label>
+                <button type="submit" class="btn btn-primary btn-sm w-full font-bold text-[11px]">Envoyer par e-mail</button>
+            </form>
+            <p class="text-[10px] text-slate-600 m-0">
+                Ou écrire à
+                <a id="drawer-help-mailto-link" class="font-semibold text-sky-700 hover:underline break-all" href="#">—</a>
+            </p>
+            <a id="drawer-help-mailto-anchor" class="hidden" href="#" aria-hidden="true"></a>
         </div>
     </div>
 </aside>

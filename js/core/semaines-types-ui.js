@@ -8,7 +8,8 @@ import { showToast } from '../utils/toast.js';
 import {
     fetchOrganSchoolSettings,
     getOrganSchoolSettingsCached,
-    invalidateOrganSchoolSettingsCache
+    invalidateOrganSchoolSettingsCache,
+    saveTemplateClosureRanges
 } from './organ-settings.js';
 import {
     analyzeTemplateApply,
@@ -17,9 +18,13 @@ import {
     runTemplateGoogleBackgroundSync
 } from './template-apply-engine.js';
 import { saveProfWeekCycleFromApply } from './week-cycle.js';
-import { openCourseStudentsPicker } from './course-students-picker.js';
-import { openPlanningRouteFromDrawer } from '../utils/planning-route-dialog.js';
-import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
+import {
+    openPlanningRouteFromDrawer,
+    setPlanningRouteBackHandler,
+    updatePlanningRouteDialog
+} from '../utils/planning-route-dialog.js';
+
+const ST_DELETE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m2-3h6a1 1 0 011 1v1H8V5a1 1 0 011-1z"/></svg>';
 
 const ST_DRAG_GRIP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>`;
 
@@ -92,18 +97,8 @@ function setStApplyButtonReady(ready) {
     }
 }
 
-function setStGotoCalBusy(busy) {
-    const btn = document.getElementById('st-goto-cal');
-    if (!btn) return;
-    if (busy) {
-        btn.setAttribute('disabled', 'disabled');
-        btn.disabled = true;
-        btn.classList.add('btn-disabled', 'opacity-50', 'pointer-events-none');
-    } else {
-        btn.removeAttribute('disabled');
-        btn.disabled = false;
-        btn.classList.remove('btn-disabled', 'opacity-50', 'pointer-events-none');
-    }
+function setStGotoCalBusy(_busy) {
+    /* Bouton Fermer retiré — conservé pour les appels existants. */
 }
 
 function setStGoogleSyncHintVisible(visible) {
@@ -114,22 +109,10 @@ function setStGoogleSyncHintVisible(visible) {
 
 /** Grise et désactive les actions pendant une opération réseau. Préparation / application aussi bloquées pendant la synchro Google en arrière-plan. */
 function setStModalActionsBusy(busy) {
-    const save = document.getElementById('st-save-gabarit');
     const analyze = document.getElementById('st-btn-analyze');
     const apply = document.getElementById('st-btn-apply');
     const analyzeApplyLocked = busy || stGoogleSyncInFlight;
 
-    if (save) {
-        if (busy) {
-            save.setAttribute('disabled', 'disabled');
-            save.disabled = true;
-            save.classList.add('btn-disabled', 'opacity-50', 'pointer-events-none');
-        } else {
-            save.removeAttribute('disabled');
-            save.disabled = false;
-            save.classList.remove('btn-disabled', 'opacity-50', 'pointer-events-none');
-        }
-    }
     for (const btn of [analyze]) {
         if (!btn) continue;
         if (analyzeApplyLocked) {
@@ -242,11 +225,11 @@ let lastAnalysis = null;
 /** True tant que la synchro Google du gabarit (étape 2) n’est pas terminée. */
 let stGoogleSyncInFlight = false;
 let stUiBound = false;
-/** @type {HTMLTableRowElement | null} */
+/** @type {HTMLElement | null} */
 let stDnDRow = null;
 /** @type {Map<string, object>} */
 let stElevesByIdRef = new Map();
-/** @type {HTMLTableRowElement | null} */
+/** @type {HTMLElement | null} */
 let stLineEditTargetTr = null;
 /** @type {string[]} */
 let stLineEditPendingStudents = [];
@@ -279,11 +262,24 @@ function escapeAttr(s) {
         .replace(/</g, '&lt;');
 }
 
-function firstNameOnly(label) {
-    const raw = String(label || '').trim();
-    if (!raw) return '';
-    const parts = raw.split(/\s+/).filter(Boolean);
-    return parts[0] || raw;
+function familyNameOnly(label) {
+    const parts = String(label || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+    if (!parts.length) return '—';
+    return parts.length > 1 ? parts[parts.length - 1] : parts[0];
+}
+
+/** @param {{ nom?: string, prenom?: string, display_name?: string, email?: string }} e */
+function elevePrenomVirguleNom(e) {
+    const n = String(e?.nom || '').trim();
+    const p = String(e?.prenom || '').trim();
+    if (p && n) return `${p}, ${n}`;
+    if (p || n) return p || n;
+    const d = String(e?.display_name || '').trim();
+    if (d) return d;
+    return String(e?.email || '').trim() || '—';
 }
 
 /** @param {{ nom?: string, prenom?: string, display_name?: string, email?: string }} e */
@@ -316,6 +312,25 @@ function enrolledLabelsSorted(ids, byId) {
     return rows.map((r) => r.label);
 }
 
+/** @param {string[]} ids @param {Map<string, object>} byId */
+function enrolledStudentsCommaLine(ids, byId) {
+    const rows = [];
+    for (const id of ids || []) {
+        const e = byId.get(id);
+        rows.push({
+            nom: String(e?.nom || '').toLowerCase(),
+            prenom: String(e?.prenom || '').toLowerCase(),
+            label: e ? elevePrenomVirguleNom(e) : id
+        });
+    }
+    rows.sort((a, b) => {
+        const c = a.nom.localeCompare(b.nom, 'fr');
+        if (c !== 0) return c;
+        return a.prenom.localeCompare(b.prenom, 'fr');
+    });
+    return rows.map((r) => r.label).join(', ');
+}
+
 function padTime(raw) {
     const s = String(raw || '08:00').slice(0, 5);
     return /^\d{2}:\d{2}$/.test(s) ? s : '08:00';
@@ -332,11 +347,56 @@ function dowLongLabel(dow) {
     return ST_DOW_LONG[v] || '—';
 }
 
-/** Met à jour les libellés lisibles (sans listes factices) à partir des data-* de ligne. */
-function syncRowReadonlyDisplay(tr, elevesById) {
-    const typ = tr.dataset.stSlotType || 'cours';
-    const dow = parseInt(tr.dataset.stDow || '1', 10);
-    const periodEl = tr.querySelector('.st-ro-period');
+/** @param {HTMLElement} card */
+function stWeekLetterForCard(card) {
+    return card.closest('#st-list-b') ? 'B' : 'A';
+}
+
+/** @param {HTMLElement} card */
+function stSlotEditRouteTitle(card) {
+    const w = stWeekLetterForCard(card);
+    const dow = dowLongLabel(parseInt(card.dataset.stDow || '1', 10));
+    const st = padTime(card.dataset.stStart);
+    const en = padTime(card.dataset.stEnd);
+    return `< Semaine ${w} / Créneau / ${dow} / ${st} – ${en}`;
+}
+
+/** @param {HTMLElement} card */
+function stStudentsEditRouteTitle(card) {
+    return `${stSlotEditRouteTitle(card)} / Élèves inscrits`;
+}
+
+/** @param {object} r @param {string} lineId @param {HTMLElement | null} listA @param {HTMLElement | null} listB */
+function syncTemplateCardLineId(r, lineId, listA, listB) {
+    const list = r.week_type === 'B' ? listB : listA;
+    if (!list || !lineId) return;
+    for (const card of list.querySelectorAll('.st-slot-card[data-st-line]')) {
+        const domId = card.getAttribute('data-line-id') || '';
+        if (domId && domId === r.domId) {
+            card.setAttribute('data-line-id', lineId);
+            r.domId = lineId;
+            return;
+        }
+        const typ = card.dataset.stSlotType === 'reservation' ? 'reservation' : 'cours';
+        if (
+            (!domId || domId.startsWith('new-')) &&
+            typ === r.slot_type &&
+            Number(card.dataset.stDow) === r.day_of_week &&
+            `${padTime(card.dataset.stStart)}:00` === r.start_time &&
+            `${padTime(card.dataset.stEnd)}:00` === r.end_time
+        ) {
+            card.setAttribute('data-line-id', lineId);
+            r.domId = lineId;
+            return;
+        }
+    }
+}
+
+/** Met à jour les libellés lisibles (sans listes factices) à partir des data-* de carte. */
+function syncRowReadonlyDisplay(card, elevesById) {
+    const typ = card.dataset.stSlotType || 'cours';
+    const dow = parseInt(card.dataset.stDow || '1', 10);
+    const periodEl = card.querySelector('.st-ro-period');
     if (periodEl) {
         periodEl.replaceChildren();
         const l1 = document.createElement('div');
@@ -344,49 +404,41 @@ function syncRowReadonlyDisplay(tr, elevesById) {
         l1.textContent = dowLongLabel(dow);
         const l2 = document.createElement('div');
         l2.className = 'font-mono text-[10px] opacity-90 mt-0.5';
-        l2.textContent = `${padTime(tr.dataset.stStart)} – ${padTime(tr.dataset.stEnd)}`;
+        l2.textContent = `${padTime(card.dataset.stStart)} – ${padTime(card.dataset.stEnd)}`;
         periodEl.appendChild(l1);
         periodEl.appendChild(l2);
     }
-    const typeTitleEl = tr.querySelector('.st-ro-type-title');
-    if (typeTitleEl) {
-        typeTitleEl.replaceChildren();
-        const t1 = document.createElement('div');
-        t1.className = 'font-medium leading-snug';
-        t1.textContent = slotTypeLabel(typ);
-        const t2 = document.createElement('div');
-        t2.className = 'mt-0.5 text-[10px] opacity-95 leading-snug break-words';
-        t2.textContent = String(tr.dataset.stTitle || '').trim() || '—';
-        typeTitleEl.appendChild(t1);
-        typeTitleEl.appendChild(t2);
+    const headlineEl = card.querySelector('.st-ro-headline');
+    if (headlineEl) {
+        const title = String(card.dataset.stTitle || '').trim() || slotTypeLabel(typ);
+        headlineEl.textContent = title;
     }
-    const roStudents = tr.querySelector('.st-ro-students');
+    const roStudents = card.querySelector('.st-ro-students');
     if (!roStudents) return;
     if (typ !== 'cours') {
         roStudents.textContent = '—';
         return;
     }
-    const ids = String(tr.dataset.stStudents || '')
+    const ids = String(card.dataset.stStudents || '')
         .split(',')
         .map((x) => x.trim())
         .filter(Boolean);
-    const labels = enrolledLabelsSorted(ids, elevesById);
-    roStudents.innerHTML = labels.length ? labels.map(escapeAttr).join('<br>') : '—';
+    roStudents.textContent = enrolledStudentsCommaLine(ids, elevesById) || '—';
 }
 
-function parseRowsFromTbody(tbody, weekLetter, ownerId) {
+function parseRowsFromList(listEl, weekLetter, ownerId) {
     const rows = [];
-    for (const tr of tbody?.querySelectorAll('tr[data-st-line]') || []) {
-        if (tr.getAttribute('data-st-editable') !== '1') continue;
-        const id = tr.getAttribute('data-line-id') || '';
-        const dow = parseInt(tr.dataset.stDow || '1', 10);
-        const st = padTime(tr.dataset.stStart);
-        const en = padTime(tr.dataset.stEnd);
-        const typ = tr.dataset.stSlotType === 'reservation' ? 'reservation' : 'cours';
-        const title = String(tr.dataset.stTitle || '').trim();
+    for (const el of listEl?.querySelectorAll('.st-slot-card[data-st-line]') || []) {
+        if (el.getAttribute('data-st-editable') !== '1') continue;
+        const id = el.getAttribute('data-line-id') || '';
+        const dow = parseInt(el.dataset.stDow || '1', 10);
+        const st = padTime(el.dataset.stStart);
+        const en = padTime(el.dataset.stEnd);
+        const typ = el.dataset.stSlotType === 'reservation' ? 'reservation' : 'cours';
+        const title = String(el.dataset.stTitle || '').trim();
         const studs =
             typ === 'cours'
-                ? String(tr.dataset.stStudents || '')
+                ? String(el.dataset.stStudents || '')
                       .split(',')
                       .map((x) => x.trim())
                       .filter(Boolean)
@@ -413,111 +465,329 @@ function refreshStleStudentSummary() {
     el.textContent = labels.length ? labels.join(', ') : 'Aucun inscrit';
 }
 
-function wireStLineEditModal() {
-    const dlg = document.getElementById('modal_st_line_edit');
-    const btnOk = document.getElementById('stle-btn-ok');
-    const btnCancel = document.getElementById('stle-btn-cancel');
-    const btnStudents = document.getElementById('stle-btn-students');
-    if (!dlg || !btnOk || !btnCancel || !btnStudents || dlg.dataset.stleWired === '1') return;
-    dlg.dataset.stleWired = '1';
+/** @type {ReturnType<typeof setTimeout> | null} */
+let stSaveDebounce = null;
+/** @type {{ startYmd: string, endYmd: string }[]} */
+let stApplyClosureRanges = [];
 
-    btnStudents.addEventListener('click', async () => {
+let stClosureSaveDebounce = null;
+
+/** @param {unknown} raw */
+function parseClosureRangesFromSettings(raw) {
+    if (!Array.isArray(raw)) return [];
+    const out = [];
+    for (const item of raw) {
+        if (!item || typeof item !== 'object') continue;
+        const startYmd = String(item.startYmd || item.start || '').trim();
+        const endYmd = String(item.endYmd || item.end || '').trim();
+        if (startYmd && endYmd && endYmd >= startYmd) out.push({ startYmd, endYmd });
+    }
+    return out;
+}
+
+function renderClosureListFromRanges(ranges) {
+    const list = document.getElementById('st-closure-list');
+    if (!list) return;
+    list.replaceChildren();
+    for (const r of ranges) appendClosureCard(r.startYmd, r.endYmd);
+}
+
+function scheduleClosureRangesPersist() {
+    const u = getPlanningSessionUser();
+    if (!isAdmin(u)) return;
+    if (stClosureSaveDebounce) clearTimeout(stClosureSaveDebounce);
+    stClosureSaveDebounce = setTimeout(() => {
+        void persistClosureRangesToSettings();
+    }, 600);
+}
+
+async function persistClosureRangesToSettings() {
+    const u = getPlanningSessionUser();
+    if (!isAdmin(u)) return;
+    stApplyClosureRanges = parseClosureRangesFromDom();
+    const r = await saveTemplateClosureRanges(stApplyClosureRanges);
+    if (!r.ok) {
+        showToast(r.error || 'Enregistrement des fermetures impossible.', 'error');
+        return;
+    }
+}
+
+function scheduleStAutoSave() {
+    const u = getPlanningSessionUser();
+    if (!u?.id || isAdmin(u)) return;
+    if (stSaveDebounce) clearTimeout(stSaveDebounce);
+    stSaveDebounce = setTimeout(() => {
+        void runSemainesTypesSaveGabarit({ silent: true });
+    }, 700);
+}
+
+function hideStSubPanels() {
+    document.getElementById('st-slot-edit-panel')?.classList.add('hidden');
+    document.getElementById('st-slot-edit-panel')?.setAttribute('aria-hidden', 'true');
+    document.getElementById('st-students-edit-panel')?.classList.add('hidden');
+    document.getElementById('st-students-edit-panel')?.setAttribute('aria-hidden', 'true');
+}
+
+function showStMainPanel() {
+    document.getElementById('st-main-panel')?.classList.remove('hidden');
+    hideStSubPanels();
+    stLineEditTargetTr = null;
+    setPlanningRouteBackHandler('modal_semaines_types', null);
+    updatePlanningRouteDialog('modal_semaines_types', 'Semaines A / B', 'Semaines A / B');
+}
+
+function applyStSlotEditFormToCard(opts = {}) {
+    const skipSave = Boolean(opts.skipSave);
+    const card = stLineEditTargetTr;
+    const panel = document.getElementById('st-slot-edit-panel');
+    if (!card || !panel) return false;
+    const typRaw = panel.querySelector('input[name="stle-slot-type"]:checked')?.value;
+    const typ = typRaw === 'reservation' ? 'reservation' : 'cours';
+    const dow = parseInt(
+        /** @type {HTMLSelectElement | null} */ (document.getElementById('stle-dow'))?.value || '1',
+        10
+    );
+    const st = padTime(/** @type {HTMLInputElement | null} */ (document.getElementById('stle-start'))?.value);
+    const en = padTime(/** @type {HTMLInputElement | null} */ (document.getElementById('stle-end'))?.value);
+    const title = String(/** @type {HTMLInputElement | null} */ (document.getElementById('stle-title'))?.value || '').trim();
+    if (st >= en) {
+        showToast('L’heure de fin doit être après le début.', 'error');
+        return false;
+    }
+    card.dataset.stSlotType = typ;
+    card.dataset.stDow = String(Math.min(7, Math.max(1, dow)));
+    card.dataset.stStart = st;
+    card.dataset.stEnd = en;
+    card.dataset.stTitle = title;
+    card.dataset.stStudents = typ === 'cours' ? stLineEditPendingStudents.join(',') : '';
+    card.classList.remove('st-row-cours', 'st-row-travail', 'st-row-other-prof');
+    card.classList.add(typ === 'cours' ? 'st-row-cours' : 'st-row-travail');
+    syncRowReadonlyDisplay(card, stElevesByIdRef);
+    if (!skipSave) scheduleStAutoSave();
+    return true;
+}
+
+function wireStLineEditModal() {
+    const panel = document.getElementById('st-slot-edit-panel');
+    if (!panel || panel.dataset.stleWired === '1') return;
+    panel.dataset.stleWired = '1';
+
+    const onFieldChange = () => {
+        applyStSlotEditFormToCard();
+    };
+    panel.addEventListener('change', onFieldChange);
+    panel.addEventListener('input', (ev) => {
+        const t = ev.target;
+        if (t instanceof HTMLInputElement && t.id === 'stle-title') onFieldChange();
+    });
+    panel.addEventListener('change', (ev) => {
+        const t = ev.target;
+        if (!(t instanceof HTMLInputElement) || t.name !== 'stle-slot-type') return;
+        document.getElementById('stle-students-wrap')?.classList.toggle('hidden', t.value !== 'cours');
+    });
+
+    document.getElementById('stle-students-wrap')?.addEventListener('click', (ev) => {
+        const t = ev.target;
+        if (!(t instanceof Element)) return;
+        if (t.closest('a, button.st-del')) return;
         const typ =
-            dlg.querySelector('input[name="stle-slot-type"]:checked')?.value === 'reservation'
+            panel.querySelector('input[name="stle-slot-type"]:checked')?.value === 'reservation'
                 ? 'reservation'
                 : 'cours';
         if (typ !== 'cours') {
             showToast('Les inscriptions concernent uniquement les créneaux « Cours ».', 'info');
             return;
         }
-        const elevesList = [...stElevesByIdRef.values()];
-        const picked = await openCourseStudentsPicker({
-            title: 'Inscriptions au cours (semaine type)',
-            maxStudents: 5,
-            eleves: elevesList,
-            selectedUserIds: stLineEditPendingStudents
-        });
-        if (!picked) return;
-        stLineEditPendingStudents = picked;
-        refreshStleStudentSummary();
-    });
-
-    btnCancel.addEventListener('click', () => {
-        stLineEditTargetTr = null;
-        dlg.close();
-    });
-
-    btnOk.addEventListener('click', () => {
-        const tr = stLineEditTargetTr;
-        if (!tr) return;
-        const typRaw = dlg.querySelector('input[name="stle-slot-type"]:checked')?.value;
-        const typ = typRaw === 'reservation' ? 'reservation' : 'cours';
-        const dowSel = /** @type {HTMLSelectElement | null} */ (document.getElementById('stle-dow'));
-        const dow = parseInt(dowSel?.value || '1', 10);
-        const st = padTime(/** @type {HTMLInputElement | null} */ (document.getElementById('stle-start'))?.value);
-        const en = padTime(/** @type {HTMLInputElement | null} */ (document.getElementById('stle-end'))?.value);
-        const title = String(/** @type {HTMLInputElement | null} */ (document.getElementById('stle-title'))?.value || '').trim();
-        if (st >= en) {
-            showToast('L’heure de fin doit être après le début.', 'error');
-            return;
-        }
-        tr.dataset.stSlotType = typ;
-        tr.dataset.stDow = String(Math.min(7, Math.max(1, dow)));
-        tr.dataset.stStart = st;
-        tr.dataset.stEnd = en;
-        tr.dataset.stTitle = title;
-        tr.dataset.stStudents = typ === 'cours' ? stLineEditPendingStudents.join(',') : '';
-        tr.classList.remove('st-row-cours', 'st-row-travail', 'st-row-other-prof');
-        tr.classList.add(typ === 'cours' ? 'st-row-cours' : 'st-row-travail');
-        syncRowReadonlyDisplay(tr, stElevesByIdRef);
-        stLineEditTargetTr = null;
-        dlg.close();
-    });
-
-    dlg.addEventListener('close', () => {
-        stLineEditTargetTr = null;
-    });
-
-    dlg.addEventListener('change', (ev) => {
-        const t = ev.target;
-        if (!(t instanceof HTMLInputElement) || t.name !== 'stle-slot-type') return;
-        const isCours = t.value === 'cours';
-        document.getElementById('stle-students-wrap')?.classList.toggle('hidden', !isCours);
+        applyStSlotEditFormToCard({ skipSave: true });
+        openStStudentsEditPanel();
     });
 }
 
-function openStLineEditModal(tr) {
-    const dlg = document.getElementById('modal_st_line_edit');
-    if (!dlg || !(dlg instanceof HTMLDialogElement)) return;
-    wireStLineEditModal();
+function renderStStudentsEditLists() {
+    const inEl = document.getElementById('st-students-list-in');
+    const outEl = document.getElementById('st-students-list-out');
+    if (!inEl || !outEl) return;
+    const inSet = new Set(stLineEditPendingStudents);
+    const rows = [...stElevesByIdRef.values()].map((e) => ({
+        id: String(e.user_id),
+        label: elevePrenomVirguleNom(e)
+    }));
+    rows.sort((a, b) => a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' }));
+    const mk = (id, label, enrolled) =>
+        `<button type="button" draggable="true" class="st-student-pick-card ${enrolled ? 'st-student-pick-card--in' : 'st-student-pick-card--out'}" data-user-id="${escapeAttr(id)}">${escapeAttr(label)}</button>`;
+    const inRows = rows.filter((r) => inSet.has(r.id));
+    const outRows = rows.filter((r) => !inSet.has(r.id));
+    inEl.innerHTML = inRows.length
+        ? inRows.map((r) => mk(r.id, r.label, true)).join('')
+        : '<p class="text-[10px] text-slate-400">Aucun inscrit.</p>';
+    outEl.innerHTML = outRows.length
+        ? outRows.map((r) => mk(r.id, r.label, false)).join('')
+        : '<p class="text-[10px] text-slate-400">Tous les élèves sont inscrits.</p>';
+}
 
-    stLineEditTargetTr = tr;
-    const typ = tr.dataset.stSlotType === 'reservation' ? 'reservation' : 'cours';
+function wireStStudentsDnDOnce() {
+    const panel = document.getElementById('st-students-edit-panel');
+    if (!panel || panel.dataset.dndWired === '1') return;
+    panel.dataset.dndWired = '1';
+
+    const toggle = (id) => {
+        if (!id || !stElevesByIdRef.has(id)) return;
+        const set = new Set(stLineEditPendingStudents);
+        if (set.has(id)) set.delete(id);
+        else set.add(id);
+        stLineEditPendingStudents = [...set];
+        renderStStudentsEditLists();
+        refreshStleStudentSummary();
+        applyStSlotEditFormToCard();
+    };
+
+    panel.addEventListener('click', (ev) => {
+        const btn = ev.target instanceof Element ? ev.target.closest('.st-student-pick-card') : null;
+        if (!btn) return;
+        toggle(btn.getAttribute('data-user-id') || '');
+    });
+
+    const onDragStart = (ev) => {
+        const btn = ev.target instanceof Element ? ev.target.closest('.st-student-pick-card') : null;
+        if (!btn) return;
+        ev.dataTransfer?.setData('text/plain', btn.getAttribute('data-user-id') || '');
+        if (ev.dataTransfer) ev.dataTransfer.effectAllowed = 'move';
+    };
+    panel.addEventListener('dragstart', onDragStart);
+
+    const onDrop = (listEl, enroll) => (ev) => {
+        ev.preventDefault();
+        listEl?.classList.remove('st-dnd-drop-active');
+        const id = String(ev.dataTransfer?.getData('text/plain') || '').trim();
+        if (!id) return;
+        const set = new Set(stLineEditPendingStudents);
+        const has = set.has(id);
+        if (enroll && !has) set.add(id);
+        if (!enroll && has) set.delete(id);
+        stLineEditPendingStudents = [...set];
+        renderStStudentsEditLists();
+        refreshStleStudentSummary();
+        applyStSlotEditFormToCard();
+    };
+
+    const inEl = document.getElementById('st-students-list-in');
+    const outEl = document.getElementById('st-students-list-out');
+    inEl?.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        inEl.classList.add('st-dnd-drop-active');
+    });
+    outEl?.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        outEl.classList.add('st-dnd-drop-active');
+    });
+    inEl?.addEventListener('dragleave', () => inEl.classList.remove('st-dnd-drop-active'));
+    outEl?.addEventListener('dragleave', () => outEl.classList.remove('st-dnd-drop-active'));
+    inEl?.addEventListener('drop', onDrop(inEl, true));
+    outEl?.addEventListener('drop', onDrop(outEl, false));
+}
+
+function openStStudentsEditPanel() {
+    const card = stLineEditTargetTr;
+    if (!card) return;
+    wireStStudentsDnDOnce();
+    renderStStudentsEditLists();
+    document.getElementById('st-main-panel')?.classList.add('hidden');
+    document.getElementById('st-slot-edit-panel')?.classList.add('hidden');
+    const panel = document.getElementById('st-students-edit-panel');
+    panel?.classList.remove('hidden');
+    panel?.setAttribute('aria-hidden', 'false');
+    const editTitle = stSlotEditRouteTitle(card);
+    setPlanningRouteBackHandler('modal_semaines_types', () => {
+        document.getElementById('st-students-edit-panel')?.classList.add('hidden');
+        const edit = document.getElementById('st-slot-edit-panel');
+        edit?.classList.remove('hidden');
+        edit?.setAttribute('aria-hidden', 'false');
+        updatePlanningRouteDialog('modal_semaines_types', editTitle, 'Semaines A / B');
+    });
+    const studentsTitle = stStudentsEditRouteTitle(card);
+    updatePlanningRouteDialog('modal_semaines_types', studentsTitle, editTitle);
+}
+
+function parseClosureRangesFromDom() {
+    const rows = [];
+    for (const el of document.querySelectorAll('#st-closure-list .st-closure-card')) {
+        const start = el.querySelector('.st-closure-start')?.value?.trim();
+        const end = el.querySelector('.st-closure-end')?.value?.trim();
+        if (start && end && end >= start) rows.push({ startYmd: start, endYmd: end });
+    }
+    return rows;
+}
+
+function appendClosureCard(startYmd = '', endYmd = '') {
+    const list = document.getElementById('st-closure-list');
+    if (!list) return;
+    const card = document.createElement('div');
+    card.className =
+        'st-closure-card flex flex-wrap items-center gap-2 py-2 border-b border-slate-100 last:border-0';
+    card.innerHTML = `
+        <label class="flex flex-col gap-0.5 min-w-0 flex-1">
+            <span class="text-[9px] font-bold text-slate-500">Début</span>
+            <input type="date" class="st-closure-start input input-bordered input-sm bg-white font-mono text-[11px]" value="${escapeAttr(startYmd)}" />
+        </label>
+        <label class="flex flex-col gap-0.5 min-w-0 flex-1">
+            <span class="text-[9px] font-bold text-slate-500">Fin</span>
+            <input type="date" class="st-closure-end input input-bordered input-sm bg-white font-mono text-[11px]" value="${escapeAttr(endYmd)}" />
+        </label>
+        <button type="button" class="st-closure-del btn btn-ghost btn-xs btn-square text-error shrink-0" title="Supprimer">${ST_DELETE_SVG}</button>
+    `;
+    const syncClosures = () => {
+        stApplyClosureRanges = parseClosureRangesFromDom();
+        if (isAdmin(getPlanningSessionUser())) scheduleClosureRangesPersist();
+    };
+    card.querySelector('.st-closure-del')?.addEventListener('click', () => {
+        card.remove();
+        syncClosures();
+    });
+    for (const inp of card.querySelectorAll('.st-closure-start, .st-closure-end')) {
+        inp.addEventListener('change', syncClosures);
+    }
+    list.appendChild(card);
+    syncClosures();
+}
+
+function openStSlotEditPanel(card) {
+    wireStLineEditModal();
+    stLineEditTargetTr = card;
+    const typ = card.dataset.stSlotType === 'reservation' ? 'reservation' : 'cours';
     const coursRadio = /** @type {HTMLInputElement | null} */ (document.getElementById('stle-type-cours'));
     const resRadio = /** @type {HTMLInputElement | null} */ (document.getElementById('stle-type-reservation'));
     if (coursRadio) coursRadio.checked = typ === 'cours';
     if (resRadio) resRadio.checked = typ === 'reservation';
 
     const dowSel = /** @type {HTMLSelectElement | null} */ (document.getElementById('stle-dow'));
-    if (dowSel) dowSel.value = String(Math.min(7, Math.max(1, parseInt(tr.dataset.stDow || '1', 10))));
+    if (dowSel) dowSel.value = String(Math.min(7, Math.max(1, parseInt(card.dataset.stDow || '1', 10))));
 
     const stIn = /** @type {HTMLInputElement | null} */ (document.getElementById('stle-start'));
     const enIn = /** @type {HTMLInputElement | null} */ (document.getElementById('stle-end'));
-    if (stIn) stIn.value = padTime(tr.dataset.stStart);
-    if (enIn) enIn.value = padTime(tr.dataset.stEnd);
+    if (stIn) stIn.value = padTime(card.dataset.stStart);
+    if (enIn) enIn.value = padTime(card.dataset.stEnd);
 
     const ti = /** @type {HTMLInputElement | null} */ (document.getElementById('stle-title'));
-    if (ti) ti.value = String(tr.dataset.stTitle || '').trim();
+    if (ti) ti.value = String(card.dataset.stTitle || '').trim();
 
-    stLineEditPendingStudents = String(tr.dataset.stStudents || '')
+    stLineEditPendingStudents = String(card.dataset.stStudents || '')
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
     refreshStleStudentSummary();
 
     document.getElementById('stle-students-wrap')?.classList.toggle('hidden', typ !== 'cours');
-    dlg.showModal();
-    focusPlanningDialogRoot(dlg instanceof HTMLDialogElement ? dlg : null);
+
+    document.getElementById('st-main-panel')?.classList.add('hidden');
+    hideStSubPanels();
+    const editPanel = document.getElementById('st-slot-edit-panel');
+    editPanel?.classList.remove('hidden');
+    editPanel?.setAttribute('aria-hidden', 'false');
+
+    const routeTitle = stSlotEditRouteTitle(card);
+    setPlanningRouteBackHandler('modal_semaines_types', showStMainPanel);
+    updatePlanningRouteDialog('modal_semaines_types', routeTitle, 'Semaines A / B');
+    editPanel?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
 
@@ -560,66 +830,75 @@ function makeStudentOptionsHtml(eleves) {
 }
 
 /**
- * @param {HTMLElement} tbody
+ * @param {HTMLElement} listEl
  * @param {object | null} line
  * @param {string} _optHtml réservé compat appelants (non utilisé — données élèves via data-students + édition modale).
  * @param {{ isAdmin: boolean, ownerLabel: string, lineOwnerId: string, currentUserId: string, elevesById: Map<string, object> }} ctx
  */
-function appendTemplateRow(tbody, line, _optHtml, ctx) {
+function appendTemplateCard(listEl, line, _optHtml, ctx) {
     const { isAdmin, ownerLabel, lineOwnerId, currentUserId, elevesById } = ctx;
     const isOwnRow = String(lineOwnerId) === String(currentUserId);
     const isReadonly = isAdmin || !isOwnRow;
     const slotT = line?.slot_type === 'reservation' ? 'reservation' : 'cours';
     const sid = line?.studentIds || [];
 
-    const tr = document.createElement('tr');
-    tr.setAttribute('data-st-line', '1');
-    tr.setAttribute('data-line-id', line?.id || '');
-    tr.setAttribute('data-owner-id', lineOwnerId);
-    tr.setAttribute('data-st-editable', isReadonly ? '0' : '1');
+    const card = document.createElement('div');
+    card.className =
+        'st-slot-card grid grid-cols-[auto_minmax(0,1fr)_minmax(0,1.35fr)_auto] gap-2 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px] text-slate-800';
+    if (!isReadonly) card.classList.add('st-slot-card--editable');
+    card.setAttribute('data-st-line', '1');
+    card.setAttribute('data-line-id', line?.id || '');
+    card.setAttribute('data-owner-id', lineOwnerId);
+    card.setAttribute('data-st-editable', isReadonly ? '0' : '1');
 
-    tr.dataset.stSlotType = slotT;
-    tr.dataset.stDow = String(line?.day_of_week ?? 1);
-    tr.dataset.stStart = String(line?.start_time || '08:00:00').slice(0, 5);
-    tr.dataset.stEnd = String(line?.end_time || '09:00:00').slice(0, 5);
-    tr.dataset.stTitle = String(line?.title || '').trim();
-    tr.dataset.stStudents = sid.join(',');
+    card.dataset.stSlotType = slotT;
+    card.dataset.stDow = String(line?.day_of_week ?? 1);
+    card.dataset.stStart = String(line?.start_time || '08:00:00').slice(0, 5);
+    card.dataset.stEnd = String(line?.end_time || '09:00:00').slice(0, 5);
+    card.dataset.stTitle = String(line?.title || '').trim();
+    card.dataset.stStudents = sid.join(',');
+    card.dataset.stOwnerLabel = ownerLabel;
 
-    const otherProfCours =
-        line?.slot_type === 'cours' && String(lineOwnerId) !== String(currentUserId);
-    if (otherProfCours) {
-        tr.classList.add('st-row-other-prof', 'st-row-travail');
+    if (isAdmin) {
+        card.classList.add('st-slot-card--admin-view');
     } else {
-        tr.classList.add(line?.slot_type === 'cours' ? 'st-row-cours' : 'st-row-travail');
+        const otherProfCours =
+            line?.slot_type === 'cours' && String(lineOwnerId) !== String(currentUserId);
+        if (otherProfCours) {
+            card.classList.add('st-row-other-prof', 'st-row-travail');
+        } else {
+            card.classList.add(line?.slot_type === 'cours' ? 'st-row-cours' : 'st-row-travail');
+        }
     }
 
-    const dragCell = isReadonly
-        ? '<td class="w-7 p-0"></td>'
-        : `<td class="w-7 p-0 align-middle text-center select-none"><span class="st-drag-handle inline-flex cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 p-0.5 rounded hover:bg-slate-100" draggable="true" title="Glisser vers l’autre semaine type" aria-label="Glisser vers l’autre semaine type">${ST_DRAG_GRIP_SVG}</span></td>`;
+    const dragHtml = isReadonly
+        ? '<span class="w-0" aria-hidden="true"></span>'
+        : `<span class="st-drag-handle inline-flex cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 p-0.5 rounded hover:bg-slate-100 shrink-0 self-center" draggable="true" title="Glisser vers l’autre semaine type" aria-label="Glisser vers l’autre semaine type">${ST_DRAG_GRIP_SVG}</span>`;
 
-    const actionsCell = isReadonly
-        ? '<td class="p-1 align-top w-14"></td>'
-        : `<td class="p-1 align-top w-14">
-      <div class="flex flex-col items-end gap-0.5">
-        <button type="button" class="st-row-edit btn btn-ghost btn-xs btn-square border border-slate-200 planning-icon-btn" title="Modifier le créneau" aria-label="Modifier le créneau">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L8.25 18.463 3 21l2.537-5.25L16.862 3.487z"/></svg>
-        </button>
-        <button type="button" class="btn btn-ghost btn-xs st-del font-black text-error min-h-0 h-7 leading-none" title="Supprimer la ligne">×</button>
-      </div>
-    </td>`;
+    const deleteHtml = isReadonly
+        ? ''
+        : `<button type="button" class="st-del btn btn-ghost btn-xs btn-square shrink-0 self-center text-slate-500 hover:text-error border border-transparent" title="Supprimer le créneau" aria-label="Supprimer le créneau">${ST_DELETE_SVG}</button>`;
 
-    tr.innerHTML = `
-        ${dragCell}
-        <td class="align-top p-2 min-w-0 max-w-[11rem]"><div class="st-ro-period text-[10px] text-slate-800 leading-snug"></div></td>
-        <td class="text-[10px] font-bold font-sans text-slate-800 align-top p-2 break-words max-w-[9rem]">${escapeAttr(ownerLabel)}</td>
-        <td class="align-top p-2 min-w-0 max-w-[12rem]"><div class="st-ro-type-title text-[10px] text-slate-800 leading-snug"></div></td>
-        <td class="st-students-cell align-top p-2 min-w-0 max-w-[14rem]"><span class="st-ro-students text-[10px] font-normal font-sans text-slate-700 leading-snug"></span></td>
-        ${actionsCell}
+    card.innerHTML = `
+        ${dragHtml}
+        <div class="st-slot-card__left min-w-0 border-r border-slate-200/80 pr-2 self-center">
+            <div class="st-ro-period leading-snug"></div>
+        </div>
+        <div class="st-slot-card__right min-w-0 pl-1 flex flex-col gap-0.5 self-center">
+            <p class="st-ro-headline font-semibold m-0 leading-snug"></p>
+            <p class="st-ro-students text-[10px] font-normal text-slate-700 m-0 leading-snug break-words"></p>
+        </div>
+        ${deleteHtml}
     `;
-    tbody.appendChild(tr);
-    syncRowReadonlyDisplay(tr, elevesById);
-    tr.querySelector('.st-del')?.addEventListener('click', () => tr.remove());
-    return tr;
+
+    listEl.appendChild(card);
+    syncRowReadonlyDisplay(card, elevesById);
+    card.querySelector('.st-del')?.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        card.remove();
+        scheduleStAutoSave();
+    });
+    return card;
 }
 
 async function loadEleves() {
@@ -647,7 +926,7 @@ async function loadOwnerLabels(userIds) {
     for (const row of data || []) {
         const id = row.user_id;
         const lab = String(row.label || '').trim();
-        m.set(id, firstNameOnly(lab) || String(id).slice(0, 8));
+        m.set(id, lab || String(id).slice(0, 8));
     }
     for (const id of uniq) {
         if (!m.has(id)) m.set(id, String(id).slice(0, 8));
@@ -710,16 +989,24 @@ function defaultApplyEndYmd() {
 async function openSemainesTypesModal(user) {
     const dlg = document.getElementById('modal_semaines_types');
     if (!dlg) return;
+    showStMainPanel();
     const isAdm = isAdmin(user);
     invalidateOrganSchoolSettingsCache();
     await fetchOrganSchoolSettings();
 
-    document.getElementById('st-gabarit-readonly-hint')?.classList.toggle('hidden', !isAdm);
     document.getElementById('st-add-row-a')?.classList.toggle('hidden', isAdm);
     document.getElementById('st-add-row-b')?.classList.toggle('hidden', isAdm);
     document.getElementById('st-gabarit-actions')?.classList.toggle('hidden', isAdm);
     document.getElementById('st-apply-admin-hint')?.classList.toggle('hidden', !isAdm);
     document.getElementById('st-apply-controls')?.classList.toggle('hidden', isAdm);
+    document.getElementById('st-apply-section')?.classList.toggle('hidden', isAdm);
+    document.getElementById('st-closure-section')?.classList.remove('hidden');
+
+    const closures = parseClosureRangesFromSettings(
+        getOrganSchoolSettingsCached()?.template_apply_closure_ranges
+    );
+    stApplyClosureRanges = closures;
+    renderClosureListFromRanges(closures);
 
     const eleves = await loadEleves();
     const elevesById = new Map(eleves.map((e) => [e.user_id, e]));
@@ -728,8 +1015,8 @@ async function openSemainesTypesModal(user) {
     const ownerIds = [...new Set(lines.map((l) => l.owner_user_id).filter(Boolean))];
     const ownerLabels = await loadOwnerLabels(ownerIds);
 
-    const ta = document.getElementById('st-tbody-a');
-    const tb = document.getElementById('st-tbody-b');
+    const ta = document.getElementById('st-list-a');
+    const tb = document.getElementById('st-list-b');
     if (ta) ta.replaceChildren();
     if (tb) tb.replaceChildren();
 
@@ -741,12 +1028,12 @@ async function openSemainesTypesModal(user) {
     stElevesByIdRef = elevesById;
 
     for (const line of lines) {
-        const tbody = line.week_type === 'A' ? ta : tb;
-        if (!tbody) continue;
+        const listEl = line.week_type === 'A' ? ta : tb;
+        if (!listEl) continue;
         const sid = byLineStudents.get(line.id) || [];
         const oid = String(line.owner_user_id || '');
         const ownerLabel = ownerLabels.get(oid) || oid.slice(0, 8);
-        appendTemplateRow(tbody, { ...line, studentIds: sid }, optHtml, {
+        appendTemplateCard(listEl, { ...line, studentIds: sid }, optHtml, {
             ...ctxBase,
             ownerLabel,
             lineOwnerId: oid
@@ -762,11 +1049,11 @@ async function openSemainesTypesModal(user) {
     lastAnalysis = null;
 }
 
-function addEmptyRow(tbody, elevesHtml, user, elevesById, ownerLabels) {
+function addEmptyRow(listEl, elevesHtml, user, elevesById, ownerLabels) {
     const oid = String(user.id);
     const ownerLabel = ownerLabels.get(oid) || user.email || oid.slice(0, 8);
-    const tr = appendTemplateRow(
-        tbody,
+    const card = appendTemplateCard(
+        listEl,
         {
             day_of_week: 1,
             start_time: '08:00:00',
@@ -786,39 +1073,33 @@ function addEmptyRow(tbody, elevesHtml, user, elevesById, ownerLabels) {
     );
     // Fix UX : forcer la ligne nouvellement ajoutée à être visible.
     requestAnimationFrame(() => {
-        if (!tr) return;
+        if (!card) return;
         try {
-            tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         } catch {
-            tr.scrollIntoView();
+            card.scrollIntoView();
         }
-        tr.classList.add('ring-2', 'ring-sky-500');
-        window.setTimeout(() => tr.classList.remove('ring-2', 'ring-sky-500'), 1200);
+        card.classList.add('ring-2', 'ring-sky-500');
+        window.setTimeout(() => card.classList.remove('ring-2', 'ring-sky-500'), 1200);
     });
 }
 
-async function runSemainesTypesSaveGabarit() {
+async function runSemainesTypesSaveGabarit(opts = {}) {
+    const silent = Boolean(opts.silent);
     const u = getPlanningSessionUser();
     const sb = getSupabaseClient();
     if (!u?.id || !sb || isAdmin(u)) return;
-    const ta = document.getElementById('st-tbody-a');
-    const tb = document.getElementById('st-tbody-b');
-    const ra = parseRowsFromTbody(ta, 'A', u.id);
-    const rb = parseRowsFromTbody(tb, 'B', u.id);
+    const ta = document.getElementById('st-list-a');
+    const tb = document.getElementById('st-list-b');
+    const ra = parseRowsFromList(ta, 'A', u.id);
+    const rb = parseRowsFromList(tb, 'B', u.id);
     const all = [...ra, ...rb];
     const err = validateNoOverlap(all);
     if (err) {
         showToast(err, 'error');
         return;
     }
-    const saveBtn = document.getElementById('st-save-gabarit');
-    const saveLabelRest =
-        saveBtn?.getAttribute('data-label-rest') || 'Enregistrer le gabarit';
-    if (saveBtn && !saveBtn.getAttribute('data-label-rest')) {
-        saveBtn.setAttribute('data-label-rest', saveLabelRest);
-    }
     setStModalActionsBusy(true);
-    if (saveBtn) saveBtn.textContent = 'Enregistrement…';
     try {
         const { data: existing } = await sb.from('organ_week_template_line').select('id').eq('owner_user_id', u.id);
         const existingIds = new Set((existing || []).map((x) => x.id));
@@ -853,6 +1134,7 @@ async function runSemainesTypesSaveGabarit() {
                     return;
                 }
                 lineId = ins.id;
+                syncTemplateCardLineId(r, lineId, ta, tb);
             } else {
                 const { error } = await sb.from('organ_week_template_line').update(payload).eq('id', lineId);
                 if (error) {
@@ -870,9 +1152,10 @@ async function runSemainesTypesSaveGabarit() {
                 }
             }
         }
-        showToast('Gabarit enregistré : semaines types A et B sauvegardées.', 'success', 5200);
+        if (!silent) {
+            showToast('Gabarit enregistré : semaines types A et B sauvegardées.', 'success', 5200);
+        }
     } finally {
-        if (saveBtn) saveBtn.textContent = saveBtn.getAttribute('data-label-rest') || saveLabelRest;
         setStModalActionsBusy(false);
     }
 }
@@ -956,6 +1239,7 @@ async function runSemainesTypesAnalyze() {
                 return;
             }
         }
+        stApplyClosureRanges = parseClosureRangesFromDom();
         const analysis = await analyzeTemplateApply({
             profUserId: u.id,
             profEmail: u.email,
@@ -963,7 +1247,8 @@ async function runSemainesTypesAnalyze() {
             applyEndYmd: applyEnd,
             firstWeekLetter,
             lines: linePayload,
-            mainCalendarId: mainId
+            mainCalendarId: mainId,
+            extraClosureRanges: stApplyClosureRanges
         });
         if (!analysis.ok) {
             const err = analysis.error || 'Préparation impossible.';
@@ -1201,12 +1486,12 @@ function onStTemplateDragStart(e) {
     if (!h) return;
     const dlg = document.getElementById('modal_semaines_types');
     if (!dlg?.open || !dlg.contains(h)) return;
-    const tr = h.closest('tr[data-st-line]');
-    if (!(tr instanceof HTMLTableRowElement) || tr.getAttribute('data-st-editable') !== '1') return;
-    stDnDRow = tr;
+    const card = h.closest('.st-slot-card[data-st-line]');
+    if (!(card instanceof HTMLElement) || card.getAttribute('data-st-editable') !== '1') return;
+    stDnDRow = card;
     e.dataTransfer?.setData('text/plain', 'semaines-types-row');
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
-    tr.classList.add('opacity-40');
+    card.classList.add('opacity-40');
 }
 
 function onStTemplateDragEnd() {
@@ -1216,7 +1501,7 @@ function onStTemplateDragEnd() {
 
 function onStTemplateDragOver(e) {
     if (!stDnDRow) return;
-    const tb = e.target?.closest?.('#st-tbody-a, #st-tbody-b');
+    const tb = e.target?.closest?.('#st-list-a, #st-list-b');
     if (!tb) return;
     const dlg = document.getElementById('modal_semaines_types');
     if (!dlg?.open || !dlg.contains(tb)) return;
@@ -1225,7 +1510,7 @@ function onStTemplateDragOver(e) {
 }
 
 function onStTemplateDrop(e) {
-    const tb = e.target?.closest?.('#st-tbody-a, #st-tbody-b');
+    const tb = e.target?.closest?.('#st-list-a, #st-list-b');
     if (!tb || !stDnDRow) return;
     const dlg = document.getElementById('modal_semaines_types');
     if (!dlg?.open || !dlg.contains(tb)) return;
@@ -1234,17 +1519,19 @@ function onStTemplateDrop(e) {
     if (src === tb) return;
     const u = getPlanningSessionUser();
     if (!u?.id) return;
-    const tbodyA = document.getElementById('st-tbody-a');
-    const tbodyB = document.getElementById('st-tbody-b');
-    if (tb !== tbodyA && tb !== tbodyB) return;
+    const listA = document.getElementById('st-list-a');
+    const listB = document.getElementById('st-list-b');
+    if (tb !== listA && tb !== listB) return;
 
     tb.appendChild(stDnDRow);
-    const ra = parseRowsFromTbody(tbodyA, 'A', u.id);
-    const rb = parseRowsFromTbody(tbodyB, 'B', u.id);
+    const ra = parseRowsFromList(listA, 'A', u.id);
+    const rb = parseRowsFromList(listB, 'B', u.id);
     const overlapErr = validateNoOverlap([...ra, ...rb]);
     if (overlapErr) {
         src.appendChild(stDnDRow);
         showToast(overlapErr, 'error');
+    } else {
+        scheduleStAutoSave();
     }
 }
 
@@ -1255,14 +1542,9 @@ async function runSemainesTypesAddRow(week) {
     const elevesById = new Map(eleves.map((e) => [e.user_id, e]));
     stElevesByIdRef = elevesById;
     const ownerLabels = await loadOwnerLabels([u.id]);
-    const tbody =
-        week === 'B' ? document.getElementById('st-tbody-b') : document.getElementById('st-tbody-a');
-    addEmptyRow(tbody, makeStudentOptionsHtml(eleves), u, elevesById, ownerLabels);
-}
-
-function runSemainesTypesGotoCal() {
-    document.getElementById('modal_semaines_types')?.close();
-    document.getElementById('calendar')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    const listEl =
+        week === 'B' ? document.getElementById('st-list-b') : document.getElementById('st-list-a');
+    addEmptyRow(listEl, makeStudentOptionsHtml(eleves), u, elevesById, ownerLabels);
 }
 
 /**
@@ -1287,9 +1569,9 @@ function onSemainesTypesDocumentClick(e) {
         void runSemainesTypesApply();
         return;
     }
-    if (t.closest('#st-save-gabarit')) {
+    if (t.closest('#st-add-closure')) {
         e.preventDefault();
-        void runSemainesTypesSaveGabarit();
+        appendClosureCard();
         return;
     }
     if (t.closest('#st-add-row-a')) {
@@ -1302,18 +1584,14 @@ function onSemainesTypesDocumentClick(e) {
         void runSemainesTypesAddRow('B');
         return;
     }
-    if (t.closest('#st-goto-cal')) {
+    const card = t.closest('.st-slot-card[data-st-line]');
+    if (
+        card instanceof HTMLElement &&
+        card.getAttribute('data-st-editable') === '1' &&
+        !t.closest('.st-del, .st-drag-handle')
+    ) {
         e.preventDefault();
-        runSemainesTypesGotoCal();
-        return;
-    }
-    const editLineBtn = t.closest('.st-row-edit');
-    if (editLineBtn instanceof HTMLButtonElement) {
-        e.preventDefault();
-        const tr = editLineBtn.closest('tr[data-st-line]');
-        if (tr instanceof HTMLTableRowElement && tr.getAttribute('data-st-editable') === '1') {
-            openStLineEditModal(tr);
-        }
+        openStSlotEditPanel(card);
     }
 }
 
