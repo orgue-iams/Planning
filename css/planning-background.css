@@ -8,7 +8,12 @@
     isolation: isolate;
 }
 
-/* Couche 1 : photo (désaturée / adoucie) ; couche 2 : voile clair */
+/* Fond photo : uniquement sur les colonnes créneaux (pas barres, légende, axe heures). */
+#app-shell.planning-app-shell > .planning-page-bg {
+    display: none !important;
+}
+
+/* Couche 1 : photo (désaturée / adoucie) ; couche 2 : voile clair — conservé pour compat. */
 .planning-page-bg {
     position: absolute;
     inset: 0;
@@ -52,56 +57,47 @@
     filter: invert(1) hue-rotate(180deg) grayscale(0.35) contrast(0.92) brightness(1.02);
 }
 
-/*
- * Portrait smartphone : le fond photo est limité à la zone #calendar (pas à toute la hauteur #app-shell
- * sous la légende), ancré en haut — évite l’image « qui continue » sous la fin de la grille.
- */
-@media (max-width: 639px) and (orientation: portrait) {
-    #app-shell.planning-app-shell > .planning-page-bg {
-        display: none !important;
-    }
+/* Photo de fond : colonnes jour/heure (créneaux), pas l’axe des heures ni les bandeaux. */
+#calendar .fc-timegrid-body .fc-timegrid-cols {
+    position: relative;
+    isolation: isolate;
+}
 
-    #calendar.planning-calendar-transparent {
-        position: relative;
-        isolation: isolate;
-    }
+#calendar .fc-timegrid-body .fc-timegrid-cols::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-color: #e2e8f0;
+    background-image: url('../images/planning-bg.png');
+    background-size: cover;
+    background-position: center;
+    filter: grayscale(0.45) brightness(1.08) contrast(0.9) saturate(0.75);
+}
 
-    #calendar.planning-calendar-transparent::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        z-index: 0;
-        pointer-events: none;
-        background-color: #e2e8f0;
-        background-image: url('../images/planning-bg.png');
-        background-size: cover;
-        background-position: top center;
-        filter: grayscale(0.45) brightness(1.08) contrast(0.9) saturate(0.75);
-    }
+#calendar .fc-timegrid-body .fc-timegrid-cols::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: rgba(248, 250, 252, 0.78);
+    backdrop-filter: saturate(0.7) blur(0.5px);
+}
 
-    #calendar.planning-calendar-transparent::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        z-index: 0;
-        pointer-events: none;
-        background: rgba(248, 250, 252, 0.78);
-        backdrop-filter: saturate(0.7) blur(0.5px);
-    }
+#calendar .fc-timegrid-body .fc-timegrid-cols > table {
+    position: relative;
+    z-index: 1;
+}
 
-    #calendar.planning-calendar-transparent > .fc {
-        position: relative;
-        z-index: 1;
-    }
+[data-theme='dark'] #calendar .fc-timegrid-body .fc-timegrid-cols::before {
+    filter: invert(1) hue-rotate(180deg) grayscale(0.35) contrast(0.92) brightness(1.02);
+}
 
-    [data-theme='dark'] #calendar.planning-calendar-transparent::before {
-        filter: invert(1) hue-rotate(180deg) grayscale(0.35) contrast(0.92) brightness(1.02);
-    }
-
-    [data-theme='dark'] #calendar.planning-calendar-transparent::after {
-        background: rgba(15, 23, 42, 0.38);
-        backdrop-filter: saturate(0.8) blur(0.5px);
-    }
+[data-theme='dark'] #calendar .fc-timegrid-body .fc-timegrid-cols::after {
+    background: rgba(15, 23, 42, 0.38);
+    backdrop-filter: saturate(0.8) blur(0.5px);
 }
 
 /* Contenu au-dessus du fond (barre d’outils dans l’en-tête fixe ; grille + légende dans #app-shell) */

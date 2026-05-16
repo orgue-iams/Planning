@@ -13,6 +13,7 @@ export async function loadUIComponents() {
         { id: 'app-modals', file: 'components/modal-broadcast.html', append: true },
         { id: 'app-modals', file: 'components/modal-users-admin.html', append: true },
         { id: 'app-modals', file: 'components/modal-calendar-pool.html', append: true },
+        { id: 'app-modals', file: 'components/modal-calendar-pool-edit.html', append: true },
         { id: 'app-modals', file: 'components/modal-announcements.html', append: true },
         { id: 'app-modals', file: 'components/modal-profile.html', append: true },
         { id: 'app-modals', file: 'components/modal-config.html', append: true },

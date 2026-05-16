@@ -121,6 +121,15 @@
     border-bottom: 1px solid rgb(51 65 85);
 }
 
+#modal_calendar_pool .pool-cal-url-cell {
+    max-width: 0;
+    width: 42%;
+}
+
+#modal_calendar_pool .pool-cal-table {
+    table-layout: fixed;
+}
+
 /* Gestion comptes — overlay plein écran (showModal custom) */
 [data-theme='dark'] #modal_users_admin[open] {
     background: rgb(15 23 42 / 0.72);

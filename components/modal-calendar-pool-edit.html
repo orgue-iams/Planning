@@ -1,0 +1,22 @@
+<dialog id="modal_calendar_pool_edit" class="modal" tabindex="-1">
+    <div class="modal-box p-5 w-[96%] max-w-md rounded-2xl border border-slate-200 shadow-2xl dark:border-slate-600">
+        <h3 class="font-bold text-sm mb-3 text-slate-800 border-b border-slate-200 pb-2 dark:text-slate-100 dark:border-slate-600">Modifier l’agenda</h3>
+        <input type="hidden" id="calendar-pool-edit-id" value="" />
+        <label class="flex flex-col gap-0 min-w-0 mb-2">
+            <span class="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Libellé</span>
+            <input type="text" id="calendar-pool-edit-label" class="input input-bordered w-full text-sm h-10 min-h-0 mt-1 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600" autocomplete="off" />
+        </label>
+        <label class="flex flex-col gap-0 min-w-0 mb-3">
+            <span class="text-[11px] font-semibold text-slate-600 dark:text-slate-300">URL / ID calendrier Google</span>
+            <input type="text" id="calendar-pool-edit-google-id" class="input input-bordered w-full text-sm h-10 min-h-0 font-mono mt-1 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600" autocomplete="off" />
+        </label>
+        <div class="mb-4">
+            <p class="text-[11px] font-semibold text-slate-600 dark:text-slate-300 m-0 mb-1">Utilisateur(s) lié(s)</p>
+            <ul id="calendar-pool-edit-assignees" class="text-sm text-slate-800 dark:text-slate-200 list-disc list-inside m-0 space-y-0.5"></ul>
+        </div>
+        <div class="modal-action mt-0 flex flex-wrap justify-between gap-2 border-t border-slate-200 pt-3 dark:border-slate-600">
+            <button type="button" id="calendar-pool-edit-delete" class="btn btn-error btn-sm btn-outline">Supprimer l’agenda</button>
+            <button type="button" id="calendar-pool-edit-close" class="btn btn-ghost btn-sm">Fermer</button>
+        </div>
+    </div>
+</dialog>

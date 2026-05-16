@@ -22,9 +22,6 @@ function escapeAttr(s) {
     return String(s ?? '').replace(/"/g, '&quot;');
 }
 
-const POOL_COPY_URL_SVG =
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4 shrink-0" aria-hidden="true"><path d="M7.5 3A1.5 1.5 0 0 0 6 4.5v11A1.5 1.5 0 0 0 7.5 17H9V4.5A1.5 1.5 0 0 1 10.5 3h-3Z"/><path d="M10.5 4.5A1.5 1.5 0 0 1 12 3h4.379a1.5 1.5 0 0 1 1.06.44l2.121 2.121a1.5 1.5 0 0 1 .44 1.06V19.5A1.5 1.5 0 0 1 18.5 21h-6A1.5 1.5 0 0 1 11 19.5v-15Z"/></svg>';
-
 /** @type {{ key: 'label' | 'assignee_nom', dir: 'asc' | 'desc' }} */
 let poolSort = { key: 'label', dir: 'asc' };
 
@@ -98,17 +95,13 @@ function renderPoolTableRows(rows) {
         const nom = String(r.assignee_nom ?? '').trim();
         const prenom = String(r.assignee_prenom ?? '').trim();
         const assignee = formatProfileFullName(nom, prenom) || '—';
+        tr.className = 'calendar-pool-row cursor-pointer hover:bg-slate-100/80 dark:hover:bg-slate-700/50';
+        tr.dataset.poolId = String(r.id ?? '');
+        tr.dataset.poolJson = JSON.stringify(r);
         tr.innerHTML = `
-            <td class="text-[11px] max-w-[10rem] sm:max-w-[14rem] truncate align-middle py-2" title="${escapeAttr(r.label || '')}">${escapeTd(r.label || '—')}</td>
-            <td class="align-middle py-2 min-w-0 p-1">
-                <div class="flex items-center gap-1 min-w-0">
-                    <span class="text-[10px] sm:text-[11px] truncate flex-1 min-w-0 font-mono text-slate-700 dark:text-slate-300" title="${escapeAttr(calUrl)}">${escapeTd(calUrl || '—')}</span>
-                    ${
-                        calUrl
-                            ? `<button type="button" class="btn btn-ghost btn-xs btn-square h-8 w-8 min-h-8 min-w-8 p-0 shrink-0 calendar-pool-copy-url border border-slate-200 dark:border-slate-600" data-calendar-url="${escapeAttr(calUrl)}" title="Copier dans le presse-papiers" aria-label="Copier l’URL du calendrier">${POOL_COPY_URL_SVG}</button>`
-                            : ''
-                    }
-                </div>
+            <td class="text-[11px] max-w-[8rem] sm:max-w-[12rem] align-middle py-2 break-words" title="${escapeAttr(r.label || '')}">${escapeTd(r.label || '—')}</td>
+            <td class="align-middle py-2 min-w-0 p-1 pool-cal-url-cell">
+                <span class="text-[10px] sm:text-[11px] font-mono text-slate-700 dark:text-slate-300 break-all whitespace-normal block" title="${escapeAttr(calUrl)}">${escapeTd(calUrl || '—')}</span>
             </td>
             <td class="text-[11px] align-middle py-2 break-words">${escapeTd(assignee)}</td>`;
         tb.appendChild(tr);
@@ -129,6 +122,124 @@ export async function refreshCalendarPoolModalTable() {
     const res = await planningAdminInvoke('list_calendar_pool', {});
     lastPoolRows = Array.isArray(res.rows) ? res.rows : [];
     renderPoolTableRows(lastPoolRows);
+}
+
+function confirmPoolDelete(message) {
+    return new Promise((resolve) => {
+        const dlg = document.getElementById('modal_admin_confirm');
+        const msg = document.getElementById('admin-confirm-message');
+        const btnOk = document.getElementById('admin-confirm-ok');
+        const btnCancel = document.getElementById('admin-confirm-cancel');
+        if (!dlg || !msg || !btnOk || !btnCancel) {
+            resolve(window.confirm(message));
+            return;
+        }
+        msg.textContent = message;
+        const cleanup = (v) => {
+            btnOk.removeEventListener('click', onOk);
+            btnCancel.removeEventListener('click', onCancel);
+            dlg.removeEventListener('cancel', onCancel);
+            dlg.close();
+            resolve(v);
+        };
+        const onOk = () => cleanup(true);
+        const onCancel = () => cleanup(false);
+        btnOk.addEventListener('click', onOk);
+        btnCancel.addEventListener('click', onCancel);
+        dlg.addEventListener('cancel', onCancel, { once: true });
+        dlg.showModal();
+        focusPlanningDialogRoot(dlg instanceof HTMLDialogElement ? dlg : null);
+    });
+}
+
+/** @param {Record<string, unknown>} row */
+function openCalendarPoolEdit(row) {
+    const id = String(row.id ?? '');
+    const gid = String(row.google_calendar_id ?? '').trim();
+    const label = String(row.label ?? '').trim();
+    const idEl = document.getElementById('calendar-pool-edit-id');
+    const gidEl = document.getElementById('calendar-pool-edit-google-id');
+    const lbEl = document.getElementById('calendar-pool-edit-label');
+    if (idEl instanceof HTMLInputElement) idEl.value = id;
+    if (gidEl instanceof HTMLInputElement) gidEl.value = gid;
+    if (lbEl instanceof HTMLInputElement) lbEl.value = label;
+
+    const ul = document.getElementById('calendar-pool-edit-assignees');
+    if (ul) {
+        ul.replaceChildren();
+        const uid = row.assigned_user_id;
+        if (uid) {
+            const nom = String(row.assignee_nom ?? '').trim();
+            const prenom = String(row.assignee_prenom ?? '').trim();
+            const name = formatProfileFullName(nom, prenom) || String(uid);
+            const li = document.createElement('li');
+            li.textContent = name;
+            ul.appendChild(li);
+        } else {
+            const li = document.createElement('li');
+            li.className = 'list-none text-slate-500 dark:text-slate-400 italic';
+            li.textContent = 'Aucun utilisateur lié';
+            ul.appendChild(li);
+        }
+    }
+
+    const dlg = document.getElementById('modal_calendar_pool_edit');
+    dlg?.showModal();
+    focusPlanningDialogRoot(dlg instanceof HTMLDialogElement ? dlg : null);
+}
+
+async function saveCalendarPoolEditOnClose() {
+    const poolId = document.getElementById('calendar-pool-edit-id')?.value?.trim();
+    if (!poolId) return;
+    const google_calendar_id = normalizeGoogleCalendarId(
+        document.getElementById('calendar-pool-edit-google-id')?.value ?? ''
+    );
+    const label = document.getElementById('calendar-pool-edit-label')?.value?.trim() || '';
+    if (!google_calendar_id) {
+        showToast('URL ou ID Google Calendar invalide.', 'error');
+        return;
+    }
+    try {
+        await planningAdminInvoke('update_calendar_pool', {
+            pool_id: poolId,
+            google_calendar_id,
+            label: label || null
+        });
+        showToast('Agenda enregistré.');
+        await refreshCalendarPoolModalTable();
+    } catch (err) {
+        showToast(err instanceof Error ? err.message : String(err), 'error');
+    }
+}
+
+async function deleteCalendarPoolFromEdit() {
+    const poolId = document.getElementById('calendar-pool-edit-id')?.value?.trim();
+    if (!poolId) return;
+    try {
+        let res = await planningAdminInvoke('delete_calendar_pool', { pool_id: poolId });
+        if (res?.needs_confirmation && Array.isArray(res.assignees) && res.assignees.length) {
+            const names = res.assignees
+                .map((a) => {
+                    const p = String(a.prenom ?? '').trim();
+                    const n = String(a.nom ?? '').trim();
+                    return [p, n].filter(Boolean).join(' ') || a.email || a.id;
+                })
+                .join(', ');
+            const ok = await confirmPoolDelete(
+                `Cet agenda est lié à : ${names}. En le supprimant, il faudra rattacher manuellement un nouveau calendrier à cet utilisateur. Confirmer la suppression ?`
+            );
+            if (!ok) return;
+            res = await planningAdminInvoke('delete_calendar_pool', { pool_id: poolId, force: true });
+        }
+        if (res?.ok === false && !res?.needs_confirmation) {
+            throw new Error(res?.error || 'Suppression impossible');
+        }
+        showToast('Agenda supprimé.');
+        document.getElementById('modal_calendar_pool_edit')?.close();
+        await refreshCalendarPoolModalTable();
+    } catch (err) {
+        showToast(err instanceof Error ? err.message : String(err), 'error');
+    }
 }
 
 let poolUiBound = false;
@@ -181,21 +292,30 @@ export function initAdminCalendarPoolUi(currentUser) {
         document.getElementById('modal_calendar_pool_add')?.close();
     });
 
-    document.getElementById('modal_calendar_pool')?.addEventListener('click', async (ev) => {
+    document.getElementById('calendar-pool-tbody')?.addEventListener('click', (ev) => {
         const t = ev.target;
-        const btn = t instanceof Element ? t.closest('.calendar-pool-copy-url') : null;
-        if (!(btn instanceof HTMLButtonElement)) return;
-        const url = btn.getAttribute('data-calendar-url')?.trim();
-        if (!url) {
-            showToast('Aucune URL à copier.', 'error');
-            return;
-        }
+        const row = t instanceof Element ? t.closest('tr.calendar-pool-row') : null;
+        if (!row?.dataset.poolJson) return;
         try {
-            await navigator.clipboard.writeText(url);
-            showToast('URL de l’agenda copiée.');
+            openCalendarPoolEdit(JSON.parse(row.dataset.poolJson));
         } catch {
-            showToast('Copie impossible.', 'error');
+            showToast('Impossible d’ouvrir l’agenda.', 'error');
         }
+    });
+
+    document.getElementById('calendar-pool-edit-close')?.addEventListener('click', () => {
+        void saveCalendarPoolEditOnClose().finally(() => {
+            document.getElementById('modal_calendar_pool_edit')?.close();
+        });
+    });
+
+    document.getElementById('modal_calendar_pool_edit')?.addEventListener('close', () => {
+        const idEl = document.getElementById('calendar-pool-edit-id');
+        if (idEl instanceof HTMLInputElement) idEl.value = '';
+    });
+
+    document.getElementById('calendar-pool-edit-delete')?.addEventListener('click', () => {
+        void deleteCalendarPoolFromEdit();
     });
 
     const submitPoolAdd = async () => {

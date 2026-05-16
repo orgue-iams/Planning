@@ -181,7 +181,11 @@ const cors: Record<string, string> = {
 
 type GateOk = { user: { id: string; email?: string } };
 type GateErr = { error: string };
-async function requirePlanningAdmin(authHeader: string | null, anonKey: string, url: string): Promise<GateOk | GateErr> {
+async function requirePlanningPrivileged(
+    authHeader: string | null,
+    anonKey: string,
+    url: string
+): Promise<GateOk | GateErr> {
     if (!authHeader) return { error: 'Missing Authorization' };
     const jwt = authHeader.replace(/^Bearer\s+/i, '').trim();
     if (!jwt) return { error: 'Missing Authorization' };
@@ -194,8 +198,29 @@ async function requirePlanningAdmin(authHeader: string | null, anonKey: string, 
         global: { headers: { Authorization: `Bearer ${jwt}` } }
     });
     const { data: row } = await userClient.from('profiles').select('role').eq('id', user.id).maybeSingle();
-    if (row?.role !== 'admin') return { error: 'Forbidden: planning admin only' };
+    const role = String(row?.role ?? '').toLowerCase();
+    if (role !== 'admin' && role !== 'prof') {
+        return { error: 'Forbidden: admin or prof only' };
+    }
     return { user: { id: user.id, email: user.email } };
+}
+
+async function requirePlanningAdmin(authHeader: string | null, anonKey: string, url: string): Promise<GateOk | GateErr> {
+    const gate = await requirePlanningPrivileged(authHeader, anonKey, url);
+    if ('error' in gate) return gate;
+    const userClient = createClient(url, anonKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+        global: {
+            headers: { Authorization: `Bearer ${authHeader?.replace(/^Bearer\s+/i, '').trim() ?? ''}` }
+        }
+    });
+    const { data: row } = await userClient
+        .from('profiles')
+        .select('role')
+        .eq('id', gate.user.id)
+        .maybeSingle();
+    if (row?.role !== 'admin') return { error: 'Forbidden: planning admin only' };
+    return gate;
 }
 
 Deno.serve(async (req) => {
@@ -224,14 +249,14 @@ Deno.serve(async (req) => {
     }
 
     const authHeader = req.headers.get('Authorization');
-    const gate = await requirePlanningAdmin(authHeader, anonKey, url);
-    if ('error' in gate) {
-        return new Response(JSON.stringify({ error: gate.error }), {
-            status: gate.error.startsWith('Forbidden') ? 403 : 401,
+    const privilegedGate = await requirePlanningPrivileged(authHeader, anonKey, url);
+    if ('error' in privilegedGate) {
+        return new Response(JSON.stringify({ error: privilegedGate.error }), {
+            status: privilegedGate.error.startsWith('Forbidden') ? 403 : 401,
             headers: { ...cors, 'Content-Type': 'application/json' }
         });
     }
-    const caller = gate.user;
+    const caller = privilegedGate.user;
 
     const admin = createClient(url, serviceKey, {
         auth: { autoRefreshToken: false, persistSession: false }
@@ -248,6 +273,29 @@ Deno.serve(async (req) => {
     }
 
     const action = String(body.action ?? '');
+
+    const ADMIN_ONLY_ACTIONS = new Set([
+        'list_users',
+        'create_user',
+        'invite',
+        'delete_user',
+        'set_password',
+        'update_role',
+        'update_user_email',
+        'add_calendar_pool',
+        'update_calendar_pool',
+        'delete_calendar_pool',
+        'reactivate_user'
+    ]);
+    if (ADMIN_ONLY_ACTIONS.has(action)) {
+        const adminGate = await requirePlanningAdmin(authHeader, anonKey, url);
+        if ('error' in adminGate) {
+            return new Response(JSON.stringify({ error: adminGate.error }), {
+                status: 403,
+                headers: { ...cors, 'Content-Type': 'application/json' }
+            });
+        }
+    }
 
     try {
         if (action === 'list_users') {
@@ -734,6 +782,97 @@ Deno.serve(async (req) => {
             if (backfillErr) throw backfillErr;
 
             return new Response(JSON.stringify({ ok: true, row: data ?? null }), {
+                headers: { ...cors, 'Content-Type': 'application/json' }
+            });
+        }
+
+        if (action === 'update_calendar_pool') {
+            const poolId = String(body.pool_id ?? '');
+            if (!poolId) {
+                return new Response(JSON.stringify({ error: 'pool_id requis' }), {
+                    status: 400,
+                    headers: { ...cors, 'Content-Type': 'application/json' }
+                });
+            }
+            const patch: Record<string, unknown> = {};
+            if (body.label !== undefined) {
+                const lab = String(body.label ?? '').trim();
+                patch.label = lab || null;
+            }
+            if (body.google_calendar_id !== undefined) {
+                const gid = normalizeGoogleCalendarId(String(body.google_calendar_id ?? ''));
+                if (!gid) {
+                    return new Response(JSON.stringify({ error: 'URL ou identifiant Google Calendar invalide' }), {
+                        status: 400,
+                        headers: { ...cors, 'Content-Type': 'application/json' }
+                    });
+                }
+                patch.google_calendar_id = gid;
+            }
+            if (Object.keys(patch).length === 0) {
+                return new Response(JSON.stringify({ error: 'Aucune modification' }), {
+                    status: 400,
+                    headers: { ...cors, 'Content-Type': 'application/json' }
+                });
+            }
+            const { data, error } = await admin
+                .from('google_calendar_pool')
+                .update(patch)
+                .eq('id', poolId)
+                .select('id,label,google_calendar_id,assigned_user_id')
+                .maybeSingle();
+            if (error) throw error;
+            return new Response(JSON.stringify({ ok: true, row: data ?? null }), {
+                headers: { ...cors, 'Content-Type': 'application/json' }
+            });
+        }
+
+        if (action === 'delete_calendar_pool') {
+            const poolId = String(body.pool_id ?? '');
+            const force = body.force === true;
+            if (!poolId) {
+                return new Response(JSON.stringify({ error: 'pool_id requis' }), {
+                    status: 400,
+                    headers: { ...cors, 'Content-Type': 'application/json' }
+                });
+            }
+            const { data: poolRow, error: poolErr } = await admin
+                .from('google_calendar_pool')
+                .select('id,label,google_calendar_id,assigned_user_id')
+                .eq('id', poolId)
+                .maybeSingle();
+            if (poolErr) throw poolErr;
+            if (!poolRow) {
+                return new Response(JSON.stringify({ error: 'Agenda introuvable' }), {
+                    status: 404,
+                    headers: { ...cors, 'Content-Type': 'application/json' }
+                });
+            }
+            const assigneeId = (poolRow as { assigned_user_id: string | null }).assigned_user_id;
+            if (assigneeId && !force) {
+                const pmap = await profileRowsForUserIds(admin, [assigneeId]);
+                const prof = pmap.get(assigneeId);
+                const { data: authRow } = await admin.auth.admin.getUserById(assigneeId);
+                const email = authRow?.user?.email ?? '';
+                return new Response(
+                    JSON.stringify({
+                        ok: false,
+                        needs_confirmation: true,
+                        assignees: [
+                            {
+                                id: assigneeId,
+                                nom: prof?.nom ?? '',
+                                prenom: prof?.prenom ?? '',
+                                email
+                            }
+                        ]
+                    }),
+                    { headers: { ...cors, 'Content-Type': 'application/json' } }
+                );
+            }
+            const { error: delErr } = await admin.from('google_calendar_pool').delete().eq('id', poolId);
+            if (delErr) throw delErr;
+            return new Response(JSON.stringify({ ok: true }), {
                 headers: { ...cors, 'Content-Type': 'application/json' }
             });
         }

@@ -563,7 +563,6 @@ export function resetAdminUsersUiBindings() {
 
 export function initAdminUsersUi(currentUser) {
     const show = isBackendAuthConfigured() && isAdmin(currentUser);
-    document.getElementById('menu-item-users-admin-wrap')?.classList.toggle('hidden', !show);
     if (!show || adminUsersHandlersBound) return;
     adminUsersHandlersBound = true;
     adminPlanningViewerId = currentUser?.id != null ? String(currentUser.id) : null;
@@ -614,22 +613,6 @@ export function initAdminUsersUi(currentUser) {
         const el = e.target;
         if (!(el instanceof HTMLInputElement)) return;
         el.value = formatFrPhone(el.value);
-    });
-
-    document.getElementById('menu-item-users-admin')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        closePlanningDrawer();
-        document.getElementById('btn-app-drawer')?.blur();
-        const dlg = document.getElementById('modal_users_admin');
-        if (!dlg) {
-            showToast('Fenêtre de gestion indisponible. Rechargez la page.', 'error');
-            return;
-        }
-        /* Après fermeture du menu, ouvrir au frame suivant évite un conflit tactiles / focus. */
-        requestAnimationFrame(() => {
-            openPlanningRouteDialog('modal_users_admin', 'Gestion des comptes', 'Comptes');
-            void refreshUserList();
-        });
     });
 
     document.getElementById('admin-create-btn')?.addEventListener('click', async () => {

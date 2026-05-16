@@ -299,7 +299,6 @@ export function resetAdminUsersUiBindings() {
 
 export function initAdminUsersUi(currentUser) {
     const show = isBackendAuthConfigured() && isAdmin(currentUser);
-    document.getElementById('menu-item-users-admin-wrap')?.classList.toggle('hidden', !show);
     if (!show || bound) return;
     bound = true;
 
