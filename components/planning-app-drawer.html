@@ -29,6 +29,28 @@
             </div>
         </div>
 
+        <div id="drawer-section-agendas" class="planning-drawer__block hidden">
+            <div class="flex items-center gap-1.5 mb-1">
+                <p class="planning-drawer__section-title m-0 flex-1">Agendas</p>
+                <button type="button" id="drawer-agenda-help-btn" class="planning-drawer__help-btn" title="À quoi servent ces agendas ?" aria-label="Aide agendas Google">?</button>
+            </div>
+            <button type="button" id="drawer-agenda-main-btn" class="planning-drawer__agenda-row hidden">
+                <span id="drawer-agenda-main-label" class="planning-drawer__agenda-label">Planning général</span>
+                <span class="planning-drawer__agenda-hint">Copier l’URL</span>
+            </button>
+            <button type="button" id="drawer-agenda-personal-btn" class="planning-drawer__agenda-row hidden">
+                <span id="drawer-agenda-personal-label" class="planning-drawer__agenda-label">Planning personnel</span>
+                <span class="planning-drawer__agenda-hint">Copier l’URL</span>
+            </button>
+            <p id="drawer-agenda-personal-none" class="planning-drawer__hint hidden">Aucun agenda personnel IAMS associé à ce compte.</p>
+        </div>
+
+        <div id="drawer-section-cours" class="planning-drawer__block hidden">
+            <p class="planning-drawer__section-title">Cours auxquels je suis inscrit</p>
+            <div id="drawer-cours-list" class="planning-drawer__cours-list"></div>
+            <p id="drawer-cours-empty" class="planning-drawer__hint hidden">Aucun cours sur la période chargée.</p>
+        </div>
+
         <div id="menu-item-display-prefs-wrap" class="planning-drawer__block hidden">
             <p class="planning-drawer__section-title">Préférences</p>
             <div class="planning-drawer__view-row planning-drawer__view-row--inline" role="radiogroup" aria-label="Thème d’affichage">

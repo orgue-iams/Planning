@@ -131,3 +131,12 @@
     color: rgb(226 232 240);
     border-color: rgb(51 65 85);
 }
+
+[data-theme='dark'] #modal_reservation #wrap-reservation-info {
+    background: rgb(30 41 59 / 0.9) !important;
+    border-color: rgb(71 85 105) !important;
+}
+
+[data-theme='dark'] #modal_reservation #event-info-description {
+    color: rgb(248 250 252) !important;
+}

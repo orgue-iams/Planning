@@ -292,3 +292,129 @@
     flex-shrink: 0;
     opacity: 0.85;
 }
+
+.planning-drawer__help-btn {
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 9999px;
+    border: 1px solid rgb(203 213 225);
+    background: rgb(248 250 252);
+    color: rgb(71 85 105);
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+[data-theme='dark'] .planning-drawer__help-btn {
+    border-color: rgb(71 85 105);
+    background: rgb(30 41 59);
+    color: rgb(203 213 225);
+}
+
+.planning-drawer__agenda-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+    margin-top: 0.35rem;
+    padding: 0.55rem 0.65rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgb(226 232 240);
+    background: rgb(248 250 252);
+    text-align: left;
+    cursor: pointer;
+}
+
+.planning-drawer__agenda-row:hover {
+    background: rgb(241 245 249);
+    border-color: rgb(203 213 225);
+}
+
+[data-theme='dark'] .planning-drawer__agenda-row {
+    border-color: rgb(71 85 105);
+    background: rgb(30 41 59);
+}
+
+[data-theme='dark'] .planning-drawer__agenda-row:hover {
+    background: rgb(51 65 85);
+}
+
+.planning-drawer__agenda-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: rgb(30 41 59);
+    min-width: 0;
+    flex: 1;
+}
+
+[data-theme='dark'] .planning-drawer__agenda-label {
+    color: rgb(241 245 249);
+}
+
+.planning-drawer__agenda-hint {
+    font-size: 0.58rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: rgb(100 116 139);
+    flex-shrink: 0;
+}
+
+[data-theme='dark'] .planning-drawer__agenda-hint {
+    color: rgb(148 163 184);
+}
+
+.planning-drawer__cours-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.35rem;
+}
+
+.drawer-cours-card {
+    padding: 0.55rem 0.65rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgb(226 232 240);
+    background: rgb(255 255 255);
+}
+
+[data-theme='dark'] .drawer-cours-card {
+    border-color: rgb(71 85 105);
+    background: rgb(30 41 59);
+}
+
+.drawer-cours-card__title {
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: rgb(15 23 42);
+    line-height: 1.3;
+}
+
+[data-theme='dark'] .drawer-cours-card__title {
+    color: rgb(248 250 252);
+}
+
+.drawer-cours-card__meta {
+    margin: 0.2rem 0 0;
+    font-size: 0.65rem;
+    color: rgb(71 85 105);
+    line-height: 1.35;
+}
+
+[data-theme='dark'] .drawer-cours-card__meta {
+    color: rgb(203 213 225);
+}
+
+.drawer-cours-card__prof {
+    margin: 0.15rem 0 0;
+    font-size: 0.62rem;
+    color: rgb(100 116 139);
+}
+
+[data-theme='dark'] .drawer-cours-card__prof {
+    color: rgb(148 163 184);
+}

@@ -118,3 +118,27 @@
 [data-theme='dark'] #planning-app-drawer .cal-pref-scale-preview {
     color: rgb(248 250 252) !important;
 }
+
+#modal_directory_users .directory-user-email-link {
+    color: rgb(37 99 235);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+#modal_directory_users .directory-user-email-link:hover {
+    color: rgb(29 78 216);
+}
+
+[data-theme='dark'] #modal_directory_users .directory-admin-user-card,
+[data-theme='dark'] #modal_directory_users .directory-users-stack > div > div > div {
+    border-color: rgb(71 85 105) !important;
+    background: rgb(30 41 59 / 0.85) !important;
+}
+
+[data-theme='dark'] #modal_directory_users .directory-user-email-link {
+    color: rgb(147 197 253) !important;
+}
+
+[data-theme='dark'] #modal_directory_users .directory-user-email-link:hover {
+    color: rgb(191 219 254) !important;
+}

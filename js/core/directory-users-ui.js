@@ -40,6 +40,13 @@ function hideLegacyDirectorySections(secAdm, secProf, secElv) {
     secElv?.replaceChildren();
 }
 
+function isDirectoryUserActive(r) {
+    const ban = r?.banned_until;
+    if (!ban) return true;
+    const until = new Date(ban);
+    return Number.isNaN(until.getTime()) || until <= new Date();
+}
+
 function directoryDisplayName(r) {
     const p = String(r?.prenom || '').trim();
     const n = String(r?.nom || '').trim();
@@ -94,8 +101,6 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
             const name = directoryDisplayName(r);
             const em = String(r.email || '').trim();
             const ph = formatFrPhone(String(r.telephone || '').trim());
-            const cal = String(r.calendar_label || '').trim();
-
             const nameEl = document.createElement('p');
             nameEl.className =
                 'font-semibold text-slate-900 dark:text-slate-100 leading-snug m-0 break-words';
@@ -110,28 +115,16 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
             if (em.includes('@')) {
                 const a = document.createElement('a');
                 a.href = `mailto:${em}`;
-                a.className = 'link link-primary';
+                a.className = 'directory-user-email-link';
                 a.textContent = em;
                 emailRow.appendChild(a);
             } else {
                 emailRow.appendChild(document.createTextNode(em || '—'));
             }
-            item.appendChild(emailRow);
-
-            if (cal) {
-                const sub = document.createElement('p');
-                sub.className =
-                    'mt-1 text-[12px] sm:text-[13px] text-slate-600 dark:text-slate-300 leading-snug m-0 break-words';
-                sub.style.overflowWrap = 'anywhere';
-                sub.textContent = cal;
-                item.appendChild(sub);
+            if (ph) {
+                emailRow.appendChild(document.createTextNode(` · Tél. ${ph}`));
             }
-
-            const phoneRow = document.createElement('p');
-            phoneRow.className =
-                'mt-1 font-mono text-[12px] sm:text-[13px] text-slate-800 dark:text-slate-200 m-0';
-            phoneRow.textContent = ph ? `Tél. ${ph}` : 'Tél. —';
-            item.appendChild(phoneRow);
+            item.appendChild(emailRow);
 
             list.appendChild(item);
         }
@@ -186,7 +179,7 @@ async function loadDirectoryIntoModal() {
         return;
     }
 
-    const rows = Array.isArray(data) ? data : [];
+    const rows = (Array.isArray(data) ? data : []).filter(isDirectoryUserActive);
     const admins = rows.filter((r) => String(r.role || '').toLowerCase() === 'admin');
     const profs = rows.filter((r) => String(r.role || '').toLowerCase() === 'prof');
     const eleves = rows.filter((r) => String(r.role || '').toLowerCase() === 'eleve');
@@ -255,42 +248,32 @@ function renderAdminDirectoryTable(users) {
         if (email.includes('@')) {
             const a = document.createElement('a');
             a.href = `mailto:${email}`;
-            a.className = 'link link-primary';
+            a.className = 'directory-user-email-link';
             a.textContent = email;
             emailBlock.appendChild(a);
         } else {
             emailBlock.textContent = email || '—';
         }
-        left.appendChild(emailBlock);
-
-        const calLine = document.createElement('div');
-        calLine.className =
-            'mt-1 flex flex-wrap items-center gap-1 text-[12px] sm:text-[13px] text-slate-600 leading-snug min-w-0 dark:text-slate-300';
-        const calText = document.createElement('span');
-        calText.className = 'break-words min-w-0';
-        calText.style.overflowWrap = 'anywhere';
-        calText.textContent = calLabel || 'Non attribué';
-        calLine.appendChild(calText);
-        if (calId) {
-            const copyBtn = document.createElement('button');
-            copyBtn.type = 'button';
-            copyBtn.className =
-                'btn btn-ghost btn-xs btn-square border border-slate-200 directory-copy-cal planning-icon-btn shrink-0';
-            copyBtn.dataset.calId = calId;
-            copyBtn.setAttribute('aria-label', "Copier l'URL du calendrier");
-            copyBtn.title = 'Copier URL';
-            copyBtn.innerHTML =
-                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9 9 0 019 9zM18.75 10.5h-6.75a1.125 1.125 0 00-1.125 1.125v6.75"/></svg>';
-            calLine.appendChild(copyBtn);
+        emailBlock.appendChild(document.createTextNode(` · Tél. ${phone}`));
+        if (calLabel || calId) {
+            emailBlock.appendChild(document.createTextNode(' · '));
+            const calText = document.createElement('span');
+            calText.textContent = calLabel || 'Agenda';
+            emailBlock.appendChild(calText);
+            if (calId) {
+                const copyBtn = document.createElement('button');
+                copyBtn.type = 'button';
+                copyBtn.className =
+                    'btn btn-ghost btn-xs btn-square border border-slate-200 directory-copy-cal planning-icon-btn shrink-0 ml-0.5 inline-flex';
+                copyBtn.dataset.calId = calId;
+                copyBtn.setAttribute('aria-label', "Copier l'URL du calendrier");
+                copyBtn.title = 'Copier URL';
+                copyBtn.innerHTML =
+                    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9 9 0 019 9zM18.75 10.5h-6.75a1.125 1.125 0 00-1.125 1.125v6.75"/></svg>';
+                emailBlock.appendChild(copyBtn);
+            }
         }
-        left.appendChild(calLine);
-
-        const phoneP = document.createElement('p');
-        phoneP.className =
-            'mt-1 font-mono text-[12px] sm:text-[13px] text-slate-800 m-0 dark:text-slate-200';
-        phoneP.textContent = `Tél. ${phone}`;
-        left.appendChild(phoneP);
-
+        left.appendChild(emailBlock);
         const editWrap = document.createElement('div');
         editWrap.className = 'shrink-0 pt-0.5';
         editWrap.innerHTML = `<button type="button" class="btn btn-ghost btn-xs btn-square border border-slate-200 directory-edit-user" data-user-id="${escapeHtmlAttr(String(r.id || ''))}" aria-label="Modifier l'utilisateur" title="Modifier">
@@ -317,7 +300,7 @@ async function loadAdminDirectoryIntoModal() {
     document.getElementById('directory-section-eleves')?.classList.add('hidden');
     try {
         const res = await planningAdminInvoke('list_users', {});
-        const users = Array.isArray(res?.users) ? res.users : [];
+        const users = (Array.isArray(res?.users) ? res.users : []).filter(isDirectoryUserActive);
         renderAdminDirectoryTable(users);
         if (status) status.textContent = '';
     } catch (e) {

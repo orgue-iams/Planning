@@ -372,11 +372,20 @@ function sortUsersByName(users) {
     });
 }
 
+function isAdminListUserActive(u) {
+    const ban = u?.banned_until;
+    if (!ban) return true;
+    const until = new Date(ban);
+    return Number.isNaN(until.getTime()) || until <= new Date();
+}
+
 function renderUsersTable(users) {
     const tb = document.getElementById('admin-users-tbody');
     if (!tb) return;
     tb.replaceChildren();
-    const list = sortUsersByName(Array.isArray(users) ? users : []);
+    const list = sortUsersByName(
+        (Array.isArray(users) ? users : []).filter(isAdminListUserActive)
+    );
     if (list.length === 0) {
         const tr = document.createElement('tr');
         tr.innerHTML = `<td colspan="8" class="text-slate-500 text-center py-4">Aucun compte renvoyé par le serveur. Vérifiez le déploiement de la fonction « planning-admin » ou rechargez la page.</td>`;

@@ -420,25 +420,13 @@ export function ownerInfoFromEvent(event, currentUser) {
     return { ownerEmail, ownerName, ownerRole, ownerUserId };
 }
 
-function ownerIdentityLabel(
-    owner,
-    currentUser = null,
-    includeActor = false,
-    ownerLabelOverride = '',
-    actorLabelOverride = ''
-) {
-    const name = ownerLabelOverride || owner.ownerName || 'Inconnu';
-    const me = String(currentUser?.email || '')
-        .trim()
-        .toLowerCase();
-    if (includeActor && me && owner.ownerEmail && owner.ownerEmail !== me) {
-        const actor =
-            actorLabelOverride ||
-            String(currentUser?.name || '').trim() ||
-            me.split('@')[0] ||
-            'inconnu';
-        return `Réservé par ${name}. Modifié par ${actor}`;
-    }
+/** Libellé fixe : premier créateur du créneau (pas d’historique des modifications). */
+function reservationReservedByLabel(owner, ownerLabelOverride = '', createdByLabelOverride = '') {
+    const name =
+        (createdByLabelOverride || '').trim() ||
+        (ownerLabelOverride || '').trim() ||
+        owner.ownerName ||
+        'Inconnu';
     return `Réservé par ${name}`;
 }
 
@@ -1652,10 +1640,11 @@ function syncReservationModalTimeOptions(calendar, eventRef) {
         new Date(Math.min(boundary.getTime(), dayMax.getTime()))
     );
     const plusOneHour = formatTimeForSelect(new Date(startAt.getTime() + 60 * 60 * 1000));
-    const preferredEnd = endChoices.includes(plusOneHour)
-        ? plusOneHour
-        : endChoices.includes(endEl.value)
-          ? endEl.value
+    const currentEnd = endEl.value;
+    const preferredEnd = endChoices.includes(currentEnd)
+        ? currentEnd
+        : endChoices.includes(plusOneHour)
+          ? plusOneHour
           : endChoices[0] || '';
     setSelectOptions(endEl, endChoices, preferredEnd);
 }
@@ -1785,10 +1774,56 @@ function reservationDisplayTitleForCurrentUser(currentUser) {
     return e || 'Réservation';
 }
 
+function reservationEventDescriptif(event) {
+    if (!event) return '—';
+    const dbType = String(event.extendedProps?.planningDbSlotType || '').trim();
+    let motif = '';
+    if (dbType === 'cours') motif = 'Cours';
+    else if (dbType === 'concert') motif = 'Concert';
+    else if (dbType === 'autre') motif = 'Autre';
+    else if (dbType === 'fermeture') motif = 'Fermeture';
+    else if (dbType === 'travail perso') motif = 'Travail';
+    else motif = slotTypeToMotif(event.extendedProps?.type);
+    const motifLabel = motifDisplayLabel(motif);
+    const title = String(event.title || '').trim();
+    if (!title || title === motifLabel) return motifLabel;
+    return `${motifLabel} — ${title}`;
+}
+
+/**
+ * Bloc « Informations » en tête de modale (édition d’un créneau existant).
+ */
+function applyReservationEventInfoPanel(
+    event,
+    start,
+    end,
+    owner,
+    ownerLabelOverride = '',
+    createdByLabelOverride = ''
+) {
+    const wrap = document.getElementById('wrap-reservation-info');
+    const whenEl = document.getElementById('event-info-when');
+    const descEl = document.getElementById('event-info-description');
+    const reservedEl = document.getElementById('event-info-reserved-by');
+    if (!wrap || !whenEl || !descEl || !reservedEl) return;
+    if (!event) {
+        wrap.classList.add('hidden');
+        return;
+    }
+    wrap.classList.remove('hidden');
+    whenEl.textContent = formatOccupationWhenSentence(start, end);
+    descEl.textContent = reservationEventDescriptif(event);
+    reservedEl.textContent = reservationReservedByLabel(
+        owner,
+        ownerLabelOverride,
+        createdByLabelOverride
+    );
+}
+
 /**
  * En-tête modale édition : libellé selon le rôle.
  * @param {string} [createdByLabelOverride] — libellé `planning_profiles_label_for_ids` (créateur)
- * @param {string} [lastModifiedByLabelOverride] — idem (dernier modificateur)
+ * @param {string} [_lastModifiedByLabelOverride] — conservé pour appelant (non affiché)
  */
 function applyReservationEditorShellForRole(
     currentUser,
@@ -1805,29 +1840,14 @@ function applyReservationEditorShellForRole(
     const sel = document.getElementById('event-motif-select');
     const r = normalizeRole(currentUser?.role);
     const owner = ownerInfoFromEvent(event, currentUser);
-    const slotOwnerName = (ownerLabelOverride || owner.ownerName || 'Inconnu').trim();
-    const createdId = String(event?.extendedProps?.createdByUserId || '').trim();
-    const modifiedId = String(event?.extendedProps?.lastModifiedByUserId || '').trim();
-
     if (r === 'eleve') {
         if (editorOwnerEl) {
             if (event) {
-                const hasActorColumns = Boolean(createdId);
-                if (hasActorColumns) {
-                    const a = (createdByLabelOverride || '—').trim();
-                    let t = `Créé par ${a}.`;
-                    if (modifiedId && createdId && modifiedId !== createdId) {
-                        const b = (lastModifiedByLabelOverride || '—').trim();
-                        t += ` Créneau modifié par ${b}.`;
-                    }
-                    editorOwnerEl.textContent = t;
-                } else {
-                    editorOwnerEl.textContent = `Créneau pour ${slotOwnerName}.`;
-                }
+                editorOwnerEl.classList.add('hidden');
             } else {
                 editorOwnerEl.textContent = reservationDisplayTitleForCurrentUser(currentUser);
+                editorOwnerEl.classList.remove('hidden');
             }
-            editorOwnerEl.classList.remove('hidden');
         }
         wrapTitle?.classList.add('hidden');
         hintFerm?.classList.add('hidden');
@@ -1835,18 +1855,7 @@ function applyReservationEditorShellForRole(
         if (nOpt <= 1) wrapMotif?.classList.add('hidden');
         else wrapMotif?.classList.remove('hidden');
     } else {
-        if (!event && editorOwnerEl) {
-            editorOwnerEl.classList.add('hidden');
-        } else if (editorOwnerEl) {
-            editorOwnerEl.textContent = ownerIdentityLabel(
-                owner,
-                currentUser,
-                true,
-                ownerLabelOverride,
-                actorLabelOverride
-            );
-            editorOwnerEl.classList.remove('hidden');
-        }
+        editorOwnerEl?.classList.add('hidden');
         wrapTitle?.classList.remove('hidden');
         const ownerIsEleve = owner.ownerRole === 'eleve';
         const currentRole = normalizeRole(currentUser?.role);
@@ -2225,9 +2234,8 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         }
     }
 
-    const ownerText = ownerIdentityLabel(owner, currentUser, false, ownerLabelOverride);
-
     const wrapRead = document.getElementById('wrap-reservation-readonly');
+    const wrapInfo = document.getElementById('wrap-reservation-info');
     const wrapEdit = document.getElementById('wrap-reservation-editor');
     const modalActions = document.querySelector('#modal_reservation .modal-action');
     const pastHint = document.getElementById('event-readonly-past-hint');
@@ -2236,6 +2244,10 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     if (wrapRead && wrapEdit) {
         wrapRead.classList.add('hidden');
         wrapEdit.classList.remove('hidden');
+    }
+    if (wrapInfo) {
+        if (event) wrapInfo.classList.remove('hidden');
+        else wrapInfo.classList.add('hidden');
     }
     modalActions?.classList.remove('justify-end');
     modalActions?.classList.add('justify-between');
@@ -2311,6 +2323,16 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     setSelectTime(startEl, startInstant);
     setSelectTime(endEl, endInstant);
     syncReservationDateWeekdayLabel();
+    if (event) {
+        applyReservationEventInfoPanel(
+            event,
+            startInstant,
+            endInstant,
+            owner,
+            ownerLabelOverride,
+            createdByLabelOverride
+        );
+    }
     if (calendarForClip?.getEvents) {
         syncReservationModalTimeOptions(calendarForClip, event || null);
         dateEl?.addEventListener(

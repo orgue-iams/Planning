@@ -8,17 +8,11 @@ import {
     PASSWORD_MIN_LENGTH
 } from './auth-logic.js';
 import { getPlanningSessionUser, setPlanningSessionUser } from './session-user.js';
-import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
-import { googleCalendarEmbedUrl } from '../utils/google-calendar-url.js';
+import { getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
 import { showToast } from '../utils/toast.js';
-import {
-    filterCoursEventsForUser,
-    sortEventsByStart,
-    formatCoursLineFr,
-    fetchCalendarEventsInRange
-} from './planning-courses.js';
 import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
 import { closePlanningDrawer } from './planning-drawer-ui.js';
+import { refreshDrawerProfileExtras } from './drawer-profile-extras-ui.js';
 
 let profileUiBound = false;
 let profileSaveInFlight = false;
@@ -38,14 +32,12 @@ function readProfileFormState() {
     const phoneEl = document.getElementById('profile-phone-input');
     const shareEmailEl = document.getElementById('profile-share-email');
     const sharePhoneEl = document.getElementById('profile-share-phone');
-    const shareCalEl = document.getElementById('profile-share-calendar');
     return {
         name: nameEl instanceof HTMLInputElement ? nameEl.value.trim() : '',
         email: emailEl instanceof HTMLInputElement ? emailEl.value.trim() : '',
         phone: phoneEl instanceof HTMLInputElement ? formatFrPhone(phoneEl.value) : '',
         shareEmail: shareEmailEl instanceof HTMLInputElement ? shareEmailEl.checked : true,
-        sharePhone: sharePhoneEl instanceof HTMLInputElement ? sharePhoneEl.checked : false,
-        shareCalendar: shareCalEl instanceof HTMLInputElement ? shareCalEl.checked : false
+        sharePhone: sharePhoneEl instanceof HTMLInputElement ? sharePhoneEl.checked : false
     };
 }
 
@@ -61,8 +53,7 @@ function hasProfileFieldChangesVsBaseline() {
         cur.email !== profileBaseline.email ||
         cur.phone !== profileBaseline.phone ||
         cur.shareEmail !== profileBaseline.shareEmail ||
-        cur.sharePhone !== profileBaseline.sharePhone ||
-        cur.shareCalendar !== profileBaseline.shareCalendar
+        cur.sharePhone !== profileBaseline.sharePhone
     );
 }
 
@@ -102,38 +93,6 @@ function syncProfilePassHint() {
     setPassHint('Les mots de passe correspondent.', 'muted');
 }
 
-async function loadPersonalPoolRow(userId) {
-    if (!isBackendAuthConfigured() || !userId) {
-        return { id: '', label: '' };
-    }
-    const sb = getSupabaseClient();
-    if (!sb) return { id: '', label: '' };
-    const { data } = await sb
-        .from('google_calendar_pool')
-        .select('google_calendar_id,label')
-        .eq('assigned_user_id', userId)
-        .maybeSingle();
-    return {
-        id: String(data?.google_calendar_id ?? '').trim(),
-        label: String(data?.label ?? '').trim()
-    };
-}
-
-async function copyInputUrl(inputId) {
-    const el = document.getElementById(inputId);
-    const v = el instanceof HTMLInputElement ? el.value.trim() : '';
-    if (!v) {
-        showToast('Aucun lien à copier.', 'error');
-        return;
-    }
-    try {
-        await navigator.clipboard.writeText(v);
-        showToast('Lien copié dans le presse-papiers.');
-    } catch {
-        showToast('Copie impossible.', 'error');
-    }
-}
-
 /** Ancien bandeau « cours de la semaine » supprimé : nettoie la classe shell si besoin. */
 export async function refreshHeaderWeekStrip(_user) {
     document.getElementById('app-shell')?.classList.remove('planning-shell--weekstrip');
@@ -153,20 +112,18 @@ async function fillProfileModal(user) {
     let tel = String(user.telephone ?? '').trim();
     let shareEmail = user.directory_share_email !== false;
     let sharePhone = user.directory_share_phone === true;
-    let shareCalendar = user.directory_share_calendar === true;
     if (isBackendAuthConfigured() && user.id) {
         const sb = getSupabaseClient();
         if (sb) {
             const { data } = await sb
                 .from('profiles')
-                .select('telephone, directory_share_email, directory_share_phone, directory_share_calendar')
+                .select('telephone, directory_share_email, directory_share_phone')
                 .eq('id', user.id)
                 .maybeSingle();
             if (data) {
                 tel = String(data.telephone ?? '').trim();
                 shareEmail = data.directory_share_email !== false;
                 sharePhone = data.directory_share_phone === true;
-                shareCalendar = data.directory_share_calendar === true;
             }
         }
     }
@@ -176,8 +133,6 @@ async function fillProfileModal(user) {
     if (shE instanceof HTMLInputElement) shE.checked = shareEmail;
     const shP = document.getElementById('profile-share-phone');
     if (shP instanceof HTMLInputElement) shP.checked = sharePhone;
-    const shC = document.getElementById('profile-share-calendar');
-    if (shC instanceof HTMLInputElement) shC.checked = shareCalendar;
     document.getElementById('profile-role-label').textContent = roleLabelFr(user.role);
     const passNew = document.getElementById('profile-pass-new');
     const passConfirm = document.getElementById('profile-pass-confirm');
@@ -185,84 +140,7 @@ async function fillProfileModal(user) {
     if (passConfirm instanceof HTMLInputElement) passConfirm.value = '';
     setPassHint('', '');
     syncProfileBaselineFromForm();
-
-    const isEleve = String(user.role).toLowerCase() === 'eleve';
-    document.getElementById('profile-cours-section')?.classList.toggle('hidden', !isEleve);
-
-    const { mainGoogleCalendarId, mainGoogleCalendarLabel } = getPlanningConfig();
-    const mainUrl = googleCalendarEmbedUrl(mainGoogleCalendarId);
-    const rowMain = document.getElementById('profile-row-main-cal');
-    const inpMain = document.getElementById('profile-url-main');
-    const nameMain = document.getElementById('profile-main-cal-name');
-    const mainDisplayName =
-        mainGoogleCalendarLabel.trim() ||
-        (mainGoogleCalendarId ? mainGoogleCalendarId.split('@')[0] || mainGoogleCalendarId : '');
-    if (mainUrl && rowMain && inpMain) {
-        rowMain.classList.remove('hidden');
-        inpMain.value = mainUrl;
-        if (nameMain) nameMain.textContent = mainDisplayName || 'Planning général';
-    } else if (rowMain) {
-        rowMain.classList.add('hidden');
-        if (inpMain) inpMain.value = '';
-        if (nameMain) nameMain.textContent = '';
-    }
-
-    const rowPers = document.getElementById('profile-row-personal-cal');
-    const inpPers = document.getElementById('profile-url-personal');
-    const namePers = document.getElementById('profile-personal-cal-name');
-    const nonePers = document.getElementById('profile-personal-cal-none');
-    const { id: persId, label: persLabel } = await loadPersonalPoolRow(user.id);
-    const persUrl = googleCalendarEmbedUrl(persId);
-    if (persUrl && rowPers && inpPers) {
-        rowPers.classList.remove('hidden');
-        inpPers.value = persUrl;
-        nonePers?.classList.add('hidden');
-        if (namePers) {
-            namePers.textContent =
-                persLabel.trim() ||
-                (persId.includes('@') ? persId.split('@')[0] : persId) ||
-                'Calendrier personnel';
-        }
-    } else {
-        rowPers?.classList.add('hidden');
-        if (inpPers) inpPers.value = '';
-        if (namePers) namePers.textContent = '';
-        if (nonePers) {
-            nonePers.classList.remove('hidden');
-            nonePers.textContent =
-                'Aucun calendrier secondaire IAMS n’est associé à votre compte pour le moment.';
-        }
-    }
-
-    const ul = document.getElementById('profile-cours-list');
-    const empty = document.getElementById('profile-cours-empty');
-    if (ul) ul.replaceChildren();
-    let list = [];
-    if (isEleve) {
-        const start = new Date();
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(start);
-        end.setDate(end.getDate() + 60);
-        try {
-            const evs = await fetchCalendarEventsInRange(start, end);
-            list = sortEventsByStart(filterCoursEventsForUser(evs, user));
-        } catch {
-            /* */
-        }
-        if (ul) {
-            for (const ev of list) {
-                const li = document.createElement('li');
-                li.className = 'pl-0 border-l-2 border-slate-200 pl-2';
-                li.textContent = formatCoursLineFr(ev);
-                ul.appendChild(li);
-            }
-        }
-        if (empty) {
-            empty.classList.toggle('hidden', list.length > 0);
-        }
-    } else if (empty) {
-        empty.classList.add('hidden');
-    }
+    await refreshDrawerProfileExtras(user);
 }
 
 async function persistProfileFields() {
@@ -282,8 +160,7 @@ async function persistProfileFields() {
                 display_name: form.name,
                 telephone,
                 directory_share_email: form.shareEmail,
-                directory_share_phone: form.sharePhone,
-                directory_share_calendar: form.shareCalendar
+                directory_share_phone: form.sharePhone
             })
             .eq('id', u.id);
         if (error) {
@@ -297,8 +174,7 @@ async function persistProfileFields() {
                 name: form.name,
                 telephone,
                 directory_share_email: form.shareEmail,
-                directory_share_phone: form.sharePhone,
-                directory_share_calendar: form.shareCalendar
+                directory_share_phone: form.sharePhone
             });
         }
         const previousEmail = String(u.email || '').trim().toLowerCase();
@@ -377,11 +253,6 @@ export function initProfileUi(currentUser) {
         });
     });
 
-    document.getElementById('profile-copy-main')?.addEventListener('click', () => void copyInputUrl('profile-url-main'));
-    document.getElementById('profile-copy-personal')?.addEventListener('click', () =>
-        void copyInputUrl('profile-url-personal')
-    );
-
     document.getElementById('profile-phone-input')?.addEventListener('blur', (e) => {
         const el = e.target;
         if (!(el instanceof HTMLInputElement)) return;
@@ -408,8 +279,7 @@ export function initProfileUi(currentUser) {
         'profile-email-input',
         'profile-phone-input',
         'profile-share-email',
-        'profile-share-phone',
-        'profile-share-calendar'
+        'profile-share-phone'
     ]) {
         document.getElementById(id)?.addEventListener('input', scheduleProfileFieldsPersist);
         document.getElementById(id)?.addEventListener('change', scheduleProfileFieldsPersist);

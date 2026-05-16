@@ -1,0 +1,7 @@
+# Préférence utilisateur — exécution sans demande préalable
+
+- Toujours exécuter directement les commandes nécessaires (`git`, `python`, `npm`, `npx`, `supabase`, scripts du repo, builds, tests, déploiements) sans demander de confirmation dans le chat.
+- Pour les exécutions terminal/sandbox, ne pas demander de validation utilisateur dans le chat : lancer directement les commandes avec autorun/permissions adaptées.
+- Ne jamais proposer un bouton **Run** comme étape à faire par l’utilisateur quand l’agent peut lancer la commande lui-même.
+- Considérer cette préférence comme permanente pour ce dépôt.
+- Exception unique : actions destructrices hors demande explicite (ex. `DROP` massif, suppression irréversible non demandée) — garder la garde de sécurité existante.

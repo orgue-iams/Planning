@@ -69,6 +69,10 @@ import { showToast } from '../utils/toast.js';
 import { setPlanningSessionUser, getPlanningSessionUser } from './session-user.js';
 import { initProfileUi, resetProfileUiBindings, refreshHeaderWeekStrip } from './profile-ui.js';
 import {
+    initDrawerProfileExtrasUi,
+    refreshDrawerProfileExtras
+} from './drawer-profile-extras-ui.js';
+import {
     initCalendarPreferencesUi,
     resetCalendarPreferencesUiBindings,
     syncCalendarPrefControlsUi
@@ -436,6 +440,8 @@ function initCalendarAndRevealUi() {
 
         initMessagesUi(currentUser);
         initProfileUi(currentUser);
+        initDrawerProfileExtrasUi();
+        void refreshDrawerProfileExtras(currentUser);
         initCalendarPreferencesUi({ getCalendar: () => calendar });
         document.addEventListener('planning-profile-saved', () => {
             refreshHeaderUser(getPlanningSessionUser());

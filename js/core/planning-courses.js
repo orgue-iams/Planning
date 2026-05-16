@@ -59,6 +59,12 @@ export function sortEventsByStart(events) {
  * @param {{ title?: string, start?: string, end?: string, extendedProps?: { owner?: string, ownerDisplayName?: string } }} ev
  */
 export function formatCoursLineFr(ev) {
+    const lines = formatCoursCardLines(ev);
+    return `${lines.meta} — ${lines.title} — ${lines.prof}`;
+}
+
+/** Lignes structurées pour cartes (tiroir, profil). */
+export function formatCoursCardLines(ev) {
     const title = String(ev?.title ?? 'Cours').trim() || 'Cours';
     const owner = String(ev?.extendedProps?.owner ?? '').trim();
     const profName =
@@ -66,12 +72,23 @@ export function formatCoursLineFr(ev) {
         (owner ? owner.split('@')[0] : '—');
     const start = ev?.start ? new Date(String(ev.start)) : null;
     const end = ev?.end ? new Date(String(ev.end)) : null;
-    if (!start || Number.isNaN(start.getTime())) return `${title} — ${profName}`;
-    const day = start.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+    const gw = String(ev?.extendedProps?.planningGabaritWeekType || '')
+        .trim()
+        .toUpperCase();
+    const weekTag = gw === 'A' || gw === 'B' ? `Semaine ${gw}` : '';
+    if (!start || Number.isNaN(start.getTime())) {
+        return { title, meta: weekTag || '—', prof: `Prof. ${profName}` };
+    }
+    const day = start.toLocaleDateString('fr-FR', { weekday: 'long' });
     const t0 = formatTimeFr24(start);
     const t1 = end && !Number.isNaN(end.getTime()) ? formatTimeFr24(end) : '';
     const hours = t1 ? `${t0} – ${t1}` : t0;
-    return `${day}, ${hours} — ${title} — ${profName}`;
+    const metaParts = [day, weekTag, hours].filter(Boolean);
+    return {
+        title,
+        meta: metaParts.join(' · '),
+        prof: `Prof. ${profName}`
+    };
 }
 
 /**
