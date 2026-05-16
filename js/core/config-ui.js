@@ -11,8 +11,8 @@ import {
 import { showToast } from '../utils/toast.js';
 import { normalizeHHmmInput } from '../utils/time-helpers.js';
 import { getPlanningSessionUser } from './session-user.js';
-import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
-import { closePlanningDrawer, syncPlanningDrawerGroupedSections } from './planning-drawer-ui.js';
+import { openPlanningRouteFromDrawer } from '../utils/planning-route-dialog.js';
+import { syncPlanningDrawerGroupedSections } from './planning-drawer-ui.js';
 
 let bound = false;
 let configInitialSnapshot = '';
@@ -227,11 +227,10 @@ export function initConfigUi(currentUser) {
 
     document.getElementById('menu-item-config')?.addEventListener('click', (ev) => {
         ev.preventDefault();
-        document.getElementById('btn-app-drawer')?.blur();
-        closePlanningDrawer();
-        void fillConfigModal().then(() =>
-            openPlanningRouteDialog('modal_config', 'Configuration du planning', 'Configuration')
-        );
+        if (!openPlanningRouteFromDrawer('modal_config', 'Configuration du planning', 'Configuration')) {
+            return;
+        }
+        void fillConfigModal();
     });
 
     /* Un seul événement par champ : `input` + `change` déclenchaient plusieurs sauvegardes (ex. nombre de toasts). */

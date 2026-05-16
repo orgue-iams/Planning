@@ -45,6 +45,10 @@ dialog.planning-route-page .modal-box {
     -webkit-overflow-scrolling: touch;
 }
 
+dialog.planning-route-page#modal_directory_users .modal-box {
+    padding-top: 0.5rem;
+}
+
 [data-theme='dark'] dialog.planning-route-page .planning-route-page__bar {
     background: rgb(15 23 42) !important;
 }

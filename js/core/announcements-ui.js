@@ -16,8 +16,8 @@ import {
     quillGetPlainText,
     quillSetHtml
 } from '../utils/planning-quill.js';
-import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
-import { closePlanningDrawer, syncPlanningDrawerGroupedSections } from './planning-drawer-ui.js';
+import { openPlanningRouteDialog, openPlanningRouteFromDrawer } from '../utils/planning-route-dialog.js';
+import { syncPlanningDrawerGroupedSections } from './planning-drawer-ui.js';
 
 function pad2(n) {
     return String(n).padStart(2, '0');
@@ -192,8 +192,9 @@ export function initAnnouncementsUi(currentUser) {
         'click',
         async (e) => {
             e.preventDefault();
-            closePlanningDrawer();
-            document.getElementById('btn-app-drawer')?.blur();
+            if (!openPlanningRouteFromDrawer('modal_announcements', 'Annonces', 'Annonces')) {
+                return;
+            }
             const latest = await fetchLatestLoginAnnouncementForEdit();
             ensureAnnQuill();
             if (!annQuill) {
@@ -212,7 +213,6 @@ export function initAnnouncementsUi(currentUser) {
                 quillSetHtml(annQuill, '');
             }
             lastPersisted = getAnnFormState();
-            openPlanningRouteDialog('modal_announcements', 'Annonces', 'Annonces');
         },
         { signal }
     );

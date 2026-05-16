@@ -8,8 +8,8 @@ import { showToast } from '../utils/toast.js';
 import { normalizeGoogleCalendarId } from '../utils/google-calendar-id.js';
 import { googleCalendarEmbedUrl } from '../utils/google-calendar-url.js';
 import { formatProfileFullName } from '../utils/profile-full-name.js';
-import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
-import { closePlanningDrawer, syncPlanningDrawerGroupedSections } from './planning-drawer-ui.js';
+import { openPlanningRouteFromDrawer } from '../utils/planning-route-dialog.js';
+import { syncPlanningDrawerGroupedSections } from './planning-drawer-ui.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
 
 function escapeTd(s) {
@@ -257,20 +257,18 @@ export function initAdminCalendarPoolUi(currentUser) {
 
     document.getElementById('menu-item-calendar-pool')?.addEventListener('click', (e) => {
         e.preventDefault();
-        closePlanningDrawer();
-        document.getElementById('btn-app-drawer')?.blur();
         const dlg = document.getElementById('modal_calendar_pool');
         if (!dlg) {
             showToast('Fenêtre pool indisponible. Rechargez la page.', 'error');
             return;
         }
         poolSort = { key: 'label', dir: 'asc' };
-        requestAnimationFrame(() => {
-            void refreshCalendarPoolModalTable().catch((err) =>
-                showToast(err instanceof Error ? err.message : String(err), 'error')
-            );
-            openPlanningRouteDialog('modal_calendar_pool', 'Calendriers des utilisateurs', 'Calendriers');
-        });
+        if (!openPlanningRouteFromDrawer('modal_calendar_pool', 'Calendriers des utilisateurs', 'Calendriers')) {
+            return;
+        }
+        void refreshCalendarPoolModalTable().catch((err) =>
+            showToast(err instanceof Error ? err.message : String(err), 'error')
+        );
     });
 
     document.getElementById('calendar-pool-sort-label')?.addEventListener('click', () => setPoolSort('label'));

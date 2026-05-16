@@ -142,3 +142,27 @@
 [data-theme='dark'] #modal_directory_users .directory-user-email-link:hover {
     color: rgb(191 219 254) !important;
 }
+
+#modal_directory_users .directory-user-card__role,
+#modal_directory_users .directory-user-card__agenda {
+    color: rgb(100 116 139);
+}
+
+[data-theme='dark'] #modal_directory_users .directory-user-card__role,
+[data-theme='dark'] #modal_directory_users .directory-user-card__agenda {
+    color: rgb(148 163 184);
+}
+
+#modal_directory_users .directory-user-delete-btn {
+    color: rgb(100 116 139);
+}
+
+#modal_directory_users .directory-user-delete-btn:hover {
+    color: rgb(220 38 38);
+    background: rgb(254 226 226 / 0.6);
+}
+
+[data-theme='dark'] #modal_directory_users .directory-user-delete-btn:hover {
+    color: rgb(248 113 113);
+    background: rgb(127 29 29 / 0.35);
+}

@@ -9,18 +9,56 @@ import { isAdmin, isProf, PASSWORD_MIN_LENGTH } from './auth-logic.js';
 import { planningAdminInvoke } from './admin-api.js';
 import { openAdminUserModalForCreate } from './admin-users-modal-ui.js';
 import {
-    openPlanningRouteDialog,
+    openPlanningRouteFromDrawer,
     setPlanningRouteBackHandler,
     updatePlanningRouteDialog
 } from '../utils/planning-route-dialog.js';
-import { closePlanningDrawer } from './planning-drawer-ui.js';
-import { normalizePlanningRole } from './planning-roles.js';
+import { normalizePlanningRole, PLANNING_ROLE_OPTIONS } from './planning-roles.js';
+import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
 
 let bound = false;
 /** @type {object | null} */
 let editingUser = null;
 /** @type {object | null} */
 let editSnapshot = null;
+/** @type {object[] | null} */
+let privilegedUsersCache = null;
+
+const DELETE_USER_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m2-3h6a1 1 0 011 1v1H8V5a1 1 0 011-1z"/></svg>';
+
+function roleLabel(role) {
+    const key = normalizePlanningRole(role);
+    return PLANNING_ROLE_OPTIONS.find((o) => o.value === key)?.label ?? key;
+}
+
+function confirmDirectoryAsync(message) {
+    return new Promise((resolve) => {
+        const dlg = document.getElementById('modal_admin_confirm');
+        const msg = document.getElementById('admin-confirm-message');
+        const btnOk = document.getElementById('admin-confirm-ok');
+        const btnCancel = document.getElementById('admin-confirm-cancel');
+        if (!dlg || !msg || !btnOk || !btnCancel) {
+            resolve(window.confirm(message));
+            return;
+        }
+        msg.textContent = message;
+        const cleanup = (v) => {
+            btnOk.removeEventListener('click', onOk);
+            btnCancel.removeEventListener('click', onCancel);
+            dlg.removeEventListener('cancel', onCancel);
+            dlg.close();
+            resolve(v);
+        };
+        const onOk = () => cleanup(true);
+        const onCancel = () => cleanup(false);
+        btnOk.addEventListener('click', onOk);
+        btnCancel.addEventListener('click', onCancel);
+        dlg.addEventListener('cancel', onCancel, { once: true });
+        dlg.showModal();
+        focusPlanningDialogRoot(dlg instanceof HTMLDialogElement ? dlg : null);
+    });
+}
 
 function formatFrPhone(raw) {
     const digits = String(raw || '').replace(/\D+/g, '').slice(0, 10);
@@ -56,38 +94,71 @@ function isDirectoryPrivileged(u) {
     return isAdmin(u) || isProf(u);
 }
 
-function privilegedLine2(r) {
-    const email = String(r.email || '').trim();
-    const phone = formatFrPhone(String(r.telephone || '').trim());
-    const calLabel = String(r.personal_calendar_label || r.calendar_label || '').trim();
-    const parts = [];
-    if (email) parts.push({ type: 'email', value: email });
-    if (phone) parts.push({ type: 'text', value: `Tél. ${phone}` });
-    else parts.push({ type: 'text', value: 'Tél. —' });
-    if (calLabel) parts.push({ type: 'text', value: `Agenda Google: ${calLabel}` });
-    return parts;
-}
+/**
+ * Carte admin/prof : gauche (nom + rôle), droite (tél. + agenda), suppression optionnelle.
+ * @param {object} r
+ * @param {{ canOpen: boolean; canDelete: boolean }} opts
+ */
+function buildPrivilegedUserCard(r, opts) {
+    const card = document.createElement('div');
+    card.className =
+        'directory-admin-user-card flex items-stretch gap-2 py-2.5 px-3 min-w-0 rounded-xl border border-slate-200 bg-slate-50/80 dark:border-slate-600 dark:bg-slate-800/70';
+    card.dataset.userJson = JSON.stringify(r);
 
-function appendLine2(parent, parts) {
-    const row = document.createElement('p');
-    row.className =
-        'mt-0.5 text-[12px] sm:text-[13px] leading-snug break-words min-w-0 text-slate-700 dark:text-slate-200 m-0';
-    row.style.overflowWrap = 'anywhere';
-    let first = true;
-    for (const p of parts) {
-        if (!first) row.appendChild(document.createTextNode(' · '));
-        first = false;
-        if (p.type === 'email' && p.value.includes('@')) {
-            const a = document.createElement('a');
-            a.href = `mailto:${p.value}`;
-            a.className = 'directory-user-email-link';
-            a.textContent = p.value;
-            row.appendChild(a);
-        } else {
-            row.appendChild(document.createTextNode(p.value));
-        }
+    const main = document.createElement('div');
+    main.className = 'directory-user-card__main flex flex-1 min-w-0 gap-2';
+    if (opts.canOpen) {
+        main.classList.add('cursor-pointer');
+        main.setAttribute('role', 'button');
+        main.tabIndex = 0;
     }
-    parent.appendChild(row);
+
+    const left = document.createElement('div');
+    left.className = 'flex-1 min-w-0';
+    const nameP = document.createElement('p');
+    nameP.className =
+        'font-semibold text-slate-900 dark:text-slate-100 leading-snug m-0 break-words text-[13px]';
+    nameP.style.overflowWrap = 'anywhere';
+    nameP.textContent = directoryDisplayName(r);
+    const roleP = document.createElement('p');
+    roleP.className = 'directory-user-card__role text-[11px] sm:text-xs leading-snug m-0 mt-0.5';
+    roleP.textContent = roleLabel(r.profile_role || r.role);
+    left.appendChild(nameP);
+    left.appendChild(roleP);
+
+    const right = document.createElement('div');
+    right.className = 'shrink-0 max-w-[46%] text-right min-w-0';
+    const phoneP = document.createElement('p');
+    phoneP.className =
+        'text-[12px] sm:text-[13px] text-slate-700 dark:text-slate-200 leading-snug m-0 break-words';
+    phoneP.style.overflowWrap = 'anywhere';
+    phoneP.textContent = formatFrPhone(String(r.telephone || '').trim()) || '—';
+    const agendaP = document.createElement('p');
+    agendaP.className =
+        'directory-user-card__agenda text-[11px] sm:text-xs leading-snug m-0 mt-0.5 truncate';
+    agendaP.title = String(r.personal_calendar_label || r.calendar_label || '').trim();
+    agendaP.textContent =
+        String(r.personal_calendar_label || r.calendar_label || '').trim() || '—';
+    right.appendChild(phoneP);
+    right.appendChild(agendaP);
+
+    main.appendChild(left);
+    main.appendChild(right);
+    card.appendChild(main);
+
+    if (opts.canDelete) {
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className =
+            'directory-user-delete-btn btn btn-ghost btn-xs btn-square shrink-0 self-start border border-transparent';
+        del.dataset.userId = String(r.id || '');
+        del.setAttribute('aria-label', 'Supprimer cet utilisateur');
+        del.title = 'Supprimer';
+        del.innerHTML = DELETE_USER_SVG;
+        card.appendChild(del);
+    }
+
+    return card;
 }
 
 /** Annuaire lecture seule (élèves) : sections + cartes 2 lignes. */
@@ -112,7 +183,7 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
 
         const head = document.createElement('p');
         head.className =
-            'text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300 mb-2 m-0';
+            'text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300 mb-1 m-0';
         head.textContent = title;
         block.appendChild(head);
 
@@ -165,13 +236,13 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
     container.appendChild(root);
 }
 
-function renderPrivilegedDirectoryCards(users, canEdit) {
+function renderPrivilegedDirectoryCards(users) {
     const host = document.getElementById('directory-admin-users-table');
     if (!host) return;
     host.replaceChildren();
 
     const root = document.createElement('div');
-    root.className = 'directory-users-stack space-y-2 min-w-0 text-[12px] sm:text-[13px]';
+    root.className = 'directory-users-stack space-y-1.5 min-w-0';
 
     const sorted = [...users].sort((a, b) =>
         `${String(a.nom || '')} ${String(a.prenom || '')}`.localeCompare(
@@ -180,25 +251,11 @@ function renderPrivilegedDirectoryCards(users, canEdit) {
         )
     );
 
+    const adminUser = isAdmin(getPlanningSessionUser());
     for (const r of sorted) {
-        const card = document.createElement('div');
-        card.className =
-            'directory-admin-user-card py-3 px-3 min-w-0 rounded-xl border border-slate-200 bg-slate-50/80 dark:border-slate-600 dark:bg-slate-800/70';
-        card.dataset.userJson = JSON.stringify(r);
-        if (canEdit) {
-            card.classList.add('cursor-pointer', 'hover:border-primary/40', 'dark:hover:border-primary/50');
-            card.setAttribute('role', 'button');
-            card.tabIndex = 0;
-        }
-
-        const nameP = document.createElement('p');
-        nameP.className =
-            'font-semibold text-slate-900 dark:text-slate-100 leading-snug m-0 break-words';
-        nameP.style.overflowWrap = 'anywhere';
-        nameP.textContent = directoryDisplayName(r);
-        card.appendChild(nameP);
-        appendLine2(card, privilegedLine2(r));
-        root.appendChild(card);
+        root.appendChild(
+            buildPrivilegedUserCard(r, { canOpen: true, canDelete: adminUser })
+        );
     }
 
     host.appendChild(root);
@@ -294,7 +351,8 @@ async function loadPrivilegedDirectoryIntoModal() {
                 .filter(isDirectoryUserActive)
                 .map(mapRpcRowToPrivileged);
         }
-        renderPrivilegedDirectoryCards(users, true);
+        privilegedUsersCache = users;
+        renderPrivilegedDirectoryCards(users);
         if (status) status.textContent = '';
     } catch (e) {
         if (!isLikelySessionErrorMessage(e) && status) {
@@ -342,6 +400,7 @@ async function saveDirectoryField(field) {
             editSnapshot.nom = f.nom;
             editSnapshot.prenom = f.prenom;
             editSnapshot.telephone = f.telephone;
+            privilegedUsersCache = null;
             showToast('Coordonnées enregistrées.');
         }
         if (adminUser && field === 'email' && f.email !== editSnapshot.email) {
@@ -351,11 +410,13 @@ async function saveDirectoryField(field) {
             }
             await planningAdminInvoke('update_user_email', { user_id: uid, email: f.email });
             editSnapshot.email = f.email;
+            privilegedUsersCache = null;
             showToast('E-mail enregistré.');
         }
         if (adminUser && field === 'role' && f.role !== editSnapshot.role) {
             await planningAdminInvoke('update_role', { user_id: uid, role: f.role });
             editSnapshot.role = f.role;
+            privilegedUsersCache = null;
             showToast('Rôle enregistré.');
         }
         if (adminUser && field === 'password' && f.password) {
@@ -417,9 +478,7 @@ function openDirectoryUserEdit(userRow) {
     ).trim();
     const agendaEl = document.getElementById('directory-edit-agenda-readonly');
     if (agendaEl) {
-        agendaEl.textContent = calLabel
-            ? `Agenda Google: ${calLabel}`
-            : 'Agenda Google: — (aucun agenda assigné)';
+        agendaEl.textContent = calLabel || '— (aucun agenda assigné)';
     }
 
     const titleName = directoryDisplayName(userRow);
@@ -440,10 +499,35 @@ async function reloadDirectoryAfterEdit() {
     else await loadDirectoryIntoModal();
 }
 
+async function deleteDirectoryUser(userId) {
+    const uid = String(userId || '').trim();
+    if (!uid || !isAdmin(getPlanningSessionUser())) return;
+    const selfId = getPlanningSessionUser()?.id;
+    if (selfId && uid === selfId) {
+        showToast('Vous ne pouvez pas supprimer votre propre compte.', 'error');
+        return;
+    }
+    const ok = await confirmDirectoryAsync(
+        'Supprimer définitivement ce compte ? Cette action est irréversible.'
+    );
+    if (!ok) return;
+    try {
+        await planningAdminInvoke('delete_user', { user_id: uid });
+        privilegedUsersCache = null;
+        showToast('Compte supprimé.');
+        if (document.getElementById('modal_directory_users')?.open) {
+            await loadPrivilegedDirectoryIntoModal();
+        }
+    } catch (err) {
+        showToast(err instanceof Error ? err.message : String(err), 'error');
+    }
+}
+
 export function resetDirectoryUsersUiBindings() {
     bound = false;
     editingUser = null;
     editSnapshot = null;
+    privilegedUsersCache = null;
 }
 
 export function initDirectoryUsersUi() {
@@ -452,21 +536,30 @@ export function initDirectoryUsersUi() {
 
     document.getElementById('menu-item-directory')?.addEventListener('click', (e) => {
         e.preventDefault();
-        closePlanningDrawer();
-        document.getElementById('btn-app-drawer')?.blur();
         const dlg = document.getElementById('modal_directory_users');
         if (!dlg) {
             showToast('Fenêtre annuaire indisponible. Rechargez la page.', 'error');
             return;
         }
-        requestAnimationFrame(() => {
-            showDirectoryListPanel();
-            const u = getPlanningSessionUser();
-            const privileged = isDirectoryPrivileged(u);
-            document.getElementById('directory-add-user-wrap')?.classList.toggle('hidden', !isAdmin(u));
-            const load = privileged ? loadPrivilegedDirectoryIntoModal() : loadDirectoryIntoModal();
-            void load.then(() => openPlanningRouteDialog('modal_directory_users', 'Utilisateurs', 'Utilisateurs'));
-        });
+        showDirectoryListPanel();
+        const u = getPlanningSessionUser();
+        const privileged = isDirectoryPrivileged(u);
+        document.getElementById('directory-add-user-wrap')?.classList.toggle('hidden', !isAdmin(u));
+        const status = document.getElementById('directory-users-status');
+        if (!openPlanningRouteFromDrawer('modal_directory_users', 'Utilisateurs', 'Utilisateurs')) {
+            return;
+        }
+        if (privileged && privilegedUsersCache?.length) {
+            const tableWrap = document.getElementById('directory-admin-users-wrap');
+            document.getElementById('directory-readonly-unified')?.classList.add('hidden');
+            tableWrap?.classList.remove('hidden');
+            renderPrivilegedDirectoryCards(privilegedUsersCache);
+            if (status) status.textContent = '';
+            void loadPrivilegedDirectoryIntoModal();
+        } else {
+            if (status) status.textContent = 'Chargement…';
+            void (privileged ? loadPrivilegedDirectoryIntoModal() : loadDirectoryIntoModal());
+        }
     });
 
     document.getElementById('directory-add-user-btn')?.addEventListener('click', () => {
@@ -476,8 +569,15 @@ export function initDirectoryUsersUi() {
     document.getElementById('directory-admin-users-table')?.addEventListener('click', (e) => {
         const t = e.target;
         if (!(t instanceof Element)) return;
-        if (t.closest('a')) return;
-        const card = t.closest('.directory-admin-user-card');
+        const delBtn = t.closest('.directory-user-delete-btn');
+        if (delBtn instanceof HTMLButtonElement) {
+            e.preventDefault();
+            e.stopPropagation();
+            void deleteDirectoryUser(delBtn.dataset.userId || '');
+            return;
+        }
+        const main = t.closest('.directory-user-card__main');
+        const card = main?.closest('.directory-admin-user-card');
         if (!card?.dataset.userJson) return;
         try {
             openDirectoryUserEdit(JSON.parse(card.dataset.userJson));
@@ -488,7 +588,8 @@ export function initDirectoryUsersUi() {
 
     document.getElementById('directory-admin-users-table')?.addEventListener('keydown', (e) => {
         if (e.key !== 'Enter' && e.key !== ' ') return;
-        const card = e.target instanceof Element ? e.target.closest('.directory-admin-user-card') : null;
+        const main = e.target instanceof Element ? e.target.closest('.directory-user-card__main') : null;
+        const card = main?.closest('.directory-admin-user-card');
         if (!card?.dataset.userJson) return;
         e.preventDefault();
         try {

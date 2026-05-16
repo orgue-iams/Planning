@@ -1,7 +1,7 @@
 /**
  * Ouvre une <dialog> en plein écran façon « page » avec retour « < {nom} » en haut à gauche.
  */
-import { openPlanningDrawer } from '../core/planning-drawer-ui.js';
+import { closePlanningDrawer, openPlanningDrawer } from '../core/planning-drawer-ui.js';
 import { focusPlanningDialogRoot } from './focus-planning-dialog.js';
 
 const ROUTE_CLASS = 'planning-route-page';
@@ -61,6 +61,22 @@ export function updatePlanningRouteDialog(dialogId, ariaLabel, backLabel) {
         back.textContent = backText;
         back.setAttribute('aria-label', `Retour (${ariaLabel || short})`);
     }
+}
+
+/**
+ * Ouvre la page route tout de suite (évite le flash planning entre tiroir fermé et showModal).
+ * @param {string} dialogId
+ * @param {string} ariaLabel
+ * @param {string} [backLabel]
+ * @returns {boolean}
+ */
+export function openPlanningRouteFromDrawer(dialogId, ariaLabel, backLabel) {
+    const el = document.getElementById(dialogId);
+    if (!(el instanceof HTMLDialogElement)) return false;
+    openPlanningRouteDialog(dialogId, ariaLabel, backLabel);
+    document.getElementById('btn-app-drawer')?.blur();
+    closePlanningDrawer();
+    return true;
 }
 
 /**

@@ -10,8 +10,7 @@ import {
 import { getPlanningSessionUser, setPlanningSessionUser } from './session-user.js';
 import { getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
 import { showToast } from '../utils/toast.js';
-import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
-import { closePlanningDrawer } from './planning-drawer-ui.js';
+import { openPlanningRouteFromDrawer } from '../utils/planning-route-dialog.js';
 import { refreshDrawerProfileExtras } from './drawer-profile-extras-ui.js';
 
 let profileUiBound = false;
@@ -237,8 +236,6 @@ export function initProfileUi(currentUser) {
 
     document.getElementById('menu-item-profile')?.addEventListener('click', (e) => {
         e.preventDefault();
-        document.getElementById('btn-app-drawer')?.blur();
-        closePlanningDrawer();
         const dlg = document.getElementById('modal_profile');
         if (!dlg) {
             showToast('Fenêtre profil indisponible. Rechargez la page.', 'error');
@@ -246,11 +243,8 @@ export function initProfileUi(currentUser) {
         }
         const u = getPlanningSessionUser();
         if (!u?.email) return;
-        requestAnimationFrame(() => {
-            void fillProfileModal(u).then(() =>
-                    openPlanningRouteDialog('modal_profile', 'Mon profil', 'Mon profil')
-                );
-        });
+        if (!openPlanningRouteFromDrawer('modal_profile', 'Mon profil', 'Mon profil')) return;
+        void fillProfileModal(u);
     });
 
     document.getElementById('profile-phone-input')?.addEventListener('blur', (e) => {
