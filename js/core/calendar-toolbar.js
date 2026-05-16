@@ -5,7 +5,7 @@
 import { getProfWeekCycleForToolbar, weekCycleLabelForDate } from './week-cycle.js';
 import { isProf } from './auth-logic.js';
 import { getPlanningSessionUser } from './session-user.js';
-import { syncDrawerViewSelection } from './planning-drawer-ui.js';
+import { syncDrawerViewSelection, togglePlanningDrawer } from './planning-drawer-ui.js';
 
 const MONTH_LONG = [
     'janvier',
@@ -110,20 +110,6 @@ export function getPlanningCornerHudParts(calendar) {
     };
 }
 
-let cornerMenuDelegationBound = false;
-
-function ensurePlanningCornerMenuDelegation() {
-    if (cornerMenuDelegationBound) return;
-    cornerMenuDelegationBound = true;
-    document.getElementById('calendar')?.addEventListener('click', (e) => {
-        const t = e.target;
-        if (!(t instanceof Element)) return;
-        if (!t.closest('#btn-app-drawer-fc')) return;
-        e.preventDefault();
-        document.getElementById('btn-app-drawer')?.click();
-    });
-}
-
 function isPlanningCornerHudViewport() {
     if (typeof window === 'undefined') return false;
     if (!window.matchMedia('(orientation: landscape)').matches) return false;
@@ -149,8 +135,6 @@ export function syncPlanningGridCornerHud(calendar) {
         return;
     }
 
-    ensurePlanningCornerMenuDelegation();
-
     let hud = axisCell.querySelector('.planning-fc-corner-hud');
     if (!hud) {
         hud = document.createElement('div');
@@ -163,7 +147,13 @@ export function syncPlanningGridCornerHud(calendar) {
                 <span class="planning-fc-corner-hud__period" aria-live="polite"></span>
                 <span class="planning-fc-corner-hud__week" aria-live="polite"></span>
             </div>`;
-        axisCell.insertBefore(hud, axisCell.firstChild);
+        axisCell.appendChild(hud);
+        const menuBtn = hud.querySelector('#btn-app-drawer-fc');
+        menuBtn?.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            togglePlanningDrawer();
+        });
     }
 
     const { period, week } = getPlanningCornerHudParts(calendar);

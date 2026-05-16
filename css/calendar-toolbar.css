@@ -261,6 +261,7 @@
     width: 100%;
     padding: 0.15rem 0.12rem 0.12rem;
     box-sizing: border-box;
+    pointer-events: auto;
 }
 
 @media (orientation: landscape) {
@@ -287,7 +288,9 @@
     background: rgb(226 232 240);
     color: rgb(51 65 85);
     cursor: pointer;
+    touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
+    pointer-events: auto;
 }
 
 .planning-fc-corner-hud__menu-btn:active {
@@ -341,11 +344,36 @@
     color: rgb(186 198 216) !important;
 }
 
-/* Cellule coin : laisser la hauteur d’en-tête respirer (contenu empilé). */
+/*
+ * Cellule coin : HUD au-dessus des couches FC (sync-inner) pour recevoir les clics.
+ */
 @media (orientation: landscape) {
     @media (max-width: 639px), (max-height: 520px) {
-        #calendar .fc-scrollgrid-section-header .fc-timegrid-axis {
+        #calendar .fc-scrollgrid-section-header td.fc-timegrid-axis {
+            position: relative !important;
             vertical-align: top !important;
         }
+
+        #calendar .fc-scrollgrid-section-header td.fc-timegrid-axis > .fc-scrollgrid-sync-inner,
+        #calendar .fc-scrollgrid-section-header td.fc-timegrid-axis .fc-timegrid-axis-frame {
+            pointer-events: none;
+        }
+
+        .planning-fc-corner-hud {
+            position: relative;
+            z-index: 12;
+        }
+
+        .planning-fc-corner-hud__menu-btn {
+            position: relative;
+            z-index: 13;
+        }
     }
+}
+
+/* Barre fixe : le bouton menu reste cliquable au-dessus du calendrier (portrait / desktop). */
+#calendar-toolbar #btn-app-drawer {
+    position: relative;
+    z-index: 2;
+    pointer-events: auto;
 }

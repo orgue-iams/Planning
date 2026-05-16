@@ -126,6 +126,11 @@ export function openPlanningDrawer() {
     openDrawer();
 }
 
+/** Ouvre ou ferme le tiroir (bouton menu barre / coin grille). */
+export function togglePlanningDrawer() {
+    toggleDrawer();
+}
+
 export function resetPlanningDrawerBindings() {
     drawerCalendarRef = null;
 }

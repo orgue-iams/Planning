@@ -1,8 +1,100 @@
-#modal_login .modal-box {
-    background: linear-gradient(to bottom, #ffffff, #f8fafc);
-    /* Ancre la graisse du bloc : évite qu’un style focus/autofill ne fasse « gonfler » tout le texte voisin (effet visuel / héritage). */
+/* —— Connexion : carte cohérente clair / sombre (data-theme, pas prefers-color-scheme seul) —— */
+#modal_login .modal-login-box {
+    background: linear-gradient(165deg, #ffffff 0%, #f1f5f9 100%);
+    border: 1px solid rgb(203 213 225);
+    color: rgb(15 23 42);
     font-weight: 400;
     font-synthesis: none;
+}
+
+#modal_login .login-card__title {
+    color: rgb(15 23 42);
+}
+
+#modal_login .login-card__subtitle {
+    color: rgb(71 85 105);
+}
+
+#modal_login .login-card__version {
+    color: rgb(100 116 139);
+}
+
+#modal_login .login-card__banner {
+    border-color: rgb(251 191 36 / 0.7);
+    background: rgb(255 251 235 / 0.95);
+    color: rgb(120 53 15);
+}
+
+#modal_login .login-field {
+    background-color: #fff !important;
+    border-color: rgb(203 213 225) !important;
+    color: rgb(15 23 42) !important;
+}
+
+#modal_login .login-field::placeholder {
+    color: rgb(100 116 139);
+    opacity: 1;
+}
+
+#modal_login .login-remember__label {
+    color: rgb(51 65 85);
+}
+
+#modal_login .login-remember__checkbox {
+    border-color: rgb(148 163 184);
+}
+
+#modal_login .login-card__forgot {
+    color: rgb(37 99 235);
+}
+
+[data-theme='dark'] #modal_login .modal-login-box {
+    background: linear-gradient(165deg, rgb(30 41 59) 0%, rgb(15 23 42) 100%) !important;
+    border-color: rgb(71 85 105) !important;
+    color: rgb(226 232 240) !important;
+    box-shadow:
+        0 20px 50px rgb(0 0 0 / 0.45),
+        0 0 0 1px rgb(51 65 85 / 0.5);
+}
+
+[data-theme='dark'] #modal_login .login-card__title {
+    color: rgb(248 250 252) !important;
+}
+
+[data-theme='dark'] #modal_login .login-card__subtitle {
+    color: rgb(203 213 225) !important;
+}
+
+[data-theme='dark'] #modal_login .login-card__version {
+    color: rgb(148 163 184) !important;
+}
+
+[data-theme='dark'] #modal_login .login-card__banner {
+    border-color: rgb(180 83 9 / 0.55) !important;
+    background: rgb(69 26 3 / 0.55) !important;
+    color: rgb(254 243 199) !important;
+}
+
+[data-theme='dark'] #modal_login .login-field {
+    background-color: rgb(15 23 42) !important;
+    border-color: rgb(71 85 105) !important;
+    color: rgb(248 250 252) !important;
+}
+
+[data-theme='dark'] #modal_login .login-field::placeholder {
+    color: rgb(148 163 184) !important;
+}
+
+[data-theme='dark'] #modal_login .login-remember__label {
+    color: rgb(226 232 240) !important;
+}
+
+[data-theme='dark'] #modal_login .login-remember__checkbox {
+    border-color: rgb(100 116 139) !important;
+}
+
+[data-theme='dark'] #modal_login .login-card__forgot {
+    color: rgb(147 197 253) !important;
 }
 
 /*
@@ -21,15 +113,19 @@
     z-index: 0;
 }
 
-#modal_login #login-email::placeholder,
-#modal_login #login-pass::placeholder {
+#modal_login .login-field::placeholder {
     font-weight: 400;
-    opacity: 0.55;
 }
 
-#modal_login input:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+#modal_login .login-field:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    outline: none;
+}
+
+[data-theme='dark'] #modal_login .login-field:focus {
+    border-color: rgb(96 165 250) !important;
+    box-shadow: 0 0 0 3px rgb(59 130 246 / 0.35) !important;
 }
 
 #modal_login #login-email:-webkit-autofill,
@@ -246,12 +342,6 @@ body.auth-pending #modal_login.modal.modal-login-shell::backdrop {
 [data-theme='dark'] body.auth-pending #modal_login.modal.modal-login-shell,
 [data-theme='dark'] body.auth-pending #modal_login.modal.modal-login-shell::backdrop {
     background: rgb(15 23 42);
-}
-
-[data-theme='dark'] #modal_login .modal-box.modal-login-box {
-    background: linear-gradient(to bottom, rgb(30 41 59), rgb(15 23 42)) !important;
-    color: rgb(226 232 240);
-    border-color: rgb(51 65 85) !important;
 }
 
 [data-theme='dark'] #modal_login #login-email:-webkit-autofill,
