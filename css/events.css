@@ -237,10 +237,6 @@ html[data-planning-fc-text='lg'] .event-time-fc {
     #planning-legend .legend-item {
         font-size: 0.56rem;
     }
-
-    #planning-legend #app-build-badge {
-        display: none;
-    }
 }
 
 .legend-swatch--fermeture {

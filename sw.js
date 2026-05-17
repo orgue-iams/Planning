@@ -118,7 +118,38 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+/** Mise à jour shell / version : réseau d’abord pour ne pas rester bloqué sur un ancien cache. */
+function isNetworkFirstRequest(url, request) {
+  const path = url.pathname;
+  if (request.mode === 'navigate') return true;
+  if (path.endsWith('cache-name.js') || path.endsWith('sw.js')) return true;
+  if (path.endsWith('index.html')) return true;
+  return false;
+}
+
+async function networkFirst(request) {
+  const cache = await caches.open(CACHE_NAME);
+  try {
+    const response = await fetch(request);
+    if (response && response.ok) {
+      await cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    return (await cache.match(request)) || (await caches.match(request));
+  }
+}
+
 self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+
+  if (isNetworkFirstRequest(url, event.request)) {
+    event.respondWith(networkFirst(event.request));
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((res) => res || fetch(event.request))
   );
