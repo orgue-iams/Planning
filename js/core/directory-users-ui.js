@@ -20,7 +20,6 @@ import {
 } from '../utils/planning-route-dialog.js';
 import { normalizePlanningRole, PLANNING_ROLE_OPTIONS } from './planning-roles.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
-import { mountPlanningSwipeCard } from '../utils/planning-card-swipe.js';
 
 let bound = false;
 /** @type {object | null} */
@@ -68,10 +67,11 @@ function directoryUserContactLines(r) {
     return lines;
 }
 
-function appendDirectoryContactColumn(parent, r) {
+/** @param {object} r @returns {HTMLElement} */
+function buildDirectoryContactColumn(r) {
     const col = document.createElement('div');
     col.className =
-        'directory-user-card__contact shrink-0 max-w-[46%] text-right min-w-0 flex flex-col gap-0.5 border-l border-slate-200/90 dark:border-slate-500/50 pl-2 self-stretch justify-center';
+        'directory-user-card__contact text-right min-w-0 flex flex-col gap-0.5 self-stretch justify-center py-0.5';
     for (const line of directoryUserContactLines(r)) {
         if (line.includes('@')) {
             const a = document.createElement('a');
@@ -89,7 +89,7 @@ function appendDirectoryContactColumn(parent, r) {
             col.appendChild(p);
         }
     }
-    if (col.childElementCount) parent.appendChild(col);
+    return col;
 }
 
 function roleLabel(role) {
@@ -167,21 +167,14 @@ function isDirectoryPrivileged(u) {
 function buildPrivilegedUserCard(r, opts) {
     const card = document.createElement('div');
     const roleKey = normalizePlanningRole(r.profile_role || r.role);
+    const withDelete = Boolean(opts.canDelete);
     card.className =
-        `directory-admin-user-card ${directoryRoleCardClass(roleKey)} flex items-stretch gap-2 py-2.5 px-3 min-w-0 rounded-xl border`;
+        `directory-admin-user-card directory-admin-user-card--layout ${directoryRoleCardClass(roleKey)} ${withDelete ? 'directory-admin-user-card--with-delete' : ''} py-2.5 px-3 min-w-0 rounded-xl border`;
     card.dataset.userJson = JSON.stringify(r);
 
-    const main = document.createElement('div');
-    main.className = 'directory-user-card__main flex flex-1 min-w-0 gap-2';
-    if (opts.canOpen && !opts.canDelete) {
-        main.classList.add('cursor-pointer');
-        main.setAttribute('role', 'button');
-        main.tabIndex = 0;
-    }
-
-    const left = document.createElement('div');
-    left.className =
-        'flex-1 min-w-0 border-r border-slate-200/90 dark:border-slate-500/50 pr-2 self-stretch flex flex-col justify-center';
+    const identity = document.createElement('div');
+    identity.className =
+        'directory-user-card__identity min-w-0 self-stretch flex flex-col justify-center pr-2';
     const nameP = document.createElement('p');
     nameP.className =
         'font-semibold text-slate-900 dark:text-slate-100 leading-snug m-0 break-words text-[13px]';
@@ -190,11 +183,12 @@ function buildPrivilegedUserCard(r, opts) {
     const roleP = document.createElement('p');
     roleP.className = 'directory-user-card__role text-[11px] sm:text-xs leading-snug m-0 mt-0.5';
     roleP.textContent = roleLabel(r.profile_role || r.role);
-    left.appendChild(nameP);
-    left.appendChild(roleP);
-    main.appendChild(left);
-    appendDirectoryContactColumn(main, r);
-    card.appendChild(main);
+    identity.appendChild(nameP);
+    identity.appendChild(roleP);
+    card.appendChild(identity);
+
+    const contact = buildDirectoryContactColumn(r);
+    if (contact.childElementCount) card.appendChild(contact);
 
     const openEdit = () => {
         try {
@@ -205,25 +199,38 @@ function buildPrivilegedUserCard(r, opts) {
     };
 
     if (opts.canDelete) {
-        return mountPlanningSwipeCard(card, {
-            enabled: true,
-            mode: 'delete-only',
-            onEdit: opts.canOpen ? openEdit : undefined,
-            onDelete: () => void deleteDirectoryUser(String(r.id || ''))
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'directory-user-delete-btn';
+        del.setAttribute('aria-label', `Supprimer ${directoryDisplayName(r)}`);
+        del.title = 'Supprimer';
+        del.innerHTML = DELETE_USER_SVG;
+        del.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            void deleteDirectoryUser(String(r.id || ''));
         });
+        card.appendChild(del);
     }
 
     if (opts.canOpen) {
-        main.classList.add('cursor-pointer');
-        main.setAttribute('role', 'button');
-        main.tabIndex = 0;
-        main.addEventListener('click', openEdit);
-        main.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
+        const bindOpen = (el) => {
+            el.classList.add('cursor-pointer');
+            el.setAttribute('role', 'button');
+            el.tabIndex = 0;
+            el.addEventListener('click', (e) => {
+                if (e.target instanceof Element && e.target.closest('a')) return;
                 openEdit();
-            }
-        });
+            });
+            el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openEdit();
+                }
+            });
+        };
+        bindOpen(identity);
+        if (contact.childElementCount) bindOpen(contact);
     }
 
     return card;
@@ -269,21 +276,19 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
         for (const r of rows) {
             const item = document.createElement('div');
             item.className =
-                'py-3 px-3 min-w-0 rounded-xl border border-slate-200 bg-slate-50/80 dark:border-slate-600 dark:bg-slate-800/70';
+                'directory-readonly-user-item directory-admin-user-card--layout py-3 px-3 min-w-0 rounded-xl border border-slate-200 bg-slate-50/80 dark:border-slate-600 dark:bg-slate-800/70';
 
-            const row = document.createElement('div');
-            row.className = 'flex items-start gap-2';
-            const left = document.createElement('div');
-            left.className = 'flex-1 min-w-0';
+            const identity = document.createElement('div');
+            identity.className = 'directory-user-card__identity min-w-0 self-stretch flex flex-col justify-center pr-2';
             const nameEl = document.createElement('p');
             nameEl.className =
                 'font-semibold text-slate-900 dark:text-slate-100 leading-snug m-0 break-words';
             nameEl.style.overflowWrap = 'anywhere';
             nameEl.textContent = directoryDisplayName(r);
-            left.appendChild(nameEl);
-            row.appendChild(left);
-            appendDirectoryContactColumn(row, r);
-            item.appendChild(row);
+            identity.appendChild(nameEl);
+            item.appendChild(identity);
+            const contact = buildDirectoryContactColumn(r);
+            if (contact.childElementCount) item.appendChild(contact);
             list.appendChild(item);
         }
         block.appendChild(list);

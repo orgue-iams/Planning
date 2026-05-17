@@ -1,7 +1,7 @@
 /**
  * Ouvre une <dialog> en plein écran façon « page » avec retour « < {nom} » en haut à gauche.
  */
-import { closePlanningDrawer, openPlanningDrawer } from '../core/planning-drawer-ui.js';
+import { closePlanningDrawer, openPlanningDrawerInstant } from '../core/planning-drawer-ui.js';
 import { showMainDrawerPanel } from '../core/drawer-help-ui.js';
 import { focusPlanningDialogRoot } from './focus-planning-dialog.js';
 
@@ -34,7 +34,7 @@ export function isPlanningRouteFromDrawer(dialogId) {
 
 function defaultRouteBack(el) {
     el.close();
-    if (routeFromDrawer.has(el.id)) openPlanningDrawer();
+    if (routeFromDrawer.has(el.id)) openPlanningDrawerInstant();
     else closePlanningDrawer();
 }
 
@@ -193,7 +193,7 @@ export function openPlanningRouteDialog(dialogId, ariaLabel, backLabel) {
         routeStacks.delete(dialogId);
         const fromDrawer = routeFromDrawer.has(dialogId);
         routeFromDrawer.delete(dialogId);
-        if (fromDrawer) openPlanningDrawer();
+        if (fromDrawer) openPlanningDrawerInstant();
         el.removeEventListener('close', onClose);
     };
     el.addEventListener('close', onClose, { once: true });

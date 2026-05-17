@@ -1,6 +1,7 @@
 /**
  * Menu principal (tiroir) : vues calendrier + liens selon profil.
  */
+import { dismissReservationRouteDialog } from './calendar-logic.js';
 
 /** @type {import('@fullcalendar/core').Calendar | null} */
 let drawerCalendarRef = null;
@@ -81,6 +82,10 @@ export function initPlanningDrawer(calendar) {
         if (routeDlg instanceof HTMLDialogElement && t.closest(`#${routeDlg.id}`)) return;
         if (!t.closest('#calendar, #planning-legend, #app-shell, .fc')) return;
         if (routeDlg instanceof HTMLDialogElement) {
+            if (routeDlg.id === 'modal_reservation') {
+                void dismissReservationRouteDialog({ save: true });
+                return;
+            }
             routeDlg.close();
             return;
         }
@@ -144,6 +149,16 @@ export function closePlanningDrawer() {
 /** Rouvre le menu principal (ex. retour depuis une page modale plein écran). */
 export function openPlanningDrawer() {
     openDrawer();
+}
+
+/** Rouvre le tiroir sans animation (retour route → menu, le panneau était « derrière »). */
+export function openPlanningDrawerInstant() {
+    const drawer = document.getElementById('planning-app-drawer');
+    drawer?.classList.add('planning-app-drawer--no-transition');
+    openDrawer();
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => drawer?.classList.remove('planning-app-drawer--no-transition'));
+    });
 }
 
 /** Ouvre ou ferme le tiroir (bouton menu barre / coin grille). */

@@ -80,7 +80,12 @@ let deleteReservationInFlight = false;
 /** @type {AbortController | null} */
 let reservationModalTimeSyncAbort = null;
 /** @type {string | null} */
+/** @type {Record<string, unknown> | null} */
 let reservationModalFormBaseline = null;
+/** @type {import('@fullcalendar/core').Calendar | null} */
+let reservationModalCalendarRef = null;
+/** @type {import('@fullcalendar/core').EventApi | null} */
+let reservationModalEventRef = null;
 
 export function isReservationMutationInFlight() {
     return saveReservationInFlight || deleteReservationInFlight;
@@ -96,22 +101,117 @@ function snapshotReservationModalFormState() {
         const el = document.getElementById(id);
         return el instanceof HTMLInputElement && el.checked;
     };
-    const bits = [
-        val('event-motif-select'),
-        val('event-title-input'),
-        val('event-date-start'),
-        val('event-start'),
-        val('event-end'),
-        String(chk('event-recurring')),
-        val('event-recur-period-start'),
-        val('event-recur-period-end'),
-        val('event-recur-start'),
-        val('event-recur-end'),
-        chk('recur-mode-all') ? 'all' : 'days',
-        val('reservation-slot-owner-email'),
-        ...[1, 2, 3, 4, 5, 6, 0].map((i) => String(chk(`recur-dow-${i}`)))
-    ];
-    return bits.join('\x1e');
+    const multi = document.getElementById('event-inscrits-select');
+    const inscrits = [];
+    if (multi instanceof HTMLSelectElement) {
+        for (const o of multi.options) {
+            if (o.selected) inscrits.push(o.value);
+        }
+    }
+    inscrits.sort();
+    return JSON.stringify({
+        motif: val('event-motif-select'),
+        title: val('event-title-input'),
+        date: val('event-date-start'),
+        start: val('event-start'),
+        end: val('event-end'),
+        recurring: chk('event-recurring'),
+        recurStart: val('event-recur-period-start'),
+        recurEnd: val('event-recur-period-end'),
+        recurTStart: val('event-recur-start'),
+        recurTEnd: val('event-recur-end'),
+        recurMode: chk('recur-mode-all') ? 'all' : 'days',
+        owner: val('reservation-slot-owner-email'),
+        dows: [1, 2, 3, 4, 5, 6, 0].map((i) => chk(`recur-dow-${i}`)),
+        inscrits
+    });
+}
+
+function applyReservationModalFormSnapshot(json) {
+    let snap;
+    try {
+        snap = JSON.parse(json);
+    } catch {
+        return;
+    }
+    if (!snap || typeof snap !== 'object') return;
+    const setVal = (id, v) => {
+        const el = document.getElementById(id);
+        if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) el.value = String(v ?? '');
+    };
+    const setChk = (id, v) => {
+        const el = document.getElementById(id);
+        if (el instanceof HTMLInputElement) el.checked = Boolean(v);
+    };
+    setVal('event-motif-select', snap.motif);
+    setVal('event-title-input', snap.title);
+    setVal('event-date-start', snap.date);
+    setVal('event-start', snap.start);
+    setVal('event-end', snap.end);
+    setChk('event-recurring', snap.recurring);
+    setVal('event-recur-period-start', snap.recurStart);
+    setVal('event-recur-period-end', snap.recurEnd);
+    setVal('event-recur-start', snap.recurTStart);
+    setVal('event-recur-end', snap.recurTEnd);
+    if (snap.recurMode === 'all') {
+        setChk('recur-mode-all', true);
+        setChk('recur-mode-days', false);
+    } else {
+        setChk('recur-mode-all', false);
+        setChk('recur-mode-days', true);
+    }
+    setVal('reservation-slot-owner-email', snap.owner);
+    const dows = Array.isArray(snap.dows) ? snap.dows : [];
+    const dowIds = [1, 2, 3, 4, 5, 6, 0];
+    for (let j = 0; j < dowIds.length; j++) {
+        setChk(`recur-dow-${dowIds[j]}`, Boolean(dows[j]));
+    }
+    const multi = document.getElementById('event-inscrits-select');
+    const want = new Set(Array.isArray(snap.inscrits) ? snap.inscrits.map(String) : []);
+    if (multi instanceof HTMLSelectElement) {
+        for (const o of multi.options) {
+            o.selected = want.has(o.value);
+        }
+    }
+    updateReservationInscritsWrapVisibility(reservationModalUserRef, reservationModalCanEditRef);
+    refreshReservationInscritsSummary();
+    syncReservationDateWeekdayLabel();
+    if (reservationModalCalendarRef?.getEvents) {
+        syncReservationModalTimeOptions(reservationModalCalendarRef, reservationModalEventRef);
+    }
+}
+
+/** Rétablit les champs tels qu’à l’ouverture de la modale (bouton Annuler). */
+export function restoreReservationModalFormBaseline() {
+    if (reservationModalFormBaseline === null) return;
+    applyReservationModalFormSnapshot(reservationModalFormBaseline);
+}
+
+/**
+ * Ferme la modale route réservation ; optionnellement enregistre d’abord (clic planning / Sauver).
+ * @param {{ save?: boolean }} [options]
+ */
+export async function dismissReservationRouteDialog(options = {}) {
+    const modal = document.getElementById('modal_reservation');
+    if (!(modal instanceof HTMLDialogElement) || !modal.open) return;
+    if (isReservationMutationInFlight()) return;
+    const save = Boolean(options.save);
+    if (save && reservationModalCanEditRef && reservationModalCalendarRef && reservationModalUserRef) {
+        reservationAutoSaveMode = true;
+        try {
+            await saveReservation(
+                reservationModalCalendarRef,
+                reservationModalUserRef,
+                reservationModalEventRef
+            );
+        } finally {
+            reservationAutoSaveMode = false;
+        }
+        modal.close();
+        return;
+    }
+    if (!reservationModalMayCloseNow()) return;
+    modal.close();
 }
 
 /** À appeler après remplissage complet de la modale créneau. */
@@ -1592,6 +1692,7 @@ function snapInstantUpToHalfHourGrid(d) {
  * ni avant le début du créneau édité (évite de ramener le début dans le passé).
  */
 function minReservationModalStartInstant(dateYmd, calendar, eventRef) {
+    if (eventRef) return null;
     const dayAnchor = new Date(`${dateYmd}T12:00:00`);
     if (Number.isNaN(dayAnchor.getTime())) return null;
     const dayStart = slotMinInstantOnSameDay(dayAnchor, calendar);
@@ -1628,6 +1729,23 @@ function setSelectOptions(selectEl, values, preferred) {
     return keep;
 }
 
+function injectEditingEventReservationTimes(eventRef, dateValue, startChoices, startAt, endChoices) {
+    if (!eventRef?.start || !eventRef?.end) return;
+    const es = eventRef.start instanceof Date ? eventRef.start : new Date(eventRef.start);
+    const ee = eventRef.end instanceof Date ? eventRef.end : new Date(eventRef.end);
+    if (Number.isNaN(es.getTime()) || Number.isNaN(ee.getTime())) return;
+    if (es.toLocaleDateString('en-CA') !== dateValue) return;
+    const sv = formatTimeForSelect(es);
+    if (!startChoices.includes(sv)) startChoices.push(sv);
+    startChoices.sort();
+    const endDisp = selectionEndDisplay(ee);
+    const ev = formatTimeForSelect(endDisp);
+    if (startAt && formatTimeForSelect(startAt) === sv && endChoices && !endChoices.includes(ev)) {
+        endChoices.push(ev);
+        endChoices.sort();
+    }
+}
+
 function syncReservationModalTimeOptions(calendar, eventRef) {
     const dateEl = document.getElementById('event-date-start');
     const startEl = document.getElementById('event-start');
@@ -1662,6 +1780,7 @@ function syncReservationModalTimeOptions(calendar, eventRef) {
             startChoices.push(formatTimeForSelect(t));
         }
     }
+    injectEditingEventReservationTimes(eventRef, dateValue, startChoices, null, null);
     const preferredStart = startEl.value;
     const selectedStart = setSelectOptions(startEl, startChoices, preferredStart);
     if (!selectedStart) {
@@ -1674,13 +1793,22 @@ function syncReservationModalTimeOptions(calendar, eventRef) {
         new Date(startAt.getTime() + 30 * 60 * 1000),
         new Date(Math.min(boundary.getTime(), dayMax.getTime()))
     );
+    injectEditingEventReservationTimes(eventRef, dateValue, startChoices, startAt, endChoices);
     const plusOneHour = formatTimeForSelect(new Date(startAt.getTime() + 60 * 60 * 1000));
     const currentEnd = endEl.value;
-    const preferredEnd = endChoices.includes(currentEnd)
+    let preferredEnd = endChoices.includes(currentEnd)
         ? currentEnd
         : endChoices.includes(plusOneHour)
           ? plusOneHour
           : endChoices[0] || '';
+    if (eventRef?.end) {
+        const ee = eventRef.end instanceof Date ? eventRef.end : new Date(eventRef.end);
+        const endDisp = selectionEndDisplay(ee);
+        if (endDisp.toLocaleDateString('en-CA') === dateValue) {
+            const ev = formatTimeForSelect(endDisp);
+            if (endChoices.includes(ev)) preferredEnd = ev;
+        }
+    }
     setSelectOptions(endEl, endChoices, preferredEnd);
 }
 
@@ -2234,6 +2362,8 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     const canEditEvent = !event || canCurrentUserEditEvent(currentUser, event);
     reservationModalUserRef = currentUser;
     reservationModalCanEditRef = canEditEvent;
+    reservationModalCalendarRef = calendarForClip || null;
+    reservationModalEventRef = event || null;
     const owner = ownerInfoFromEvent(event, currentUser);
     let ownerLabelOverride = '';
     let actorLabelOverride = '';
@@ -2343,9 +2473,12 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     }
 
     if (dateEl instanceof HTMLInputElement) dateEl.value = dateStartVal;
+    syncReservationDateWeekdayLabel();
+    if (calendarForClip?.getEvents) {
+        syncReservationModalTimeOptions(calendarForClip, event || null);
+    }
     setSelectTime(startEl, startInstant);
     setSelectTime(endEl, endInstant);
-    syncReservationDateWeekdayLabel();
     if (event) {
         applyReservationEventInfoPanel(
             event,
@@ -2357,7 +2490,6 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         );
     }
     if (calendarForClip?.getEvents) {
-        syncReservationModalTimeOptions(calendarForClip, event || null);
         dateEl?.addEventListener(
             'change',
             () => {
@@ -2440,6 +2572,15 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     }
 
     document.getElementById('btn-save')?.classList.add('hidden');
+    const actionsWrap = document.getElementById('reservation-form-actions');
+    const btnCancel = document.getElementById('btn-reservation-cancel');
+    const btnSaveFooter = document.getElementById('btn-reservation-save');
+    if (actionsWrap) {
+        actionsWrap.classList.toggle('hidden', !canEditEvent);
+        actionsWrap.setAttribute('aria-hidden', canEditEvent ? 'false' : 'true');
+    }
+    if (btnCancel instanceof HTMLButtonElement) btnCancel.disabled = !canEditEvent;
+    if (btnSaveFooter instanceof HTMLButtonElement) btnSaveFooter.disabled = !canEditEvent;
     const showDelete =
         Boolean(event) &&
         canCurrentUserEditEventIgnoringPast(currentUser, event) &&
@@ -2464,6 +2605,23 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
             if (canEditEvent) scheduleReservationAutoSave();
         }, { signal: modalSignal });
     }
+
+    btnCancel?.addEventListener(
+        'click',
+        (e) => {
+            e.preventDefault();
+            restoreReservationModalFormBaseline();
+        },
+        { signal: modalSignal }
+    );
+    btnSaveFooter?.addEventListener(
+        'click',
+        (e) => {
+            e.preventDefault();
+            void dismissReservationRouteDialog({ save: true });
+        },
+        { signal: modalSignal }
+    );
 
     openPlanningRouteDialog('modal_reservation', 'Réservation', 'Réservation');
     focusPlanningDialogRoot(modal instanceof HTMLDialogElement ? modal : null);

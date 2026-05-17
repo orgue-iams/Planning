@@ -9,15 +9,17 @@ import { syncDrawerViewSelection, togglePlanningDrawer } from './planning-drawer
 
 let headerOffsetObserver = null;
 let headerOffsetSyncInited = false;
+let headerOffsetRaf = 0;
+let lastHeaderOffsetBottom = 0;
 
 /** Aligne le padding de #app-shell sur la hauteur réelle du bandeau fixe (évite le masquage des en-têtes FC). */
 export function syncPlanningAppHeaderOffset() {
     const header = document.querySelector('#app-header .app-navbar');
     if (!(header instanceof HTMLElement)) return;
     const bottom = Math.ceil(header.getBoundingClientRect().bottom);
-    if (bottom > 0) {
-        document.documentElement.style.setProperty('--planning-app-header-h', `${bottom}px`);
-    }
+    if (bottom <= 0 || bottom === lastHeaderOffsetBottom) return;
+    lastHeaderOffsetBottom = bottom;
+    document.documentElement.style.setProperty('--planning-app-header-h', `${bottom}px`);
     window.dispatchEvent(new Event('planning-app-header-resized'));
 }
 
@@ -32,7 +34,13 @@ export function initPlanningAppHeaderOffsetSync() {
     syncPlanningAppHeaderOffset();
     headerOffsetObserver?.disconnect();
     if (typeof ResizeObserver !== 'undefined') {
-        headerOffsetObserver = new ResizeObserver(() => syncPlanningAppHeaderOffset());
+        headerOffsetObserver = new ResizeObserver(() => {
+            if (headerOffsetRaf) cancelAnimationFrame(headerOffsetRaf);
+            headerOffsetRaf = requestAnimationFrame(() => {
+                headerOffsetRaf = 0;
+                syncPlanningAppHeaderOffset();
+            });
+        });
         headerOffsetObserver.observe(header);
     } else {
         window.addEventListener('resize', syncPlanningAppHeaderOffset);

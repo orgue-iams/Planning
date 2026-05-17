@@ -992,6 +992,56 @@
     border-color: rgb(147 197 253 / 0.65);
 }
 
+#modal_directory_users .directory-admin-user-card--layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(7.5rem, 11.5rem);
+    column-gap: 0.5rem;
+    align-items: stretch;
+}
+
+#modal_directory_users .directory-admin-user-card--layout.directory-admin-user-card--with-delete {
+    grid-template-columns: minmax(0, 1fr) minmax(7.5rem, 11.5rem) 2.75rem;
+}
+
+#modal_directory_users .directory-user-card__identity {
+    border-right: 1px solid rgb(226 232 240 / 0.9);
+}
+
+#modal_directory_users .directory-user-card__contact {
+    border-right: 1px solid rgb(226 232 240 / 0.9);
+    padding-left: 0.5rem;
+}
+
+#modal_directory_users .directory-admin-user-card--layout:not(.directory-admin-user-card--with-delete) .directory-user-card__contact {
+    border-right: none;
+}
+
+#modal_directory_users .directory-user-delete-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    width: 2.75rem;
+    min-height: 2.5rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    cursor: pointer;
+}
+
+[data-theme='dark'] #modal_directory_users .directory-user-card__identity,
+[data-theme='dark'] #modal_directory_users .directory-user-card__contact {
+    border-right-color: rgb(71 85 105 / 0.85);
+}
+
+[data-theme='dark'] #modal_directory_users .directory-admin-user-card--layout .directory-user-card__identity p,
+[data-theme='dark'] #modal_directory_users .directory-admin-user-card--layout .directory-user-card__contact p,
+[data-theme='dark'] #modal_directory_users .directory-admin-user-card--layout .directory-user-card__contact a {
+    background: transparent !important;
+}
+
 [data-theme='dark'] .directory-admin-user-card--role-admin {
     background: rgb(127 29 29 / 0.45);
     border-color: rgb(185 28 28 / 0.55);

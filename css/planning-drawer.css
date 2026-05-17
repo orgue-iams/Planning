@@ -44,6 +44,10 @@
     transform: translateX(0);
 }
 
+#planning-app-drawer.planning-app-drawer--no-transition {
+    transition: none !important;
+}
+
 .planning-drawer__scroll {
     flex: 1 1 auto;
     min-height: 0;

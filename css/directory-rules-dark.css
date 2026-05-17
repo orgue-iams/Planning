@@ -129,9 +129,9 @@
     color: rgb(29 78 216);
 }
 
-[data-theme='dark'] #modal_directory_users .directory-users-stack > div > div > div:not(.directory-admin-user-card) {
+[data-theme='dark'] #modal_directory_users .directory-readonly-user-item {
     border-color: rgb(71 85 105) !important;
-    background: rgb(30 41 59 / 0.85) !important;
+    background: rgb(30 41 59 / 0.45) !important;
 }
 
 [data-theme='dark'] #modal_directory_users .directory-user-email-link {

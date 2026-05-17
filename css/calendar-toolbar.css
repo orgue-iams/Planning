@@ -422,25 +422,28 @@
     width: auto;
     flex-shrink: 0;
     box-shadow: none !important;
+    background: transparent !important;
     transition:
-        background-color 0.15s ease,
-        border-color 0.15s ease;
+        background-color 0.12s ease,
+        border-color 0.12s ease;
 }
 
 .calendar-toolbar__brand-btn .whitespace-nowrap {
     white-space: nowrap;
 }
 
-.calendar-toolbar__brand-btn:hover,
-.calendar-toolbar__brand-btn:focus-visible {
-    background: rgb(219 234 254);
-    border-color: rgb(147 197 253);
+.calendar-toolbar__brand-btn:active {
+    background: rgb(219 234 254) !important;
+    border-color: rgb(147 197 253) !important;
 }
 
-[data-theme='dark'] .calendar-toolbar__brand-btn:hover,
-[data-theme='dark'] .calendar-toolbar__brand-btn:focus-visible {
-    background: rgb(30 58 138 / 0.45);
-    border-color: rgb(59 130 246);
+[data-theme='dark'] .calendar-toolbar__brand-btn:active {
+    background: rgb(30 58 138 / 0.55) !important;
+    border-color: rgb(59 130 246) !important;
+}
+
+.calendar-toolbar__nav-inline {
+    flex-shrink: 0;
 }
 
 .calendar-toolbar__click-chip {

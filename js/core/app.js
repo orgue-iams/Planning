@@ -39,7 +39,8 @@ import {
     refetchPlanningGrid,
     isReservationMutationInFlight,
     reservationModalMayCloseNow,
-    isReservationModalDirty
+    isReservationModalDirty,
+    dismissReservationRouteDialog
 } from './calendar-logic.js';
 import {
     login,
@@ -539,7 +540,8 @@ function wireDialogBackdropClose() {
             /* Fenêtre utilisateur admin : fermeture fond / abandon gérés dans admin-users-modal-ui.js */
             if (e.target.id === 'modal_users_admin') return;
             if (e.target.id === 'modal_reservation') {
-                if (!reservationModalMayCloseNow()) return;
+                void dismissReservationRouteDialog({ save: true });
+                return;
             }
             e.target.close();
         }
