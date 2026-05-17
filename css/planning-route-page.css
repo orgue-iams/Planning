@@ -1,6 +1,7 @@
-/* Modales ouvertes comme une « page » plein écran (lien Précédent en haut à gauche). */
+/* Sous-pages (dialog route) : panneau à gauche (~75 %), planning visible à droite. */
 
 dialog.planning-route-page {
+    --planning-route-panel-width: min(75vw, 22rem);
     width: 100vw;
     max-width: 100vw;
     height: 100%;
@@ -8,49 +9,98 @@ dialog.planning-route-page {
     margin: 0;
     padding: 0;
     border: none;
-    background: rgb(248 250 252);
-    display: flex;
-    flex-direction: column;
+    background: transparent;
+    display: grid;
+    grid-template-columns: var(--planning-route-panel-width) 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    align-items: stretch;
     overflow: hidden;
-}
-
-[data-theme='dark'] dialog.planning-route-page {
-    background: rgb(15 23 42);
+    pointer-events: none;
 }
 
 dialog.planning-route-page::backdrop {
-    background: rgb(15 23 42 / 0.35);
+    background: rgb(15 23 42 / 0.22);
 }
 
 dialog.planning-route-page .planning-route-page__bar {
-    flex: 0 0 auto;
-    order: 0;
+    grid-column: 1;
+    grid-row: 1;
+    pointer-events: auto;
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
+    background: rgb(248 250 252);
+    border-bottom: 1px solid rgb(226 232 240);
+    box-shadow: none;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+}
+
+dialog.planning-route-page#modal_reservation .planning-route-page__bar-extra {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+dialog.planning-route-page#modal_reservation .planning-route-page__bar-extra #btn-delete {
+    margin-left: 0;
 }
 
 dialog.planning-route-page .modal-box {
-    order: 1;
-    max-height: none;
-    flex: 1 1 auto;
-    min-height: 0;
-    max-width: 100%;
+    grid-column: 1;
+    grid-row: 2;
+    pointer-events: auto;
     width: 100%;
+    max-width: 100%;
+    min-height: 0;
+    max-height: none;
+    flex: none;
     margin: 0;
     border-radius: 0;
     border: none;
-    box-shadow: none;
+    box-shadow: 4px 0 24px rgb(15 23 42 / 0.1);
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    background: rgb(248 250 252);
+}
+
+dialog.planning-route-page#modal_directory_users {
+    --planning-route-panel-width: min(80vw, 28rem);
+}
+
+dialog.planning-route-page#modal_config,
+dialog.planning-route-page#modal_fermetures,
+dialog.planning-route-page#modal_announcements,
+dialog.planning-route-page#modal_profile,
+dialog.planning-route-page#modal_calendar_pool,
+dialog.planning-route-page#modal_statistics {
+    --planning-route-panel-width: min(75vw, 24rem);
+}
+
+dialog.planning-route-page#modal_semaines_types {
+    --planning-route-panel-width: min(88vw, 52rem);
+}
+
+dialog.planning-route-page#modal_reservation {
+    --planning-route-panel-width: min(75vw, 26rem);
+}
+
+[data-theme='dark'] dialog.planning-route-page .planning-route-page__bar,
+[data-theme='dark'] dialog.planning-route-page .modal-box {
+    background: rgb(15 23 42);
+}
+
+[data-theme='dark'] dialog.planning-route-page .planning-route-page__bar {
+    border-bottom-color: rgb(51 65 85);
+}
+
+[data-theme='dark'] dialog.planning-route-page .modal-box {
+    box-shadow: 4px 0 24px rgb(0 0 0 / 0.35);
 }
 
 dialog.planning-route-page#modal_directory_users .modal-box {
     padding-top: 0.5rem;
-}
-
-[data-theme='dark'] dialog.planning-route-page .planning-route-page__bar {
-    background: rgb(15 23 42) !important;
 }
 
 [data-theme='dark'] dialog.planning-route-page .planning-route-page__back {
@@ -61,12 +111,10 @@ dialog.planning-route-page#modal_directory_users .modal-box {
     color: rgb(255 255 255) !important;
 }
 
-/* Ancienne barre avec titre (sessions déjà ouvertes) : masquer le titre doublon. */
 dialog.planning-route-page .planning-route-page__title {
     display: none !important;
 }
 
-/* Sections « page route » : séparateur horizontal, pas de cartons arrondis. */
 dialog.planning-route-page .planning-route-section {
     margin-top: 1rem;
     padding-top: 1rem;

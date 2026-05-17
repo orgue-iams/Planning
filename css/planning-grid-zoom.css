@@ -1,0 +1,40 @@
+/* Zoom tableau planning (zone calendrier uniquement) */
+
+.planning-calendar-zoom-host {
+    touch-action: pan-x pan-y;
+    -webkit-overflow-scrolling: touch;
+}
+
+.planning-calendar-zoom-inner {
+    will-change: transform;
+}
+
+.planning-legend__zoom {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.planning-legend__zoom-label {
+    font-size: 0.5625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: rgb(100 116 139);
+    white-space: nowrap;
+}
+
+.planning-legend__zoom-range {
+    width: 4.5rem;
+    max-width: 22vw;
+    accent-color: #3b82f6;
+    height: 0.35rem;
+}
+
+@media (min-width: 1024px) {
+    .planning-legend__zoom {
+        display: none;
+    }
+}

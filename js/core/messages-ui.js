@@ -69,7 +69,7 @@ export function initMessagesUi(_ignored) {
     messagesUiAbort = new AbortController();
     const { signal } = messagesUiAbort;
 
-    const btnRulesFab = document.getElementById('btn-rules-fab');
+    const btnRulesFab = document.getElementById('btn-org-brand-rules');
     const modalRules = document.getElementById('modal_rules');
     const modalBroadcast = document.getElementById('modal_broadcast');
 

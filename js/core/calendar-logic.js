@@ -142,7 +142,6 @@ function setReservationModalMutationLock(locked) {
     const controls = [
         'btn-save',
         'btn-delete',
-        'btn-cancel-reservation',
         'event-date-start',
         'event-start',
         'event-end',
@@ -210,6 +209,16 @@ function getReservationInscritsSelection() {
     return { userIds, emailsCsv: emails.join(',') };
 }
 
+function refreshReservationInscritsSummary() {
+    const summary = document.getElementById('reservation-inscrits-summary');
+    const multi = document.getElementById('event-inscrits-select');
+    if (!summary || !multi) return;
+    const labels = [...multi.selectedOptions]
+        .map((o) => String(o.textContent || '').trim())
+        .filter(Boolean);
+    summary.textContent = labels.length ? labels.join(', ') : 'Aucun élève (optionnel)';
+}
+
 function updateReservationInscritsWrapVisibility(currentUser, canEdit) {
     const wrap = document.getElementById('wrap-reservation-inscrits');
     const multi = document.getElementById('event-inscrits-select');
@@ -218,11 +227,12 @@ function updateReservationInscritsWrapVisibility(currentUser, canEdit) {
     if (!wrap || !multi || !sel) return;
     const show = canManageReservationInscrits(currentUser) && sel.value === 'Cours';
     wrap.classList.toggle('hidden', !show);
+    wrap.setAttribute('aria-hidden', show ? 'false' : 'true');
     multi.disabled = !canEdit || !show;
     if (toggle instanceof HTMLButtonElement) {
         toggle.disabled = !canEdit || !show;
     }
-    // Deux colonnes + glisser-déposer dès que le motif est « Cours » et le créneau est éditable.
+    if (show) refreshReservationInscritsSummary();
     setReservationInscritsEditMode(Boolean(show && canEdit), canEdit);
 }
 
@@ -232,18 +242,16 @@ function updateReservationInscritsWrapVisibility(currentUser, canEdit) {
  */
 function setReservationInscritsEditMode(editMode, canEdit) {
     const wrap = document.getElementById('wrap-reservation-inscrits');
-    const availWrap = document.getElementById('event-inscrits-available-wrap');
-    const grid = document.getElementById('event-inscrits-grid');
     const multi = document.getElementById('event-inscrits-select');
     const toggle = document.getElementById('event-inscrits-users-toggle');
     const allowed = Boolean(editMode && canEdit);
-    if (!wrap || !availWrap || !grid || !multi) return;
+    if (!wrap || !multi) return;
     wrap.dataset.inscritsEditMode = allowed ? '1' : '0';
-    availWrap.classList.toggle('hidden', !allowed);
-    grid.classList.toggle('grid-cols-2', allowed);
-    grid.classList.toggle('grid-cols-1', !allowed);
     if (toggle instanceof HTMLButtonElement) toggle.setAttribute('aria-pressed', allowed ? 'true' : 'false');
-    renderReservationInscritsDnD(multi, allowed);
+    refreshReservationInscritsSummary();
+    const availWrap = document.getElementById('event-inscrits-available-wrap');
+    const grid = document.getElementById('event-inscrits-grid');
+    if (availWrap && grid) renderReservationInscritsDnD(multi, allowed);
 }
 
 function ensureReservationMotifInscritsListener() {
@@ -374,8 +382,10 @@ async function prepareReservationInscritsSelect(currentUser, event, canEdit) {
             for (const o of multi.options) {
                 o.selected = picked.includes(o.value);
             }
+            refreshReservationInscritsSummary();
             const wrapR = document.getElementById('wrap-reservation-inscrits');
             renderReservationInscritsDnD(multi, wrapR?.dataset.inscritsEditMode === '1');
+            scheduleReservationAutoSave();
         });
     }
     const rows = await fetchPlanningListElevesActifs();
@@ -2430,13 +2440,11 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     }
 
     document.getElementById('btn-save')?.classList.add('hidden');
-    const cancelBtn = document.getElementById('btn-cancel-reservation');
-    if (cancelBtn) cancelBtn.textContent = 'Annuler';
     const showDelete =
         Boolean(event) &&
         canCurrentUserEditEventIgnoringPast(currentUser, event) &&
         (!isPastSlot || meRoleOpen === 'admin' || meRoleOpen === 'prof');
-    document.getElementById('btn-delete').classList.toggle('hidden', !showDelete);
+    document.getElementById('reservation-delete-wrap')?.classList.toggle('hidden', !showDelete);
 
     await prepareReservationOwnerSelect(currentUser, event || null, canEditEvent);
     await prepareReservationInscritsSelect(currentUser, event || null, canEditEvent);
@@ -2741,10 +2749,6 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
             return;
         }
         const dbSlotType = motifToPlanningDbSlotType(motif);
-        if (dbSlotType === 'cours' && getReservationInscritsSelection().userIds.length === 0) {
-            showToast('Pour un cours, sélectionnez au moins un élève inscrit.', 'error');
-            return;
-        }
         const bridgeType = planningDbSlotTypeToBridgeType(dbSlotType);
         /** @type {Record<string, unknown>[]} */
         const bridgeEventsDb = [];
@@ -2861,10 +2865,6 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         return;
     }
     const dbSlotType = motifToPlanningDbSlotType(motif);
-    if (dbSlotType === 'cours' && getReservationInscritsSelection().userIds.length === 0) {
-        showToast('Pour un cours, sélectionnez au moins un élève inscrit.', 'error');
-        return;
-    }
     const rEleveChk = normalizeRole(currentUser?.role);
     if (rEleveChk === 'eleve' && dbSlotType === 'travail perso') {
         await fetchOrganSchoolSettings();

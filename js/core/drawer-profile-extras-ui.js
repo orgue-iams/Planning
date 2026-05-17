@@ -13,7 +13,7 @@ import {
 } from './planning-courses.js';
 
 const AGENDA_HELP =
-    'Ces liens permettent d’afficher le planning dans Google Agenda (lecture seule). Dans Google Agenda : Paramètres → Ajouter un agenda → À partir de l’URL. Collez le lien copié. Le planning général affiche tous les créneaux ; le planning personnel n’affiche que vos réservations IAMS.';
+    'Ces liens permettent d’afficher le planning dans Google Agenda (lecture seule). Dans Google Agenda : Paramètres → Ajouter un agenda → À partir de l’URL. Collez le lien copié. Le planning complet affiche tous les créneaux ; le planning personnel n’affiche que vos réservations IAMS.';
 
 async function loadPersonalPoolRow(userId) {
     if (!isBackendAuthConfigured() || !userId) return { id: '', label: '' };
@@ -44,7 +44,7 @@ async function copyText(text) {
     }
 }
 
-function bindAgendaRow(btnId, url) {
+function bindAgendaCopyBtn(btnId, url) {
     const btn = document.getElementById(btnId);
     if (!(btn instanceof HTMLButtonElement)) return;
     const hasUrl = Boolean(url);
@@ -53,9 +53,21 @@ function bindAgendaRow(btnId, url) {
     btn.onclick = () => void copyText(url);
 }
 
+function setAgendaHelpExpanded(expanded) {
+    const help = document.getElementById('drawer-agenda-help-text');
+    const btn = document.getElementById('drawer-agenda-help-btn');
+    if (help) {
+        help.textContent = AGENDA_HELP;
+        help.classList.toggle('hidden', !expanded);
+    }
+    if (btn instanceof HTMLButtonElement) {
+        btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    }
+}
+
 /** @param {object | null} user */
 export async function refreshDrawerAgendas(user) {
-    const block = document.getElementById('drawer-section-agendas');
+    const block = document.getElementById('profile-section-agendas');
     if (!block) return;
     if (!user?.email) {
         block.classList.add('hidden');
@@ -63,35 +75,21 @@ export async function refreshDrawerAgendas(user) {
     }
     block.classList.remove('hidden');
 
-    const { mainGoogleCalendarId, mainGoogleCalendarLabel } = getPlanningConfig();
+    const { mainGoogleCalendarId } = getPlanningConfig();
     const mainUrl = googleCalendarEmbedUrl(mainGoogleCalendarId);
-    const mainName =
-        mainGoogleCalendarLabel.trim() ||
-        (mainGoogleCalendarId ? mainGoogleCalendarId.split('@')[0] : 'Planning général');
+    bindAgendaCopyBtn('drawer-agenda-main-btn', mainUrl);
 
-    const mainLabel = document.getElementById('drawer-agenda-main-label');
-    if (mainLabel) mainLabel.textContent = mainName || 'Planning général';
-    bindAgendaRow('drawer-agenda-main-btn', mainUrl);
-
-    const { id: persId, label: persLabel } = await loadPersonalPoolRow(user.id);
+    const { id: persId } = await loadPersonalPoolRow(user.id);
     const persUrl = googleCalendarEmbedUrl(persId);
-    const persName =
-        persLabel.trim() ||
-        (persId.includes('@') ? persId.split('@')[0] : '') ||
-        'Planning personnel';
 
-    const persLabelEl = document.getElementById('drawer-agenda-personal-label');
     const persBtn = document.getElementById('drawer-agenda-personal-btn');
     const persNone = document.getElementById('drawer-agenda-personal-none');
     if (persUrl) {
-        if (persLabelEl) persLabelEl.textContent = persName;
-        bindAgendaRow('drawer-agenda-personal-btn', persUrl);
+        bindAgendaCopyBtn('drawer-agenda-personal-btn', persUrl);
         persNone?.classList.add('hidden');
         persBtn?.classList.remove('hidden');
-        persLabelEl?.classList.remove('hidden');
     } else {
         persBtn?.classList.add('hidden');
-        persLabelEl?.classList.add('hidden');
         persNone?.classList.remove('hidden');
     }
 }
@@ -160,8 +158,11 @@ export function initDrawerProfileExtrasUi() {
     bound = true;
 
     document.getElementById('drawer-agenda-help-btn')?.addEventListener('click', () => {
-        showToast(AGENDA_HELP, 'info', 12000);
+        const help = document.getElementById('drawer-agenda-help-text');
+        const expanded = help?.classList.contains('hidden') ?? true;
+        setAgendaHelpExpanded(expanded);
     });
+    setAgendaHelpExpanded(false);
 
     document.addEventListener('planning-profile-saved', () => {
         const u = getPlanningSessionUser();

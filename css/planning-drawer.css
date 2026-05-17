@@ -22,7 +22,7 @@
     z-index: 270;
     height: 100%;
     height: 100dvh;
-    width: min(70vw, 22rem);
+    width: min(75vw, 22rem);
     max-width: 100%;
     background: rgb(255 255 255);
     border-right: 1px solid rgb(226 232 240);
@@ -48,13 +48,13 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
-    padding: 0.5rem 0.65rem 1rem;
+    padding: 0.35rem 0.55rem 0.65rem;
 }
 
 /* Séparation entre catégories : une seule ligne au-dessus de chaque bloc visible (les blocs .hidden ne laissent pas d’empilement). */
 .planning-drawer__block {
-    padding-top: 0.5rem;
-    margin-top: 0.5rem;
+    padding-top: 0.35rem;
+    margin-top: 0.35rem;
     border-top: 1px solid rgb(226 232 240);
 }
 
@@ -80,6 +80,53 @@
 .planning-drawer__view-btn--profile {
     width: 100%;
     justify-content: flex-start;
+}
+
+.planning-drawer__profile-chip--outlined,
+.planning-drawer__profile-chip {
+    border: 1.5px solid rgb(37 99 235);
+    border-radius: 0.65rem;
+    background: transparent;
+    padding: 0.45rem 0.55rem;
+    box-shadow: none;
+}
+
+.planning-drawer__profile-chip:hover {
+    background: rgb(248 250 252);
+    border-color: rgb(100 116 139);
+}
+
+.planning-drawer__view-btn--profile.is-active,
+.planning-drawer__profile-chip.is-active {
+    background: transparent !important;
+    border-color: rgb(37 99 235);
+    box-shadow: none;
+}
+
+[data-theme='dark'] .planning-drawer__view-btn--profile.is-active,
+[data-theme='dark'] .planning-drawer__profile-chip.is-active {
+    background: transparent !important;
+    border-color: rgb(96 165 250);
+}
+
+[data-theme='dark'] .planning-drawer__profile-chip {
+    border-color: rgb(100 116 139);
+    background: transparent;
+}
+
+[data-theme='dark'] .planning-drawer__profile-chip:hover {
+    background: rgb(30 41 59);
+    border-color: rgb(148 163 184);
+}
+
+.profile-agendas-section .planning-drawer__agenda-line {
+    align-items: center;
+}
+
+.profile-agendas-section .planning-drawer__agenda-copy-btn {
+    max-width: none;
+    min-width: 6.5rem;
+    text-align: center;
 }
 
 .planning-drawer__profile-chip-text {
@@ -149,7 +196,15 @@
 }
 
 .planning-drawer__scale-previews {
-    max-width: 12rem;
+    width: 95%;
+    max-width: 95%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.planning-drawer__range-wrap {
+    width: 95%;
+    max-width: 95%;
     margin-left: auto;
     margin-right: auto;
 }
@@ -253,6 +308,10 @@
     border-color: rgb(59 130 246);
 }
 
+.planning-drawer__view-btn .planning-drawer__link-icon {
+    flex-shrink: 0;
+}
+
 .planning-drawer__view-btn svg {
     width: 1.1rem;
     height: 1.1rem;
@@ -260,12 +319,29 @@
     opacity: 0.85;
 }
 
+.planning-drawer__link-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0.35rem;
+    margin-top: 0.1rem;
+}
+
+.planning-drawer__link-row-item {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.planning-drawer__link--compact {
+    padding-left: 0.45rem;
+    padding-right: 0.45rem;
+}
+
 .planning-drawer__link {
     display: flex;
     align-items: center;
     gap: 0.55rem;
     width: 100%;
-    padding: 0.45rem 0.55rem;
+    padding: 0.35rem 0.5rem;
     border-radius: 0.65rem;
     font-size: 0.8125rem;
     font-weight: 600;
@@ -291,6 +367,50 @@
     height: 1.05rem;
     flex-shrink: 0;
     opacity: 0.85;
+}
+
+.planning-drawer__link-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    border-radius: 0.45rem;
+    flex-shrink: 0;
+}
+
+.planning-drawer__link-icon svg {
+    width: 1.05rem;
+    height: 1.05rem;
+    opacity: 1;
+}
+
+.planning-drawer__link-icon--neutral {
+    background: rgb(241 245 249);
+}
+
+.planning-drawer__link-icon--agenda-blue {
+    background: rgb(59 130 246 / 0.2);
+    color: rgb(29 78 216);
+}
+
+.planning-drawer__link-icon--agenda-orange {
+    background: rgb(249 115 22 / 0.24);
+    color: rgb(194 65 12);
+}
+
+[data-theme='dark'] .planning-drawer__link-icon--neutral {
+    background: rgb(51 65 85);
+}
+
+[data-theme='dark'] .planning-drawer__link-icon--agenda-blue {
+    background: rgb(59 130 246 / 0.28);
+    color: rgb(147 197 253);
+}
+
+[data-theme='dark'] .planning-drawer__link-icon--agenda-orange {
+    background: rgb(249 115 22 / 0.3);
+    color: rgb(253 186 116);
 }
 
 .planning-drawer__help-btn {
@@ -365,6 +485,76 @@
 
 [data-theme='dark'] .planning-drawer__agenda-hint {
     color: rgb(148 163 184);
+}
+
+.planning-drawer__agenda-help {
+    font-size: 0.68rem;
+    line-height: 1.45;
+    color: rgb(71 85 105);
+    margin: 0 0 0.5rem;
+    padding: 0.5rem 0.55rem;
+    border-radius: 0.5rem;
+    background: rgb(241 245 249);
+    border: 1px solid rgb(226 232 240);
+}
+
+[data-theme='dark'] .planning-drawer__agenda-help {
+    color: rgb(203 213 225);
+    background: rgb(30 41 59);
+    border-color: rgb(71 85 105);
+}
+
+.planning-drawer__agenda-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    width: 100%;
+    margin-top: 0.35rem;
+    min-height: 2.25rem;
+}
+
+.planning-drawer__agenda-line-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgb(30 41 59);
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+[data-theme='dark'] .planning-drawer__agenda-line-title {
+    color: rgb(241 245 249);
+}
+
+.planning-drawer__agenda-copy-btn {
+    flex-shrink: 0;
+    padding: 0.4rem 0.65rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgb(226 232 240);
+    background: rgb(248 250 252);
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: rgb(30 64 175);
+    cursor: pointer;
+    text-align: right;
+    max-width: 58%;
+    line-height: 1.25;
+}
+
+.planning-drawer__agenda-copy-btn:hover {
+    background: rgb(219 234 254);
+    border-color: rgb(147 197 253);
+}
+
+[data-theme='dark'] .planning-drawer__agenda-copy-btn {
+    border-color: rgb(71 85 105);
+    background: rgb(30 41 59);
+    color: rgb(147 197 253);
+}
+
+[data-theme='dark'] .planning-drawer__agenda-copy-btn:hover {
+    background: rgb(30 58 138 / 0.45);
+    border-color: rgb(59 130 246);
 }
 
 .planning-drawer__cours-list {

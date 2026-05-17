@@ -234,11 +234,79 @@
     min-height: 6.5rem;
 }
 
-/* Annonces : pas de cadre autour de la zone d’édition (sous la barre d’outils). */
+/* Annonces : zone courte (~4 lignes), barre d’outils en bas (évite la barre système Android au-dessus). */
+.planning-quill-mount.planning-quill-mount--announcements {
+    flex-direction: column-reverse;
+}
+
+.planning-quill-mount.planning-quill-mount--announcements .ql-toolbar.ql-snow {
+    position: static;
+    top: auto;
+    border-radius: 0 0 0.75rem 0.75rem;
+    border-top: none;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+}
+
 .planning-quill-mount.planning-quill-mount--announcements .ql-container.ql-snow {
-    border: none !important;
-    border-radius: 0 !important;
-    background: transparent;
+    border: 1px solid #e2e8f0 !important;
+    border-bottom: none !important;
+    border-radius: 0.75rem 0.75rem 0 0 !important;
+    background: white;
+    min-height: 0;
+}
+
+.planning-quill-mount.planning-quill-mount--announcements .ql-editor {
+    min-height: 4.25rem;
+    max-height: 4.25rem;
+    overflow-y: auto;
+    padding-bottom: 0.5rem;
+}
+
+.planning-quill-toolbar--announcements .planning-quill-clear-all {
+    margin-left: auto;
+    flex-shrink: 0;
+    border-radius: 0.5rem;
+    border: 1px solid rgb(37 99 235);
+    background: rgb(37 99 235);
+    color: #fff;
+    font-weight: 700;
+    padding: 0.25rem 0.65rem;
+}
+
+.planning-quill-toolbar--announcements .planning-quill-clear-all:hover {
+    background: rgb(29 78 216);
+    border-color: rgb(29 78 216);
+}
+
+.planning-quill-mount.planning-quill-mount--announcements .ql-editor {
+    text-align: left;
+    vertical-align: top;
+}
+
+#modal_semaines_types .st-bottom-sheet {
+    flex-shrink: 0;
+    border-top: 1px solid rgb(226 232 240);
+    background: rgb(248 250 252);
+    box-shadow: 0 -8px 24px rgb(15 23 42 / 0.08);
+    max-height: min(52dvh, 28rem);
+    overflow-y: auto;
+}
+
+#modal_semaines_types .st-slot-card--tap-edit {
+    cursor: pointer;
+}
+
+#modal_semaines_types .st-slot-card--tap-edit:active {
+    opacity: 0.92;
+}
+
+[data-theme='dark'] #modal_semaines_types .st-bottom-sheet {
+    border-top-color: rgb(51 65 85);
+    background: rgb(15 23 42);
+    box-shadow: 0 -8px 24px rgb(0 0 0 / 0.35);
 }
 
 [data-theme='dark'] #modal_announcements .planning-quill-mount .ql-toolbar.ql-snow {
@@ -497,7 +565,7 @@
 #modal_semaines_types::backdrop {
     background: rgb(15 23 42 / 0.4);
 }
-#modal_semaines_types[open] {
+#modal_semaines_types[open]:not(.planning-route-page) {
     position: fixed;
     inset: 0;
     z-index: 1150;
@@ -515,13 +583,39 @@
     background: transparent;
     border: none;
 }
-#modal_semaines_types[open] .modal-box.semaines-types-modal-box {
+#modal_semaines_types[open]:not(.planning-route-page) .modal-box.semaines-types-modal-box {
     position: relative;
     z-index: 1;
     flex: 1 1 auto;
     width: 100%;
     max-width: none;
     height: 100%;
+    max-height: none;
+    min-height: 0;
+}
+#modal_semaines_types.planning-route-page[open] {
+    position: fixed;
+    inset: 0;
+    z-index: 1150;
+    display: grid;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    min-height: 100dvh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: transparent;
+    border: none;
+}
+#modal_semaines_types.planning-route-page[open] .modal-box.semaines-types-modal-box {
+    position: relative;
+    z-index: 1;
+    flex: none;
+    width: 100%;
+    max-width: none;
+    height: auto;
     max-height: none;
     min-height: 0;
 }
@@ -632,8 +726,67 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.85rem;
     font-size: 0.6875rem;
+}
+
+#modal_semaines_types .st-slot-card.st-slot-card--prof-tint-0 {
+    background: rgb(219 234 254 / 0.55);
+}
+#modal_semaines_types .st-slot-card.st-slot-card--prof-tint-1 {
+    background: rgb(254 243 199 / 0.55);
+}
+#modal_semaines_types .st-slot-card.st-slot-card--prof-tint-2 {
+    background: rgb(220 252 231 / 0.55);
+}
+#modal_semaines_types .st-slot-card.st-slot-card--prof-tint-3 {
+    background: rgb(243 232 255 / 0.55);
+}
+#modal_semaines_types .st-slot-card.st-slot-card--prof-tint-4 {
+    background: rgb(255 228 230 / 0.55);
+}
+#modal_semaines_types .st-slot-card.st-slot-card--prof-tint-5 {
+    background: rgb(204 251 241 / 0.55);
+}
+#modal_semaines_types .st-slot-card.st-slot-card--prof-tint-6 {
+    background: rgb(254 226 226 / 0.5);
+}
+#modal_semaines_types .st-slot-card.st-slot-card--prof-tint-7 {
+    background: rgb(224 231 255 / 0.55);
+}
+
+[data-theme='dark'] #modal_semaines_types .st-slot-card.st-slot-card--prof-tint-0 {
+    background: rgb(30 58 138 / 0.62);
+}
+[data-theme='dark'] #modal_semaines_types .st-slot-card.st-slot-card--prof-tint-1 {
+    background: rgb(120 53 15 / 0.55);
+}
+[data-theme='dark'] #modal_semaines_types .st-slot-card.st-slot-card--prof-tint-2 {
+    background: rgb(20 83 45 / 0.55);
+}
+[data-theme='dark'] #modal_semaines_types .st-slot-card.st-slot-card--prof-tint-3 {
+    background: rgb(88 28 135 / 0.5);
+}
+[data-theme='dark'] #modal_semaines_types .st-slot-card.st-slot-card--prof-tint-4 {
+    background: rgb(127 29 29 / 0.5);
+}
+[data-theme='dark'] #modal_semaines_types .st-slot-card.st-slot-card--prof-tint-5 {
+    background: rgb(15 118 110 / 0.52);
+}
+[data-theme='dark'] #modal_semaines_types .st-slot-card.st-slot-card--prof-tint-6 {
+    background: rgb(153 27 27 / 0.48);
+}
+[data-theme='dark'] #modal_semaines_types .st-slot-card.st-slot-card--prof-tint-7 {
+    background: rgb(49 46 129 / 0.55);
+}
+
+[data-theme='dark'] #modal_semaines_types .st-slot-card__left,
+[data-theme='dark'] #modal_semaines_types .st-slot-card__prof {
+    border-color: rgb(71 85 105 / 0.65);
+}
+
+#modal_semaines_types .st-slot-card__prof .st-ro-prof {
+    word-break: break-word;
 }
 
 #modal_semaines_types .st-slot-list {
@@ -643,11 +796,13 @@
     min-width: 0;
 }
 
-#modal_semaines_types .st-closure-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    min-width: 0;
+#modal_fermetures .fermeture-card {
+    transition: background-color 0.12s ease;
+}
+
+#modal_fermetures .fermeture-card [role='button']:hover {
+    background: rgb(241 245 249 / 0.6);
+    border-radius: 0.5rem;
 }
 
 #modal_config .config-rule-row {
@@ -664,12 +819,37 @@
     border-bottom: none;
 }
 
+#modal_config .config-rule-row--multiline {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    column-gap: 0.75rem;
+    row-gap: 0.25rem;
+}
+
+#modal_config .config-rule-row--multiline .config-rule-toggle {
+    grid-column: 1;
+    grid-row: 1;
+    margin-top: 0.05rem;
+}
+
+#modal_config .config-rule-row--multiline .config-rule-title {
+    grid-column: 2;
+    grid-row: 1;
+    flex: none;
+}
+
 #modal_config .config-rule-title {
-    flex: 1 1 12rem;
-    min-width: 8rem;
+    flex: 1 1 auto;
+    min-width: 0;
     font-weight: 600;
     color: rgb(51 65 85);
     line-height: 1.35;
+}
+
+#modal_config .config-rule-field {
+    flex-shrink: 0;
+    margin-left: 0.25rem;
 }
 
 #modal_config .config-rule-toggle {
@@ -703,6 +883,24 @@
 
 #modal_config .config-rule-toggle--on::after {
     transform: translateX(1rem);
+}
+
+#modal_config .config-rule-toggle--disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+#modal_config .config-rule-row--readonly .config-rule-field:disabled {
+    background: transparent;
+    border-color: rgb(203 213 225);
+    color: rgb(15 23 42) !important;
+    opacity: 1 !important;
+}
+
+[data-theme='dark'] #modal_config .config-rule-row--readonly .config-rule-field:disabled {
+    background: transparent;
+    border-color: rgb(71 85 105);
+    color: rgb(203 213 225);
 }
 
 #modal_config .config-rule-field:not(.hidden) {

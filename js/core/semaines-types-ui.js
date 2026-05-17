@@ -1,15 +1,15 @@
 /**
  * Semaines types A/B : gabarit (prof), analyse / application Google.
  */
-import { isAdmin, isPrivilegedUser } from './auth-logic.js';
+import { isAdmin } from './auth-logic.js';
+import { parseClosureRangesFromSettings } from './fermetures-ui.js';
 import { getPlanningSessionUser } from './session-user.js';
 import { getSupabaseClient, isBackendAuthConfigured, getPlanningConfig } from './supabase-client.js';
 import { showToast } from '../utils/toast.js';
 import {
     fetchOrganSchoolSettings,
     getOrganSchoolSettingsCached,
-    invalidateOrganSchoolSettingsCache,
-    saveTemplateClosureRanges
+    invalidateOrganSchoolSettingsCache
 } from './organ-settings.js';
 import {
     analyzeTemplateApply,
@@ -20,13 +20,21 @@ import {
 import { saveProfWeekCycleFromApply } from './week-cycle.js';
 import {
     openPlanningRouteFromDrawer,
-    setPlanningRouteBackHandler,
-    updatePlanningRouteDialog
+    pushPlanningRouteLevel,
+    resetPlanningRouteStack
 } from '../utils/planning-route-dialog.js';
 
 const ST_DELETE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m2-3h6a1 1 0 011 1v1H8V5a1 1 0 011-1z"/></svg>';
 
 const ST_DRAG_GRIP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>`;
+
+/** @param {string} ownerId */
+function profTintIndex(ownerId) {
+    const s = String(ownerId || '0');
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return h % 8;
+}
 
 const ST_ANALYZE_PLACEHOLDER_HTML =
     'Cliquez sur <strong>1. Préparer l’application</strong> : le résumé (bilan, conflits) s’affiche dans cet encadré. Ensuite activez <strong>2. Appliquer sur Google Agenda</strong> (à droite du bouton 1).';
@@ -354,11 +362,10 @@ function stWeekLetterForCard(card) {
 
 /** @param {HTMLElement} card */
 function stSlotEditRouteTitle(card) {
-    const w = stWeekLetterForCard(card);
     const dow = dowLongLabel(parseInt(card.dataset.stDow || '1', 10));
     const st = padTime(card.dataset.stStart);
     const en = padTime(card.dataset.stEnd);
-    return `< Semaine ${w} / Créneau / ${dow} / ${st} – ${en}`;
+    return `< Semaines A / B / ${dow} / ${st} – ${en}`;
 }
 
 /** @param {HTMLElement} card */
@@ -424,6 +431,8 @@ function syncRowReadonlyDisplay(card, elevesById) {
         .map((x) => x.trim())
         .filter(Boolean);
     roStudents.textContent = enrolledStudentsCommaLine(ids, elevesById) || '—';
+    const profEl = card.querySelector('.st-ro-prof');
+    if (profEl) profEl.textContent = String(card.dataset.stOwnerLabel || '').trim() || '—';
 }
 
 function parseRowsFromList(listEl, weekLetter, ownerId) {
@@ -470,48 +479,6 @@ let stSaveDebounce = null;
 /** @type {{ startYmd: string, endYmd: string }[]} */
 let stApplyClosureRanges = [];
 
-let stClosureSaveDebounce = null;
-
-/** @param {unknown} raw */
-function parseClosureRangesFromSettings(raw) {
-    if (!Array.isArray(raw)) return [];
-    const out = [];
-    for (const item of raw) {
-        if (!item || typeof item !== 'object') continue;
-        const startYmd = String(item.startYmd || item.start || '').trim();
-        const endYmd = String(item.endYmd || item.end || '').trim();
-        if (startYmd && endYmd && endYmd >= startYmd) out.push({ startYmd, endYmd });
-    }
-    return out;
-}
-
-function renderClosureListFromRanges(ranges) {
-    const list = document.getElementById('st-closure-list');
-    if (!list) return;
-    list.replaceChildren();
-    for (const r of ranges) appendClosureCard(r.startYmd, r.endYmd);
-}
-
-function scheduleClosureRangesPersist() {
-    const u = getPlanningSessionUser();
-    if (!isAdmin(u)) return;
-    if (stClosureSaveDebounce) clearTimeout(stClosureSaveDebounce);
-    stClosureSaveDebounce = setTimeout(() => {
-        void persistClosureRangesToSettings();
-    }, 600);
-}
-
-async function persistClosureRangesToSettings() {
-    const u = getPlanningSessionUser();
-    if (!isAdmin(u)) return;
-    stApplyClosureRanges = parseClosureRangesFromDom();
-    const r = await saveTemplateClosureRanges(stApplyClosureRanges);
-    if (!r.ok) {
-        showToast(r.error || 'Enregistrement des fermetures impossible.', 'error');
-        return;
-    }
-}
-
 function scheduleStAutoSave() {
     const u = getPlanningSessionUser();
     if (!u?.id || isAdmin(u)) return;
@@ -528,12 +495,24 @@ function hideStSubPanels() {
     document.getElementById('st-students-edit-panel')?.setAttribute('aria-hidden', 'true');
 }
 
+function hideStBottomSheet() {
+    const sheet = document.getElementById('st-bottom-sheet');
+    sheet?.classList.add('hidden');
+    sheet?.setAttribute('aria-hidden', 'true');
+    hideStSubPanels();
+}
+
+function showStBottomSheet() {
+    const sheet = document.getElementById('st-bottom-sheet');
+    sheet?.classList.remove('hidden');
+    sheet?.setAttribute('aria-hidden', 'false');
+}
+
 function showStMainPanel() {
     document.getElementById('st-main-panel')?.classList.remove('hidden');
-    hideStSubPanels();
+    hideStBottomSheet();
     stLineEditTargetTr = null;
-    setPlanningRouteBackHandler('modal_semaines_types', null);
-    updatePlanningRouteDialog('modal_semaines_types', 'Semaines A / B', 'Semaines A / B');
+    resetPlanningRouteStack('modal_semaines_types', 'Semaines A / B', 'Menu');
 }
 
 function applyStSlotEditFormToCard(opts = {}) {
@@ -584,6 +563,17 @@ function wireStLineEditModal() {
         const t = ev.target;
         if (!(t instanceof HTMLInputElement) || t.name !== 'stle-slot-type') return;
         document.getElementById('stle-students-wrap')?.classList.toggle('hidden', t.value !== 'cours');
+    });
+
+    document.getElementById('stle-delete-btn')?.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const card = stLineEditTargetTr;
+        if (!card) return;
+        if (!window.confirm('Supprimer ce créneau du gabarit ?')) return;
+        card.remove();
+        showStMainPanel();
+        scheduleStAutoSave();
     });
 
     document.getElementById('stle-students-wrap')?.addEventListener('click', (ev) => {
@@ -691,63 +681,20 @@ function openStStudentsEditPanel() {
     if (!card) return;
     wireStStudentsDnDOnce();
     renderStStudentsEditLists();
-    document.getElementById('st-main-panel')?.classList.add('hidden');
     document.getElementById('st-slot-edit-panel')?.classList.add('hidden');
+    showStBottomSheet();
     const panel = document.getElementById('st-students-edit-panel');
     panel?.classList.remove('hidden');
     panel?.setAttribute('aria-hidden', 'false');
     const editTitle = stSlotEditRouteTitle(card);
-    setPlanningRouteBackHandler('modal_semaines_types', () => {
+    const studentsTitle = stStudentsEditRouteTitle(card);
+    pushPlanningRouteLevel('modal_semaines_types', studentsTitle, editTitle, () => {
         document.getElementById('st-students-edit-panel')?.classList.add('hidden');
+        document.getElementById('st-students-edit-panel')?.setAttribute('aria-hidden', 'true');
         const edit = document.getElementById('st-slot-edit-panel');
         edit?.classList.remove('hidden');
         edit?.setAttribute('aria-hidden', 'false');
-        updatePlanningRouteDialog('modal_semaines_types', editTitle, 'Semaines A / B');
     });
-    const studentsTitle = stStudentsEditRouteTitle(card);
-    updatePlanningRouteDialog('modal_semaines_types', studentsTitle, editTitle);
-}
-
-function parseClosureRangesFromDom() {
-    const rows = [];
-    for (const el of document.querySelectorAll('#st-closure-list .st-closure-card')) {
-        const start = el.querySelector('.st-closure-start')?.value?.trim();
-        const end = el.querySelector('.st-closure-end')?.value?.trim();
-        if (start && end && end >= start) rows.push({ startYmd: start, endYmd: end });
-    }
-    return rows;
-}
-
-function appendClosureCard(startYmd = '', endYmd = '') {
-    const list = document.getElementById('st-closure-list');
-    if (!list) return;
-    const card = document.createElement('div');
-    card.className =
-        'st-closure-card flex flex-wrap items-center gap-2 py-2 border-b border-slate-100 last:border-0';
-    card.innerHTML = `
-        <label class="flex flex-col gap-0.5 min-w-0 flex-1">
-            <span class="text-[9px] font-bold text-slate-500">Début</span>
-            <input type="date" class="st-closure-start input input-bordered input-sm bg-white font-mono text-[11px]" value="${escapeAttr(startYmd)}" />
-        </label>
-        <label class="flex flex-col gap-0.5 min-w-0 flex-1">
-            <span class="text-[9px] font-bold text-slate-500">Fin</span>
-            <input type="date" class="st-closure-end input input-bordered input-sm bg-white font-mono text-[11px]" value="${escapeAttr(endYmd)}" />
-        </label>
-        <button type="button" class="st-closure-del btn btn-ghost btn-xs btn-square text-error shrink-0" title="Supprimer">${ST_DELETE_SVG}</button>
-    `;
-    const syncClosures = () => {
-        stApplyClosureRanges = parseClosureRangesFromDom();
-        if (isAdmin(getPlanningSessionUser())) scheduleClosureRangesPersist();
-    };
-    card.querySelector('.st-closure-del')?.addEventListener('click', () => {
-        card.remove();
-        syncClosures();
-    });
-    for (const inp of card.querySelectorAll('.st-closure-start, .st-closure-end')) {
-        inp.addEventListener('change', syncClosures);
-    }
-    list.appendChild(card);
-    syncClosures();
 }
 
 function openStSlotEditPanel(card) {
@@ -778,16 +725,19 @@ function openStSlotEditPanel(card) {
 
     document.getElementById('stle-students-wrap')?.classList.toggle('hidden', typ !== 'cours');
 
-    document.getElementById('st-main-panel')?.classList.add('hidden');
     hideStSubPanels();
+    showStBottomSheet();
     const editPanel = document.getElementById('st-slot-edit-panel');
     editPanel?.classList.remove('hidden');
     editPanel?.setAttribute('aria-hidden', 'false');
 
     const routeTitle = stSlotEditRouteTitle(card);
-    setPlanningRouteBackHandler('modal_semaines_types', showStMainPanel);
-    updatePlanningRouteDialog('modal_semaines_types', routeTitle, 'Semaines A / B');
-    editPanel?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    resetPlanningRouteStack('modal_semaines_types', 'Semaines A / B', 'Menu');
+    pushPlanningRouteLevel('modal_semaines_types', routeTitle, 'Semaines A / B', () => {
+        hideStBottomSheet();
+        document.getElementById('st-main-panel')?.classList.remove('hidden');
+        stLineEditTargetTr = null;
+    });
 }
 
 
@@ -838,13 +788,15 @@ function makeStudentOptionsHtml(eleves) {
 function appendTemplateCard(listEl, line, _optHtml, ctx) {
     const { isAdmin, ownerLabel, lineOwnerId, currentUserId, elevesById } = ctx;
     const isOwnRow = String(lineOwnerId) === String(currentUserId);
-    const isReadonly = isAdmin || !isOwnRow;
+    const isEleve = String(getPlanningSessionUser()?.role || '').toLowerCase() === 'eleve';
+    const isReadonly = isAdmin || !isOwnRow || isEleve;
     const slotT = line?.slot_type === 'reservation' ? 'reservation' : 'cours';
     const sid = line?.studentIds || [];
 
     const card = document.createElement('div');
     card.className =
-        'st-slot-card grid grid-cols-[auto_minmax(0,1fr)_minmax(0,1.35fr)_auto] gap-2 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px] text-slate-800';
+        'st-slot-card grid grid-cols-[auto_minmax(0,0.85fr)_minmax(0,1fr)_minmax(0,0.95fr)] gap-2 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px] text-slate-800';
+    card.classList.add(`st-slot-card--prof-tint-${profTintIndex(lineOwnerId)}`);
     if (!isReadonly) card.classList.add('st-slot-card--editable');
     card.setAttribute('data-st-line', '1');
     card.setAttribute('data-line-id', line?.id || '');
@@ -859,45 +811,35 @@ function appendTemplateCard(listEl, line, _optHtml, ctx) {
     card.dataset.stStudents = sid.join(',');
     card.dataset.stOwnerLabel = ownerLabel;
 
-    if (isAdmin) {
-        card.classList.add('st-slot-card--admin-view');
-    } else {
-        const otherProfCours =
-            line?.slot_type === 'cours' && String(lineOwnerId) !== String(currentUserId);
-        if (otherProfCours) {
-            card.classList.add('st-row-other-prof', 'st-row-travail');
-        } else {
-            card.classList.add(line?.slot_type === 'cours' ? 'st-row-cours' : 'st-row-travail');
-        }
-    }
-
     const dragHtml = isReadonly
         ? '<span class="w-0" aria-hidden="true"></span>'
         : `<span class="st-drag-handle inline-flex cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 p-0.5 rounded hover:bg-slate-100 shrink-0 self-center" draggable="true" title="Glisser vers l’autre semaine type" aria-label="Glisser vers l’autre semaine type">${ST_DRAG_GRIP_SVG}</span>`;
 
-    const deleteHtml = isReadonly
-        ? ''
-        : `<button type="button" class="st-del btn btn-ghost btn-xs btn-square shrink-0 self-center text-slate-500 hover:text-error border border-transparent" title="Supprimer le créneau" aria-label="Supprimer le créneau">${ST_DELETE_SVG}</button>`;
-
     card.innerHTML = `
         ${dragHtml}
-        <div class="st-slot-card__left min-w-0 border-r border-slate-200/80 pr-2 self-center">
+        <div class="st-slot-card__left min-w-0 border-r border-slate-200/80 dark:border-slate-500/50 pr-2 self-stretch flex flex-col justify-center py-0.5">
             <div class="st-ro-period leading-snug"></div>
         </div>
-        <div class="st-slot-card__right min-w-0 pl-1 flex flex-col gap-0.5 self-center">
+        <div class="st-slot-card__right min-w-0 pl-1 flex flex-col gap-0.5 self-stretch justify-center py-0.5">
             <p class="st-ro-headline font-semibold m-0 leading-snug"></p>
-            <p class="st-ro-students text-[10px] font-normal text-slate-700 m-0 leading-snug break-words"></p>
+            <p class="st-ro-students text-[10px] font-normal text-slate-700 dark:text-slate-300 m-0 leading-snug break-words"></p>
         </div>
-        ${deleteHtml}
+        <div class="st-slot-card__prof min-w-0 border-l border-slate-200/80 dark:border-slate-500/50 pl-2 self-stretch flex items-center py-0.5">
+            <span class="st-ro-prof text-[10px] font-medium text-slate-600 dark:text-slate-300 leading-snug block"></span>
+        </div>
     `;
 
-    listEl.appendChild(card);
     syncRowReadonlyDisplay(card, elevesById);
-    card.querySelector('.st-del')?.addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        card.remove();
-        scheduleStAutoSave();
-    });
+    if (!isReadonly) {
+        card.classList.add('st-slot-card--tap-edit');
+        card.addEventListener('click', (ev) => {
+            const t = ev.target;
+            if (!(t instanceof Element)) return;
+            if (t.closest('.st-drag-handle')) return;
+            openStSlotEditPanel(card);
+        });
+    }
+    listEl.appendChild(card);
     return card;
 }
 
@@ -991,22 +933,20 @@ async function openSemainesTypesModal(user) {
     if (!dlg) return;
     showStMainPanel();
     const isAdm = isAdmin(user);
+    const isEleve = String(user?.role || '').toLowerCase() === 'eleve';
     invalidateOrganSchoolSettingsCache();
     await fetchOrganSchoolSettings();
 
-    document.getElementById('st-add-row-a')?.classList.toggle('hidden', isAdm);
-    document.getElementById('st-add-row-b')?.classList.toggle('hidden', isAdm);
-    document.getElementById('st-gabarit-actions')?.classList.toggle('hidden', isAdm);
+    document.getElementById('st-add-row-a')?.classList.toggle('hidden', isAdm || isEleve);
+    document.getElementById('st-add-row-b')?.classList.toggle('hidden', isAdm || isEleve);
+    document.getElementById('st-gabarit-actions')?.classList.toggle('hidden', isAdm || isEleve);
     document.getElementById('st-apply-admin-hint')?.classList.toggle('hidden', !isAdm);
-    document.getElementById('st-apply-controls')?.classList.toggle('hidden', isAdm);
-    document.getElementById('st-apply-section')?.classList.toggle('hidden', isAdm);
-    document.getElementById('st-closure-section')?.classList.remove('hidden');
+    document.getElementById('st-apply-controls')?.classList.toggle('hidden', isAdm || isEleve);
+    document.getElementById('st-apply-section')?.classList.toggle('hidden', isAdm || isEleve);
 
-    const closures = parseClosureRangesFromSettings(
+    stApplyClosureRanges = parseClosureRangesFromSettings(
         getOrganSchoolSettingsCached()?.template_apply_closure_ranges
     );
-    stApplyClosureRanges = closures;
-    renderClosureListFromRanges(closures);
 
     const eleves = await loadEleves();
     const elevesById = new Map(eleves.map((e) => [e.user_id, e]));
@@ -1152,9 +1092,6 @@ async function runSemainesTypesSaveGabarit(opts = {}) {
                 }
             }
         }
-        if (!silent) {
-            showToast('Gabarit enregistré : semaines types A et B sauvegardées.', 'success', 5200);
-        }
     } finally {
         setStModalActionsBusy(false);
     }
@@ -1239,7 +1176,9 @@ async function runSemainesTypesAnalyze() {
                 return;
             }
         }
-        stApplyClosureRanges = parseClosureRangesFromDom();
+        stApplyClosureRanges = parseClosureRangesFromSettings(
+            getOrganSchoolSettingsCached()?.template_apply_closure_ranges
+        );
         const analysis = await analyzeTemplateApply({
             profUserId: u.id,
             profEmail: u.email,
@@ -1569,11 +1508,6 @@ function onSemainesTypesDocumentClick(e) {
         void runSemainesTypesApply();
         return;
     }
-    if (t.closest('#st-add-closure')) {
-        e.preventDefault();
-        appendClosureCard();
-        return;
-    }
     if (t.closest('#st-add-row-a')) {
         e.preventDefault();
         void runSemainesTypesAddRow('A');
@@ -1584,20 +1518,10 @@ function onSemainesTypesDocumentClick(e) {
         void runSemainesTypesAddRow('B');
         return;
     }
-    const card = t.closest('.st-slot-card[data-st-line]');
-    if (
-        card instanceof HTMLElement &&
-        card.getAttribute('data-st-editable') === '1' &&
-        !t.closest('.st-del, .st-drag-handle')
-    ) {
-        e.preventDefault();
-        openStSlotEditPanel(card);
-    }
 }
 
-export function initSemainesTypesUi(currentUser) {
-    const show = isBackendAuthConfigured() && isPrivilegedUser(currentUser);
-    if (!show) return;
+export function initSemainesTypesUi() {
+    if (!isBackendAuthConfigured()) return;
     if (stUiBound) return;
     stUiBound = true;
 
@@ -1611,7 +1535,7 @@ export function initSemainesTypesUi(currentUser) {
             e.preventDefault();
             const u = getPlanningSessionUser();
             if (!u?.id) return;
-            if (!openPlanningRouteFromDrawer('modal_semaines_types', 'Semaines A / B', 'Semaines A / B')) {
+            if (!openPlanningRouteFromDrawer('modal_semaines_types', 'Semaines A / B', 'Menu')) {
                 return;
             }
             void openSemainesTypesModal(u);

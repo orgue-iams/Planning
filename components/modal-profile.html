@@ -58,5 +58,32 @@
                 </dd>
             </div>
         </dl>
+
+        <div id="profile-section-agendas" class="profile-agendas-section hidden mt-4 pt-4 border-t border-slate-200">
+            <div class="flex items-center gap-1.5 mb-2">
+                <p class="text-[10px] font-bold uppercase text-slate-600 tracking-wide m-0 flex-1">Agendas</p>
+                <button
+                    type="button"
+                    id="drawer-agenda-help-btn"
+                    class="planning-drawer__help-btn"
+                    title="Afficher ou masquer l’aide"
+                    aria-label="Aide agendas Google"
+                    aria-expanded="false"
+                    aria-controls="drawer-agenda-help-text"
+                >
+                    ?
+                </button>
+            </div>
+            <p id="drawer-agenda-help-text" class="planning-drawer__agenda-help hidden mb-2" role="region" aria-label="Aide agendas"></p>
+            <div class="planning-drawer__agenda-line">
+                <span class="planning-drawer__agenda-line-title">Planning complet</span>
+                <button type="button" id="drawer-agenda-main-btn" class="planning-drawer__agenda-copy-btn hidden">Copier l’URL</button>
+            </div>
+            <div class="planning-drawer__agenda-line">
+                <span class="planning-drawer__agenda-line-title">Planning personnel</span>
+                <button type="button" id="drawer-agenda-personal-btn" class="planning-drawer__agenda-copy-btn hidden">Copier l’URL</button>
+            </div>
+            <p id="drawer-agenda-personal-none" class="planning-drawer__hint hidden mt-1">Aucun agenda personnel IAMS associé à ce compte.</p>
+        </div>
     </div>
 </dialog>

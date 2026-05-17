@@ -3,7 +3,7 @@
  */
 import { CACHE_NAME } from '../config/cache-name.js';
 import { getOrganSchoolSettingsCached, fetchOrganSchoolSettings } from './organ-settings.js';
-import { closePlanningDrawer, openPlanningDrawer } from './planning-drawer-ui.js';
+import { closePlanningDrawer } from './planning-drawer-ui.js';
 
 let bound = false;
 
@@ -27,23 +27,9 @@ export function showMainDrawerPanel() {
 
 function refreshHelpContent() {
     const ver = document.getElementById('drawer-help-version');
-    if (ver) ver.textContent = `Planning IAMS : ${CACHE_NAME.replace(/^orgue-/, 'v')}`;
-    const mail = supportEmail();
-    const mailEl = document.getElementById('drawer-help-support-email');
-    if (mailEl) mailEl.textContent = mail || '— (non configuré par l’administrateur)';
-    const link = document.getElementById('drawer-help-mailto-link');
-    if (link instanceof HTMLAnchorElement) {
-        if (mail) {
-            link.href = `mailto:${encodeURIComponent(mail)}`;
-            link.textContent = mail;
-            link.classList.remove('hidden');
-        } else {
-            link.href = '#';
-            link.textContent = 'Configurer l’e-mail dans Configuration (admin).';
-            link.classList.remove('hidden');
-        }
-    }
+    if (ver) ver.textContent = CACHE_NAME;
     const form = document.getElementById('drawer-help-contact-form');
+    const mail = supportEmail();
     if (form instanceof HTMLFormElement && mail) {
         form.action = `mailto:${mail}`;
     }
@@ -53,8 +39,8 @@ export function initDrawerHelpUi() {
     if (bound) return;
     bound = true;
 
-    document.getElementById('menu-item-help')?.addEventListener('click', (ev) => {
-        ev.preventDefault();
+    document.getElementById('menu-item-help')?.addEventListener('click', (e) => {
+        e.preventDefault();
         void (async () => {
             await fetchOrganSchoolSettings();
             refreshHelpContent();
@@ -62,8 +48,8 @@ export function initDrawerHelpUi() {
         })();
     });
 
-    document.getElementById('drawer-help-back')?.addEventListener('click', (ev) => {
-        ev.preventDefault();
+    document.getElementById('drawer-help-back')?.addEventListener('click', (e) => {
+        e.preventDefault();
         showMainDrawerPanel();
     });
 

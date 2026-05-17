@@ -153,7 +153,7 @@ function showPoolListPanel() {
     editingPoolRow = null;
     poolEditSnapshot = null;
     setPlanningRouteBackHandler('modal_calendar_pool', null);
-    updatePlanningRouteDialog('modal_calendar_pool', 'Calendriers', 'Calendriers');
+    updatePlanningRouteDialog('modal_calendar_pool', 'Calendriers', 'Menu');
 }
 
 function readPoolEditForm() {
@@ -186,7 +186,6 @@ async function savePoolField(field) {
         await planningAdminInvoke('update_calendar_pool', { pool_id: poolId, ...patch });
         if (patch.label !== undefined) poolEditSnapshot.label = f.label;
         if (patch.google_calendar_id) poolEditSnapshot.google_calendar_id = patch.google_calendar_id;
-        showToast('Agenda enregistré.');
         await refreshCalendarPoolModalTable();
     } catch (err) {
         showToast(err instanceof Error ? err.message : String(err), 'error');
@@ -279,7 +278,6 @@ async function deletePoolRow(poolId, rowForNames) {
         if (res?.ok === false && !res?.needs_confirmation) {
             throw new Error(res?.error || 'Suppression impossible');
         }
-        showToast('Agenda supprimé.');
         showPoolListPanel();
         await refreshCalendarPoolModalTable();
     } catch (err) {
@@ -310,7 +308,7 @@ export function initAdminCalendarPoolUi(currentUser) {
         }
         poolSort = { key: 'label', dir: 'asc' };
         showPoolListPanel();
-        if (!openPlanningRouteFromDrawer('modal_calendar_pool', 'Calendriers', 'Calendriers')) {
+        if (!openPlanningRouteFromDrawer('modal_calendar_pool', 'Calendriers', 'Menu')) {
             return;
         }
         const status = document.getElementById('calendar-pool-status');
@@ -418,7 +416,6 @@ export function initAdminCalendarPoolUi(currentUser) {
                 label: label || undefined,
                 sort_order: 0
             });
-            showToast('Calendrier ajouté au pool.');
             document.getElementById('modal_calendar_pool_add')?.close();
             await refreshCalendarPoolModalTable();
         } catch (err) {

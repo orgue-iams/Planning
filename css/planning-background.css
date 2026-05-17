@@ -101,6 +101,7 @@
 /* Contenu au-dessus du fond (barre d’outils dans l’en-tête fixe ; grille + légende dans #app-shell) */
 header.app-navbar #calendar-toolbar,
 #app-shell.planning-app-shell > #calendar,
+#app-shell.planning-app-shell > #planning-calendar-zoom-host,
 #app-shell.planning-app-shell > #planning-legend {
     position: relative;
     z-index: 0;

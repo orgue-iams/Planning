@@ -147,18 +147,25 @@ export async function saveOrganSchoolSettingsAdmin(row) {
 }
 
 /**
- * @param {{ startYmd: string, endYmd: string }[]} ranges
+ * @param {{ startYmd: string, endYmd: string, title?: string }[]} ranges
  */
 export async function saveTemplateClosureRanges(ranges) {
     const sb = getSupabaseClient();
     if (!sb) return { ok: false, error: 'Session indisponible.' };
     const safe = Array.isArray(ranges)
         ? ranges
-              .map((r) => ({
-                  startYmd: String(r?.startYmd || '').trim(),
-                  endYmd: String(r?.endYmd || '').trim()
-              }))
-              .filter((r) => r.startYmd && r.endYmd && r.endYmd >= r.startYmd)
+              .map((r) => {
+                  const startYmd = String(r?.startYmd || '').trim();
+                  const endYmd = String(r?.endYmd || '').trim();
+                  const title = String(r?.title || '').trim();
+                  if (!startYmd || !endYmd || endYmd < startYmd) return null;
+                  return {
+                      startYmd,
+                      endYmd,
+                      ...(title ? { title } : {})
+                  };
+              })
+              .filter(Boolean)
         : [];
     const { error } = await sb
         .from('organ_school_settings')

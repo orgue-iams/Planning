@@ -16,7 +16,7 @@ import {
     quillGetPlainText,
     quillSetHtml
 } from '../utils/planning-quill.js';
-import { openPlanningRouteDialog, openPlanningRouteFromDrawer } from '../utils/planning-route-dialog.js';
+import { openPlanningRouteFromDrawer } from '../utils/planning-route-dialog.js';
 import { syncPlanningDrawerGroupedSections } from './planning-drawer-ui.js';
 
 function pad2(n) {
@@ -161,6 +161,17 @@ export function initAnnouncementsUi(currentUser) {
     const modal = document.getElementById('modal_announcements');
     const mount = document.getElementById('ann-quill-mount');
 
+    const wireAnnouncementsQuillChrome = (quill) => {
+        const clearBtn = document.getElementById('ann-clear-all-btn');
+        const tb = quill?.getModule?.('toolbar')?.container;
+        if (!(clearBtn instanceof HTMLButtonElement) || !(tb instanceof HTMLElement)) return;
+        clearBtn.classList.remove('hidden');
+        clearBtn.removeAttribute('aria-hidden');
+        clearBtn.classList.add('planning-quill-clear-all');
+        tb.classList.add('planning-quill-toolbar--announcements');
+        if (!tb.contains(clearBtn)) tb.appendChild(clearBtn);
+    };
+
     const ensureAnnQuill = () => {
         if (!(mount instanceof HTMLElement)) return null;
         if (!isQuillAvailable()) {
@@ -172,6 +183,7 @@ export function initAnnouncementsUi(currentUser) {
             placeholder: 'Votre message…',
             compactAnnouncementToolbar: true
         });
+        wireAnnouncementsQuillChrome(annQuill);
         if (annQuill?.root) {
             annQuill.root.addEventListener('blur', () => scheduleMaybePersistBlur(), { signal });
         }
@@ -192,15 +204,12 @@ export function initAnnouncementsUi(currentUser) {
         'click',
         async (e) => {
             e.preventDefault();
-            if (!openPlanningRouteFromDrawer('modal_announcements', 'Annonces', 'Annonces')) {
+            if (!openPlanningRouteFromDrawer('modal_announcements', 'Annonces', 'Menu')) {
                 return;
             }
             const latest = await fetchLatestLoginAnnouncementForEdit();
             ensureAnnQuill();
-            if (!annQuill) {
-                openPlanningRouteDialog('modal_announcements', 'Annonces', 'Annonces');
-                return;
-            }
+            if (!annQuill) return;
             const sd = document.getElementById('ann-start-date');
             const ed = document.getElementById('ann-end-date');
             if (latest) {

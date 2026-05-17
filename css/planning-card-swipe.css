@@ -1,0 +1,81 @@
+/* Cartes avec actions révélées au glissement horizontal */
+
+.planning-swipe-wrap {
+    position: relative;
+    overflow: hidden;
+    border-radius: 0.75rem;
+    min-width: 0;
+}
+
+.planning-swipe-track {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+    pointer-events: none;
+}
+
+.planning-swipe-surface {
+    position: relative;
+    z-index: 2;
+    touch-action: pan-y;
+    min-width: 0;
+    pointer-events: auto;
+}
+
+.planning-swipe-pane {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 5.5rem;
+    padding: 0 0.35rem;
+    border: 0;
+    font-size: 0.6875rem;
+    font-weight: 800;
+    line-height: 1.2;
+    text-align: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+}
+
+.planning-swipe-pane.is-revealed {
+    opacity: 1;
+}
+
+.planning-swipe-pane--delete {
+    left: 0;
+    background: rgb(254 226 226);
+    color: rgb(185 28 28);
+}
+
+.planning-swipe-pane--edit {
+    right: 0;
+    background: rgb(219 234 254);
+    color: rgb(29 78 216);
+}
+
+[data-theme='dark'] .planning-swipe-pane--delete {
+    background: rgb(127 29 29 / 0.85);
+    color: rgb(254 202 202);
+}
+
+[data-theme='dark'] .planning-swipe-pane--edit {
+    background: rgb(30 58 138 / 0.85);
+    color: rgb(191 219 254);
+}
+
+#modal_fermetures .fermeture-card.planning-swipe-surface,
+#modal_fermetures .fermeture-card .planning-swipe-surface {
+    background: rgb(255 237 213 / 0.92);
+    border: 1px solid rgb(253 186 116 / 0.55);
+}
+
+[data-theme='dark'] #modal_fermetures .fermeture-card,
+[data-theme='dark'] #modal_fermetures .planning-swipe-wrap .fermeture-card {
+    background: rgb(154 52 18 / 0.45) !important;
+    border-color: rgb(234 88 12 / 0.45) !important;
+}

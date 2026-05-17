@@ -38,16 +38,21 @@
                 </div>
 
                 <div id="event-recurring-wrap" class="hidden" aria-hidden="true"></div>
-                <div id="wrap-reservation-inscrits" class="hidden" aria-hidden="true">
+                <div id="wrap-reservation-inscrits" class="hidden form-control" aria-hidden="true">
+                    <span class="label-text font-bold text-[11px] uppercase text-slate-500 py-0">Élèves inscrits</span>
+                    <p id="reservation-inscrits-summary" class="text-[11px] text-slate-700 dark:text-slate-200 mt-1 mb-2 leading-snug">Aucun élève (optionnel)</p>
+                    <button type="button" id="event-inscrits-users-toggle" class="btn btn-outline btn-sm font-bold text-[11px] w-full sm:w-auto">Gérer les inscrits</button>
                     <select id="event-inscrits-select" multiple class="hidden"></select>
                 </div>
                 <p id="event-editor-owner" class="hidden" aria-hidden="true"></p>
+
+                <div id="reservation-delete-wrap" class="hidden pt-3 mt-1 border-t border-slate-200 dark:border-slate-600">
+                    <button type="button" id="btn-delete" class="btn btn-error btn-outline btn-sm font-bold text-[11px] w-full sm:w-auto">Supprimer</button>
+                </div>
             </div>
         </div>
 
-        <div class="reservation-route-actions flex justify-between items-center gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-slate-600 shrink-0">
-            <button type="button" id="btn-delete" class="btn btn-error btn-outline btn-sm font-bold text-[11px]">Supprimer</button>
-            <button type="button" id="btn-cancel-reservation" class="btn btn-ghost btn-sm font-bold text-[11px]">Annuler</button>
+        <div class="reservation-route-actions hidden" aria-hidden="true">
             <button type="button" id="btn-save" class="hidden" aria-hidden="true">Enregistrer</button>
         </div>
     </div>

@@ -165,3 +165,18 @@
     color: rgb(248 113 113);
     background: rgb(127 29 29 / 0.35);
 }
+
+[data-theme='dark'] #modal_directory_users #directory-user-edit-panel .input,
+[data-theme='dark'] #modal_directory_users #directory-user-edit-panel .select,
+[data-theme='dark'] #modal_directory_users #directory-user-create-panel .input,
+[data-theme='dark'] #modal_directory_users #directory-user-create-panel .select {
+    background: transparent !important;
+    color: rgb(241 245 249);
+    border-color: rgb(71 85 105);
+}
+
+[data-theme='dark'] #modal_directory_users #directory-user-edit-panel .input:disabled,
+[data-theme='dark'] #modal_directory_users #directory-user-edit-panel .select:disabled {
+    background: transparent !important;
+    opacity: 0.75;
+}

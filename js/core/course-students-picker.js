@@ -26,7 +26,6 @@ function escapeAttr(s) {
 /**
  * @param {{
  *   title?: string,
- *   maxStudents?: number,
  *   eleves: EleveRow[],
  *   selectedUserIds: string[],
  * }} opts
@@ -35,7 +34,6 @@ function escapeAttr(s) {
 export function openCourseStudentsPicker(opts) {
     const dlg = document.getElementById('modal_course_students');
     const titleEl = document.getElementById('csp-title');
-    const maxLab = document.getElementById('csp-max-label');
     const inEl = document.getElementById('csp-list-in');
     const outEl = document.getElementById('csp-list-out');
     const btnOk = document.getElementById('csp-btn-ok');
@@ -44,14 +42,12 @@ export function openCourseStudentsPicker(opts) {
         return Promise.resolve(null);
     }
 
-    const max = Math.max(1, Math.min(20, Number(opts.maxStudents ?? 5)));
     const byId = new Map((opts.eleves || []).map((e) => [String(e.user_id), e]));
     const allIds = [...byId.keys()].filter(Boolean);
     /** @type {Set<string>} */
     let inSet = new Set((opts.selectedUserIds || []).map((x) => String(x)).filter((id) => byId.has(id)));
 
     if (titleEl) titleEl.textContent = opts.title || 'Inscriptions au cours';
-    if (maxLab) maxLab.textContent = String(max);
 
     const render = () => {
         const inRows = [];
@@ -80,12 +76,8 @@ export function openCourseStudentsPicker(opts) {
         if (!btn) return;
         const id = btn.getAttribute('data-user-id') || '';
         if (!id || !byId.has(id)) return;
-        if (inSet.has(id)) {
-            inSet.delete(id);
-        } else {
-            if (inSet.size >= max) return;
-            inSet.add(id);
-        }
+        if (inSet.has(id)) inSet.delete(id);
+        else inSet.add(id);
         render();
     };
 
@@ -111,10 +103,6 @@ export function openCourseStudentsPicker(opts) {
         inEl.classList.remove('st-dnd-drop-active');
         const id = String(ev.dataTransfer?.getData('text/plain') || '').trim();
         if (!id || !byId.has(id) || inSet.has(id)) return;
-        if (inSet.size >= max) {
-            showToast(`Maximum ${max} élève(s) pour ce cours.`, 'error');
-            return;
-        }
         inSet.add(id);
         render();
     };

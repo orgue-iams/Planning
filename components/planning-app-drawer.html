@@ -2,7 +2,7 @@
 <aside id="planning-app-drawer" class="planning-app-drawer" aria-label="Menu principal" aria-hidden="true">
     <div id="planning-drawer-main-scroll" class="planning-drawer__scroll">
         <div id="menu-item-profile-wrap" class="planning-drawer__block planning-drawer__block--profile hidden">
-            <button type="button" id="menu-item-profile" class="planning-drawer__view-btn planning-drawer__view-btn--profile planning-drawer__profile-chip" aria-label="Ouvrir mon profil">
+            <button type="button" id="menu-item-profile" class="planning-drawer__view-btn planning-drawer__view-btn--profile planning-drawer__profile-chip planning-drawer__profile-chip--outlined" aria-label="Ouvrir mon profil">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
                 <span class="planning-drawer__profile-chip-text">
                     <span id="drawer-profile-name" class="planning-drawer__profile-name">Invité</span>
@@ -15,15 +15,21 @@
             <p class="planning-drawer__section-title">Vues</p>
             <div class="planning-drawer__view-row" role="group" aria-label="Changer de vue">
                 <button type="button" class="planning-drawer__view-btn" data-calendar-view="timeGridDay" aria-pressed="false">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5a2.25 2.25 0 002.25-2.25m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5a2.25 2.25 0 012.25 2.25v7.5" /></svg>
+                    <span class="planning-drawer__link-icon planning-drawer__link-icon--neutral" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5a2.25 2.25 0 002.25-2.25m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5a2.25 2.25 0 012.25 2.25v7.5" /></svg>
+                    </span>
                     Jour
                 </button>
                 <button type="button" class="planning-drawer__view-btn" data-calendar-view="timeGridWeek" aria-pressed="false">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25v-2.25z" /></svg>
+                    <span class="planning-drawer__link-icon planning-drawer__link-icon--neutral" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25v-2.25z" /></svg>
+                    </span>
                     Semaine
                 </button>
                 <button type="button" class="planning-drawer__view-btn" data-calendar-view="dayGridMonth" aria-pressed="false">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5a2.25 2.25 0 002.25-2.25m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5a2.25 2.25 0 012.25 2.25v7.5" /></svg>
+                    <span class="planning-drawer__link-icon planning-drawer__link-icon--neutral" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5a2.25 2.25 0 002.25-2.25m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5a2.25 2.25 0 012.25 2.25v7.5M8 10.5h.01M12 10.5h.01M16 10.5h.01M8 14.25h.01M12 14.25h.01M16 14.25h.01M8 18h.01M12 18h.01M16 18h.01" /></svg>
+                    </span>
                     Mois
                 </button>
             </div>
@@ -47,12 +53,12 @@
                     Thème sombre
                 </button>
             </div>
-            <div class="cal-pref-scale-previews planning-drawer__scale-previews flex justify-between items-end gap-2 px-0.5 mb-1 select-none" aria-hidden="true">
+            <div class="cal-pref-scale-previews planning-drawer__scale-previews flex justify-between items-end gap-2 px-0.5 mb-1 select-none w-[95%] max-w-[95%] mx-auto" aria-hidden="true">
                 <span class="cal-pref-scale-preview cal-pref-scale-preview--0 font-semibold text-slate-700 leading-none">A</span>
                 <span class="cal-pref-scale-preview cal-pref-scale-preview--1 font-semibold text-slate-700 leading-none">A</span>
                 <span class="cal-pref-scale-preview cal-pref-scale-preview--2 font-semibold text-slate-700 leading-none">A</span>
             </div>
-            <div class="cal-pref-range-wrap planning-drawer__range-wrap px-0.5 max-w-[75%] mx-auto">
+            <div class="cal-pref-range-wrap planning-drawer__range-wrap w-[95%] max-w-[95%] mx-auto px-0.5">
                 <input
                     type="range"
                     id="cal-pref-text-scale"
@@ -70,59 +76,80 @@
         </div>
 
         <div id="menu-drawer-section-configuration" class="planning-drawer__block hidden">
-            <p class="planning-drawer__section-title">Configuration</p>
+            <p class="planning-drawer__section-title">Administration</p>
             <div id="menu-item-config-wrap" class="hidden">
                 <button type="button" id="menu-item-config" class="planning-drawer__link">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l1.149 6.891c.05.302.2.58.42.78.22.2.51.32.82.32h4.5a.75.75 0 01.65.35l1.5 2.25a.75.75 0 01-.15.95l-3.55 3.55a.75.75 0 01-1.08 0l-7.5-7.5a.75.75 0 010-1.08l3.55-3.55a.75.75 0 01.95-.15l2.25 1.5a.75.75 0 00.65.35h1.09z" /></svg>
+                    <span class="planning-drawer__link-icon planning-drawer__link-icon--neutral" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.634c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.23 1.026.086l1.27-.458a1.125 1.125 0 011.37.066l1.482 2.568a1.125 1.125 0 01-.17 1.378l-1.016 1.035c-.28.286-.41.684-.36 1.086.014.12.024.24.024.36 0 .12-.01.24-.024.36-.05.402.08.8.36 1.086l1.016 1.035c.35.356.45.888.17 1.378l-1.482 2.568a1.125 1.125 0 01-1.37.41l-1.27-.458a1.125 1.125 0 00-1.026.086 6.67 6.67 0 01-.22.127c-.332.184-.582.496-.645.87l-.213 1.281c-.09.542-.56.94-1.11.94h-2.634c-.55 0-1.02-.398-1.11-.94l-.213-1.281a6.67 6.67 0 00-.645-.87 6.67 6.67 0 00-.22-.127 1.125 1.125 0 00-1.026-.086l-1.27.458a1.125 1.125 0 01-1.37-.41l-1.482-2.568a1.125 1.125 0 01.17-1.378l1.016-1.035c.28-.286.41-.684.36-1.086a6.7 6.7 0 01-.024-.36c0-.12.01-.24.024-.36.05-.402-.08-.8-.36-1.086l-1.016-1.035a1.125 1.125 0 01-.17-1.378l1.482-2.568a1.125 1.125 0 011.37-.41l1.27.458c.306.144.702.11 1.026-.086.074-.04.147-.083.22-.127.332-.184.582-.496.645-.87l.213-1.281z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    </span>
                     Configuration du planning
                 </button>
             </div>
-            <div id="menu-item-announcements-wrap" class="hidden">
-                <button type="button" id="menu-item-announcements" class="planning-drawer__link">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.34 15.84c-.688-.06-1.316-.254-1.856-.523-.484-.231-.804-.674-.904-1.194a3.75 3.75 0 01.832-3.137l.135-.153a2.25 2.25 0 00.872-1.795v-2.598a2.25 2.25 0 01.92-1.82l5.37-3.97a2.25 2.25 0 012.598 0l5.37 3.97a2.25 2.25 0 01.92 1.82v2.598a2.25 2.25 0 00.872 1.795l.135.153a3.75 3.75 0 01.832 3.137c-.1.52-.42.963-.904 1.194-.54.269-1.168.463-1.856.523m-6.34 0c.688.06 1.316.254 1.856.523.484.231.804.674.904 1.194a3.75 3.75 0 01-.832 3.137l-.135.153a2.25 2.25 0 00-.872 1.795v2.598a2.25 2.25 0 01-.92 1.82l-5.37 3.97a2.25 2.25 0 01-2.598 0l-5.37-3.97a2.25 2.25 0 01-.92-1.82v-2.598a2.25 2.25 0 00-.872-1.795l-.135-.153a3.75 3.75 0 01-.832-3.137c.1-.52.42-.963.904-1.194.54-.269 1.168-.463 1.856-.523" /></svg>
-                    Annonces
+            <div id="menu-item-statistics-wrap" class="hidden">
+                <button type="button" id="menu-item-statistics" class="planning-drawer__link">
+                    <span class="planning-drawer__link-icon planning-drawer__link-icon--neutral" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
+                    </span>
+                    Statistiques
                 </button>
             </div>
             <div id="menu-item-calendar-pool-wrap" class="hidden">
                 <button type="button" id="menu-item-calendar-pool" class="planning-drawer__link">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5a2.25 2.25 0 002.25-2.25m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5a2.25 2.25 0 012.25 2.25v7.5m-15 0h3.75m9 0H18" /></svg>
+                    <span class="planning-drawer__link-icon planning-drawer__link-icon--neutral" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5a2.25 2.25 0 002.25-2.25m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5a2.25 2.25 0 012.25 2.25v7.5m-15 0h3.75m9 0H18" /></svg>
+                    </span>
                     Calendriers
                 </button>
             </div>
         </div>
 
+        <div id="menu-item-announcements-wrap" class="planning-drawer__block hidden">
+            <button type="button" id="menu-item-announcements" class="planning-drawer__link">
+                <span class="planning-drawer__link-icon planning-drawer__link-icon--neutral" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18V7.125C3 6.504 3.504 6 4.125 6h3.374M12 7.5V4.875c0-.621-.504-1.125-1.125-1.125h-1.5a1.125 1.125 0 00-1.125 1.125V7.5m0 0h6" /></svg>
+                </span>
+                Annonces
+            </button>
+        </div>
 
         <div id="menu-drawer-section-users-courses" class="planning-drawer__block hidden">
             <p class="planning-drawer__section-title">Utilisateurs / Cours</p>
             <div id="menu-item-directory-wrap" class="hidden">
                 <button type="button" id="menu-item-directory" class="planning-drawer__link">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
+                    <span class="planning-drawer__link-icon planning-drawer__link-icon--neutral" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
+                    </span>
                     Utilisateurs
                 </button>
             </div>
             <div id="menu-item-semaines-types-wrap" class="hidden">
                 <button type="button" id="menu-item-semaines-types" class="planning-drawer__link">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-9-3.75h.008v.008H12V15.75zm-3.75 0h.008v.008H8.25V15.75z" /></svg>
+                    <span class="planning-drawer__link-icon planning-drawer__link-icon--agenda-blue" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5a2.25 2.25 0 002.25-2.25m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5a2.25 2.25 0 012.25 2.25v7.5" /></svg>
+                    </span>
                     Semaines A/B
+                </button>
+            </div>
+            <div id="menu-item-fermetures-wrap" class="hidden">
+                <button type="button" id="menu-item-fermetures" class="planning-drawer__link">
+                    <span class="planning-drawer__link-icon planning-drawer__link-icon--agenda-orange" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5a2.25 2.25 0 002.25-2.25m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5a2.25 2.25 0 012.25 2.25v7.5" /></svg>
+                    </span>
+                    Fermetures
                 </button>
             </div>
         </div>
 
-        <div id="menu-item-statistics-wrap" class="planning-drawer__block hidden">
-            <button type="button" id="menu-item-statistics" class="planning-drawer__link">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
-                Statistiques
-            </button>
-        </div>
-
         <div id="menu-item-help-wrap" class="planning-drawer__block">
             <button type="button" id="menu-item-help" class="planning-drawer__link">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712 3.712 0 1.025-1.171 2.687-1.025 4.242 0M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <span class="planning-drawer__link-icon planning-drawer__link-icon--neutral" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
+                </span>
                 Aide
             </button>
         </div>
 
-        <div id="menu-item-logout-wrap" class="planning-drawer__block hidden">
+                <div id="menu-item-logout-wrap" class="planning-drawer__block hidden">
             <button type="button" id="menu-item-logout" class="planning-drawer__link planning-drawer__link--danger">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" /></svg>
                 Déconnexion
@@ -136,13 +163,15 @@
                 &lt; Aide
             </button>
         </div>
-        <div class="planning-drawer__block space-y-3">
-            <p id="drawer-help-version" class="text-[11px] font-semibold text-slate-800 m-0"></p>
-            <div>
-                <p class="text-[10px] font-bold uppercase text-slate-600 tracking-wide m-0 mb-0.5">Support Technique</p>
-                <p id="drawer-help-support-email" class="text-[11px] text-slate-700 m-0 break-words"></p>
+        <div class="planning-drawer__block planning-drawer__block--help-body space-y-5 mt-4">
+            <div class="planning-drawer__help-section">
+                <p class="text-[10px] font-bold uppercase text-slate-600 dark:text-slate-300 tracking-wide m-0 mb-1">Version</p>
+                <p id="drawer-help-version" class="text-[11px] font-semibold text-slate-800 dark:text-slate-100 m-0"></p>
             </div>
-            <form id="drawer-help-contact-form" class="drawer-help-contact rounded-xl border border-slate-200 bg-white p-3 space-y-2" method="get" action="#">
+            <div class="planning-drawer__help-section">
+                <p class="text-[10px] font-bold uppercase text-slate-600 dark:text-slate-300 tracking-wide m-0 mb-0.5">Support technique</p>
+            </div>
+            <form id="drawer-help-contact-form" class="drawer-help-contact rounded-xl border border-sky-200 bg-sky-50 p-3 space-y-2 dark:border-sky-800 dark:bg-sky-950/40" method="get" action="#">
                 <p class="text-[10px] font-bold text-slate-700 m-0">Nous contacter</p>
                 <label class="block">
                     <span class="text-[9px] font-bold text-slate-500">Objet</span>
@@ -154,10 +183,6 @@
                 </label>
                 <button type="submit" class="btn btn-primary btn-sm w-full font-bold text-[11px]">Envoyer par e-mail</button>
             </form>
-            <p class="text-[10px] text-slate-600 m-0">
-                Ou écrire à
-                <a id="drawer-help-mailto-link" class="font-semibold text-sky-700 hover:underline break-all" href="#">—</a>
-            </p>
             <a id="drawer-help-mailto-anchor" class="hidden" href="#" aria-hidden="true"></a>
         </div>
     </div>

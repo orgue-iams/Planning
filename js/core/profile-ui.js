@@ -243,8 +243,11 @@ export function initProfileUi(currentUser) {
         }
         const u = getPlanningSessionUser();
         if (!u?.email) return;
-        if (!openPlanningRouteFromDrawer('modal_profile', 'Mon profil', 'Mon profil')) return;
-        void fillProfileModal(u);
+        if (!openPlanningRouteFromDrawer('modal_profile', 'Mon profil', 'Menu')) return;
+        void (async () => {
+            await fillProfileModal(u);
+            await refreshDrawerProfileExtras(u);
+        })();
     });
 
     document.getElementById('profile-phone-input')?.addEventListener('blur', (e) => {

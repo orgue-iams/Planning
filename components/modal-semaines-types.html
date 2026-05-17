@@ -4,19 +4,21 @@
             <div class="max-w-[1600px] mx-auto w-full">
 
                 <div id="st-main-panel" class="st-main-panel-stack">
+                    <p class="st-swipe-hint text-[10px] text-slate-600 dark:text-slate-300 m-0 mb-2 leading-snug">
+                        Appuyez sur un créneau pour le modifier ou le supprimer.
+                    </p>
                     <section id="st-gabarit-section" class="st-section">
-                        <p class="st-section-title">Semaines types A / B</p>
                         <div class="st-section-split">
                             <div class="st-section-col">
                                 <div class="st-section-col-head">
-                                    <span class="font-bold text-slate-700">Semaine type A</span>
+                                    <span class="font-bold text-slate-700">Semaine A</span>
                                     <button type="button" id="st-add-row-a" class="btn btn-ghost btn-xs font-black text-[10px] hidden">+ Créneau</button>
                                 </div>
                                 <div id="st-list-a" class="st-slot-list"></div>
                             </div>
                             <div class="st-section-col">
                                 <div class="st-section-col-head">
-                                    <span class="font-bold text-slate-700">Semaine type B</span>
+                                    <span class="font-bold text-slate-700">Semaine B</span>
                                     <button type="button" id="st-add-row-b" class="btn btn-ghost btn-xs font-black text-[10px] hidden">+ Créneau</button>
                                 </div>
                                 <div id="st-list-b" class="st-slot-list"></div>
@@ -39,22 +41,21 @@
                         </p>
                         <div id="st-apply-controls" class="space-y-3">
                             <p class="text-[9px] text-slate-500 m-0">Étape 1 : préparer (compte des créations / suppressions). Étape 2 : appliquer sur le planning général et les agendas pool concernés.</p>
-                            <div class="st-apply-period space-y-2 pt-2 border-t border-slate-200">
-                                <p class="text-[9px] font-bold text-slate-600 m-0">Période et semaine type de départ</p>
-                                <div class="flex flex-wrap gap-3 items-end">
-                                    <div>
+                            <div class="st-apply-period pt-2 border-t border-slate-200 space-y-2">
+                                <p class="text-[9px] font-bold text-slate-600 m-0">Période d’application</p>
+                                <div class="st-apply-period-row grid grid-cols-2 gap-2 sm:gap-3 items-stretch">
+                                    <div class="st-apply-week-start-group rounded-xl border border-slate-200 bg-white/90 p-3 shadow-sm flex flex-col gap-2 min-h-[7.5rem]">
                                         <label class="text-[9px] font-bold text-slate-500 block" for="st-apply-start">Date de début (inclus)</label>
-                                        <input type="date" id="st-apply-start" class="input input-sm h-9 font-mono text-sm bg-white border border-slate-200 rounded-lg" />
+                                        <input type="date" id="st-apply-start" class="input input-sm h-9 font-mono text-sm bg-white border border-slate-200 rounded-lg w-full" />
+                                        <div class="flex flex-col gap-1.5 text-[11px] font-bold text-slate-700 pt-0.5">
+                                            <label class="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="st-apply-first-week" id="st-apply-week-a" value="A" class="radio radio-xs" checked /> Semaine A</label>
+                                            <label class="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="st-apply-first-week" id="st-apply-week-b" value="B" class="radio radio-xs" /> Semaine B</label>
+                                        </div>
                                     </div>
-                                    <div>
+                                    <div class="st-apply-end-group rounded-xl border border-slate-200 bg-white/90 p-3 shadow-sm flex flex-col gap-2 min-h-[7.5rem]">
                                         <label class="text-[9px] font-bold text-slate-500 block" for="st-apply-end">Date de fin (inclus)</label>
-                                        <input type="date" id="st-apply-end" class="input input-sm h-9 font-mono text-sm bg-white border border-slate-200 rounded-lg" />
+                                        <input type="date" id="st-apply-end" class="input input-sm h-9 font-mono text-sm bg-white border border-slate-200 rounded-lg w-full" />
                                     </div>
-                                </div>
-                                <p class="text-[9px] font-bold text-slate-500 m-0">Semaine type de la semaine du jour de début</p>
-                                <div class="flex flex-wrap gap-3 text-[11px] font-bold text-slate-700">
-                                    <label class="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="st-apply-first-week" id="st-apply-week-a" value="A" class="radio radio-xs" checked /> A</label>
-                                    <label class="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="st-apply-first-week" id="st-apply-week-b" value="B" class="radio radio-xs" /> B</label>
                                 </div>
                             </div>
                             <p class="text-[9px] text-slate-500 leading-snug m-0">La semaine type porte sur la semaine <strong>lundi → dimanche</strong> qui <strong>contient</strong> la date de début. Le <strong>lundi suivant</strong> bascule A ↔ B, etc. Ce repère est <strong>personnel</strong> (chaque prof le sien).</p>
@@ -98,64 +99,71 @@
                     </section>
                 </div>
 
-                <section id="st-slot-edit-panel" class="hidden max-w-lg st-edit-panel" aria-hidden="true">
-                    <div class="space-y-3 text-[11px] text-slate-800">
-                        <div class="st-edit-field">
-                            <span class="st-edit-label">Type</span>
-                            <div class="flex flex-wrap gap-3 mt-1">
-                                <label class="flex items-center gap-1.5 cursor-pointer font-medium">
-                                    <input type="radio" name="stle-slot-type" id="stle-type-cours" value="cours" class="radio radio-xs" checked />
-                                    Cours
-                                </label>
-                                <label class="flex items-center gap-1.5 cursor-pointer font-medium">
-                                    <input type="radio" name="stle-slot-type" id="stle-type-reservation" value="reservation" class="radio radio-xs" />
-                                    Travail perso.
-                                </label>
-                            </div>
+            </div>
+        </div>
+
+        <div id="st-bottom-sheet" class="st-bottom-sheet hidden" aria-hidden="true">
+            <section id="st-slot-edit-panel" class="hidden st-edit-panel" aria-hidden="true">
+                <div class="space-y-3 text-[11px] text-slate-800 px-4 sm:px-6 py-3 max-w-lg mx-auto w-full">
+                    <div class="st-edit-field">
+                        <span class="st-edit-label">Type</span>
+                        <div class="flex flex-wrap gap-3 mt-1">
+                            <label class="flex items-center gap-1.5 cursor-pointer font-medium">
+                                <input type="radio" name="stle-slot-type" id="stle-type-cours" value="cours" class="radio radio-xs" checked />
+                                Cours
+                            </label>
+                            <label class="flex items-center gap-1.5 cursor-pointer font-medium">
+                                <input type="radio" name="stle-slot-type" id="stle-type-reservation" value="reservation" class="radio radio-xs" />
+                                Travail perso.
+                            </label>
                         </div>
-                        <label class="st-edit-field block" for="stle-dow">
-                            <span class="st-edit-label">Jour</span>
-                            <select id="stle-dow" class="select select-bordered select-sm w-full text-[11px] bg-white mt-0.5">
-                                <option value="1">Lundi</option>
-                                <option value="2">Mardi</option>
-                                <option value="3">Mercredi</option>
-                                <option value="4">Jeudi</option>
-                                <option value="5">Vendredi</option>
-                                <option value="6">Samedi</option>
-                                <option value="7">Dimanche</option>
-                            </select>
-                        </label>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="stle-start">Début</label>
-                                <input type="time" id="stle-start" step="300" class="input input-bordered input-sm w-full font-mono text-[11px] bg-white" />
-                            </div>
-                            <div>
-                                <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="stle-end">Fin</label>
-                                <input type="time" id="stle-end" step="300" class="input input-bordered input-sm w-full font-mono text-[11px] bg-white" />
-                            </div>
+                    </div>
+                    <label class="st-edit-field block" for="stle-dow">
+                        <span class="st-edit-label">Jour</span>
+                        <select id="stle-dow" class="select select-bordered select-sm w-full text-[11px] bg-white mt-0.5">
+                            <option value="1">Lundi</option>
+                            <option value="2">Mardi</option>
+                            <option value="3">Mercredi</option>
+                            <option value="4">Jeudi</option>
+                            <option value="5">Vendredi</option>
+                            <option value="6">Samedi</option>
+                            <option value="7">Dimanche</option>
+                        </select>
+                    </label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="stle-start">Début</label>
+                            <input type="time" id="stle-start" step="300" class="input input-bordered input-sm w-full font-mono text-[11px] bg-white" />
                         </div>
                         <div>
-                            <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="stle-title">Titre</label>
-                            <input type="text" id="stle-title" class="input input-bordered input-sm w-full text-[11px] bg-white" maxlength="200" />
+                            <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="stle-end">Fin</label>
+                            <input type="time" id="stle-end" step="300" class="input input-bordered input-sm w-full font-mono text-[11px] bg-white" />
                         </div>
-                        <button
-                            type="button"
-                            id="stle-students-wrap"
-                            class="stle-students-trigger st-edit-field st-edit-field--clickable w-full text-left hidden"
-                        >
-                            <span class="st-edit-label">Élèves inscrits</span>
-                            <span id="stle-students-summary" class="block text-[11px] text-slate-800 leading-snug mt-1 min-h-[1.25rem]">Aucun inscrit</span>
-                        </button>
                     </div>
-                </section>
+                    <div>
+                        <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="stle-title">Titre</label>
+                        <input type="text" id="stle-title" class="input input-bordered input-sm w-full text-[11px] bg-white" maxlength="200" />
+                    </div>
+                    <button
+                        type="button"
+                        id="stle-students-wrap"
+                        class="stle-students-trigger st-edit-field st-edit-field--clickable w-full text-left hidden"
+                    >
+                        <span class="st-edit-label">Élèves inscrits</span>
+                        <span id="stle-students-summary" class="block text-[11px] text-slate-800 leading-snug mt-1 min-h-[1.25rem]">Aucun inscrit</span>
+                    </button>
+                    <div class="pt-2 mt-1 border-t border-slate-200">
+                        <button type="button" id="stle-delete-btn" class="btn btn-error btn-outline btn-sm font-bold text-[11px] w-full sm:w-auto">Supprimer</button>
+                    </div>
+                </div>
+            </section>
 
-                <section id="st-students-edit-panel" class="hidden max-w-lg st-edit-panel" aria-hidden="true">
+            <section id="st-students-edit-panel" class="hidden st-edit-panel" aria-hidden="true">
+                <div class="px-4 sm:px-6 py-3 max-w-lg mx-auto w-full">
                     <div id="st-students-list-in" class="st-students-pick-stack space-y-1"></div>
                     <div id="st-students-list-out" class="st-students-pick-stack space-y-1 mt-2"></div>
-                </section>
-
-            </div>
+                </div>
+            </section>
         </div>
     </div>
 </dialog>

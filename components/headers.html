@@ -23,16 +23,15 @@
             <button
                 type="button"
                 id="btn-org-brand-rules"
-                class="calendar-toolbar__brand-btn calendar-toolbar__click-chip flex flex-col items-start min-w-0 leading-tight text-left rounded-xl border border-slate-200/90 bg-white/80 px-2.5 py-1 -mx-1 shadow-sm hover:bg-slate-50 hover:border-slate-300"
+                class="calendar-toolbar__brand-btn calendar-toolbar__click-chip flex flex-col items-start w-auto max-w-full shrink-0 leading-tight text-left rounded-xl border border-slate-200/90 bg-white/80 px-2 py-1 shadow-none hover:bg-slate-50 hover:border-slate-300"
                 aria-label="Consignes d’utilisation"
                 title="Consignes d’utilisation"
             >
                 <span class="font-black text-[11px] uppercase text-slate-800 max-sm:text-[10px] max-sm:leading-tight">Orgue</span>
-                <span class="text-[10px] uppercase text-slate-500 font-bold tracking-wide max-sm:text-[9px] max-sm:leading-tight max-sm:opacity-90">Gérard Bancells</span>
+                <span class="text-[10px] uppercase text-slate-500 font-bold tracking-wide max-sm:text-[9px] max-sm:leading-tight max-sm:opacity-90 whitespace-nowrap">Gérard Bancells</span>
                 <span id="header-build-version" class="text-[7px] sm:text-[8px] font-mono text-slate-400 tabular-nums leading-none mt-0.5 max-w-[10rem] truncate text-left" title="" aria-label="Version de l’application"></span>
             </button>
             <div class="hidden lg:flex calendar-toolbar__nav-cluster items-center gap-0.5 shrink-0 ml-0.5 pl-1 border-l border-slate-200/90">
-                <button type="button" id="cal-btn-today" class="cal-tb-pill">Aujourd’hui</button>
                 <button type="button" id="cal-btn-prev" class="cal-tb-nav" aria-label="Période précédente">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
                 </button>
@@ -42,7 +41,10 @@
             </div>
         </div>
 
-        <div id="cal-toolbar-title" class="calendar-toolbar__title min-w-0 text-center" aria-live="polite"></div>
+        <div class="calendar-toolbar__period min-w-0 flex-1 flex items-center justify-center gap-2 px-1">
+            <div id="cal-toolbar-title" class="calendar-toolbar__title-text min-w-0 flex-1 text-center" aria-live="polite"></div>
+            <button type="button" id="cal-btn-today" class="cal-tb-pill calendar-toolbar__today-btn shrink-0">Aujourd’hui</button>
+        </div>
 
         <div class="calendar-toolbar__right flex items-center justify-end gap-1 sm:gap-1.5 min-w-0 shrink-0 flex-wrap sm:flex-nowrap">
             <button

@@ -2,12 +2,16 @@
  * Annuaire interne : RPC planning_directory_users (élèves) ; admin/prof voient tout et éditent dans le tiroir route.
  */
 import { getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
-import { isLikelySessionErrorMessage, notifySessionInvalid } from './auth-logic.js';
+import {
+    isLikelySessionErrorMessage,
+    notifySessionInvalid,
+    isAdmin,
+    isProf,
+    PASSWORD_MIN_LENGTH
+} from './auth-logic.js';
 import { getPlanningSessionUser } from './session-user.js';
 import { showToast } from '../utils/toast.js';
-import { isAdmin, isProf, PASSWORD_MIN_LENGTH } from './auth-logic.js';
 import { planningAdminInvoke } from './admin-api.js';
-import { PASSWORD_MIN_LENGTH } from './auth-logic.js';
 import { isPlanningRole } from './planning-roles.js';
 import {
     openPlanningRouteFromDrawer,
@@ -16,6 +20,7 @@ import {
 } from '../utils/planning-route-dialog.js';
 import { normalizePlanningRole, PLANNING_ROLE_OPTIONS } from './planning-roles.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
+import { mountPlanningSwipeCard } from '../utils/planning-card-swipe.js';
 
 let bound = false;
 /** @type {object | null} */
@@ -65,7 +70,8 @@ function directoryUserContactLines(r) {
 
 function appendDirectoryContactColumn(parent, r) {
     const col = document.createElement('div');
-    col.className = 'directory-user-card__contact shrink-0 max-w-[46%] text-right min-w-0 flex flex-col gap-0.5';
+    col.className =
+        'directory-user-card__contact shrink-0 max-w-[46%] text-right min-w-0 flex flex-col gap-0.5 border-l border-slate-200/90 dark:border-slate-500/50 pl-2 self-stretch justify-center';
     for (const line of directoryUserContactLines(r)) {
         if (line.includes('@')) {
             const a = document.createElement('a');
@@ -167,14 +173,15 @@ function buildPrivilegedUserCard(r, opts) {
 
     const main = document.createElement('div');
     main.className = 'directory-user-card__main flex flex-1 min-w-0 gap-2';
-    if (opts.canOpen) {
+    if (opts.canOpen && !opts.canDelete) {
         main.classList.add('cursor-pointer');
         main.setAttribute('role', 'button');
         main.tabIndex = 0;
     }
 
     const left = document.createElement('div');
-    left.className = 'flex-1 min-w-0';
+    left.className =
+        'flex-1 min-w-0 border-r border-slate-200/90 dark:border-slate-500/50 pr-2 self-stretch flex flex-col justify-center';
     const nameP = document.createElement('p');
     nameP.className =
         'font-semibold text-slate-900 dark:text-slate-100 leading-snug m-0 break-words text-[13px]';
@@ -189,16 +196,34 @@ function buildPrivilegedUserCard(r, opts) {
     appendDirectoryContactColumn(main, r);
     card.appendChild(main);
 
+    const openEdit = () => {
+        try {
+            openDirectoryUserEdit(JSON.parse(card.dataset.userJson || '{}'));
+        } catch {
+            showToast('Impossible d’ouvrir la fiche utilisateur.', 'error');
+        }
+    };
+
     if (opts.canDelete) {
-        const del = document.createElement('button');
-        del.type = 'button';
-        del.className =
-            'directory-user-delete-btn btn btn-ghost btn-xs btn-square shrink-0 self-start border border-transparent';
-        del.dataset.userId = String(r.id || '');
-        del.setAttribute('aria-label', 'Supprimer cet utilisateur');
-        del.title = 'Supprimer';
-        del.innerHTML = DELETE_USER_SVG;
-        card.appendChild(del);
+        return mountPlanningSwipeCard(card, {
+            enabled: true,
+            mode: 'delete-only',
+            onEdit: opts.canOpen ? openEdit : undefined,
+            onDelete: () => void deleteDirectoryUser(String(r.id || ''))
+        });
+    }
+
+    if (opts.canOpen) {
+        main.classList.add('cursor-pointer');
+        main.setAttribute('role', 'button');
+        main.tabIndex = 0;
+        main.addEventListener('click', openEdit);
+        main.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openEdit();
+            }
+        });
     }
 
     return card;
@@ -283,10 +308,11 @@ function renderPrivilegedDirectoryCards(users) {
         )
     );
 
-    const adminUser = isAdmin(getPlanningSessionUser());
+    const sessionUser = getPlanningSessionUser();
+    const adminUser = isAdmin(sessionUser);
     for (const r of sorted) {
         root.appendChild(
-            buildPrivilegedUserCard(r, { canOpen: true, canDelete: adminUser })
+            buildPrivilegedUserCard(r, { canOpen: adminUser, canDelete: adminUser })
         );
     }
 
@@ -403,8 +429,10 @@ function showDirectoryListPanel() {
     create?.setAttribute('aria-hidden', 'true');
     editingUser = null;
     editSnapshot = null;
-    setPlanningRouteBackHandler('modal_directory_users', null);
-    updatePlanningRouteDialog('modal_directory_users', 'Utilisateurs', 'Utilisateurs');
+    setPlanningRouteBackHandler('modal_directory_users', () => {
+        document.getElementById('modal_directory_users')?.close();
+    });
+    updatePlanningRouteDialog('modal_directory_users', 'Utilisateurs', 'Menu');
 }
 
 function getDirectoryCreateMode() {
@@ -468,7 +496,6 @@ async function submitDirectoryCreateUser() {
                 role: f.role,
                 password: f.password
             });
-            showToast('Compte créé.');
         } else {
             await planningAdminInvoke('invite', {
                 email: f.email,
@@ -478,7 +505,6 @@ async function submitDirectoryCreateUser() {
                 role: f.role,
                 redirect_to: new URL('.', window.location.href).href
             });
-            showToast('Invitation envoyée.');
         }
         resetDirectoryCreateForm();
         showDirectoryListPanel();
@@ -536,7 +562,6 @@ async function saveDirectoryField(field) {
             editSnapshot.prenom = f.prenom;
             editSnapshot.telephone = f.telephone;
             privilegedUsersCache = null;
-            showToast('Coordonnées enregistrées.');
         }
         if (adminUser && field === 'email' && f.email !== editSnapshot.email) {
             if (!f.email.includes('@')) {
@@ -546,13 +571,11 @@ async function saveDirectoryField(field) {
             await planningAdminInvoke('update_user_email', { user_id: uid, email: f.email });
             editSnapshot.email = f.email;
             privilegedUsersCache = null;
-            showToast('E-mail enregistré.');
         }
         if (adminUser && field === 'role' && f.role !== editSnapshot.role) {
             await planningAdminInvoke('update_role', { user_id: uid, role: f.role });
             editSnapshot.role = f.role;
             privilegedUsersCache = null;
-            showToast('Rôle enregistré.');
         }
         if (adminUser && field === 'password' && f.password) {
             if (f.password.length < PASSWORD_MIN_LENGTH) {
@@ -562,7 +585,6 @@ async function saveDirectoryField(field) {
             await planningAdminInvoke('set_password', { user_id: uid, password: f.password });
             const pw = document.getElementById('directory-edit-password');
             if (pw instanceof HTMLInputElement) pw.value = '';
-            showToast('Mot de passe mis à jour.');
         }
     } catch (err) {
         showToast(err instanceof Error ? err.message : String(err), 'error');
@@ -652,7 +674,6 @@ async function deleteDirectoryUser(userId) {
     try {
         await planningAdminInvoke('delete_user', { user_id: uid });
         privilegedUsersCache = null;
-        showToast('Compte supprimé.');
         if (document.getElementById('modal_directory_users')?.open) {
             await loadPrivilegedDirectoryIntoModal();
         }
@@ -684,7 +705,7 @@ export function initDirectoryUsersUi() {
         const privileged = isDirectoryPrivileged(u);
         document.getElementById('directory-add-user-wrap')?.classList.toggle('hidden', !isAdmin(u));
         const status = document.getElementById('directory-users-status');
-        if (!openPlanningRouteFromDrawer('modal_directory_users', 'Utilisateurs', 'Utilisateurs')) {
+        if (!openPlanningRouteFromDrawer('modal_directory_users', 'Utilisateurs', 'Menu')) {
             return;
         }
         if (privileged && privilegedUsersCache?.length) {
@@ -709,39 +730,6 @@ export function initDirectoryUsersUi() {
     });
     document.getElementById('directory-create-submit')?.addEventListener('click', () => {
         void submitDirectoryCreateUser();
-    });
-
-    document.getElementById('directory-admin-users-table')?.addEventListener('click', (e) => {
-        const t = e.target;
-        if (!(t instanceof Element)) return;
-        const delBtn = t.closest('.directory-user-delete-btn');
-        if (delBtn instanceof HTMLButtonElement) {
-            e.preventDefault();
-            e.stopPropagation();
-            void deleteDirectoryUser(delBtn.dataset.userId || '');
-            return;
-        }
-        const main = t.closest('.directory-user-card__main');
-        const card = main?.closest('.directory-admin-user-card');
-        if (!card?.dataset.userJson) return;
-        try {
-            openDirectoryUserEdit(JSON.parse(card.dataset.userJson));
-        } catch {
-            showToast('Impossible d’ouvrir la fiche utilisateur.', 'error');
-        }
-    });
-
-    document.getElementById('directory-admin-users-table')?.addEventListener('keydown', (e) => {
-        if (e.key !== 'Enter' && e.key !== ' ') return;
-        const main = e.target instanceof Element ? e.target.closest('.directory-user-card__main') : null;
-        const card = main?.closest('.directory-admin-user-card');
-        if (!card?.dataset.userJson) return;
-        e.preventDefault();
-        try {
-            openDirectoryUserEdit(JSON.parse(card.dataset.userJson));
-        } catch {
-            showToast('Impossible d’ouvrir la fiche utilisateur.', 'error');
-        }
     });
 
     const bindBlur = (id, field) => {

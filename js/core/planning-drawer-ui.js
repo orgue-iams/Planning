@@ -73,6 +73,21 @@ export function initPlanningDrawer(calendar) {
     });
     document.getElementById('planning-drawer-backdrop')?.addEventListener('click', () => closeDrawer());
 
+    const closeMenusFromPlanningClick = (e) => {
+        const t = e.target;
+        if (!(t instanceof Element)) return;
+        if (t.closest('#planning-app-drawer, #planning-drawer-backdrop, #btn-app-drawer')) return;
+        const routeDlg = document.querySelector('dialog.planning-route-page[open]');
+        if (routeDlg instanceof HTMLDialogElement && t.closest(`#${routeDlg.id}`)) return;
+        if (!t.closest('#calendar, #planning-legend, #app-shell, .fc')) return;
+        if (routeDlg instanceof HTMLDialogElement) {
+            routeDlg.close();
+            return;
+        }
+        closeDrawer();
+    };
+    document.addEventListener('click', closeMenusFromPlanningClick);
+
     for (const b of document.querySelectorAll('#planning-app-drawer [data-calendar-view]')) {
         b.addEventListener('click', (ev) => {
             const el = ev.currentTarget;
@@ -93,25 +108,30 @@ export function initPlanningDrawer(calendar) {
     }
 }
 
-/** Affiche ou masque les blocs groupés « Configuration » et « Utilisateurs / Cours » selon les entrées visibles. */
+/** Affiche ou masque les blocs groupés « Administration » et « Utilisateurs / Cours » selon les entrées visibles. */
 export function syncPlanningDrawerGroupedSections() {
     const configSec = document.getElementById('menu-drawer-section-configuration');
     if (configSec) {
         const c1 = document.getElementById('menu-item-config-wrap');
         const c2 = document.getElementById('menu-item-announcements-wrap');
         const c3 = document.getElementById('menu-item-calendar-pool-wrap');
+        const c4 = document.getElementById('menu-item-statistics-wrap');
         const any =
             Boolean(c1 && !c1.classList.contains('hidden')) ||
             Boolean(c2 && !c2.classList.contains('hidden')) ||
-            Boolean(c3 && !c3.classList.contains('hidden'));
+            Boolean(c3 && !c3.classList.contains('hidden')) ||
+            Boolean(c4 && !c4.classList.contains('hidden'));
         configSec.classList.toggle('hidden', !any);
     }
     const usersSec = document.getElementById('menu-drawer-section-users-courses');
     if (usersSec) {
         const u1 = document.getElementById('menu-item-directory-wrap');
         const u2 = document.getElementById('menu-item-semaines-types-wrap');
+        const u3 = document.getElementById('menu-item-fermetures-wrap');
         const any =
-            Boolean(u1 && !u1.classList.contains('hidden')) || Boolean(u2 && !u2.classList.contains('hidden'));
+            Boolean(u1 && !u1.classList.contains('hidden')) ||
+            Boolean(u2 && !u2.classList.contains('hidden')) ||
+            Boolean(u3 && !u3.classList.contains('hidden'));
         usersSec.classList.toggle('hidden', !any);
     }
 }

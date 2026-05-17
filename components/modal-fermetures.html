@@ -1,0 +1,25 @@
+<dialog id="modal_fermetures" class="modal">
+    <div class="modal-box p-4 w-[96%] max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 shadow-2xl flex flex-col dark:border-slate-600">
+        <div id="fermetures-main-panel" class="min-w-0 flex-1">
+            <div id="fermetures-list" class="fermetures-card-list space-y-2 min-w-0"></div>
+            <div id="fermetures-add-wrap" class="hidden mt-4 pt-3 border-t border-slate-200 dark:border-slate-600">
+                <button type="button" id="fermetures-add" class="btn btn-primary btn-sm font-bold text-[11px]">+ Période de fermeture</button>
+            </div>
+        </div>
+
+        <div id="fermetures-edit-panel" class="hidden min-w-0 space-y-3" aria-hidden="true">
+            <label class="flex flex-col gap-1 min-w-0">
+                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Début (inclus)</span>
+                <input type="date" id="fermeture-edit-start" class="input input-bordered input-sm w-full font-mono bg-white dark:bg-slate-900 dark:text-slate-100" />
+            </label>
+            <label class="flex flex-col gap-1 min-w-0">
+                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Fin (inclus)</span>
+                <input type="date" id="fermeture-edit-end" class="input input-bordered input-sm w-full font-mono bg-white dark:bg-slate-900 dark:text-slate-100" />
+            </label>
+            <label class="flex flex-col gap-1 min-w-0">
+                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Titre (optionnel)</span>
+                <input type="text" id="fermeture-edit-title" class="input input-bordered input-sm w-full bg-white dark:bg-slate-900 dark:text-slate-100" maxlength="120" placeholder="Ex. Vacances de Pâques" />
+            </label>
+        </div>
+    </div>
+</dialog>

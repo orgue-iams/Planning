@@ -216,6 +216,28 @@ function collectFullClosureMondayIsoSet(mainEvents, rangeStart, rangeEnd) {
 }
 
 /**
+ * Semaines de fermeture saisies dans l’UI (plages jour → jour, lundis concernés).
+ * @param {Set<string>} closureMondaySet
+ * @param {{ startYmd: string, endYmd: string }[]} ranges
+ */
+export function mergeClosureMondayRanges(closureMondaySet, ranges) {
+    for (const r of ranges || []) {
+        const start = String(r.startYmd || '').slice(0, 10);
+        const end = String(r.endYmd || '').slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) continue;
+        const d0 = toLocalDateFromIsoDate(start);
+        const d1 = toLocalDateFromIsoDate(end);
+        if (Number.isNaN(d0.getTime()) || Number.isNaN(d1.getTime()) || d1 < d0) continue;
+        let mon = mondayOfLocalWeek(d0);
+        const endMon = mondayOfLocalWeek(d1);
+        while (mon.getTime() <= endMon.getTime()) {
+            closureMondaySet.add(formatLocalYmd(mon));
+            mon.setDate(mon.getDate() + 7);
+        }
+    }
+}
+
+/**
  * Lettre A/B pour un jour, en sautant les semaines entièrement en fermeture (sans avancer l’alternance).
  */
 export function templateWeekLetterForDate(d, applyStartYmd, firstWeekLetter, closureMondaySet) {
@@ -342,6 +364,7 @@ export async function analyzeTemplateApply(p) {
     const mainEvents = listMain.data?.events || [];
 
     const closureMondaySet = collectFullClosureMondayIsoSet(mainEvents, startD, endD);
+    mergeClosureMondayRanges(closureMondaySet, p.extraClosureRanges || []);
 
     /** @type {{ start: Date, end: Date, line: object, studentEmail: string }[]} */
     const slotsWithStudent = [];

@@ -64,10 +64,16 @@ html, body {
     padding-bottom: 0;
 }
 
-/* Smartphone : navbar — hauteur alignée avec le padding du #app-shell (évite chevauchement barre calendrier). */
+/* Décalage sous le bandeau fixe : --planning-app-header-h mesuré en JS (bas du header). */
+body:not(.auth-pending) #app-shell.planning-app-shell {
+    padding-top: var(--planning-app-header-h, 3.25rem);
+}
+
+/* Smartphone : navbar — hauteur minimale ; le padding shell suit la mesure réelle. */
 @media (max-width: 639px) {
     #app-header .app-navbar {
         min-height: calc(2.85rem + env(safe-area-inset-top, 0px));
+        padding-top: env(safe-area-inset-top, 0px);
         align-content: center;
     }
 }
@@ -210,8 +216,30 @@ html, body {
     stroke: currentColor;
 }
 
-[data-theme='dark'] .calendar-toolbar__title {
+[data-theme='dark'] .calendar-toolbar__title-text {
     color: rgb(241 245 249) !important;
+}
+
+/* Champs en lecture seule : texte lisible (pas de gris trop clair sur fond blanc). */
+input:disabled,
+select:disabled,
+textarea:disabled,
+.input:disabled,
+.select:disabled,
+.textarea:disabled {
+    color: rgb(15 23 42) !important;
+    -webkit-text-fill-color: rgb(15 23 42);
+    opacity: 1 !important;
+}
+
+[data-theme='dark'] input:disabled,
+[data-theme='dark'] select:disabled,
+[data-theme='dark'] textarea:disabled,
+[data-theme='dark'] .input:disabled,
+[data-theme='dark'] .select:disabled,
+[data-theme='dark'] .textarea:disabled {
+    color: rgb(241 245 249) !important;
+    -webkit-text-fill-color: rgb(241 245 249);
 }
 
 [data-theme='dark'] .cal-tb-pill,

@@ -1,11 +1,16 @@
 import { loadUIComponents } from '../utils/loader.js';
 import { applyPlanningThemeFromStorage, applyPlanningFcTextScaleFromStorage } from '../utils/planning-theme.js';
 import { getCalendarConfig, bindResponsiveCalendarToolbar } from '../config/fc-settings.js';
-import { initCalendarToolbar } from './calendar-toolbar.js';
+import {
+    initCalendarToolbar,
+    initPlanningAppHeaderOffsetSync,
+    syncPlanningAppHeaderOffset
+} from './calendar-toolbar.js';
 import {
     initPlanningDrawer,
     resetPlanningDrawerBindings,
-    syncPlanningDrawerGroupedSections
+    syncPlanningDrawerGroupedSections,
+    closePlanningDrawer
 } from './planning-drawer-ui.js';
 import { populateTimeSelects } from '../utils/time-helpers.js';
 import { initSwipe } from '../utils/touch-handler.js';
@@ -80,6 +85,7 @@ import {
     syncCalendarPrefControlsUi
 } from './calendar-preferences-ui.js';
 import { initSemainesTypesUi, resetSemainesTypesUiBindings } from './semaines-types-ui.js';
+import { initFermeturesUi, resetFermeturesUiBindings } from './fermetures-ui.js';
 import { initStatisticsUi, resetStatisticsUiBindings } from './statistics-ui.js';
 import { initDirectoryUsersUi, resetDirectoryUsersUiBindings } from './directory-users-ui.js';
 import { initCoursSeriesScopeUi, resetCoursSeriesScopeUiBindings } from './cours-series-scope-ui.js';
@@ -90,7 +96,6 @@ import { fetchOrganSchoolSettings, getChapelSlotBounds, invalidateOrganSchoolSet
 import { CACHE_NAME } from '../config/cache-name.js';
 import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
 import { applyPlanningPortraitSlotFit, bindPlanningPortraitSlotFit } from './planning-viewport-fit.js';
-import { closePlanningDrawer } from './planning-drawer-ui.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
 
 if ('serviceWorker' in navigator) {
@@ -130,6 +135,7 @@ function performLogout() {
     resetProfileUiBindings();
     resetCalendarPreferencesUiBindings();
     resetSemainesTypesUiBindings();
+    resetFermeturesUiBindings();
     resetStatisticsUiBindings();
     resetDirectoryUsersUiBindings();
     resetCoursSeriesScopeUiBindings();
@@ -164,6 +170,7 @@ function performLogout() {
         'modal_announcements',
         'modal_profile',
         'modal_semaines_types',
+        'modal_fermetures',
         'modal_config',
         'modal_course_students',
         'modal_statistics',
@@ -190,6 +197,7 @@ function refreshHeaderUser(user) {
         document.getElementById('menu-item-logout-wrap')?.classList.add('hidden');
         document.getElementById('menu-item-directory-wrap')?.classList.add('hidden');
         document.getElementById('menu-item-semaines-types-wrap')?.classList.add('hidden');
+        document.getElementById('menu-item-fermetures-wrap')?.classList.add('hidden');
         document.getElementById('menu-item-statistics-wrap')?.classList.add('hidden');
         shell?.classList.remove('planning-shell--weekstrip');
         document.getElementById('btn-admin-clear-week')?.classList.add('hidden');
@@ -208,7 +216,9 @@ function refreshHeaderUser(user) {
     document.getElementById('menu-item-logout-wrap')?.classList.remove('hidden');
     syncCalendarPrefControlsUi();
     document.getElementById('menu-item-directory-wrap')?.classList.toggle('hidden', !isBackendAuthConfigured());
-    document.getElementById('menu-item-semaines-types-wrap')?.classList.toggle('hidden', !staff);
+    const auth = isBackendAuthConfigured();
+    document.getElementById('menu-item-semaines-types-wrap')?.classList.toggle('hidden', !auth);
+    document.getElementById('menu-item-fermetures-wrap')?.classList.toggle('hidden', !auth);
     document.getElementById('menu-item-statistics-wrap')?.classList.toggle('hidden', !staff);
     document.getElementById('btn-admin-clear-week')?.classList.toggle('hidden', r !== 'admin');
     if (r !== 'eleve') {
@@ -355,6 +365,7 @@ function initCalendarAndRevealUi() {
     // FullCalendar mesure le conteneur au render : il doit être visible (plus auth-pending).
     document.body.classList.remove('auth-pending');
     closePlanningDrawer();
+    requestAnimationFrame(() => syncPlanningAppHeaderOffset());
 
     const mount = async () => {
         if (isBackendAuthConfigured()) {
@@ -452,6 +463,13 @@ function initCalendarAndRevealUi() {
         unbindPortraitSlotFit = bindPlanningPortraitSlotFit(calendarEl);
         document.removeEventListener('planning-calendar-slot-layout', onPlanningCalendarSlotLayout);
         document.addEventListener('planning-calendar-slot-layout', onPlanningCalendarSlotLayout);
+        const onAppHeaderResized = () => {
+            if (typeof calendar?.updateSize === 'function') calendar.updateSize();
+            scheduleTimeGridColumnSync(calendarEl);
+        };
+        document.removeEventListener('planning-app-header-resized', onAppHeaderResized);
+        document.addEventListener('planning-app-header-resized', onAppHeaderResized);
+        syncPlanningAppHeaderOffset();
 
         initMessagesUi(currentUser);
         initProfileUi(currentUser);
@@ -462,7 +480,8 @@ function initCalendarAndRevealUi() {
         document.addEventListener('planning-profile-saved', () => {
             refreshHeaderUser(getPlanningSessionUser());
         });
-        initSemainesTypesUi(currentUser);
+        initSemainesTypesUi();
+        initFermeturesUi();
         initStatisticsUi();
         initDirectoryUsersUi();
         initCoursSeriesScopeUi();
@@ -535,6 +554,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     applyPlanningThemeFromStorage();
     applyPlanningFcTextScaleFromStorage();
     await loadUIComponents();
+    initPlanningAppHeaderOffsetSync();
     installAdminClearWeekDelegatedClick(() => calendar, () => currentUser);
 
     const loginV = document.getElementById('login-version-badge');
@@ -572,11 +592,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
     });
-    document.getElementById('btn-cancel-reservation')?.addEventListener('click', () => {
-        const m = document.getElementById('modal_reservation');
-        if (!(m instanceof HTMLDialogElement)) return;
-        if (!reservationModalMayCloseNow()) return;
-        m.close();
+    document.getElementById('modal_reservation')?.addEventListener('close', () => {
+        closePlanningDrawer();
     });
 
     const policyUl = document.getElementById('password-policy-lines');

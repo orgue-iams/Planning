@@ -54,44 +54,16 @@
 
         <div class="planning-route-section">
             <h4 class="text-[10px] font-black uppercase text-slate-600 tracking-wide mb-1 mt-0">Travail personnel — par élève</h4>
-            <p class="text-[9px] text-slate-500 mb-1.5 leading-snug">Tous les élèves actifs ; uniquement leurs créneaux « travail perso » réservables.</p>
-            <div class="overflow-x-auto mb-4">
-                <table class="w-full text-left text-[11px]">
-                    <thead class="bg-slate-50 text-slate-600 font-bold uppercase tracking-wide">
-                        <tr>
-                            <th class="p-2">Élève</th>
-                            <th class="p-2 text-right">Créneaux</th>
-                            <th class="p-2 text-right">Heures</th>
-                            <th class="p-2 text-right">Moy. / sem. (h)</th>
-                        </tr>
-                    </thead>
-                    <tbody id="statistics-eleves-tbody"></tbody>
-                    <tfoot class="bg-slate-50 font-bold text-slate-800">
-                        <tr>
-                            <td class="p-2">Total</td>
-                            <td class="p-2 text-right font-mono" id="statistics-eleves-foot-count">—</td>
-                            <td class="p-2 text-right font-mono" id="statistics-eleves-foot-hours">—</td>
-                            <td class="p-2 text-right font-mono text-slate-500 font-normal">—</td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
+            <p class="text-[9px] text-slate-500 mb-1.5 leading-snug">
+                Cliquez sur une ou plusieurs cartes pour mettre à jour le graphique ci-dessous. Tous les élèves actifs ; uniquement leurs créneaux « travail perso » réservables.
+            </p>
+            <div id="statistics-eleves-list" class="statistics-eleves-list mb-1" role="list"></div>
+            <p id="statistics-eleves-totals" class="statistics-eleves-totals m-0" aria-live="polite"></p>
         </div>
 
         <div class="planning-route-section">
             <h4 class="text-[10px] font-black uppercase text-slate-600 tracking-wide mb-1 mt-0">Évolution du travail perso (par jour)</h4>
-            <p class="text-[9px] text-slate-500 mb-2 leading-snug">
-                Fuseau <strong>Europe/Paris</strong> pour l’axe des jours. Sélectionnez un ou plusieurs élèves : histogramme des heures par jour (barres groupées).
-            </p>
-            <label for="statistics-chart-eleves" class="text-[9px] font-bold text-slate-500 block mb-1">Élèves affichés sur le graphique</label>
-            <select
-                id="statistics-chart-eleves"
-                multiple
-                size="5"
-                class="select select-bordered select-sm w-full max-w-xl font-sans text-[11px] mb-2 bg-white min-h-[6rem]"
-                aria-label="Élèves pour le graphique"
-            ></select>
-            <div id="statistics-chart-wrap" class="overflow-hidden p-1">
+            <div id="statistics-chart-wrap" class="overflow-hidden p-1 mt-2">
                 <canvas id="statistics-chart-canvas" width="800" height="240" class="w-full max-w-full h-auto"></canvas>
             </div>
         </div>

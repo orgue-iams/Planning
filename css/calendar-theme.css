@@ -568,9 +568,32 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     border-spacing: 0 !important;
 }
 
+#calendar .fc-scrollgrid-section-header .fc-scroller-harness,
+#calendar .fc-scrollgrid-section-header .fc-scroller {
+    overflow: visible !important;
+    height: auto !important;
+}
+
 #calendar .fc-scrollgrid-section-header .fc-col-header-cell {
-    min-height: 2.85rem;
+    min-height: 3.5rem;
+    height: auto !important;
     vertical-align: middle !important;
+    overflow: visible !important;
+}
+
+#calendar .fc-scrollgrid-section-header .fc-col-header-cell .fc-scrollgrid-sync-inner,
+#calendar .fc-scrollgrid-section-header .fc-col-header-cell-cushion {
+    overflow: visible !important;
+    height: auto !important;
+}
+
+#calendar .fc-scrollgrid-section-header .fc-col-header-cell-cushion {
+    display: block;
+    padding: 0;
+}
+
+#calendar .fc-scrollgrid-section-header .fc-day-head-gcal {
+    overflow: visible;
 }
 
 #calendar .fc-scrollgrid-section-header .fc-col-header .fc-col-header-cell {

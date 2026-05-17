@@ -7,6 +7,38 @@ import { isProf } from './auth-logic.js';
 import { getPlanningSessionUser } from './session-user.js';
 import { syncDrawerViewSelection, togglePlanningDrawer } from './planning-drawer-ui.js';
 
+let headerOffsetObserver = null;
+let headerOffsetSyncInited = false;
+
+/** Aligne le padding de #app-shell sur la hauteur réelle du bandeau fixe (évite le masquage des en-têtes FC). */
+export function syncPlanningAppHeaderOffset() {
+    const header = document.querySelector('#app-header .app-navbar');
+    if (!(header instanceof HTMLElement)) return;
+    const bottom = Math.ceil(header.getBoundingClientRect().bottom);
+    if (bottom > 0) {
+        document.documentElement.style.setProperty('--planning-app-header-h', `${bottom}px`);
+    }
+    window.dispatchEvent(new Event('planning-app-header-resized'));
+}
+
+export function initPlanningAppHeaderOffsetSync() {
+    if (headerOffsetSyncInited) {
+        syncPlanningAppHeaderOffset();
+        return;
+    }
+    const header = document.querySelector('#app-header .app-navbar');
+    if (!(header instanceof HTMLElement)) return;
+    headerOffsetSyncInited = true;
+    syncPlanningAppHeaderOffset();
+    headerOffsetObserver?.disconnect();
+    if (typeof ResizeObserver !== 'undefined') {
+        headerOffsetObserver = new ResizeObserver(() => syncPlanningAppHeaderOffset());
+        headerOffsetObserver.observe(header);
+    } else {
+        window.addEventListener('resize', syncPlanningAppHeaderOffset);
+    }
+}
+
 const MONTH_LONG = [
     'janvier',
     'février',
@@ -185,11 +217,6 @@ export function initCalendarToolbar(calendar) {
     const wrap = document.getElementById('calendar-toolbar');
     if (!titleEl || !btnToday || !btnPrev || !btnNext || !wrap) return;
 
-    titleEl.classList.add('calendar-toolbar__title-chip', 'calendar-toolbar__click-chip');
-    titleEl.setAttribute('role', 'button');
-    titleEl.tabIndex = 0;
-    titleEl.title = 'Revenir à la date du jour';
-
     const refreshTitle = () => {
         titleEl.textContent = formatCalendarToolbarTitle(calendar);
         syncDrawerViewSelection(calendar);
@@ -200,14 +227,6 @@ export function initCalendarToolbar(calendar) {
         calendar.today();
         refreshTitle();
     };
-
-    titleEl.addEventListener('click', goToday);
-    titleEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            goToday();
-        }
-    });
 
     btnToday.addEventListener('click', goToday);
     btnPrev.addEventListener('click', () => {
@@ -221,6 +240,8 @@ export function initCalendarToolbar(calendar) {
 
     refreshTitle();
     wrap.classList.remove('hidden');
+    initPlanningAppHeaderOffsetSync();
+    requestAnimationFrame(() => syncPlanningAppHeaderOffset());
 
     return { refreshTitle };
 }

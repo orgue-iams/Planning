@@ -197,7 +197,6 @@ async function persistConfigIfAdmin() {
         showToast(r.error || 'Erreur.', 'error');
         return;
     }
-    showToast('Configuration enregistrée.', 'success', 2800);
     configInitialSnapshot = currentConfigSnapshot();
     document.dispatchEvent(new CustomEvent('planning-organ-settings-updated'));
 }
@@ -205,6 +204,38 @@ async function persistConfigIfAdmin() {
 function scheduleConfigPersist() {
     window.clearTimeout(persistTimer);
     persistTimer = window.setTimeout(() => void persistConfigIfAdmin(), 550);
+}
+
+function applyConfigFieldAccess() {
+    const admin = isAdmin(getPlanningSessionUser());
+    document.getElementById('config-planning-notify-wrap')?.classList.toggle('hidden', !admin);
+
+    for (const id of ['config-school-start', 'config-school-end', 'config-chapel-min', 'config-chapel-max']) {
+        const el = document.getElementById(id);
+        el?.toggleAttribute('disabled', !admin);
+        el?.classList.toggle('opacity-60', !admin);
+        el?.classList.toggle('cursor-not-allowed', !admin);
+    }
+    const notifyEl = document.getElementById('config-planning-error-notify-email');
+    notifyEl?.toggleAttribute('disabled', !admin);
+    notifyEl?.classList.toggle('opacity-60', !admin);
+    notifyEl?.classList.toggle('cursor-not-allowed', !admin);
+
+    for (const id of ELEVE_FIELD_IDS) {
+        const el = document.getElementById(id);
+        el?.toggleAttribute('disabled', !admin);
+        const isToggle = el instanceof HTMLInputElement && el.type === 'checkbox';
+        el?.classList.toggle('opacity-60', !admin && !isToggle);
+        el?.classList.toggle('cursor-not-allowed', !admin);
+        const lab = document.querySelector(`label.config-rule-toggle[for="${id}"]`);
+        lab?.classList.toggle('config-rule-toggle--disabled', !admin);
+        lab?.classList.toggle('cursor-not-allowed', !admin);
+        lab?.classList.toggle('opacity-60', !admin);
+    }
+    document.querySelectorAll('.config-rule-row').forEach((row) => {
+        row.classList.toggle('config-rule-row--readonly', !admin);
+    });
+    document.getElementById('config-prof-readonly-hint')?.classList.toggle('hidden', admin);
 }
 
 export function initConfigUi(currentUser) {
@@ -215,38 +246,14 @@ export function initConfigUi(currentUser) {
     bound = true;
 
     ensureChapelHourSelectsFilled();
-
-    const admin = isAdmin(currentUser);
-    document.getElementById('config-hint-admin')?.classList.toggle('hidden', !admin);
-    document.getElementById('config-hint-readonly')?.classList.toggle('hidden', admin);
-    document.getElementById('config-planning-notify-wrap')?.classList.toggle('hidden', !admin);
-
-    for (const id of ['config-school-start', 'config-school-end', 'config-chapel-min', 'config-chapel-max']) {
-        const el = document.getElementById(id);
-        el?.toggleAttribute('disabled', !admin);
-        el?.classList.toggle('bg-slate-200', !admin);
-        el?.classList.toggle('text-slate-500', !admin);
-        el?.classList.toggle('cursor-not-allowed', !admin);
-    }
-    const notifyEl = document.getElementById('config-planning-error-notify-email');
-    notifyEl?.toggleAttribute('disabled', !admin);
-    notifyEl?.classList.toggle('bg-slate-200', !admin);
-    notifyEl?.classList.toggle('text-slate-500', !admin);
-    notifyEl?.classList.toggle('cursor-not-allowed', !admin);
-
-    for (const id of ELEVE_FIELD_IDS) {
-        const el = document.getElementById(id);
-        el?.toggleAttribute('disabled', !admin);
-        el?.classList.toggle('bg-slate-200', !admin && !(el instanceof HTMLInputElement && el.type === 'checkbox'));
-        el?.classList.toggle('text-slate-500', !admin);
-        el?.classList.toggle('cursor-not-allowed', !admin);
-    }
+    applyConfigFieldAccess();
 
     document.getElementById('menu-item-config')?.addEventListener('click', (ev) => {
         ev.preventDefault();
-        if (!openPlanningRouteFromDrawer('modal_config', 'Configuration du planning', 'Configuration')) {
+        if (!openPlanningRouteFromDrawer('modal_config', 'Administration', 'Menu')) {
             return;
         }
+        applyConfigFieldAccess();
         void fillConfigModal();
     });
 
@@ -263,6 +270,11 @@ export function initConfigUi(currentUser) {
         toggle?.addEventListener('change', () => {
             syncConfigRuleRows();
             scheduleConfigPersist();
+        });
+        const lab = document.querySelector(`label.config-rule-toggle[for="${rule.toggleId}"]`);
+        lab?.addEventListener('click', (e) => {
+            const cb = document.getElementById(rule.toggleId);
+            if (cb instanceof HTMLInputElement && cb.disabled) e.preventDefault();
         });
     }
 }

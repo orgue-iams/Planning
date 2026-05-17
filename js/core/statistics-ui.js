@@ -5,7 +5,6 @@ import { getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js
 import { isPrivilegedUser } from './auth-logic.js';
 import { getPlanningSessionUser } from './session-user.js';
 import { fetchOrganSchoolSettings, getOrganSchoolSettingsCached } from './organ-settings.js';
-import { fetchPlanningListElevesActifs } from './planning-events-db.js';
 import { openPlanningRouteFromDrawer } from '../utils/planning-route-dialog.js';
 
 let bound = false;
@@ -14,6 +13,14 @@ let chartSelectFresh = true;
 
 /** @type {Map<string, string>} */
 let lastEleveLabelsById = new Map();
+
+/** @type {Set<string>} */
+let chartSelectedStudentIds = new Set();
+
+/** @type {Map<string, number>} id élève → teinte HSL (graphique + cartes) */
+let chartHueByStudentId = new Map();
+
+const CHART_HUES = [217, 142, 28, 280, 12, 185, 300, 55, 330, 95];
 
 const ORG_LABELS = {
     cours: 'Cours',
@@ -87,42 +94,110 @@ function numHours(v) {
     return Number.isFinite(n) ? n : 0;
 }
 
-/** @param {HTMLSelectElement} sel */
-function getSelectedChartStudentIds(sel) {
-    return [...sel.selectedOptions].map((o) => String(o.value).trim()).filter(Boolean);
+function getSelectedChartStudentIds() {
+    const ids = [];
+    for (const el of document.querySelectorAll(
+        '#statistics-eleves-list .statistics-eleve-card--selected'
+    )) {
+        const id = el.getAttribute('data-user-id')?.trim();
+        if (id) ids.push(id);
+    }
+    return ids;
 }
 
-function eleveDisplayName(r) {
-    const p = String(r?.prenom || '').trim();
-    const n = String(r?.nom || '').trim();
-    const t = `${p} ${n}`.trim();
-    if (t) return t;
-    return String(r?.display_name || r?.email || r?.user_id || '').trim() || String(r?.user_id || '');
+/** @param {number} n */
+function formatFrDecimal(n, digits = 2) {
+    return Number(n).toLocaleString('fr-FR', {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits
+    });
 }
 
 /**
- * @param {object[]} rows
+ * @param {object[]} totRows
  * @param {boolean} resetSelection
  */
-function populateChartElevesSelect(rows, resetSelection) {
-    const sel = document.getElementById('statistics-chart-eleves');
-    if (!(sel instanceof HTMLSelectElement)) return;
-    const prev = resetSelection ? new Set() : new Set(getSelectedChartStudentIds(sel));
-    sel.innerHTML = '';
-    for (const r of rows) {
-        const id = String(r.user_id || '').trim();
-        if (!id) continue;
-        const opt = new Option(eleveDisplayName(r), id);
-        sel.add(opt);
-    }
-    for (let i = 0; i < sel.options.length; i++) {
-        const o = sel.options[i];
-        if (resetSelection) {
-            o.selected = i < Math.min(4, sel.options.length);
-        } else {
-            o.selected = prev.has(o.value);
+function renderStatisticsEleveCards(totRows, resetSelection) {
+    const list = document.getElementById('statistics-eleves-list');
+    const totalsEl = document.getElementById('statistics-eleves-totals');
+    if (!list) return;
+
+    chartHueByStudentId = new Map();
+    const orderIds = totRows.map((r) => String(r.student_user_id || '').trim()).filter(Boolean);
+    orderIds.forEach((id, i) => chartHueByStudentId.set(id, CHART_HUES[i % CHART_HUES.length]));
+
+    if (resetSelection) {
+        chartSelectedStudentIds = new Set(orderIds.slice(0, Math.min(4, orderIds.length)));
+    } else {
+        const next = new Set();
+        for (const id of chartSelectedStudentIds) {
+            if (orderIds.includes(id)) next.add(id);
         }
+        chartSelectedStudentIds = next.size ? next : new Set(orderIds.slice(0, Math.min(4, orderIds.length)));
     }
+
+    let sumC = 0;
+    let sumH = 0;
+    list.innerHTML = '';
+
+    if (!totRows.length) {
+        list.innerHTML =
+            '<p class="text-[11px] text-slate-500 p-2 m-0">Aucun élève actif.</p>';
+        if (totalsEl) totalsEl.textContent = '';
+        return;
+    }
+
+    for (const r of totRows) {
+        const id = String(r.student_user_id || '').trim();
+        if (!id) continue;
+        const c = Number(r.slot_count) || 0;
+        const h = numHours(r.hours);
+        const hpw = numHours(r.hours_per_week);
+        sumC += c;
+        sumH += h;
+        const name = String(r.display_name || '').trim() || id;
+        const hue = chartHueByStudentId.get(id) ?? CHART_HUES[0];
+        const selected = chartSelectedStudentIds.has(id);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `statistics-eleve-card${selected ? ' statistics-eleve-card--selected' : ''}`;
+        btn.dataset.userId = id;
+        btn.style.setProperty('--stat-hue', String(hue));
+        const sat = selected ? 52 : 22;
+        const light = selected ? 86 : 95;
+        btn.style.background = `hsl(${hue} ${sat}% ${light}%)`;
+        btn.innerHTML = `
+            <span class="statistics-eleve-card__name">${escapeHtml(name)}</span>
+            <span class="statistics-eleve-card__metric">${c} créneau${c > 1 ? 'x' : ''}</span>
+            <span class="statistics-eleve-card__metric">${formatFrDecimal(h, 1)} h total</span>
+            <span class="statistics-eleve-card__metric">${formatFrDecimal(hpw, 2)} h/sem</span>
+        `;
+        list.appendChild(btn);
+    }
+
+    if (totalsEl) {
+        totalsEl.textContent = `Total — ${sumC} créneaux, ${formatFrDecimal(sumH, 1)} h`;
+    }
+}
+
+function escapeHtml(s) {
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function toggleStatisticsEleveCard(btn) {
+    if (!(btn instanceof HTMLButtonElement)) return;
+    const id = btn.dataset.userId?.trim();
+    if (!id) return;
+    const selected = btn.classList.toggle('statistics-eleve-card--selected');
+    if (selected) chartSelectedStudentIds.add(id);
+    else chartSelectedStudentIds.delete(id);
+    const hue = chartHueByStudentId.get(id) ?? CHART_HUES[0];
+    const sat = selected ? 52 : 22;
+    const light = selected ? 86 : 95;
+    btn.style.background = `hsl(${hue} ${sat}% ${light}%)`;
 }
 
 /**
@@ -201,7 +276,6 @@ function drawStatisticsChart(p) {
     }
 
     const n = days.length;
-    const hues = [217, 142, 28, 280, 12, 185, 300, 55, 330, 95];
 
     const groupW = n > 0 ? innerW / n : innerW;
     const nb = Math.max(1, studentOrder.length);
@@ -218,7 +292,8 @@ function drawStatisticsChart(p) {
             const bh = (val / maxH) * innerH;
             const x = gx + j * (barW + gapBars);
             const y = padT + innerH - bh;
-            ctx.fillStyle = `hsl(${hues[j % hues.length]} 62% 48%)`;
+            const hue = chartHueByStudentId.get(sid) ?? CHART_HUES[j % CHART_HUES.length];
+            ctx.fillStyle = `hsl(${hue} 62% 48%)`;
             ctx.fillRect(x, y, Math.max(1.2, barW - 0.5), Math.max(0, bh));
         });
     }
@@ -233,30 +308,10 @@ function drawStatisticsChart(p) {
         const label = days[i].slice(5);
         ctx.fillText(label, x, cssH - 12);
     }
-
-    ctx.textAlign = 'left';
-    let lx = padL;
-    let ly = 12;
-    studentOrder.forEach((sid, idx) => {
-        const raw = labelsById.get(sid) || sid;
-        const name = raw.length > 22 ? `${raw.slice(0, 20)}…` : raw;
-        const w = 18 + ctx.measureText(name).width + 10;
-        if (lx + w > cssW - padR) {
-            lx = padL;
-            ly += 14;
-        }
-        ctx.fillStyle = `hsl(${hues[idx % hues.length]} 62% 36%)`;
-        ctx.fillRect(lx, ly - 7, 10, 4);
-        ctx.fillStyle = '#334155';
-        ctx.fillText(name, lx + 14, ly + 1);
-        lx += w;
-    });
 }
 
 async function loadChartSeries(rangeStart, rangeEnd, fromYmd, toYmd) {
-    const sel = document.getElementById('statistics-chart-eleves');
-    if (!(sel instanceof HTMLSelectElement)) return;
-    const ids = getSelectedChartStudentIds(sel);
+    const ids = getSelectedChartStudentIds();
     const days = enumerateDaysInclusive(fromYmd, toYmd);
     const labelsById = new Map(lastEleveLabelsById);
 
@@ -322,18 +377,16 @@ function scheduleChartRedraw(rangeStart, rangeEnd, fromYmd, toYmd) {
 async function loadStatsIntoDom() {
     const statusEl = document.getElementById('statistics-status');
     const orgBody = document.getElementById('statistics-org-tbody');
-    const elBody = document.getElementById('statistics-eleves-tbody');
-    const footC = document.getElementById('statistics-eleves-foot-count');
-    const footH = document.getElementById('statistics-eleves-foot-hours');
-    if (!orgBody || !elBody || !footC || !footH) return;
+    const elList = document.getElementById('statistics-eleves-list');
+    if (!orgBody || !elList) return;
 
     const user = getPlanningSessionUser();
     if (!isBackendAuthConfigured() || !isPrivilegedUser(user)) {
         if (statusEl) statusEl.textContent = 'Statistiques réservées aux professeurs et administrateurs.';
         orgBody.innerHTML = '';
-        elBody.innerHTML = '';
-        footC.textContent = '—';
-        footH.textContent = '—';
+        elList.innerHTML = '';
+        const totalsEl = document.getElementById('statistics-eleves-totals');
+        if (totalsEl) totalsEl.textContent = '';
         drawStatisticsChart({
             days: [],
             studentOrder: [],
@@ -368,8 +421,6 @@ async function loadStatsIntoDom() {
         return;
     }
 
-    const elevesRows = await fetchPlanningListElevesActifs();
-
     const [orgRes, totRes] = await Promise.all([
         sb.rpc('planning_stats_org_occupation', { p_start: rs, p_end: re }),
         sb.rpc('planning_stats_eleve_travail_totals', { p_start: rs, p_end: re })
@@ -378,17 +429,13 @@ async function loadStatsIntoDom() {
     if (orgRes.error) {
         if (statusEl) statusEl.textContent = orgRes.error.message || 'Erreur occupation.';
         orgBody.innerHTML = '';
-        elBody.innerHTML = '';
-        footC.textContent = '—';
-        footH.textContent = '—';
+        elList.innerHTML = '';
         return;
     }
     if (totRes.error) {
         if (statusEl) statusEl.textContent = totRes.error.message || 'Erreur élèves.';
         orgBody.innerHTML = '';
-        elBody.innerHTML = '';
-        footC.textContent = '—';
-        footH.textContent = '—';
+        elList.innerHTML = '';
         return;
     }
 
@@ -406,58 +453,18 @@ async function loadStatsIntoDom() {
         : '<tr><td colspan="3" class="p-2 text-slate-500">Aucune donnée.</td></tr>';
 
     const totRows = Array.isArray(totRes.data) ? totRes.data : [];
-    let sumC = 0;
-    let sumH = 0;
-    elBody.innerHTML = totRows.length
-        ? totRows
-              .map((r) => {
-                  const c = Number(r.slot_count) || 0;
-                  const h = numHours(r.hours);
-                  const hpw = numHours(r.hours_per_week);
-                  sumC += c;
-                  sumH += h;
-                  const name = String(r.display_name || '').trim() || String(r.student_user_id || '');
-                  return `<tr class="border-t border-slate-100"><td class="p-2">${name}</td><td class="p-2 text-right font-mono">${c}</td><td class="p-2 text-right font-mono">${h.toFixed(1)}</td><td class="p-2 text-right font-mono">${hpw.toFixed(2)}</td></tr>`;
-              })
-              .join('')
-        : '<tr><td colspan="4" class="p-2 text-slate-500">Aucun élève actif.</td></tr>';
-
-    footC.textContent = String(sumC);
-    footH.textContent = sumH.toFixed(1);
 
     if (statusEl) {
         statusEl.textContent = `Période du ${fromStr} au ${toStr} — ${totRows.length} élève(s) actif(s) listé(s).`;
     }
 
-    const orderIds = totRows.map((r) => String(r.student_user_id || '').trim()).filter(Boolean);
-    const byId = new Map(elevesRows.map((r) => [String(r.user_id || '').trim(), r]));
-    /** @type {typeof elevesRows} */
-    const sortedForChart = [];
-    const seen = new Set();
-    for (const id of orderIds) {
-        const row = byId.get(id);
-        if (row) {
-            sortedForChart.push(row);
-            seen.add(id);
-        }
-    }
-    const rest = elevesRows.filter((r) => !seen.has(String(r.user_id || '').trim()));
-    rest.sort((a, b) => {
-        const an = String(a.nom ?? '').trim().toLowerCase();
-        const bn = String(b.nom ?? '').trim().toLowerCase();
-        if (an !== bn) return an.localeCompare(bn, 'fr');
-        const ap = String(a.prenom ?? '').trim().toLowerCase();
-        const bp = String(b.prenom ?? '').trim().toLowerCase();
-        return ap.localeCompare(bp, 'fr');
-    });
-    const chartRows = [...sortedForChart, ...rest];
     lastEleveLabelsById = new Map(
-        chartRows.map((r) => {
-            const id = String(r.user_id || '').trim();
-            return [id, eleveDisplayName(r)];
+        totRows.map((r) => {
+            const id = String(r.student_user_id || '').trim();
+            return [id, String(r.display_name || '').trim() || id];
         })
     );
-    populateChartElevesSelect(chartRows, chartSelectFresh);
+    renderStatisticsEleveCards(totRows, chartSelectFresh);
     chartSelectFresh = false;
 
     await loadChartSeries(rangeStart, rangeEnd, fromStr, toStr);
@@ -477,7 +484,7 @@ export function initStatisticsUi() {
 
     document.getElementById('menu-item-statistics')?.addEventListener('click', (ev) => {
         ev.preventDefault();
-        openPlanningRouteFromDrawer('modal_statistics', 'Statistiques', 'Statistiques');
+        openPlanningRouteFromDrawer('modal_statistics', 'Statistiques', 'Menu');
     });
 
     const dlg = document.getElementById('modal_statistics');
@@ -506,7 +513,12 @@ export function initStatisticsUi() {
         scheduleChartRedraw(rangeStart, rangeEnd, fromStr, toStr);
     };
 
-    document.getElementById('statistics-chart-eleves')?.addEventListener('change', bindRange);
+    document.getElementById('statistics-eleves-list')?.addEventListener('click', (ev) => {
+        const btn = ev.target instanceof Element ? ev.target.closest('.statistics-eleve-card') : null;
+        if (!(btn instanceof HTMLButtonElement)) return;
+        toggleStatisticsEleveCard(btn);
+        bindRange();
+    });
 
     document.getElementById('statistics-apply-range')?.addEventListener('click', () => {
         void loadStatsIntoDom();
@@ -540,4 +552,6 @@ export function initStatisticsUi() {
 export function resetStatisticsUiBindings() {
     bound = false;
     chartSelectFresh = true;
+    chartSelectedStudentIds = new Set();
+    chartHueByStudentId = new Map();
 }
