@@ -118,26 +118,31 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-/** Mise à jour shell / version : réseau d’abord pour ne pas rester bloqué sur un ancien cache. */
-function isNetworkFirstRequest(url, request) {
+/** Fichiers de version / SW uniquement (pas la navigation : risque de réponse vide). */
+function isNetworkFirstRequest(url) {
   const path = url.pathname;
-  if (request.mode === 'navigate') return true;
-  if (path.endsWith('cache-name.js') || path.endsWith('sw.js')) return true;
-  if (path.endsWith('index.html')) return true;
-  return false;
+  return path.endsWith('cache-name.js') || path.endsWith('sw.js');
 }
 
 async function networkFirst(request) {
   const cache = await caches.open(CACHE_NAME);
+  let response;
   try {
-    const response = await fetch(request);
-    if (response && response.ok) {
-      await cache.put(request, response.clone());
+    response = await fetch(request);
+    if (response?.ok) {
+      try {
+        await cache.put(request, response.clone());
+      } catch (err) {
+        console.warn('[SW] cache.put', request.url, err);
+      }
     }
-    return response;
   } catch {
-    return (await cache.match(request)) || (await caches.match(request));
+    response = undefined;
   }
+  if (response) return response;
+  const cached = (await cache.match(request)) || (await caches.match(request));
+  if (cached) return cached;
+  return fetch(request);
 }
 
 self.addEventListener('fetch', (event) => {
@@ -145,7 +150,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (isNetworkFirstRequest(url, event.request)) {
+  if (isNetworkFirstRequest(url)) {
     event.respondWith(networkFirst(event.request));
     return;
   }
