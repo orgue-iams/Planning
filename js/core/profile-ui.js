@@ -1,5 +1,5 @@
 /**
- * Modale Profil — enregistrement progressif (champs + mot de passe).
+ * Modale Profil — enregistrement progressif (champs + mot de passe sur action).
  */
 import {
     roleLabelFr,
@@ -17,7 +17,6 @@ let profileUiBound = false;
 let profileSaveInFlight = false;
 let profileBaseline = null;
 let profileFieldTimer = 0;
-let profilePwdTimer = 0;
 
 function formatFrPhone(raw) {
     const digits = String(raw || '').replace(/\D+/g, '').slice(0, 10);
@@ -31,12 +30,14 @@ function readProfileFormState() {
     const phoneEl = document.getElementById('profile-phone-input');
     const shareEmailEl = document.getElementById('profile-share-email');
     const sharePhoneEl = document.getElementById('profile-share-phone');
+    const showSundayEl = document.getElementById('profile-show-sunday');
     return {
         name: nameEl instanceof HTMLInputElement ? nameEl.value.trim() : '',
         email: emailEl instanceof HTMLInputElement ? emailEl.value.trim() : '',
         phone: phoneEl instanceof HTMLInputElement ? formatFrPhone(phoneEl.value) : '',
         shareEmail: shareEmailEl instanceof HTMLInputElement ? shareEmailEl.checked : true,
-        sharePhone: sharePhoneEl instanceof HTMLInputElement ? sharePhoneEl.checked : false
+        sharePhone: sharePhoneEl instanceof HTMLInputElement ? sharePhoneEl.checked : false,
+        showSunday: showSundayEl instanceof HTMLInputElement ? showSundayEl.checked : false
     };
 }
 
@@ -52,7 +53,8 @@ function hasProfileFieldChangesVsBaseline() {
         cur.email !== profileBaseline.email ||
         cur.phone !== profileBaseline.phone ||
         cur.shareEmail !== profileBaseline.shareEmail ||
-        cur.sharePhone !== profileBaseline.sharePhone
+        cur.sharePhone !== profileBaseline.sharePhone ||
+        cur.showSunday !== profileBaseline.showSunday
     );
 }
 
@@ -72,24 +74,29 @@ function setPassHint(msg, kind) {
     else hint.classList.add('text-slate-600');
 }
 
-function syncProfilePassHint() {
+function syncProfilePassApplyState() {
     const a = /** @type {HTMLInputElement | null} */ (document.getElementById('profile-pass-new'));
     const b = /** @type {HTMLInputElement | null} */ (document.getElementById('profile-pass-confirm'));
+    const btn = document.getElementById('profile-pass-apply');
     const av = (a?.value || '').trim();
     const bv = (b?.value || '').trim();
     if (!av && !bv) {
         setPassHint('', '');
+        if (btn instanceof HTMLButtonElement) btn.disabled = true;
         return;
     }
     if (av !== bv) {
         setPassHint('Mots de passe non identiques.', 'error');
+        if (btn instanceof HTMLButtonElement) btn.disabled = true;
         return;
     }
     if (av.length < PASSWORD_MIN_LENGTH) {
         setPassHint(`Au moins ${PASSWORD_MIN_LENGTH} caractères.`, 'error');
+        if (btn instanceof HTMLButtonElement) btn.disabled = true;
         return;
     }
     setPassHint('Les mots de passe correspondent.', 'muted');
+    if (btn instanceof HTMLButtonElement) btn.disabled = false;
 }
 
 /** Ancien bandeau « cours de la semaine » supprimé : nettoie la classe shell si besoin. */
@@ -111,18 +118,22 @@ async function fillProfileModal(user) {
     let tel = String(user.telephone ?? '').trim();
     let shareEmail = user.directory_share_email !== false;
     let sharePhone = user.directory_share_phone === true;
+    let showSunday = user.planning_show_sunday === true;
     if (isBackendAuthConfigured() && user.id) {
         const sb = getSupabaseClient();
         if (sb) {
             const { data } = await sb
                 .from('profiles')
-                .select('telephone, directory_share_email, directory_share_phone')
+                .select(
+                    'telephone, directory_share_email, directory_share_phone, planning_show_sunday'
+                )
                 .eq('id', user.id)
                 .maybeSingle();
             if (data) {
                 tel = String(data.telephone ?? '').trim();
                 shareEmail = data.directory_share_email !== false;
                 sharePhone = data.directory_share_phone === true;
+                showSunday = data.planning_show_sunday === true;
             }
         }
     }
@@ -132,17 +143,19 @@ async function fillProfileModal(user) {
     if (shE instanceof HTMLInputElement) shE.checked = shareEmail;
     const shP = document.getElementById('profile-share-phone');
     if (shP instanceof HTMLInputElement) shP.checked = sharePhone;
+    const shSun = document.getElementById('profile-show-sunday');
+    if (shSun instanceof HTMLInputElement) shSun.checked = showSunday;
     document.getElementById('profile-role-label').textContent = roleLabelFr(user.role);
     const passNew = document.getElementById('profile-pass-new');
     const passConfirm = document.getElementById('profile-pass-confirm');
     if (passNew instanceof HTMLInputElement) passNew.value = '';
     if (passConfirm instanceof HTMLInputElement) passConfirm.value = '';
-    setPassHint('', '');
+    syncProfilePassApplyState();
     syncProfileBaselineFromForm();
     await refreshDrawerProfileExtras(user);
 }
 
-async function persistProfileFields() {
+export async function persistProfileFields() {
     if (profileSaveInFlight) return;
     if (!hasProfileFieldChangesVsBaseline()) return;
     const u = getPlanningSessionUser();
@@ -159,7 +172,8 @@ async function persistProfileFields() {
                 display_name: form.name,
                 telephone,
                 directory_share_email: form.shareEmail,
-                directory_share_phone: form.sharePhone
+                directory_share_phone: form.sharePhone,
+                planning_show_sunday: form.showSunday
             })
             .eq('id', u.id);
         if (error) {
@@ -173,7 +187,8 @@ async function persistProfileFields() {
                 name: form.name,
                 telephone,
                 directory_share_email: form.shareEmail,
-                directory_share_phone: form.sharePhone
+                directory_share_phone: form.sharePhone,
+                planning_show_sunday: form.showSunday
             });
         }
         const previousEmail = String(u.email || '').trim().toLowerCase();
@@ -198,12 +213,13 @@ function scheduleProfileFieldsPersist() {
     profileFieldTimer = window.setTimeout(() => void persistProfileFields(), 450);
 }
 
-async function tryPersistPassword() {
+async function applyProfilePassword() {
     const a = /** @type {HTMLInputElement | null} */ (document.getElementById('profile-pass-new'));
     const b = /** @type {HTMLInputElement | null} */ (document.getElementById('profile-pass-confirm'));
     const av = (a?.value || '').trim();
     const bv = (b?.value || '').trim();
     if (!av && !bv) return;
+    syncProfilePassApplyState();
     if (av !== bv || av.length < PASSWORD_MIN_LENGTH) return;
     const passRes = await updateCurrentUserPasswordSimple(av, bv);
     if (!passRes.ok) {
@@ -216,12 +232,8 @@ async function tryPersistPassword() {
     if (passToggle instanceof HTMLInputElement) passToggle.checked = false;
     document.getElementById('profile-pass-new')?.setAttribute('type', 'password');
     document.getElementById('profile-pass-confirm')?.setAttribute('type', 'password');
+    syncProfilePassApplyState();
     setPassHint('Mot de passe changé.', 'success');
-}
-
-function schedulePasswordPersist() {
-    window.clearTimeout(profilePwdTimer);
-    profilePwdTimer = window.setTimeout(() => void tryPersistPassword(), 600);
 }
 
 export function resetProfileUiBindings() {
@@ -254,6 +266,7 @@ export function initProfileUi(currentUser) {
         const el = e.target;
         if (!(el instanceof HTMLInputElement)) return;
         el.value = formatFrPhone(el.value);
+        void persistProfileFields();
     });
 
     const passToggle = document.getElementById('profile-pass-show-plain');
@@ -269,25 +282,32 @@ export function initProfileUi(currentUser) {
     const profileDlg = document.getElementById('modal_profile');
     profileDlg?.addEventListener('close', () => {
         applyPassVisibility(false);
+        void persistProfileFields();
+    });
+
+    document.addEventListener('planning-overlay-flush', () => {
+        void persistProfileFields();
     });
 
     for (const id of [
         'profile-display-name-input',
         'profile-email-input',
-        'profile-phone-input',
         'profile-share-email',
-        'profile-share-phone'
+        'profile-share-phone',
+        'profile-show-sunday'
     ]) {
-        document.getElementById(id)?.addEventListener('input', scheduleProfileFieldsPersist);
-        document.getElementById(id)?.addEventListener('change', scheduleProfileFieldsPersist);
+        const el = document.getElementById(id);
+        el?.addEventListener('input', scheduleProfileFieldsPersist);
+        el?.addEventListener('change', scheduleProfileFieldsPersist);
+        el?.addEventListener('blur', () => void persistProfileFields());
     }
 
-    document.getElementById('profile-pass-new')?.addEventListener('input', () => {
-        syncProfilePassHint();
-        schedulePasswordPersist();
-    });
-    document.getElementById('profile-pass-confirm')?.addEventListener('input', () => {
-        syncProfilePassHint();
-        schedulePasswordPersist();
-    });
+    document.getElementById('profile-pass-new')?.addEventListener('input', syncProfilePassApplyState);
+    document.getElementById('profile-pass-confirm')?.addEventListener('input', syncProfilePassApplyState);
+    document.getElementById('profile-pass-apply')?.addEventListener('click', () => void applyProfilePassword());
+
+    document.getElementById('profile-display-name-input')?.addEventListener('blur', () =>
+        void persistProfileFields()
+    );
+    document.getElementById('profile-email-input')?.addEventListener('blur', () => void persistProfileFields());
 }

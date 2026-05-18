@@ -12,8 +12,7 @@ import { getPlanningSessionUser } from './session-user.js';
 import { showToast } from '../utils/toast.js';
 import {
     openPlanningRouteFromDrawer,
-    setPlanningRouteBackHandler,
-    updatePlanningRouteDialog
+    pushPlanningRouteLevel
 } from '../utils/planning-route-dialog.js';
 import { mountPlanningSwipeCard } from '../utils/planning-card-swipe.js';
 
@@ -120,8 +119,6 @@ function showFermeturesMainPanel() {
     edit?.classList.add('hidden');
     edit?.setAttribute('aria-hidden', 'true');
     editingClosureIndex = null;
-    setPlanningRouteBackHandler('modal_fermetures', null);
-    updatePlanningRouteDialog('modal_fermetures', 'Fermetures', 'Menu');
     renderClosureCards();
 }
 
@@ -182,8 +179,7 @@ function openClosureEdit(index) {
 
     const title =
         index < 0 ? 'Fermetures / Nouvelle période' : editable ? 'Fermetures / Édition' : 'Fermetures / Détail';
-    setPlanningRouteBackHandler('modal_fermetures', showFermeturesMainPanel);
-    updatePlanningRouteDialog('modal_fermetures', title, 'Fermetures');
+    pushPlanningRouteLevel('modal_fermetures', title, 'Fermetures', showFermeturesMainPanel);
 }
 
 async function saveEditPanel() {
@@ -279,5 +275,22 @@ export function initFermeturesUi() {
 
     document.getElementById('modal_fermetures')?.addEventListener('close', () => {
         showFermeturesMainPanel();
+        if (saveDebounce) {
+            clearTimeout(saveDebounce);
+            saveDebounce = null;
+        }
+        void persistClosures();
     });
+
+    document.addEventListener('planning-overlay-flush', () => {
+        if (saveDebounce) {
+            clearTimeout(saveDebounce);
+            saveDebounce = null;
+        }
+        void persistClosures();
+    });
+
+    for (const id of ['fermeture-edit-start', 'fermeture-edit-end', 'fermeture-edit-title']) {
+        document.getElementById(id)?.addEventListener('blur', onEditFieldChange);
+    }
 }

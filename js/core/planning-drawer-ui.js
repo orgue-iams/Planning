@@ -2,6 +2,7 @@
  * Menu principal (tiroir) : vues calendrier + liens selon profil.
  */
 import { dismissReservationRouteDialog } from './calendar-logic.js';
+import { dismissPlanningOverlaysToCalendar } from '../utils/planning-overlay-dismiss.js';
 
 /** @type {import('@fullcalendar/core').Calendar | null} */
 let drawerCalendarRef = null;
@@ -80,13 +81,14 @@ export function initPlanningDrawer(calendar) {
         if (t.closest('#planning-app-drawer, #planning-drawer-backdrop, #btn-app-drawer')) return;
         const routeDlg = document.querySelector('dialog.planning-route-page[open]');
         if (routeDlg instanceof HTMLDialogElement && t.closest(`#${routeDlg.id}`)) return;
+        if (t.closest('dialog#modal_reservation[open]')) {
+            if (t.closest('#modal_reservation')) return;
+            void dismissReservationRouteDialog({ save: true });
+            return;
+        }
         if (!t.closest('#calendar, #planning-legend, #app-shell, .fc')) return;
         if (routeDlg instanceof HTMLDialogElement) {
-            if (routeDlg.id === 'modal_reservation') {
-                void dismissReservationRouteDialog({ save: true });
-                return;
-            }
-            routeDlg.close();
+            dismissPlanningOverlaysToCalendar({ save: true });
             return;
         }
         closeDrawer();

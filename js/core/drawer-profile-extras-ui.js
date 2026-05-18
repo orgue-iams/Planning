@@ -53,15 +53,11 @@ function bindAgendaCopyBtn(btnId, url) {
     btn.onclick = () => void copyText(url);
 }
 
-function setAgendaHelpExpanded(expanded) {
+function showAgendaHelpAlways() {
     const help = document.getElementById('drawer-agenda-help-text');
-    const btn = document.getElementById('drawer-agenda-help-btn');
     if (help) {
         help.textContent = AGENDA_HELP;
-        help.classList.toggle('hidden', !expanded);
-    }
-    if (btn instanceof HTMLButtonElement) {
-        btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        help.classList.remove('hidden');
     }
 }
 
@@ -74,6 +70,7 @@ export async function refreshDrawerAgendas(user) {
         return;
     }
     block.classList.remove('hidden');
+    showAgendaHelpAlways();
 
     const { mainGoogleCalendarId } = getPlanningConfig();
     const mainUrl = googleCalendarEmbedUrl(mainGoogleCalendarId);
@@ -156,13 +153,6 @@ let bound = false;
 export function initDrawerProfileExtrasUi() {
     if (bound) return;
     bound = true;
-
-    document.getElementById('drawer-agenda-help-btn')?.addEventListener('click', () => {
-        const help = document.getElementById('drawer-agenda-help-text');
-        const expanded = help?.classList.contains('hidden') ?? true;
-        setAgendaHelpExpanded(expanded);
-    });
-    setAgendaHelpExpanded(false);
 
     document.addEventListener('planning-profile-saved', () => {
         const u = getPlanningSessionUser();

@@ -223,6 +223,15 @@ export function initAnnouncementsUi(currentUser) {
         { signal }
     );
 
+    document.addEventListener(
+        'planning-overlay-flush',
+        () => {
+            const m = document.getElementById('modal_announcements');
+            if (m instanceof HTMLDialogElement && m.open) void persistAnnouncement({ silent: true });
+        },
+        { signal }
+    );
+
     document.getElementById('menu-item-announcements')?.addEventListener(
         'click',
         async (e) => {

@@ -9,8 +9,7 @@ import { normalizeGoogleCalendarId } from '../utils/google-calendar-id.js';
 import { formatProfileFullName } from '../utils/profile-full-name.js';
 import {
     openPlanningRouteFromDrawer,
-    setPlanningRouteBackHandler,
-    updatePlanningRouteDialog
+    pushPlanningRouteLevel
 } from '../utils/planning-route-dialog.js';
 import { syncPlanningDrawerGroupedSections } from './planning-drawer-ui.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
@@ -152,8 +151,6 @@ function showPoolListPanel() {
     edit?.setAttribute('aria-hidden', 'true');
     editingPoolRow = null;
     poolEditSnapshot = null;
-    setPlanningRouteBackHandler('modal_calendar_pool', null);
-    updatePlanningRouteDialog('modal_calendar_pool', 'Calendriers', 'Menu');
 }
 
 function readPoolEditForm() {
@@ -217,15 +214,15 @@ function openPoolEdit(row) {
             : 'Aucun utilisateur lié';
     }
 
-    const backLabel = label || 'Agenda';
-    setPlanningRouteBackHandler('modal_calendar_pool', () => {
-        showPoolListPanel();
-        void refreshCalendarPoolModalTable();
-    });
-    updatePlanningRouteDialog(
+    const titleLabel = label || 'Agenda';
+    pushPlanningRouteLevel(
         'modal_calendar_pool',
-        `Calendriers / ${backLabel}`,
-        `Calendriers / ${backLabel}`
+        `Calendriers / ${titleLabel}`,
+        'Calendriers',
+        () => {
+            showPoolListPanel();
+            void refreshCalendarPoolModalTable();
+        }
     );
 }
 

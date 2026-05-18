@@ -487,7 +487,10 @@ function initCalendarAndRevealUi() {
         void refreshDrawerProfileExtras(currentUser);
         initCalendarPreferencesUi({ getCalendar: () => calendar });
         document.addEventListener('planning-profile-saved', () => {
-            refreshHeaderUser(getPlanningSessionUser());
+            const u = getPlanningSessionUser();
+            refreshHeaderUser(u);
+            updatePlanningSundayColumnVisibility(calendar, u);
+            calendar?.updateSize();
         });
         initSemainesTypesUi();
         initFermeturesUi();

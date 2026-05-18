@@ -15,8 +15,7 @@ import { planningAdminInvoke } from './admin-api.js';
 import { isPlanningRole } from './planning-roles.js';
 import {
     openPlanningRouteFromDrawer,
-    setPlanningRouteBackHandler,
-    updatePlanningRouteDialog
+    pushPlanningRouteLevel
 } from '../utils/planning-route-dialog.js';
 import { normalizePlanningRole, PLANNING_ROLE_OPTIONS } from './planning-roles.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
@@ -434,10 +433,6 @@ function showDirectoryListPanel() {
     create?.setAttribute('aria-hidden', 'true');
     editingUser = null;
     editSnapshot = null;
-    setPlanningRouteBackHandler('modal_directory_users', () => {
-        document.getElementById('modal_directory_users')?.close();
-    });
-    updatePlanningRouteDialog('modal_directory_users', 'Utilisateurs', 'Menu');
 }
 
 function getDirectoryCreateMode() {
@@ -528,13 +523,11 @@ function openDirectoryUserCreate() {
     create?.classList.remove('hidden');
     create?.setAttribute('aria-hidden', 'false');
     resetDirectoryCreateForm();
-    setPlanningRouteBackHandler('modal_directory_users', () => {
-        showDirectoryListPanel();
-    });
-    updatePlanningRouteDialog(
+    pushPlanningRouteLevel(
         'modal_directory_users',
         'Utilisateurs / Nouvel utilisateur',
-        'Utilisateurs'
+        'Utilisateurs',
+        showDirectoryListPanel
     );
 }
 
@@ -651,11 +644,15 @@ function openDirectoryUserEdit(userRow) {
     document.getElementById('directory-edit-save-hint')?.remove();
 
     const titleName = directoryDisplayName(userRow);
-    setPlanningRouteBackHandler('modal_directory_users', () => {
-        showDirectoryListPanel();
-        void reloadDirectoryAfterEdit();
-    });
-    updatePlanningRouteDialog('modal_directory_users', `Utilisateurs / ${titleName}`, 'Utilisateurs');
+    pushPlanningRouteLevel(
+        'modal_directory_users',
+        `Utilisateurs / ${titleName}`,
+        'Utilisateurs',
+        () => {
+            showDirectoryListPanel();
+            void reloadDirectoryAfterEdit();
+        }
+    );
 }
 
 async function reloadDirectoryAfterEdit() {

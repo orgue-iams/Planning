@@ -21,13 +21,16 @@
             <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-start min-h-[2.75rem] py-2.5">
                 <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none pt-1">Tél.</dt>
                 <dd class="m-0 min-w-0">
-                    <input
-                        type="tel"
-                        id="profile-phone-input"
-                        class="input input-xs input-bordered w-full text-[11px] h-8"
-                        autocomplete="tel"
-                        maxlength="40"
-                    />
+                    <input type="tel" id="profile-phone-input" class="input input-xs input-bordered w-full text-[11px] h-8" autocomplete="tel" maxlength="40" />
+                </dd>
+            </div>
+            <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-start min-h-[2.75rem] py-2.5">
+                <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none pt-1">Affichage</dt>
+                <dd class="m-0 min-w-0">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="profile-show-sunday" class="checkbox checkbox-primary checkbox-sm" />
+                        <span class="text-[10px] text-slate-700">Afficher le dimanche (vue semaine)</span>
+                    </label>
                 </dd>
             </div>
             <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-start min-h-[2.75rem] py-2.5">
@@ -35,53 +38,42 @@
                 <dd class="m-0 min-w-0 space-y-2">
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" id="profile-share-email" class="checkbox checkbox-primary checkbox-sm" />
-                        <span class="text-[10px] text-slate-700">Mon email dans la liste des utilisateurs de l'appli</span>
+                        <span class="text-[10px] text-slate-700">email</span>
                     </label>
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" id="profile-share-phone" class="checkbox checkbox-primary checkbox-sm" />
-                        <span class="text-[10px] text-slate-700">Mon téléphone dans la liste des utilisateurs de l'appli</span>
+                        <span class="text-[10px] text-slate-700">n° de tel.</span>
                     </label>
                 </dd>
             </div>
-            <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2.5">
-                <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none">Mot de passe</dt>
+            <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-start min-h-[2.75rem] py-2.5">
+                <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none pt-1">Mot de passe</dt>
                 <dd class="m-0 min-w-0">
                     <div class="flex flex-col gap-1.5">
                         <input type="password" id="profile-pass-new" class="input input-xs input-bordered w-full text-[11px] h-8" placeholder="Nouveau mot de passe" autocomplete="new-password" />
                         <input type="password" id="profile-pass-confirm" class="input input-xs input-bordered w-full text-[11px] h-8" placeholder="Confirmer le mot de passe" autocomplete="new-password" />
                         <p id="profile-pass-hint" class="hidden text-[10px] leading-snug min-h-[1rem]" aria-live="polite"></p>
-                        <label class="label cursor-pointer justify-start gap-2 py-0 min-h-0">
-                            <input type="checkbox" id="profile-pass-show-plain" class="checkbox checkbox-primary checkbox-sm" />
-                            <span class="label-text text-[10px] text-slate-600">Montrer les mots de passe</span>
-                        </label>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" id="profile-pass-apply" class="btn btn-primary btn-xs" disabled>Appliquer</button>
+                            <label class="label cursor-pointer justify-start gap-2 py-0 min-h-0">
+                                <input type="checkbox" id="profile-pass-show-plain" class="checkbox checkbox-primary checkbox-sm" />
+                                <span class="label-text text-[10px] text-slate-600">Montrer les mots de passe</span>
+                            </label>
+                        </div>
                     </div>
                 </dd>
             </div>
         </dl>
-
         <div id="profile-section-agendas" class="profile-agendas-section hidden mt-4 pt-4 border-t border-slate-200">
-            <div class="flex items-center gap-1.5 mb-2">
-                <p class="text-[10px] font-bold uppercase text-slate-600 tracking-wide m-0 flex-1">Agendas</p>
-                <button
-                    type="button"
-                    id="drawer-agenda-help-btn"
-                    class="planning-drawer__help-btn"
-                    title="Afficher ou masquer l’aide"
-                    aria-label="Aide agendas Google"
-                    aria-expanded="false"
-                    aria-controls="drawer-agenda-help-text"
-                >
-                    ?
-                </button>
-            </div>
-            <p id="drawer-agenda-help-text" class="planning-drawer__agenda-help hidden mb-2" role="region" aria-label="Aide agendas"></p>
+            <p class="text-[10px] font-bold uppercase text-slate-600 tracking-wide m-0 mb-2">Agendas</p>
+            <p id="drawer-agenda-help-text" class="planning-drawer__agenda-help mb-2 text-[10px] text-slate-600 leading-snug" role="region" aria-label="Aide agendas"></p>
             <div class="planning-drawer__agenda-line">
                 <span class="planning-drawer__agenda-line-title">Planning complet</span>
-                <button type="button" id="drawer-agenda-main-btn" class="planning-drawer__agenda-copy-btn hidden">Copier l’URL</button>
+                <button type="button" id="drawer-agenda-main-btn" class="planning-drawer__agenda-copy-btn hidden">Copier l'URL</button>
             </div>
             <div class="planning-drawer__agenda-line">
                 <span class="planning-drawer__agenda-line-title">Planning personnel</span>
-                <button type="button" id="drawer-agenda-personal-btn" class="planning-drawer__agenda-copy-btn hidden">Copier l’URL</button>
+                <button type="button" id="drawer-agenda-personal-btn" class="planning-drawer__agenda-copy-btn hidden">Copier l'URL</button>
             </div>
             <p id="drawer-agenda-personal-none" class="planning-drawer__hint hidden mt-1">Aucun agenda personnel IAMS associé à ce compte.</p>
         </div>

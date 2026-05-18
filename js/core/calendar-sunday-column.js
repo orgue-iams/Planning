@@ -1,9 +1,8 @@
 /**
- * Option d’affichage : masquer le dimanche sur la vue semaine si aucun créneau « à nous »
- * (prof/admin : créneaux dont nous sommes propriétaires ; élève : tout créneau hors fermeture).
- * La réservation du dimanche reste possible (navigation / autre vue / jour courant).
+ * Colonne dimanche en vue semaine : préférence profil (`planning_show_sunday`) ou masquage automatique
+ * selon les créneaux « à nous » (prof/admin : propriétaires ; élève : hors fermeture).
  * @param {import('@fullcalendar/core').CalendarApi} calendar
- * @param {{ id?: string, email?: string, role?: string } | null} currentUser
+ * @param {{ id?: string, email?: string, role?: string, planning_show_sunday?: boolean } | null} currentUser
  */
 export function updatePlanningSundayColumnVisibility(calendar, currentUser) {
     if (!calendar) return;
@@ -11,6 +10,15 @@ export function updatePlanningSundayColumnVisibility(calendar, currentUser) {
     if (!view || view.type !== 'timeGridWeek') {
         const cur = calendar.getOption('hiddenDays');
         if (Array.isArray(cur) && cur.length) calendar.setOption('hiddenDays', []);
+        return;
+    }
+
+    if (currentUser?.planning_show_sunday === true) {
+        applyHiddenDays(calendar, []);
+        return;
+    }
+    if (currentUser?.planning_show_sunday === false) {
+        applyHiddenDays(calendar, [0]);
         return;
     }
 
@@ -58,7 +66,14 @@ export function updatePlanningSundayColumnVisibility(calendar, currentUser) {
         }
     }
 
-    const want = showSunday ? [] : [0];
+    applyHiddenDays(calendar, showSunday ? [] : [0]);
+}
+
+/**
+ * @param {import('@fullcalendar/core').CalendarApi} calendar
+ * @param {number[]} want
+ */
+function applyHiddenDays(calendar, want) {
     const cur = calendar.getOption('hiddenDays');
     const same =
         Array.isArray(cur) &&

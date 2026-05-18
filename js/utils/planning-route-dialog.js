@@ -4,6 +4,7 @@
 import { closePlanningDrawer, openPlanningDrawerInstant } from '../core/planning-drawer-ui.js';
 import { showMainDrawerPanel } from '../core/drawer-help-ui.js';
 import { focusPlanningDialogRoot } from './focus-planning-dialog.js';
+import { isPlanningDrawerReopenSuppressed } from './planning-overlay-dismiss.js';
 
 const ROUTE_CLASS = 'planning-route-page';
 
@@ -34,12 +35,35 @@ export function isPlanningRouteFromDrawer(dialogId) {
 
 function defaultRouteBack(el) {
     el.close();
-    if (routeFromDrawer.has(el.id)) openPlanningDrawerInstant();
+    if (routeFromDrawer.has(el.id) && !isPlanningDrawerReopenSuppressed()) openPlanningDrawerInstant();
     else closePlanningDrawer();
 }
 
 function syncPlanningRouteBackFromStack(dialogId) {
     setPlanningRouteBackHandler(dialogId, () => popPlanningRouteLevel(dialogId));
+}
+
+/**
+ * Met à jour la barre (titre + retour) à partir de la pile courante.
+ * @param {string} dialogId
+ */
+export function refreshPlanningRouteChrome(dialogId) {
+    const stack = routeStacks.get(dialogId);
+    if (!stack?.length) return;
+    const top = stack[stack.length - 1];
+    const el = document.getElementById(dialogId);
+    if (!(el instanceof HTMLDialogElement)) return;
+    if (top.ariaLabel) el.setAttribute('aria-label', top.ariaLabel);
+    const bar = ensureRouteBar(el);
+    const short = (top.backLabel || 'Menu').trim();
+    const backText = `< ${short}`;
+    const back = bar.querySelector('.planning-route-page__back');
+    if (back instanceof HTMLButtonElement) {
+        back.textContent = backText;
+        back.setAttribute('aria-label', `Retour (${short})`);
+    }
+    const title = bar.querySelector('.planning-route-page__title');
+    if (title) title.textContent = (top.ariaLabel || '').trim();
 }
 
 /**
@@ -50,7 +74,7 @@ function syncPlanningRouteBackFromStack(dialogId) {
  */
 export function resetPlanningRouteStack(dialogId, ariaLabel, backLabel = 'Menu') {
     routeStacks.set(dialogId, [{ ariaLabel, backLabel }]);
-    updatePlanningRouteDialog(dialogId, ariaLabel, backLabel);
+    refreshPlanningRouteChrome(dialogId);
     syncPlanningRouteBackFromStack(dialogId);
 }
 
@@ -70,7 +94,30 @@ export function pushPlanningRouteLevel(dialogId, ariaLabel, backLabel, onPop) {
         onPop
     });
     routeStacks.set(dialogId, stack);
-    updatePlanningRouteDialog(dialogId, ariaLabel, stack[stack.length - 1].backLabel);
+    refreshPlanningRouteChrome(dialogId);
+    syncPlanningRouteBackFromStack(dialogId);
+}
+
+/**
+ * Remplace le niveau courant (sans empiler) — sous-écran dans le même dialogue.
+ * @param {string} dialogId
+ * @param {string} ariaLabel
+ * @param {string} backLabel
+ * @param {() => void} [onPop]
+ */
+export function replacePlanningRouteLevel(dialogId, ariaLabel, backLabel, onPop) {
+    const stack = routeStacks.get(dialogId) || [];
+    if (!stack.length) {
+        resetPlanningRouteStack(dialogId, ariaLabel, backLabel);
+        return;
+    }
+    stack[stack.length - 1] = {
+        ariaLabel,
+        backLabel: (backLabel || stack[stack.length - 2]?.ariaLabel || 'Menu').trim(),
+        onPop
+    };
+    routeStacks.set(dialogId, stack);
+    refreshPlanningRouteChrome(dialogId);
     syncPlanningRouteBackFromStack(dialogId);
 }
 
@@ -91,8 +138,7 @@ export function popPlanningRouteLevel(dialogId) {
     }
     const popped = stack.pop();
     popped?.onPop?.();
-    const top = stack[stack.length - 1];
-    updatePlanningRouteDialog(dialogId, top.ariaLabel, top.backLabel);
+    refreshPlanningRouteChrome(dialogId);
     syncPlanningRouteBackFromStack(dialogId);
     return true;
 }
@@ -135,25 +181,24 @@ export function setPlanningRouteBackHandler(dialogId, fn) {
 }
 
 /**
- * Met à jour le libellé du bouton retour sans rouvrir le dialogue.
+ * Met à jour le niveau courant de la pile puis rafraîchit la barre.
  * @param {string} dialogId
  * @param {string} ariaLabel
  * @param {string} [backLabel] Texte affiché après « < » (parent dans la hiérarchie).
  */
 export function updatePlanningRouteDialog(dialogId, ariaLabel, backLabel) {
-    const el = document.getElementById(dialogId);
-    if (!(el instanceof HTMLDialogElement)) return;
-    if (ariaLabel) el.setAttribute('aria-label', ariaLabel);
-    const bar = ensureRouteBar(el);
-    const short = (backLabel || ariaLabel || 'Retour').trim();
-    const backText = `< ${short}`;
-    const back = bar.querySelector('.planning-route-page__back');
-    if (back instanceof HTMLButtonElement) {
-        back.textContent = backText;
-        back.setAttribute('aria-label', `Retour (${short})`);
+    const stack = routeStacks.get(dialogId);
+    if (stack?.length) {
+        stack[stack.length - 1] = {
+            ...stack[stack.length - 1],
+            ariaLabel: ariaLabel.trim(),
+            backLabel: (backLabel ?? stack[stack.length - 1].backLabel ?? 'Menu').trim()
+        };
+        routeStacks.set(dialogId, stack);
+    } else {
+        routeStacks.set(dialogId, [{ ariaLabel, backLabel: (backLabel || 'Menu').trim() }]);
     }
-    const title = bar.querySelector('.planning-route-page__title');
-    if (title) title.textContent = (ariaLabel || '').trim();
+    refreshPlanningRouteChrome(dialogId);
 }
 
 /**
@@ -170,7 +215,7 @@ export function openPlanningRouteFromDrawer(dialogId, ariaLabel, backLabel) {
     routeFromDrawer.add(dialogId);
     resetPlanningRouteStack(dialogId, ariaLabel, backLabel || 'Menu');
     showMainDrawerPanel();
-    openPlanningRouteDialog(dialogId, ariaLabel, backLabel);
+    openPlanningRouteDialog(dialogId);
     document.getElementById('btn-app-drawer')?.blur();
     closePlanningDrawer();
     return true;
@@ -178,8 +223,8 @@ export function openPlanningRouteFromDrawer(dialogId, ariaLabel, backLabel) {
 
 /**
  * @param {string} dialogId
- * @param {string} ariaLabel Libellé complet (aria-label du dialogue).
- * @param {string} [backLabel] Texte après « < » sur le bouton retour (défaut = `ariaLabel`).
+ * @param {string} [ariaLabel] Utilisé seulement si la pile n’existe pas encore.
+ * @param {string} [backLabel]
  */
 export function openPlanningRouteDialog(dialogId, ariaLabel, backLabel) {
     const el = document.getElementById(dialogId);
@@ -188,9 +233,9 @@ export function openPlanningRouteDialog(dialogId, ariaLabel, backLabel) {
     el.classList.add(ROUTE_CLASS);
     ensureRouteBar(el);
     if (!routeStacks.has(dialogId)) {
-        resetPlanningRouteStack(dialogId, ariaLabel, backLabel || ariaLabel);
+        resetPlanningRouteStack(dialogId, ariaLabel || 'Menu', backLabel || 'Menu');
     } else {
-        updatePlanningRouteDialog(dialogId, ariaLabel, backLabel);
+        refreshPlanningRouteChrome(dialogId);
     }
 
     const onClose = () => {
@@ -199,7 +244,7 @@ export function openPlanningRouteDialog(dialogId, ariaLabel, backLabel) {
         routeStacks.delete(dialogId);
         const fromDrawer = routeFromDrawer.has(dialogId);
         routeFromDrawer.delete(dialogId);
-        if (fromDrawer) openPlanningDrawerInstant();
+        if (fromDrawer && !isPlanningDrawerReopenSuppressed()) openPlanningDrawerInstant();
         el.removeEventListener('close', onClose);
     };
     el.addEventListener('close', onClose, { once: true });

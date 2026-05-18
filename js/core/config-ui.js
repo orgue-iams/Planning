@@ -258,11 +258,27 @@ export function initConfigUi(currentUser) {
     });
 
     /* Un seul événement par champ : `input` + `change` déclenchaient plusieurs sauvegardes (ex. nombre de toasts). */
+    document.getElementById('modal_config')?.addEventListener('close', () => {
+        window.clearTimeout(persistTimer);
+        void persistConfigIfAdmin();
+    });
+    document.addEventListener('planning-overlay-flush', () => {
+        const m = document.getElementById('modal_config');
+        if (m instanceof HTMLDialogElement && m.open) {
+            window.clearTimeout(persistTimer);
+            void persistConfigIfAdmin();
+        }
+    });
+
     for (const id of CONFIG_PERSIST_IDS) {
         const el = document.getElementById(id);
         el?.addEventListener('change', () => {
             syncConfigRuleRows();
             scheduleConfigPersist();
+        });
+        el?.addEventListener('blur', () => {
+            window.clearTimeout(persistTimer);
+            void persistConfigIfAdmin();
         });
     }
     for (const rule of CONFIG_RULES) {
