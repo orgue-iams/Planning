@@ -12,14 +12,14 @@
                             <div class="st-section-col">
                                 <div class="st-section-col-head">
                                     <span class="font-bold text-slate-700 dark:text-slate-200">Semaine A</span>
-                                    <button type="button" id="st-add-row-a" class="btn btn-ghost btn-xs font-black text-[10px] hidden">+ Créneau</button>
+                                    <button type="button" id="st-add-row-a" class="btn btn-sm planning-btn-accent font-semibold text-[10px] hidden">+ Créneau</button>
                                 </div>
                                 <div id="st-list-a" class="st-slot-list"></div>
                             </div>
                             <div class="st-section-col">
                                 <div class="st-section-col-head">
                                     <span class="font-bold text-slate-700 dark:text-slate-200">Semaine B</span>
-                                    <button type="button" id="st-add-row-b" class="btn btn-ghost btn-xs font-black text-[10px] hidden">+ Créneau</button>
+                                    <button type="button" id="st-add-row-b" class="btn btn-sm planning-btn-accent font-semibold text-[10px] hidden">+ Créneau</button>
                                 </div>
                                 <div id="st-list-b" class="st-slot-list"></div>
                             </div>
@@ -36,17 +36,17 @@
                             <div class="st-apply-period pt-2 border-t border-slate-200 dark:border-slate-600 space-y-2">
                                 <p class="text-[9px] font-bold text-slate-600 dark:text-slate-300 m-0">Période d’application</p>
                                 <div class="st-apply-period-row grid grid-cols-2 gap-2 sm:gap-3 items-stretch">
-                                    <div class="st-apply-week-start-group planning-surface-card rounded-xl p-3 shadow-sm flex flex-col gap-2 min-h-[7.5rem]">
+                                    <div class="st-apply-week-start-group planning-surface-card rounded-xl p-2.5 sm:p-3 shadow-sm flex flex-col gap-2">
                                         <label class="text-[9px] font-bold block" for="st-apply-start">Date de début (inclus)</label>
-                                        <input type="date" id="st-apply-start" class="input input-sm h-9 font-mono text-sm rounded-lg w-full" />
+                                        <input type="date" id="st-apply-start" class="input input-sm h-9 font-mono text-sm rounded-lg w-full min-w-0 planning-date-input" />
                                         <div class="flex flex-col gap-1.5 text-[11px] font-bold pt-0.5">
                                             <label class="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="st-apply-first-week" id="st-apply-week-a" value="A" class="radio radio-xs" checked /> Semaine A</label>
                                             <label class="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="st-apply-first-week" id="st-apply-week-b" value="B" class="radio radio-xs" /> Semaine B</label>
                                         </div>
                                     </div>
-                                    <div class="st-apply-end-group planning-surface-card rounded-xl p-3 shadow-sm flex flex-col gap-2 min-h-[7.5rem]">
+                                    <div class="st-apply-end-group planning-surface-card rounded-xl p-2.5 sm:p-3 shadow-sm flex flex-col gap-2">
                                         <label class="text-[9px] font-bold block" for="st-apply-end">Date de fin (inclus)</label>
-                                        <input type="date" id="st-apply-end" class="input input-sm h-9 font-mono text-sm rounded-lg w-full" />
+                                        <input type="date" id="st-apply-end" class="input input-sm h-9 font-mono text-sm rounded-lg w-full min-w-0 planning-date-input" />
                                     </div>
                                 </div>
                             </div>

@@ -1,9 +1,9 @@
 /**
- * Modale Consignes ; annonces planifiées via Supabase (menu Annonces / bandeau login).
+ * Modale Consignes (lecture / édition admin et prof).
  */
 
 import { showToast } from '../utils/toast.js';
-import { getRulesText, markBroadcastSeen } from '../utils/messaging.js';
+import { getRulesText } from '../utils/messaging.js';
 import { isPrivilegedUser } from './auth-logic.js';
 import { isBackendAuthConfigured } from './supabase-client.js';
 import { fetchOrganRulesRemote, saveOrganRulesRemote } from '../utils/org-content.js';
@@ -71,7 +71,6 @@ export function initMessagesUi(_ignored) {
 
     const btnRulesFab = document.getElementById('btn-org-brand-rules');
     const modalRules = document.getElementById('modal_rules');
-    const modalBroadcast = document.getElementById('modal_broadcast');
 
     const view = document.getElementById('rules-view');
     const editWrap = document.getElementById('rules-edit-wrap');
@@ -79,10 +78,6 @@ export function initMessagesUi(_ignored) {
     const btnEdit = document.getElementById('rules-btn-edit');
     const btnSave = document.getElementById('rules-btn-save');
     const btnClose = document.getElementById('rules-btn-close');
-
-    const adminBlock = document.getElementById('rules-admin-broadcast');
-    const broadcastEditor = document.getElementById('broadcast-editor');
-    const btnPublish = document.getElementById('broadcast-publish');
     const backendHint = document.getElementById('rules-backend-hint');
 
     /** @type {any} */
@@ -102,11 +97,9 @@ export function initMessagesUi(_ignored) {
         const backend = isBackendAuthConfigured();
         if (priv) {
             btnEdit?.classList.toggle('hidden', !backend);
-            adminBlock?.classList.add('hidden');
             backendHint?.classList.toggle('hidden', !backend);
         } else {
             btnEdit?.classList.add('hidden');
-            adminBlock?.classList.add('hidden');
             backendHint?.classList.add('hidden');
         }
     };
@@ -244,34 +237,4 @@ export function initMessagesUi(_ignored) {
         { signal }
     );
 
-    btnPublish?.addEventListener(
-        'click',
-        () => {
-            showToast('Utilisez le menu Réglages (engrenage) → Annonces (Supabase) pour publier une annonce.', 'info');
-        },
-        { signal }
-    );
-
-    const btnBroadcastOk = document.getElementById('broadcast-btn-ok');
-
-    btnBroadcastOk?.addEventListener(
-        'click',
-        () => {
-            const id = modalBroadcast?.dataset.broadcastId;
-            if (id) {
-                if (id.startsWith('sm_')) {
-                    localStorage.setItem(`orgue_sm_seen_${id.slice(3)}`, '1');
-                } else {
-                    markBroadcastSeen(id);
-                }
-            }
-            modalBroadcast?.close();
-        },
-        { signal }
-    );
-}
-
-export async function tryShowBroadcastPopup(currentUser) {
-    void currentUser;
-    /* Popups locales supprimées : annonces via Supabase uniquement. */
 }

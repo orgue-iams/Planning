@@ -10,6 +10,9 @@
     --planning-text: rgb(30 41 59);
     --planning-text-muted: rgb(100 116 139);
     --planning-input-bg: rgb(255 255 255);
+    --planning-accent-bg: rgb(239 246 255);
+    --planning-accent-border: rgb(37 99 235);
+    --planning-accent-text: rgb(29 78 216);
 }
 
 [data-theme='dark'] {
@@ -20,6 +23,9 @@
     --planning-text: rgb(241 245 249);
     --planning-text-muted: rgb(148 163 184);
     --planning-input-bg: rgb(15 23 42);
+    --planning-accent-bg: rgb(30 58 138 / 0.35);
+    --planning-accent-border: rgb(96 165 250);
+    --planning-accent-text: rgb(191 219 254);
 }
 
 .planning-surface-card {
@@ -52,4 +58,40 @@
     background: var(--planning-input-bg) !important;
     border-color: var(--planning-border) !important;
     color: var(--planning-text) !important;
+}
+
+.planning-btn-accent {
+    background: var(--planning-accent-bg) !important;
+    border: 1px solid var(--planning-accent-border) !important;
+    color: var(--planning-accent-text) !important;
+    font-weight: 600;
+    box-shadow: none;
+}
+
+.planning-btn-accent:hover {
+    filter: brightness(0.97);
+}
+
+[data-theme='dark'] .planning-btn-accent:hover {
+    filter: brightness(1.08);
+}
+
+.planning-date-input {
+    color-scheme: light;
+    min-width: 0;
+    max-width: 100%;
+}
+
+[data-theme='dark'] .planning-date-input {
+    color-scheme: dark;
+}
+
+.planning-date-input::-webkit-calendar-picker-indicator {
+    opacity: 0.72;
+    cursor: pointer;
+}
+
+[data-theme='dark'] .planning-date-input::-webkit-calendar-picker-indicator {
+    filter: invert(0.85);
+    opacity: 0.9;
 }

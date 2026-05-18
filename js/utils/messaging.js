@@ -1,10 +1,8 @@
 /**
- * Consignes (texte local) et annonces (stockage local en démo).
+ * Consignes (texte local) — repli si pas de backend.
  */
 
 const KEY_RULES = 'orgue_iams_rules';
-const KEY_BROADCAST = 'orgue_iams_broadcast';
-const KEY_BROADCAST_SEEN = 'orgue_iams_broadcast_seen';
 
 const DEFAULT_RULES = `Consignes
 
@@ -28,53 +26,4 @@ export function getRulesText() {
 
 export function setRulesText(text) {
     localStorage.setItem(KEY_RULES, text);
-}
-
-export function getBroadcast() {
-    try {
-        const raw = localStorage.getItem(KEY_BROADCAST);
-        if (!raw) return null;
-        const o = JSON.parse(raw);
-        if (!o || typeof o.text !== 'string') return null;
-        return o;
-    } catch {
-        return null;
-    }
-}
-
-/** Publie une nouvelle annonce : nouvel id → tous les élèves/profs la verront à nouveau. */
-export function publishBroadcast(text) {
-    const t = String(text || '').trim();
-    if (!t) {
-        localStorage.removeItem(KEY_BROADCAST);
-        return null;
-    }
-    const payload = {
-        id: `b_${Date.now()}`,
-        text: t,
-        at: new Date().toISOString()
-    };
-    localStorage.setItem(KEY_BROADCAST, JSON.stringify(payload));
-    return payload;
-}
-
-export function getLastSeenBroadcastId() {
-    try {
-        return localStorage.getItem(KEY_BROADCAST_SEEN) || '';
-    } catch {
-        return '';
-    }
-}
-
-export function markBroadcastSeen(id) {
-    if (id) localStorage.setItem(KEY_BROADCAST_SEEN, id);
-}
-
-/** Popup réservée aux élèves et profs (pas à l’admin qui diffuse). */
-export function shouldShowBroadcast(user) {
-    if (!user || user.role === 'admin') return false;
-    if (user.role !== 'eleve' && user.role !== 'prof') return false;
-    const b = getBroadcast();
-    if (!b || !b.text) return false;
-    return b.id !== getLastSeenBroadcastId();
 }

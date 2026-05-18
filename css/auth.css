@@ -149,7 +149,7 @@
     margin: 0 !important;
 }
 
-/* Bandeau d’annonce sous le titre : graisse stable (indépendante du focus dans les champs). */
+/* Bandeau configuration (écran de connexion) : graisse stable. */
 #modal_login #login-banner-box {
     font-weight: 400;
     font-synthesis: none;

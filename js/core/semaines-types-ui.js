@@ -21,6 +21,7 @@ import { saveProfWeekCycleFromApply } from './week-cycle.js';
 import { openPlanningRouteFromDrawer } from '../utils/planning-route-dialog.js';
 import { openCourseStudentsPicker } from './course-students-picker.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
+import { populateTimeSelects } from '../utils/time-helpers.js';
 
 const ST_DELETE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m2-3h6a1 1 0 011 1v1H8V5a1 1 0 011-1z"/></svg>';
 
@@ -334,7 +335,61 @@ function enrolledStudentsCommaLine(ids, byId) {
         if (c !== 0) return c;
         return a.prenom.localeCompare(b.prenom, 'fr');
     });
+    if (!rows.length) return '';
     return rows.map((r) => r.label).join(', ');
+}
+
+/** @param {HTMLElement | null} listEl */
+function sortTemplateListDOM(listEl) {
+    if (!listEl) return;
+    const cards = [...listEl.querySelectorAll('.st-slot-card[data-st-line]')];
+    cards.sort((a, b) => {
+        const da = parseInt(a.dataset.stDow || '1', 10);
+        const db = parseInt(b.dataset.stDow || '1', 10);
+        if (da !== db) return da - db;
+        return padTime(a.dataset.stStart).localeCompare(padTime(b.dataset.stStart));
+    });
+    for (const card of cards) listEl.appendChild(card);
+}
+
+/** @param {HTMLElement} profEl @param {HTMLElement} card */
+function renderProfTwoLines(profEl, card) {
+    const prenom = String(card.dataset.stOwnerPrenom || '').trim();
+    const nom = String(card.dataset.stOwnerNom || '').trim();
+    profEl.replaceChildren();
+    if (!prenom && !nom) {
+        const label = String(card.dataset.stOwnerLabel || '').trim();
+        if (!label) {
+            profEl.textContent = '—';
+            return;
+        }
+        const parts = label.split(/\s+/).filter(Boolean);
+        if (parts.length <= 1) {
+            profEl.textContent = label;
+            return;
+        }
+        const l1 = document.createElement('span');
+        l1.className = 'block leading-snug';
+        l1.textContent = parts[0];
+        const l2 = document.createElement('span');
+        l2.className = 'block leading-snug';
+        l2.textContent = parts.slice(1).join(' ');
+        profEl.appendChild(l1);
+        profEl.appendChild(l2);
+        return;
+    }
+    if (prenom) {
+        const l1 = document.createElement('span');
+        l1.className = 'block leading-snug';
+        l1.textContent = prenom;
+        profEl.appendChild(l1);
+    }
+    if (nom) {
+        const l2 = document.createElement('span');
+        l2.className = 'block leading-snug';
+        l2.textContent = nom;
+        profEl.appendChild(l2);
+    }
 }
 
 function padTime(raw) {
@@ -423,15 +478,17 @@ function syncRowReadonlyDisplay(card, elevesById) {
     if (roStudents.classList.contains('hidden') || roStudents.hasAttribute('hidden')) return;
     if (typ !== 'cours') {
         roStudents.textContent = '—';
+        const profElRes = card.querySelector('.st-ro-prof');
+        if (profElRes) renderProfTwoLines(profElRes, card);
         return;
     }
     const ids = String(card.dataset.stStudents || '')
         .split(',')
         .map((x) => x.trim())
         .filter(Boolean);
-    roStudents.textContent = enrolledStudentsCommaLine(ids, elevesById) || '—';
+    roStudents.textContent = enrolledStudentsCommaLine(ids, elevesById) || "pas d'élèves";
     const profEl = card.querySelector('.st-ro-prof');
-    if (profEl) profEl.textContent = String(card.dataset.stOwnerLabel || '').trim() || '—';
+    if (profEl) renderProfTwoLines(profEl, card);
 }
 
 function parseRowsFromList(listEl, weekLetter, ownerId) {
@@ -508,8 +565,8 @@ function applyStSlotEditFormToCard(opts = {}) {
         /** @type {HTMLSelectElement | null} */ (document.getElementById('stle-dow'))?.value || '1',
         10
     );
-    const st = padTime(/** @type {HTMLInputElement | null} */ (document.getElementById('stle-start'))?.value);
-    const en = padTime(/** @type {HTMLInputElement | null} */ (document.getElementById('stle-end'))?.value);
+    const st = padTime(/** @type {HTMLSelectElement | null} */ (document.getElementById('stle-start'))?.value);
+    const en = padTime(/** @type {HTMLSelectElement | null} */ (document.getElementById('stle-end'))?.value);
     const title = String(/** @type {HTMLInputElement | null} */ (document.getElementById('stle-title'))?.value || '').trim();
     if (st >= en) {
         showToast('L’heure de fin doit être après le début.', 'error');
@@ -524,6 +581,7 @@ function applyStSlotEditFormToCard(opts = {}) {
     card.classList.remove('st-row-cours', 'st-row-travail', 'st-row-other-prof');
     card.classList.add(typ === 'cours' ? 'st-row-cours' : 'st-row-travail');
     syncRowReadonlyDisplay(card, stElevesByIdRef);
+    sortTemplateListDOM(card.closest('.st-slot-list'));
     if (!skipSave) scheduleStAutoSave();
     return true;
 }
@@ -532,6 +590,7 @@ function wireStLineEditModal() {
     const dlg = document.getElementById('modal_st_slot_edit');
     if (!dlg || dlg.dataset.stleWired === '1') return;
     dlg.dataset.stleWired = '1';
+    populateTimeSelects('stle-start', 'stle-end');
 
     const onFieldChange = () => {
         applyStSlotEditFormToCard();
@@ -689,10 +748,22 @@ function openStSlotEditPanel(card) {
     const dowSel = /** @type {HTMLSelectElement | null} */ (document.getElementById('stle-dow'));
     if (dowSel) dowSel.value = String(Math.min(7, Math.max(1, parseInt(card.dataset.stDow || '1', 10))));
 
-    const stIn = /** @type {HTMLInputElement | null} */ (document.getElementById('stle-start'));
-    const enIn = /** @type {HTMLInputElement | null} */ (document.getElementById('stle-end'));
-    if (stIn) stIn.value = padTime(card.dataset.stStart);
-    if (enIn) enIn.value = padTime(card.dataset.stEnd);
+    const stIn = /** @type {HTMLSelectElement | null} */ (document.getElementById('stle-start'));
+    const enIn = /** @type {HTMLSelectElement | null} */ (document.getElementById('stle-end'));
+    const stVal = padTime(card.dataset.stStart);
+    const enVal = padTime(card.dataset.stEnd);
+    if (stIn) {
+        if (![...stIn.options].some((o) => o.value === stVal)) {
+            stIn.add(new Option(stVal, stVal));
+        }
+        stIn.value = stVal;
+    }
+    if (enIn) {
+        if (![...enIn.options].some((o) => o.value === enVal)) {
+            enIn.add(new Option(enVal, enVal));
+        }
+        enIn.value = enVal;
+    }
 
     const ti = /** @type {HTMLInputElement | null} */ (document.getElementById('stle-title'));
     if (ti) ti.value = String(card.dataset.stTitle || '').trim();
@@ -763,7 +834,7 @@ function makeStudentOptionsHtml(eleves) {
  * @param {{ isAdmin: boolean, ownerLabel: string, lineOwnerId: string, currentUserId: string, elevesById: Map<string, object> }} ctx
  */
 function appendTemplateCard(listEl, line, _optHtml, ctx) {
-    const { isAdmin, ownerLabel, lineOwnerId, currentUserId, elevesById } = ctx;
+    const { isAdmin, ownerLabel, ownerPrenom, ownerNom, lineOwnerId, currentUserId, elevesById } = ctx;
     const isOwnRow = String(lineOwnerId) === String(currentUserId);
     const isEleve = String(getPlanningSessionUser()?.role || '').toLowerCase() === 'eleve';
     const isReadonly = isAdmin || !isOwnRow || isEleve;
@@ -773,8 +844,8 @@ function appendTemplateCard(listEl, line, _optHtml, ctx) {
     const weekLetter = line?.week_type === 'B' ? 'B' : 'A';
     const card = document.createElement('div');
     card.className = isEleve
-        ? 'st-slot-card st-slot-card--eleve-view grid grid-cols-[minmax(0,0.75fr)_minmax(0,1.1fr)_minmax(0,0.95fr)] gap-2 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px] text-slate-800'
-        : 'st-slot-card grid grid-cols-[auto_minmax(0,0.85fr)_minmax(0,1fr)_minmax(0,0.95fr)] gap-2 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px] text-slate-800';
+        ? 'st-slot-card st-slot-card--eleve-view grid grid-cols-[minmax(5rem,0.95fr)_minmax(0,1.1fr)_minmax(0,0.95fr)] gap-2 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px] text-slate-800'
+        : 'st-slot-card grid grid-cols-[auto_minmax(5.5rem,1.15fr)_minmax(0,1fr)_minmax(0,0.95fr)] gap-2 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px] text-slate-800';
     card.classList.add(`st-slot-card--prof-tint-${profTintIndex(lineOwnerId)}`);
     if (!isReadonly) card.classList.add('st-slot-card--editable');
     card.setAttribute('data-st-line', '1');
@@ -789,6 +860,8 @@ function appendTemplateCard(listEl, line, _optHtml, ctx) {
     card.dataset.stTitle = String(line?.title || '').trim();
     card.dataset.stStudents = sid.join(',');
     card.dataset.stOwnerLabel = ownerLabel;
+    card.dataset.stOwnerPrenom = ownerPrenom || '';
+    card.dataset.stOwnerNom = ownerNom || '';
 
     const dragHtml = isReadonly
         ? '<span class="w-0" aria-hidden="true"></span>'
@@ -864,6 +937,34 @@ async function loadOwnerLabels(userIds) {
     }
     for (const id of uniq) {
         if (!m.has(id)) m.set(id, String(id).slice(0, 8));
+    }
+    return m;
+}
+
+/** @param {string[]} userIds @returns {Promise<Map<string, { label: string, prenom: string, nom: string }>>} */
+async function loadOwnerProfiles(userIds) {
+    const uniq = [...new Set((userIds || []).filter(Boolean))];
+    const labels = await loadOwnerLabels(uniq);
+    const m = new Map();
+    if (!uniq.length) return m;
+    const sb = getSupabaseClient();
+    if (sb) {
+        const { data, error } = await sb.from('profiles').select('id, prenom, nom').in('id', uniq);
+        if (!error) {
+            for (const row of data || []) {
+                const id = String(row.id);
+                m.set(id, {
+                    label: labels.get(id) || id.slice(0, 8),
+                    prenom: String(row.prenom || '').trim(),
+                    nom: String(row.nom || '').trim()
+                });
+            }
+        }
+    }
+    for (const id of uniq) {
+        if (!m.has(id)) {
+            m.set(id, { label: labels.get(id) || id.slice(0, 8), prenom: '', nom: '' });
+        }
     }
     return m;
 }
@@ -948,7 +1049,7 @@ async function openSemainesTypesModal(user) {
     const optHtml = makeStudentOptionsHtml(eleves);
     const { lines, byLineStudents } = await loadLinesForModal();
     const ownerIds = [...new Set(lines.map((l) => l.owner_user_id).filter(Boolean))];
-    const ownerLabels = await loadOwnerLabels(ownerIds);
+    const ownerProfiles = await loadOwnerProfiles(ownerIds);
 
     const ta = document.getElementById('st-list-a');
     const tb = document.getElementById('st-list-b');
@@ -967,13 +1068,17 @@ async function openSemainesTypesModal(user) {
         if (!listEl) continue;
         const sid = byLineStudents.get(line.id) || [];
         const oid = String(line.owner_user_id || '');
-        const ownerLabel = ownerLabels.get(oid) || oid.slice(0, 8);
+        const prof = ownerProfiles.get(oid) || { label: oid.slice(0, 8), prenom: '', nom: '' };
         appendTemplateCard(listEl, { ...line, studentIds: sid }, optHtml, {
             ...ctxBase,
-            ownerLabel,
+            ownerLabel: prof.label,
+            ownerPrenom: prof.prenom,
+            ownerNom: prof.nom,
             lineOwnerId: oid
         });
     }
+    sortTemplateListDOM(ta);
+    sortTemplateListDOM(tb);
 
     const applyStart = document.getElementById('st-apply-start');
     if (applyStart) applyStart.value = defaultApplyStartYmd();
@@ -984,9 +1089,13 @@ async function openSemainesTypesModal(user) {
     lastAnalysis = null;
 }
 
-function addEmptyRow(listEl, elevesHtml, user, elevesById, ownerLabels) {
+function addEmptyRow(listEl, elevesHtml, user, elevesById, ownerProfiles) {
     const oid = String(user.id);
-    const ownerLabel = ownerLabels.get(oid) || user.email || oid.slice(0, 8);
+    const prof = ownerProfiles.get(oid) || {
+        label: user.email || oid.slice(0, 8),
+        prenom: '',
+        nom: ''
+    };
     const card = appendTemplateCard(
         listEl,
         {
@@ -1000,12 +1109,15 @@ function addEmptyRow(listEl, elevesHtml, user, elevesById, ownerLabels) {
         elevesHtml,
         {
             isAdmin: false,
-            ownerLabel,
+            ownerLabel: prof.label,
+            ownerPrenom: prof.prenom,
+            ownerNom: prof.nom,
             lineOwnerId: oid,
             currentUserId: oid,
             elevesById
         }
     );
+    sortTemplateListDOM(listEl);
     // Fix UX : forcer la ligne nouvellement ajoutée à être visible.
     requestAnimationFrame(() => {
         if (!card) return;
@@ -1475,10 +1587,10 @@ async function runSemainesTypesAddRow(week) {
     const eleves = await loadEleves();
     const elevesById = new Map(eleves.map((e) => [e.user_id, e]));
     stElevesByIdRef = elevesById;
-    const ownerLabels = await loadOwnerLabels([u.id]);
+    const ownerProfiles = await loadOwnerProfiles([u.id]);
     const listEl =
         week === 'B' ? document.getElementById('st-list-b') : document.getElementById('st-list-a');
-    addEmptyRow(listEl, makeStudentOptionsHtml(eleves), u, elevesById, ownerLabels);
+    addEmptyRow(listEl, makeStudentOptionsHtml(eleves), u, elevesById, ownerProfiles);
 }
 
 /**

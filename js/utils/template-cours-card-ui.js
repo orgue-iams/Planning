@@ -34,7 +34,7 @@ function escapeHtml(s) {
 
 /**
  * @param {HTMLElement} host
- * @param {{ dayOfWeek?: number|string, startTime?: string, endTime?: string, title?: string, slotType?: string, studentsLine?: string, ownerLabel?: string, ownerUserId?: string, dateSubline?: string }} p
+ * @param {{ dayOfWeek?: number|string, startTime?: string, endTime?: string, title?: string, slotType?: string, studentsLine?: string, ownerLabel?: string, ownerPrenom?: string, ownerNom?: string, ownerUserId?: string, dateSubline?: string }} p
  */
 export function appendEleveGabaritCoursCard(host, p) {
     const card = document.createElement('article');
@@ -43,16 +43,33 @@ export function appendEleveGabaritCoursCard(host, p) {
     const dow = DOW_FR[parseInt(String(p.dayOfWeek || 1), 10)] || '—';
     card.className = [
         'st-slot-card st-slot-card--eleve-view profile-gabarit-cours-card',
-        'grid grid-cols-[minmax(0,0.75fr)_minmax(0,1.1fr)_minmax(0,0.95fr)] gap-2 items-stretch',
+        'grid grid-cols-[minmax(5rem,0.95fr)_minmax(0,1.1fr)_minmax(0,0.95fr)] gap-2 items-stretch',
         'rounded-lg border border-slate-200/90 dark:border-slate-600/80 px-2 py-2 min-w-0 text-[10px] text-slate-800 dark:text-slate-100',
         profTintClass(p.ownerUserId)
     ]
         .filter(Boolean)
         .join(' ');
+    const studentsLine =
+        typ === 'cours' ? String(p.studentsLine || '').trim() || "pas d'élèves" : '';
     const studentsHtml =
         typ === 'cours'
-            ? `<p class="st-ro-students text-[10px] font-normal text-slate-700 dark:text-slate-300 m-0 mt-0.5 leading-snug break-words">${escapeHtml(p.studentsLine || '—')}</p>`
+            ? `<p class="st-ro-students text-[10px] font-normal text-slate-700 dark:text-slate-300 m-0 mt-0.5 leading-snug break-words">${escapeHtml(studentsLine)}</p>`
             : '';
+    const prenom = String(p.ownerPrenom || '').trim();
+    const nom = String(p.ownerNom || '').trim();
+    let profHtml = '—';
+    if (prenom || nom) {
+        profHtml = [prenom, nom]
+            .filter(Boolean)
+            .map((line) => `<span class="block leading-snug">${escapeHtml(line)}</span>`)
+            .join('');
+    } else if (String(p.ownerLabel || '').trim()) {
+        const parts = String(p.ownerLabel).trim().split(/\s+/).filter(Boolean);
+        if (parts.length <= 1) profHtml = escapeHtml(parts[0] || '—');
+        else {
+            profHtml = `<span class="block leading-snug">${escapeHtml(parts[0])}</span><span class="block leading-snug">${escapeHtml(parts.slice(1).join(' '))}</span>`;
+        }
+    }
     const dateSubHtml = p.dateSubline
         ? `<div class="text-[10px] font-medium text-slate-600 dark:text-slate-300 mt-0.5 leading-snug">${escapeHtml(p.dateSubline)}</div>`
         : '';
@@ -67,7 +84,7 @@ export function appendEleveGabaritCoursCard(host, p) {
             ${studentsHtml}
         </div>
         <div class="st-slot-card__prof min-w-0 self-stretch flex items-center justify-end py-0.5">
-            <span class="st-ro-prof text-[10px] font-medium text-slate-600 dark:text-slate-300 leading-snug text-right">${escapeHtml(p.ownerLabel || '—')}</span>
+            <span class="st-ro-prof text-[10px] font-medium text-slate-600 dark:text-slate-300 leading-snug text-right">${profHtml}</span>
         </div>`;
     host.appendChild(card);
 }

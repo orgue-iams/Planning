@@ -249,7 +249,7 @@ export async function refreshDrawerNextCours(user) {
         endTime: String(next.end ?? ''),
         title: lines.title,
         slotType: 'cours',
-        studentsLine: lines.students || '—',
+        studentsLine: lines.students || '',
         ownerLabel: lines.prof,
         ownerUserId: '',
         dateSubline: lines.dateSubline || ''

@@ -155,6 +155,8 @@ export function initDrawerHelpUi() {
             }
             showToast('Message envoyé au support.');
             clearHelpForm();
+            showMainDrawerPanel();
+            closePlanningDrawer();
         })();
     });
 }

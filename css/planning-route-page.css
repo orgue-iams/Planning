@@ -81,7 +81,6 @@ dialog.planning-route-page#modal_directory_users {
 
 dialog.planning-route-page#modal_config,
 dialog.planning-route-page#modal_fermetures,
-dialog.planning-route-page#modal_announcements,
 dialog.planning-route-page#modal_profile,
 dialog.planning-route-page#modal_calendar_pool,
 dialog.planning-route-page#modal_statistics {
@@ -152,4 +151,37 @@ dialog.planning-route-page .planning-route-section--first {
 
 [data-theme='dark'] dialog.planning-route-page .planning-route-section {
     border-top-color: rgb(51 65 85);
+}
+
+@media (max-width: 1023px) {
+    dialog.planning-route-page {
+        --planning-route-panel-width: 100vw;
+        grid-template-columns: 100vw 0;
+    }
+}
+
+@media (min-width: 1024px) {
+    dialog.planning-route-page {
+        --planning-route-panel-width: min(75vw, 22rem);
+    }
+
+    dialog.planning-route-page#modal_directory_users {
+        --planning-route-panel-width: min(80vw, 28rem);
+    }
+
+    dialog.planning-route-page#modal_config,
+    dialog.planning-route-page#modal_fermetures,
+    dialog.planning-route-page#modal_profile,
+    dialog.planning-route-page#modal_calendar_pool,
+    dialog.planning-route-page#modal_statistics {
+        --planning-route-panel-width: min(75vw, 24rem);
+    }
+
+    dialog.planning-route-page#modal_semaines_types {
+        --planning-route-panel-width: min(88vw, 52rem);
+    }
+
+    dialog.planning-route-page#modal_reservation {
+        --planning-route-panel-width: min(75vw, 26rem);
+    }
 }

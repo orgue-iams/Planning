@@ -66,12 +66,11 @@ import {
     shouldResumeSupabasePasswordRecovery,
     roleLabelFr
 } from './auth-logic.js';
-import { initMessagesUi, resetMessagesUiBindings, tryShowBroadcastPopup } from './messages-ui.js';
+import { initMessagesUi, resetMessagesUiBindings } from './messages-ui.js';
 import { destroyPlanningQuillMount } from '../utils/planning-quill.js';
 import { applyLoginBanner } from './login-banner.js';
 import { initAdminUsersUi, resetAdminUsersUiBindings } from './admin-users-modal-ui.js';
 import { initAdminCalendarPoolUi, resetAdminCalendarPoolBindings } from './admin-calendar-pool-ui.js';
-import { initAnnouncementsUi, resetAnnouncementsUiBindings } from './announcements-ui.js';
 import { showToast } from '../utils/toast.js';
 import { setPlanningSessionUser, getPlanningSessionUser } from './session-user.js';
 import { initProfileUi, resetProfileUiBindings, refreshHeaderWeekStrip } from './profile-ui.js';
@@ -138,7 +137,6 @@ function performLogout() {
     setPlanningSessionUser(null);
     destroyPlanningQuillMount(document.getElementById('rules-quill-mount'));
     resetMessagesUiBindings();
-    resetAnnouncementsUiBindings();
     resetAdminUsersUiBindings();
     resetAdminCalendarPoolBindings();
     resetProfileUiBindings();
@@ -171,12 +169,10 @@ function performLogout() {
         'modal_password',
         'modal_reservation',
         'modal_rules',
-        'modal_broadcast',
         'modal_users_admin',
         'modal_calendar_pool',
         'modal_admin_password',
         'modal_admin_confirm',
-        'modal_announcements',
         'modal_profile',
         'modal_semaines_types',
         'modal_fermetures',
@@ -500,11 +496,6 @@ function initCalendarAndRevealUi() {
         initConfigUi(currentUser);
         initAdminUsersUi(currentUser);
         initAdminCalendarPoolUi(currentUser);
-        initAnnouncementsUi(currentUser);
-        window.setTimeout(
-            () => void tryShowBroadcastPopup(currentUser).catch((e) => console.warn(e)),
-            500
-        );
     };
 
     requestAnimationFrame(() => void mount());

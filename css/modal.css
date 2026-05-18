@@ -115,7 +115,7 @@
     color: #1d4ed8;
 }
 
-/* Quill (règles + annonces) — barre au-dessus du texte, sticky pour rester sous l’en-tête de la modale */
+/* Quill (règles) — barre au-dessus du texte, sticky pour rester sous l’en-tête de la modale */
 .planning-quill-mount {
     display: flex;
     flex-direction: column;
@@ -234,57 +234,6 @@
     min-height: 6.5rem;
 }
 
-/* Annonces : zone courte (~4 lignes), barre d’outils en bas (évite la barre système Android au-dessus). */
-.planning-quill-mount.planning-quill-mount--announcements {
-    flex-direction: column-reverse;
-}
-
-.planning-quill-mount.planning-quill-mount--announcements .ql-toolbar.ql-snow {
-    position: static;
-    top: auto;
-    border-radius: 0 0 0.75rem 0.75rem;
-    border-top: none;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.planning-quill-mount.planning-quill-mount--announcements .ql-container.ql-snow {
-    border: 1px solid #e2e8f0 !important;
-    border-bottom: none !important;
-    border-radius: 0.75rem 0.75rem 0 0 !important;
-    background: white;
-    min-height: 0;
-}
-
-.planning-quill-mount.planning-quill-mount--announcements .ql-editor {
-    min-height: 4.25rem;
-    max-height: 7.5rem;
-    overflow-y: auto;
-    padding-bottom: 0.5rem;
-}
-
-.planning-quill-toolbar--announcements .planning-quill-clear-all {
-    margin-left: auto;
-    flex-shrink: 0;
-    border-radius: 0.5rem;
-    border: 1px solid rgb(37 99 235);
-    background: rgb(37 99 235);
-    color: #fff;
-    font-weight: 700;
-    padding: 0.25rem 0.65rem;
-}
-
-.planning-quill-toolbar--announcements .planning-quill-clear-all:hover {
-    background: rgb(29 78 216);
-    border-color: rgb(29 78 216);
-}
-
-.planning-quill-mount.planning-quill-mount--announcements .ql-editor {
-    text-align: left;
-    vertical-align: top;
-}
 
 #modal_semaines_types .st-bottom-sheet {
     flex-shrink: 0;
@@ -309,36 +258,28 @@
     box-shadow: 0 -8px 24px rgb(0 0 0 / 0.35);
 }
 
-[data-theme='dark'] #modal_announcements .planning-quill-mount .ql-toolbar.ql-snow {
     background: rgb(30 41 59);
     border-color: rgb(51 65 85);
 }
 
-[data-theme='dark'] #modal_announcements .planning-quill-mount .ql-toolbar .ql-stroke {
     stroke: #94a3b8;
 }
 
-[data-theme='dark'] #modal_announcements .planning-quill-mount .ql-toolbar .ql-fill {
     fill: #94a3b8;
 }
 
-[data-theme='dark'] #modal_announcements .planning-quill-mount .ql-toolbar button.ql-bold .ql-stroke {
     stroke: #60a5fa;
 }
 
-[data-theme='dark'] #modal_announcements .planning-quill-mount .ql-toolbar button.ql-bold.ql-active .ql-stroke {
     stroke: #93c5fd;
 }
 
-[data-theme='dark'] #modal_announcements .planning-quill-mount .ql-toolbar button:hover:not(.ql-active) .ql-stroke {
     stroke: #cbd5e1;
 }
 
-[data-theme='dark'] #modal_announcements .planning-quill-mount--announcements .ql-editor {
     color: #e2e8f0;
 }
 
-[data-theme='dark'] #modal_announcements .planning-quill-mount--announcements .ql-editor.ql-blank::before {
     color: #64748b;
 }
 
@@ -706,19 +647,29 @@
 #modal_semaines_types .st-section-split {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 0;
+    gap: 0.75rem;
+}
+
+#modal_semaines_types .st-section-col {
+    border: 1px solid var(--planning-border, rgb(226 232 240));
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    background: var(--planning-surface-elevated, rgb(255 255 255));
+}
+
+[data-theme='dark'] #modal_semaines_types .st-section-col {
+    background: var(--planning-surface-elevated, rgb(30 41 59));
 }
 
 @media (min-width: 640px) {
     #modal_semaines_types .st-section-split {
         grid-template-columns: 1fr 1fr;
     }
-    #modal_semaines_types .st-section-col:first-child {
-        border-right: 1px solid rgb(226 232 240);
-        padding-right: 0.75rem;
-    }
-    #modal_semaines_types .st-section-col:last-child {
-        padding-left: 0.75rem;
+}
+
+@media (max-width: 639px) {
+    #modal_semaines_types .st-apply-period-row {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -1219,14 +1170,6 @@ dialog#modal_reservation:not(.planning-route-page) .modal-box.reservation-route-
     background: var(--planning-surface, rgb(15 23 42));
 }
 
-.planning-quill-toolbar--announcements .planning-quill-clear-all.btn-square {
-    min-height: 2rem;
-    min-width: 2rem;
-    padding: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
 
 /* Inscriptions cours : cartes visibles, listes sans hauteur fixe */
 .csp-student-stack {
@@ -1246,33 +1189,45 @@ dialog#modal_reservation:not(.planning-route-page) .modal-box.reservation-route-
     display: block;
 }
 
-/* Annonces : zone ~10 lignes, barre d'outils juste en dessous */
-.planning-quill-mount.planning-quill-mount--announcements {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
+#modal_course_students .csp-student-row--enrolled {
+    background: rgb(219 234 254);
+    border-color: rgb(37 99 235);
+    color: rgb(30 41 59);
 }
-.planning-quill-mount.planning-quill-mount--announcements .ql-toolbar.ql-snow {
-    order: 2;
-    margin: 0;
-    padding: 0.35rem 0.5rem;
-    border: 1px solid #e2e8f0 !important;
-    border-top: none !important;
-    border-radius: 0 0 0.75rem 0.75rem !important;
+
+#modal_course_students .csp-student-row--enrolled:hover {
+    background: rgb(191 219 254);
 }
-.planning-quill-mount.planning-quill-mount--announcements .ql-container.ql-snow {
-    order: 1;
-    border-radius: 0.75rem 0.75rem 0 0 !important;
-    border-bottom: none !important;
+
+#modal_course_students .csp-student-row--available {
+    background: rgb(248 250 252);
+    border-color: rgb(203 213 225);
+    color: rgb(51 65 85);
 }
-.planning-quill-mount.planning-quill-mount--announcements .ql-editor {
-    min-height: 11rem;
-    max-height: 11rem;
+
+#modal_course_students .csp-student-row--available:hover {
+    background: rgb(241 245 249);
+    border-color: rgb(148 163 184);
 }
-.planning-quill-toolbar--announcements .planning-quill-clear-all {
-    opacity: 1;
-    visibility: visible;
+
+#modal_course_students .csp-student-stack.st-dnd-drop-active {
+    outline: 2px dashed rgb(37 99 235);
+    outline-offset: 2px;
+    background: rgb(239 246 255 / 0.5);
 }
+
+[data-theme='dark'] #modal_course_students .csp-student-row--enrolled {
+    background: rgb(30 58 138 / 0.45);
+    border-color: rgb(96 165 250);
+    color: rgb(241 245 249);
+}
+
+[data-theme='dark'] #modal_course_students .csp-student-row--available {
+    background: rgb(30 41 59);
+    border-color: rgb(71 85 105);
+    color: rgb(226 232 240);
+}
+
 
 #modal_config .config-rule-row {
     border-bottom: none;

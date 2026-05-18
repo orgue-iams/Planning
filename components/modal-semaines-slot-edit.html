@@ -27,14 +27,12 @@
                     <option value="7">Dimanche</option>
                 </select>
             </label>
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="stle-start">Début</label>
-                    <input type="time" id="stle-start" step="300" class="input input-bordered input-sm w-full font-mono text-[11px]" />
-                </div>
-                <div>
-                    <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="stle-end">Fin</label>
-                    <input type="time" id="stle-end" step="300" class="input input-bordered input-sm w-full font-mono text-[11px]" />
+            <div class="form-control">
+                <span class="st-edit-label">Horaires</span>
+                <div class="flex flex-wrap items-center gap-2 mt-1">
+                    <select id="stle-start" aria-label="Heure de début" class="select select-bordered select-sm w-[6.5rem] font-mono text-[11px] bg-white dark:bg-slate-900"></select>
+                    <span class="text-slate-500 text-sm">à</span>
+                    <select id="stle-end" aria-label="Heure de fin" class="select select-bordered select-sm w-[6.5rem] font-mono text-[11px] bg-white dark:bg-slate-900"></select>
                 </div>
             </div>
             <div>

@@ -53,7 +53,7 @@ function formatFrRange(startYmd, endYmd) {
     if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) {
         return `${startYmd} → ${endYmd}`;
     }
-    const opts = { day: 'numeric', month: 'short', year: 'numeric' };
+    const opts = { day: 'numeric', month: 'long', year: 'numeric' };
     if (startYmd === endYmd) return s.toLocaleDateString('fr-FR', opts);
     return `${s.toLocaleDateString('fr-FR', opts)} → ${e.toLocaleDateString('fr-FR', opts)}`;
 }

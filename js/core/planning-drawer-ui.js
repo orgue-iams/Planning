@@ -120,12 +120,10 @@ export function syncPlanningDrawerGroupedSections() {
     const configSec = document.getElementById('menu-drawer-section-configuration');
     if (configSec) {
         const c1 = document.getElementById('menu-item-config-wrap');
-        const c2 = document.getElementById('menu-item-announcements-wrap');
         const c3 = document.getElementById('menu-item-calendar-pool-wrap');
         const c4 = document.getElementById('menu-item-statistics-wrap');
         const any =
             Boolean(c1 && !c1.classList.contains('hidden')) ||
-            Boolean(c2 && !c2.classList.contains('hidden')) ||
             Boolean(c3 && !c3.classList.contains('hidden')) ||
             Boolean(c4 && !c4.classList.contains('hidden'));
         configSec.classList.toggle('hidden', !any);

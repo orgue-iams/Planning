@@ -1,5 +1,5 @@
 /**
- * Éditeur WYSIWYG partagé (modales Règles + Annonces).
+ * Éditeur WYSIWYG partagé (modale Consignes).
  * Requiert `window.Quill` chargé via CDN (voir index.html).
  *
  * Tailles : format Quill `size` (px) — 3 boutons T (prof) ou T− / T+ pas à pas (admin).
@@ -186,8 +186,7 @@ function registerPlanningSizeFormat() {
 
 /**
  * @param {HTMLElement} mountEl conteneur vide (rempli par Quill : barre + zone d’édition)
- * @param {{ placeholder?: string; adminFontStepper?: boolean; compactAnnouncementToolbar?: boolean; disableFontSizeButtons?: boolean } | undefined} opts
- *   compactAnnouncementToolbar : annonces login — gras / italique / souligné uniquement (pas de tailles ni listes).
+ * @param {{ placeholder?: string; adminFontStepper?: boolean; disableFontSizeButtons?: boolean } | undefined} opts
  */
 export function createPlanningQuill(mountEl, opts = {}) {
     if (!(mountEl instanceof HTMLElement)) return null;
@@ -198,15 +197,13 @@ export function createPlanningQuill(mountEl, opts = {}) {
     destroyPlanningQuillMount(mountEl);
     registerPlanningSizeFormat();
     const Quill = window.Quill;
-    const toolbar = opts.compactAnnouncementToolbar
-        ? [['bold', 'italic', 'underline']]
-        : [['bold', 'italic', 'underline'], [{ list: 'bullet' }]];
+    const toolbar = [['bold', 'italic', 'underline'], [{ list: 'bullet' }]];
     const q = new Quill(mountEl, {
         theme: 'snow',
         placeholder: opts.placeholder ?? '',
         modules: { toolbar }
     });
-    if (!opts.compactAnnouncementToolbar && !opts.disableFontSizeButtons) {
+    if (!opts.disableFontSizeButtons) {
         injectPlanningFontSizeButtons(q, opts);
     }
     return q;
