@@ -98,11 +98,19 @@ import { CACHE_NAME } from '../config/cache-name.js';
 import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
 import { applyPlanningPortraitSlotFit, bindPlanningPortraitSlotFit } from './planning-viewport-fit.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
+import {
+    clearPlanningServiceWorkerCaches,
+    isPlanningServiceWorkerEnabled
+} from '../utils/planning-sw-env.js';
 
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker
-        .register(new URL('../../sw.js', import.meta.url), { type: 'module' })
-        .catch(() => {});
+    if (isPlanningServiceWorkerEnabled()) {
+        navigator.serviceWorker
+            .register(new URL('../../sw.js', import.meta.url), { type: 'module' })
+            .catch(() => {});
+    } else {
+        void clearPlanningServiceWorkerCaches();
+    }
 }
 
 let calendar;
@@ -553,6 +561,7 @@ function wireHeaderHoverMenus() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    try {
     applyPlanningThemeFromStorage();
     applyPlanningFcTextScaleFromStorage();
     await loadUIComponents();
@@ -862,4 +871,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         const u = getPlanningSessionUser();
         if (u?.email) void refreshHeaderWeekStrip(u);
     });
+    } catch (err) {
+        console.error('[Planning] bootstrap', err);
+        document.body.classList.remove('auth-pending');
+        showToast(
+            'Erreur au chargement. Rechargez la page (en local : pas de cache PWA sur le port 5173).',
+            'error',
+            15000
+        );
+    }
 });
