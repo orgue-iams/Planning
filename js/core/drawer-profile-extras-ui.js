@@ -5,6 +5,7 @@ import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from '.
 import { getPlanningSessionUser } from './session-user.js';
 import { googleCalendarEmbedUrl } from '../utils/google-calendar-url.js';
 import { showToast } from '../utils/toast.js';
+import { appendEleveGabaritCoursCard } from '../utils/template-cours-card-ui.js';
 import {
     filterCoursEventsForUser,
     sortEventsByStart,
@@ -14,14 +15,6 @@ import {
 
 const AGENDA_HELP =
     'Ces liens permettent d’afficher le planning dans Google Agenda (lecture seule). Dans Google Agenda : Paramètres → Ajouter un agenda → À partir de l’URL. Collez le lien copié. Le planning complet affiche tous les créneaux ; le planning personnel n’affiche que vos réservations IAMS.';
-
-const DOW_FR = ['', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
-
-function padTime(t) {
-    const s = String(t || '').slice(0, 5);
-    const p = s.split(':');
-    return `${p[0] || '00'}:${p[1] || '00'}`;
-}
 
 async function loadPersonalPoolRow(userId) {
     if (!isBackendAuthConfigured() || !userId) return { id: '', label: '' };
@@ -99,6 +92,13 @@ export async function refreshDrawerAgendas(user) {
     }
 }
 
+function studentsLineFromIds(ids, labelById) {
+    const names = (ids || [])
+        .map((id) => String(labelById.get(id) || '').trim())
+        .filter(Boolean);
+    return names.join(', ') || '—';
+}
+
 async function loadEleveGabaritEnrollments(userId) {
     const sb = getSupabaseClient();
     if (!sb || !userId) return [];
@@ -111,35 +111,70 @@ async function loadEleveGabaritEnrollments(userId) {
     const lids = lines.map((l) => l.id);
     const { data: links } = await sb
         .from('organ_week_template_line_student')
-        .select('line_id')
-        .eq('student_user_id', userId)
+        .select('line_id, student_user_id')
         .in('line_id', lids);
-    const lineIds = new Set((links || []).map((l) => l.line_id));
-    const ownerIds = [...new Set(lines.map((l) => l.owner_user_id).filter(Boolean))];
-    const { data: labels } = ownerIds.length
-        ? await sb.rpc('planning_profiles_label_for_ids', { p_ids: ownerIds })
+    const lineIds = new Set(
+        (links || []).filter((l) => l.student_user_id === userId).map((l) => l.line_id)
+    );
+    const studentsByLine = new Map();
+    for (const l of links || []) {
+        if (!studentsByLine.has(l.line_id)) studentsByLine.set(l.line_id, []);
+        studentsByLine.get(l.line_id).push(l.student_user_id);
+    }
+    const allUserIds = [
+        ...new Set([
+            ...lines.map((l) => l.owner_user_id).filter(Boolean),
+            ...(links || []).map((l) => l.student_user_id)
+        ])
+    ];
+    const { data: labels } = allUserIds.length
+        ? await sb.rpc('planning_profiles_label_for_ids', { p_ids: allUserIds })
         : { data: [] };
-    const ownerMap = new Map((labels || []).map((r) => [r.user_id, r.label]));
+    const labelMap = new Map((labels || []).map((r) => [r.user_id, r.label]));
     return lines
         .filter((l) => lineIds.has(l.id) && String(l.slot_type || '').toLowerCase() === 'cours')
         .map((l) => ({
             ...l,
-            ownerLabel: ownerMap.get(l.owner_user_id) || ''
+            ownerLabel: labelMap.get(l.owner_user_id) || '',
+            studentsLine: studentsLineFromIds(studentsByLine.get(l.id) || [], labelMap)
         }));
 }
 
-function renderGabaritCoursCard(line, host) {
-    const card = document.createElement('article');
-    card.className =
-        'st-slot-card st-slot-card--eleve-view profile-gabarit-cours-card grid grid-cols-[auto_minmax(0,0.75fr)_minmax(0,1.1fr)_minmax(0,0.95fr)] gap-2 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px]';
-    const week = line.week_type === 'B' ? 'B' : 'A';
-    const dow = DOW_FR[parseInt(String(line.day_of_week || 1), 10)] || '—';
-    card.innerHTML = `
-        <span class="st-eleve-week-badge text-[9px] font-black uppercase text-sky-800 self-center">Sem. ${week}</span>
-        <div class="font-mono text-[10px] leading-snug">${dow}<br/>${padTime(line.start_time)} – ${padTime(line.end_time)}</div>
-        <p class="font-semibold m-0 leading-snug self-center">${String(line.title || 'Cours').trim()}</p>
-        <p class="m-0 text-right self-center text-slate-600">${String(line.ownerLabel || '').trim() || '—'}</p>`;
-    host.appendChild(card);
+function appendWeekSectionTitle(host, week) {
+    const h = document.createElement('p');
+    h.className =
+        'profile-cours-week-title text-[10px] font-bold uppercase text-slate-600 dark:text-slate-300 tracking-wide m-0 mt-2 mb-1 first:mt-0';
+    h.textContent = week === 'B' ? 'Semaine B' : 'Semaine A';
+    host.appendChild(h);
+}
+
+function renderProfileCoursGrouped(rows, list) {
+    const byWeek = { A: [], B: [] };
+    for (const line of rows) {
+        const w = line.week_type === 'B' ? 'B' : 'A';
+        byWeek[w].push(line);
+    }
+    for (const w of ['A', 'B']) {
+        if (!byWeek[w].length) continue;
+        appendWeekSectionTitle(list, w);
+        for (const line of byWeek[w]) {
+            appendEleveGabaritCoursCard(list, {
+                dayOfWeek: line.day_of_week,
+                startTime: line.start_time,
+                endTime: line.end_time,
+                title: line.title,
+                slotType: line.slot_type,
+                studentsLine: line.studentsLine,
+                ownerLabel: line.ownerLabel,
+                ownerUserId: line.owner_user_id
+            });
+        }
+    }
+}
+
+function jsDateToPlanningDow(d) {
+    const j = d.getDay();
+    return j === 0 ? 7 : j;
 }
 
 /** @param {object | null} user */
@@ -169,7 +204,7 @@ export async function refreshProfileCoursInscrits(user) {
         return;
     }
     empty?.classList.add('hidden');
-    for (const line of rows) renderGabaritCoursCard(line, list);
+    renderProfileCoursGrouped(rows, list);
 }
 
 /** @param {object | null} user */
@@ -207,10 +242,18 @@ export async function refreshDrawerNextCours(user) {
     empty?.classList.add('hidden');
     cardHost.classList.remove('hidden');
     const lines = formatCoursCardLines(next);
-    const card = document.createElement('article');
-    card.className = 'drawer-cours-card profile-gabarit-cours-card';
-    card.innerHTML = `<p class="drawer-cours-card__title">${lines.title}</p><p class="drawer-cours-card__meta">${lines.meta}</p><p class="drawer-cours-card__prof">${lines.prof}</p>`;
-    cardHost.appendChild(card);
+    const startDt = new Date(String(next.start ?? ''));
+    appendEleveGabaritCoursCard(cardHost, {
+        dayOfWeek: jsDateToPlanningDow(startDt),
+        startTime: startDt.toISOString(),
+        endTime: String(next.end ?? ''),
+        title: lines.title,
+        slotType: 'cours',
+        studentsLine: lines.students || '—',
+        ownerLabel: lines.prof,
+        ownerUserId: '',
+        dateSubline: lines.dateSubline || ''
+    });
 }
 
 /** @param {object | null} user */

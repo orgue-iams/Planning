@@ -773,7 +773,7 @@ function appendTemplateCard(listEl, line, _optHtml, ctx) {
     const weekLetter = line?.week_type === 'B' ? 'B' : 'A';
     const card = document.createElement('div');
     card.className = isEleve
-        ? 'st-slot-card st-slot-card--eleve-view grid grid-cols-[auto_minmax(0,0.75fr)_minmax(0,1.1fr)_minmax(0,0.95fr)] gap-2 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px] text-slate-800'
+        ? 'st-slot-card st-slot-card--eleve-view grid grid-cols-[minmax(0,0.75fr)_minmax(0,1.1fr)_minmax(0,0.95fr)] gap-2 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px] text-slate-800'
         : 'st-slot-card grid grid-cols-[auto_minmax(0,0.85fr)_minmax(0,1fr)_minmax(0,0.95fr)] gap-2 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px] text-slate-800';
     card.classList.add(`st-slot-card--prof-tint-${profTintIndex(lineOwnerId)}`);
     if (!isReadonly) card.classList.add('st-slot-card--editable');
@@ -796,12 +796,12 @@ function appendTemplateCard(listEl, line, _optHtml, ctx) {
 
     if (isEleve) {
         card.innerHTML = `
-        <span class="st-eleve-week-badge text-[9px] font-black uppercase text-sky-800 dark:text-sky-200 self-center shrink-0">Sem. ${weekLetter}</span>
         <div class="st-slot-card__left min-w-0 self-stretch flex flex-col justify-center py-0.5">
             <div class="st-ro-period leading-snug"></div>
         </div>
         <div class="st-slot-card__right min-w-0 flex flex-col justify-center py-0.5">
             <p class="st-ro-headline font-semibold m-0 leading-snug"></p>
+            <p class="st-ro-students text-[10px] font-normal text-slate-700 dark:text-slate-300 m-0 leading-snug break-words"></p>
         </div>
         <div class="st-slot-card__prof min-w-0 self-stretch flex items-center justify-end py-0.5">
             <span class="st-ro-prof text-[10px] font-medium text-slate-600 dark:text-slate-300 leading-snug block text-right"></span>

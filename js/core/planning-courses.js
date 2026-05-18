@@ -76,18 +76,39 @@ export function formatCoursCardLines(ev) {
         .trim()
         .toUpperCase();
     const weekTag = gw === 'A' || gw === 'B' ? `Semaine ${gw}` : '';
+    const inscritsRaw = ev?.extendedProps?.inscrits;
+    const students =
+        inscritsRaw == null || inscritsRaw === ''
+            ? ''
+            : String(inscritsRaw)
+                  .split(/[,;]/)
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+                  .join(', ');
     if (!start || Number.isNaN(start.getTime())) {
-        return { title, meta: weekTag || '—', prof: `Prof. ${profName}` };
+        return {
+            title,
+            meta: weekTag || '—',
+            prof: profName,
+            students
+        };
     }
-    const day = start.toLocaleDateString('fr-FR', { weekday: 'long' });
+    const dateLine = start.toLocaleDateString('fr-FR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long'
+    });
+    const dateSubline = start.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
     const t0 = formatTimeFr24(start);
     const t1 = end && !Number.isNaN(end.getTime()) ? formatTimeFr24(end) : '';
     const hours = t1 ? `${t0} – ${t1}` : t0;
-    const metaParts = [day, weekTag, hours].filter(Boolean);
+    const metaParts = [dateLine, weekTag, hours].filter(Boolean);
     return {
         title,
         meta: metaParts.join(' · '),
-        prof: `Prof. ${profName}`
+        dateSubline,
+        prof: profName,
+        students
     };
 }
 

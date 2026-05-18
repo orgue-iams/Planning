@@ -95,7 +95,7 @@ export function refreshPlanningRouteChrome(dialogId) {
         nav = document.createElement('button');
         nav.type = 'button';
         nav.className =
-            'planning-route-page__nav w-full min-w-0 text-left text-sm font-semibold text-slate-800 dark:text-slate-100 py-1 px-0 min-h-0 h-auto border-0 bg-transparent cursor-pointer truncate hover:text-slate-900 dark:hover:text-white';
+            'planning-route-page__nav w-full min-w-0 text-left text-sm font-semibold text-slate-800 dark:text-slate-100 py-1 px-0 min-h-0 h-auto border-0 bg-transparent cursor-pointer truncate underline underline-offset-2 decoration-slate-400 dark:decoration-slate-500 hover:text-slate-900 dark:hover:text-white';
         nav.addEventListener('click', () => {
             const stk = routeStacks.get(el.id);
             if (stk && stk.length > 1) {
@@ -113,13 +113,11 @@ export function refreshPlanningRouteChrome(dialogId) {
         });
         bar.replaceChildren(nav);
     }
-    if (atRoot) {
-        nav.textContent = titleText;
-        nav.setAttribute('aria-label', titleText);
-    } else {
-        nav.textContent = `‹ ${titleText}`;
-        nav.setAttribute('aria-label', `Retour vers ${short} (${titleText})`);
-    }
+    nav.textContent = `< ${titleText}`;
+    nav.setAttribute(
+        'aria-label',
+        atRoot ? `Retour au menu : ${titleText}` : `Retour vers ${short} : ${titleText}`
+    );
 }
 
 /**
@@ -208,7 +206,7 @@ function ensureRouteBar(el) {
     const nav = document.createElement('button');
     nav.type = 'button';
     nav.className =
-        'planning-route-page__nav w-full min-w-0 text-left text-sm font-semibold text-slate-800 dark:text-slate-100 py-1 px-0 min-h-0 h-auto border-0 bg-transparent cursor-pointer truncate hover:text-slate-900 dark:hover:text-white';
+        'planning-route-page__nav w-full min-w-0 text-left text-sm font-semibold text-slate-800 dark:text-slate-100 py-1 px-0 min-h-0 h-auto border-0 bg-transparent cursor-pointer truncate underline underline-offset-2 decoration-slate-400 dark:decoration-slate-500 hover:text-slate-900 dark:hover:text-white';
     nav.addEventListener('click', () => {
         const stack = routeStacks.get(el.id);
         if (stack && stack.length > 1) {

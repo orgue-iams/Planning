@@ -22,6 +22,16 @@ dialog.planning-route-page::backdrop {
     background: rgb(15 23 42 / 0.22);
 }
 
+dialog.planning-route-page .planning-route-page__nav {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-color: rgb(148 163 184);
+}
+
+[data-theme='dark'] dialog.planning-route-page .planning-route-page__nav {
+    text-decoration-color: rgb(100 116 139);
+}
+
 dialog.planning-route-page .planning-route-page__bar {
     grid-column: 1;
     grid-row: 1;

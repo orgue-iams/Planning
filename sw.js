@@ -49,6 +49,7 @@ const ASSETS = [
   './js/utils/planning-route-dialog.js',
   './js/core/planning-drawer-ui.js',
   './js/core/drawer-help-ui.js',
+  './js/utils/template-cours-card-ui.js',
   './js/core/drawer-profile-extras-ui.js',
   './components/modal-directory-users.html',
   './components/modal-broadcast.html',

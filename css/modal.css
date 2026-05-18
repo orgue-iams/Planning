@@ -1282,8 +1282,21 @@ dialog#modal_reservation:not(.planning-route-page) .modal-box.reservation-route-
 #modal_semaines_types.st-main-panel--eleve .st-section-col {
     border-right: none;
 }
+#modal_semaines_types .st-gabarit-section--eleve {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
 #modal_semaines_types .st-gabarit-section--eleve .st-section-split {
     border: none;
+}
+
+@media (max-width: 639px) {
+    #modal_semaines_types .st-gabarit-section--eleve .st-section-col:first-child {
+        border-bottom: none;
+        padding-bottom: 0;
+        margin-bottom: 0.5rem;
+    }
 }
 
 dialog#modal_st_slot_edit {

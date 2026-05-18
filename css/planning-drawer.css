@@ -86,18 +86,18 @@
     justify-content: flex-start;
 }
 
-.planning-drawer__profile-chip--outlined,
-.planning-drawer__profile-chip {
-    border: 1.5px solid rgb(37 99 235);
+.planning-drawer__view-btn.planning-drawer__profile-chip--outlined,
+.planning-drawer__view-btn.planning-drawer__profile-chip {
+    border: 2px solid rgb(37 99 235) !important;
     border-radius: 0.65rem;
     background: transparent;
     padding: 0.45rem 0.55rem;
     box-shadow: none;
 }
 
-.planning-drawer__profile-chip:hover {
-    background: rgb(248 250 252);
-    border-color: rgb(100 116 139);
+.planning-drawer__view-btn.planning-drawer__profile-chip:hover {
+    background: rgb(239 246 255);
+    border-color: rgb(29 78 216) !important;
 }
 
 .planning-drawer__view-btn--profile.is-active,
@@ -113,8 +113,9 @@
     border-color: rgb(96 165 250);
 }
 
-[data-theme='dark'] .planning-drawer__profile-chip {
-    border-color: rgb(100 116 139);
+[data-theme='dark'] .planning-drawer__view-btn.planning-drawer__profile-chip--outlined,
+[data-theme='dark'] .planning-drawer__view-btn.planning-drawer__profile-chip {
+    border-color: rgb(96 165 250) !important;
     background: transparent;
 }
 
@@ -631,12 +632,18 @@
     border-radius: 0.35rem;
 }
 
-.profile-gabarit-cours-card {
-    border-color: rgb(186 230 253);
-    background: rgb(240 249 255 / 0.85);
+.profile-gabarit-cours-card.st-slot-card--prof-tint-0 {
+    background: rgb(219 234 254 / 0.55);
 }
-
-[data-theme='dark'] .profile-gabarit-cours-card {
-    border-color: rgb(30 58 138 / 0.65);
-    background: rgb(12 74 110 / 0.35);
+.profile-gabarit-cours-card.st-slot-card--prof-tint-1 {
+    background: rgb(254 243 199 / 0.55);
+}
+.profile-gabarit-cours-card.st-slot-card--prof-tint-2 {
+    background: rgb(220 252 231 / 0.55);
+}
+.profile-gabarit-cours-card.st-slot-card--prof-tint-3 {
+    background: rgb(243 232 255 / 0.55);
+}
+.profile-gabarit-cours-card.st-slot-card--prof-tint-4 {
+    background: rgb(255 228 230 / 0.55);
 }
