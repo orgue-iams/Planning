@@ -1,0 +1,32 @@
+---
+description: Version à chaque modif ; push/deploy sans re-bump. Pas de commit partiel type diff-tab.
+alwaysApply: true
+---
+
+# Version et livraison (préférence utilisateur)
+
+## Modifications demandées
+
+Quand l’utilisateur demande des **changements** (code, UI, config front, etc.) :
+
+1. Implémenter la demande.
+2. **Incrémenter `APP_VERSION`** dans `js/config/app-version.js` (format `vXX.YY.ZZ`) — **même pour des modifs locales / petites**.
+   - Par défaut : **+1 sur ZZ** (correctif / petit changement).
+   - **+1 sur YY** si évolution fonctionnelle visible pour l’utilisateur.
+   - **+1 sur XX** seulement sur demande explicite ou release majeure / infra.
+3. `CACHE_NAME` suit `APP_VERSION` (déjà lié dans ce fichier).
+4. Si classes Tailwind / markup changent : `npm run build:css`.
+5. **Ne pas** commit / push / deploy sauf demande explicite.
+
+## Push / deploy sur `main`
+
+Quand l’utilisateur demande de **pousser**, **livrer**, **deploy** sur le **`main` distant** :
+
+1. **Ne pas** re-incrémenter la version (déjà faite à l’étape modifs).
+2. Committer **tout** le working tree pertinent (pas de commit partiel « diff-tab » ni exclusion des fichiers hors sujet immédiat).
+3. Exclure seulement le bruit évident (ex. `.DS_Store`).
+4. Enchaîner selon les règles du dépôt : `npm run build:css` si besoin, `npm run deploy:pages`, commit, `git push origin main`, et si `CACHE_NAME` a changé dans la session → livraison complète (`cache-bump-full-ship.mdc`).
+
+## Commit
+
+Ne committer que sur **demande explicite** de l’utilisateur (règle git existante), sauf s’il demande push/deploy (commit inclus).
