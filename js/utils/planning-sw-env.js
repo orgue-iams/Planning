@@ -28,7 +28,9 @@ export async function clearPlanningServiceWorkerCaches() {
     if (typeof caches !== 'undefined') {
         const keys = await caches.keys();
         await Promise.all(
-            keys.filter((k) => k.startsWith('orgue-v')).map((k) => caches.delete(k))
+            keys.filter((k) => k.startsWith('orgue-v') || k.startsWith('planning-cache-')).map((k) =>
+                caches.delete(k)
+            )
         );
     }
 }

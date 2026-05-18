@@ -1,5 +1,4 @@
 /**
- * Nom du cache du service worker + libellé affiché (login + légende).
- * Incrémenter +1 (orgue-vN) à chaque livraison : JS, CSS, HTML, SQL, edge, config, etc.
+ * @deprecated Préférer `APP_VERSION` et `CACHE_NAME` depuis `app-version.js`.
  */
-export const CACHE_NAME = 'orgue-v254';
+export { APP_VERSION, CACHE_NAME } from './app-version.js';

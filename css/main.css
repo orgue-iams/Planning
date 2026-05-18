@@ -1,3 +1,5 @@
+@import './planning-theme-tokens.css';
+
 /* Libellés accessibles uniquement aux lecteurs d’écran (si classe Tailwind absente) */
 .sr-only {
     position: absolute;

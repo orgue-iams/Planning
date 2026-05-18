@@ -71,9 +71,12 @@ function buildClosureCard(range, index, editable) {
     dates.textContent = formatFrRange(range.startYmd, range.endYmd);
     const title = document.createElement('p');
     title.className = 'text-[11px] text-slate-600 dark:text-orange-100/90 m-0 mt-0.5 leading-snug break-words';
-    title.textContent = range.title || '—';
     body.appendChild(dates);
-    body.appendChild(title);
+    const titleText = String(range.title || '').trim();
+    if (titleText) {
+        title.textContent = titleText;
+        body.appendChild(title);
+    }
     card.appendChild(body);
 
     if (!editable) return card;

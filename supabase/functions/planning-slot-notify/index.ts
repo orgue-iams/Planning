@@ -194,7 +194,50 @@ Deno.serve(async (req) => {
         const actorEmail = String(body.actorEmail ?? '')
             .trim()
             .toLowerCase();
-        const action = String(body.action ?? '') as SlotAction;
+        const action = String(body.action ?? '') as SlotAction | 'support';
+
+        if (action === 'support') {
+            const targetEmail = String(body.targetEmail ?? '')
+                .trim()
+                .toLowerCase();
+            const subject = String(body.subject ?? '').trim() || 'Support Planning IAMS';
+            const message = String(body.message ?? '').trim();
+            const actorDisplayName = String(body.actorDisplayName ?? '').trim() || me;
+            if (!targetEmail || !message) {
+                return json({ ok: false, emailSent: false, error: 'Requête invalide' }, 400);
+            }
+            const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"/></head><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#222;">
+<p>Message de support depuis le planning orgue IAMS.</p>
+<p><strong>${escapeHtml(actorDisplayName)}</strong> (${escapeHtml(me)})</p>
+<p>${escapeHtml(message).replace(/\n/g, '<br/>')}</p>
+</body></html>`;
+            const brevoBody = {
+                sender: { name: fromName, email: fromEmail },
+                to: [{ email: targetEmail }],
+                replyTo: { email: me, name: actorDisplayName },
+                subject: `[Support] ${subject}`,
+                htmlContent: html
+            };
+            const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+                method: 'POST',
+                headers: {
+                    accept: 'application/json',
+                    'content-type': 'application/json',
+                    'api-key': apiKey
+                },
+                body: JSON.stringify(brevoBody)
+            });
+            if (!brevoRes.ok) {
+                const t = await brevoRes.text();
+                return json({
+                    ok: false,
+                    emailSent: false,
+                    error: 'BREVO_SEND_FAILED',
+                    detail: t.slice(0, 350)
+                });
+            }
+            return json({ ok: true, emailSent: true });
+        }
 
         if (!targetEmail || !actorEmail || !['deleted', 'moved', 'modified'].includes(action)) {
             return json({ ok: false, emailSent: false, error: 'Requête invalide' }, 400);

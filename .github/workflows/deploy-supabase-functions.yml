@@ -45,13 +45,9 @@ jobs:
           echo "Secrets requis : OK (valeurs masquées)"
 
       - name: Install Supabase CLI
-        run: |
-          set -euxo pipefail
-          curl -fsSL "https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz" -o /tmp/supabase.tgz
-          tar -tzf /tmp/supabase.tgz | head -20
-          sudo tar -xzf /tmp/supabase.tgz -C /usr/local/bin
-          chmod +x /usr/local/bin/supabase
-          supabase --version
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
 
       - name: Link project
         run: |

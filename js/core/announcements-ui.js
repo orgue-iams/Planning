@@ -162,14 +162,37 @@ export function initAnnouncementsUi(currentUser) {
     const mount = document.getElementById('ann-quill-mount');
 
     const wireAnnouncementsQuillChrome = (quill) => {
-        const clearBtn = document.getElementById('ann-clear-all-btn');
+        let clearBtn = document.getElementById('ann-clear-all-btn');
         const tb = quill?.getModule?.('toolbar')?.container;
-        if (!(clearBtn instanceof HTMLButtonElement) || !(tb instanceof HTMLElement)) return;
+        if (!(tb instanceof HTMLElement)) return;
+        if (!(clearBtn instanceof HTMLButtonElement)) {
+            clearBtn = document.createElement('button');
+            clearBtn.type = 'button';
+            clearBtn.id = 'ann-clear-all-btn';
+            document.getElementById('modal_announcements')?.appendChild(clearBtn);
+        }
         clearBtn.classList.remove('hidden');
         clearBtn.removeAttribute('aria-hidden');
-        clearBtn.classList.add('planning-quill-clear-all');
+        clearBtn.classList.add('planning-quill-clear-all', 'btn', 'btn-square', 'btn-sm');
+        clearBtn.setAttribute('aria-label', 'Tout effacer');
+        clearBtn.title = 'Tout effacer';
+        clearBtn.innerHTML =
+            '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m2-3h6a1 1 0 011 1v1H8V5a1 1 0 011-1z"/></svg>';
         tb.classList.add('planning-quill-toolbar--announcements');
         if (!tb.contains(clearBtn)) tb.appendChild(clearBtn);
+        if (!clearBtn.dataset.annClearWired) {
+            clearBtn.dataset.annClearWired = '1';
+            clearBtn.addEventListener('click', async () => {
+                if (!annQuill) ensureAnnQuill();
+                if (!annQuill) return;
+                const sdEl = document.getElementById('ann-start-date');
+                const edEl = document.getElementById('ann-end-date');
+                if (sdEl) sdEl.value = '';
+                if (edEl) edEl.value = '';
+                quillSetHtml(annQuill, '');
+                await persistAnnouncement({ silent: false });
+            });
+        }
     };
 
     const ensureAnnQuill = () => {
@@ -229,26 +252,6 @@ export function initAnnouncementsUi(currentUser) {
     document.getElementById('ann-start-date')?.addEventListener('blur', () => scheduleMaybePersistBlur(), { signal });
     document.getElementById('ann-end-date')?.addEventListener('blur', () => scheduleMaybePersistBlur(), { signal });
 
-    document.getElementById('ann-clear-all-btn')?.addEventListener(
-        'click',
-        async () => {
-            if (!annQuill) ensureAnnQuill();
-            if (!annQuill) return;
-            const sdEl = document.getElementById('ann-start-date');
-            const edEl = document.getElementById('ann-end-date');
-            if (sdEl) sdEl.value = '';
-            if (edEl) edEl.value = '';
-            quillSetHtml(annQuill, '');
-            const res = await replaceLoginAnnouncementRemote({ body: '', startsAt: null, endsAt: null });
-            if (!res.ok) {
-                showToast(res.error || 'Erreur', 'error');
-                return;
-            }
-            lastPersisted = { sd: '', ed: '', body: '' };
-            showToast('Texte et dates effacés (aucune annonce sur l’écran de connexion).');
-        },
-        { signal }
-    );
 }
 
 /**

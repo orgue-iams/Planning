@@ -19,9 +19,9 @@ import {
 } from './template-apply-engine.js';
 import { saveProfWeekCycleFromApply } from './week-cycle.js';
 import {
+    openPlanningRouteDialog,
     openPlanningRouteFromDrawer,
-    pushPlanningRouteLevel,
-    resetPlanningRouteStack
+    pushPlanningRouteLevel
 } from '../utils/planning-route-dialog.js';
 
 const ST_DELETE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m2-3h6a1 1 0 011 1v1H8V5a1 1 0 011-1z"/></svg>';
@@ -365,7 +365,7 @@ function stSlotEditRouteTitle(card) {
     const dow = dowLongLabel(parseInt(card.dataset.stDow || '1', 10));
     const st = padTime(card.dataset.stStart);
     const en = padTime(card.dataset.stEnd);
-    return `< Semaines A / B / ${dow} / ${st} – ${en}`;
+    return `Semaines A / B / ${dow} / ${st} – ${en}`;
 }
 
 /** @param {HTMLElement} card */
@@ -488,39 +488,17 @@ function scheduleStAutoSave() {
     }, 700);
 }
 
-function hideStSubPanels() {
-    document.getElementById('st-slot-edit-panel')?.classList.add('hidden');
-    document.getElementById('st-slot-edit-panel')?.setAttribute('aria-hidden', 'true');
-    document.getElementById('st-students-edit-panel')?.classList.add('hidden');
-    document.getElementById('st-students-edit-panel')?.setAttribute('aria-hidden', 'true');
-}
-
-function hideStBottomSheet() {
-    const sheet = document.getElementById('st-bottom-sheet');
-    sheet?.classList.add('hidden');
-    sheet?.setAttribute('aria-hidden', 'true');
-    hideStSubPanels();
-}
-
-function showStBottomSheet() {
-    const sheet = document.getElementById('st-bottom-sheet');
-    sheet?.classList.remove('hidden');
-    sheet?.setAttribute('aria-hidden', 'false');
-}
-
 function showStMainPanel() {
-    document.getElementById('st-main-panel')?.classList.remove('hidden');
-    hideStBottomSheet();
+    const dlg = document.getElementById('modal_st_slot_edit');
+    if (dlg instanceof HTMLDialogElement && dlg.open) dlg.close();
     stLineEditTargetTr = null;
-    resetPlanningRouteStack('modal_semaines_types', 'Semaines A / B', 'Menu');
 }
 
 function applyStSlotEditFormToCard(opts = {}) {
     const skipSave = Boolean(opts.skipSave);
     const card = stLineEditTargetTr;
-    const panel = document.getElementById('st-slot-edit-panel');
-    if (!card || !panel) return false;
-    const typRaw = panel.querySelector('input[name="stle-slot-type"]:checked')?.value;
+    if (!card) return false;
+    const typRaw = document.querySelector('#modal_st_slot_edit input[name="stle-slot-type"]:checked')?.value;
     const typ = typRaw === 'reservation' ? 'reservation' : 'cours';
     const dow = parseInt(
         /** @type {HTMLSelectElement | null} */ (document.getElementById('stle-dow'))?.value || '1',
@@ -547,22 +525,27 @@ function applyStSlotEditFormToCard(opts = {}) {
 }
 
 function wireStLineEditModal() {
-    const panel = document.getElementById('st-slot-edit-panel');
-    if (!panel || panel.dataset.stleWired === '1') return;
-    panel.dataset.stleWired = '1';
+    const dlg = document.getElementById('modal_st_slot_edit');
+    if (!dlg || dlg.dataset.stleWired === '1') return;
+    dlg.dataset.stleWired = '1';
 
     const onFieldChange = () => {
         applyStSlotEditFormToCard();
     };
-    panel.addEventListener('change', onFieldChange);
-    panel.addEventListener('input', (ev) => {
+    dlg.addEventListener('change', onFieldChange);
+    dlg.addEventListener('input', (ev) => {
         const t = ev.target;
         if (t instanceof HTMLInputElement && t.id === 'stle-title') onFieldChange();
     });
-    panel.addEventListener('change', (ev) => {
+    dlg.addEventListener('change', (ev) => {
         const t = ev.target;
         if (!(t instanceof HTMLInputElement) || t.name !== 'stle-slot-type') return;
-        document.getElementById('stle-students-wrap')?.classList.toggle('hidden', t.value !== 'cours');
+        const wrap = document.getElementById('stle-students-wrap');
+        wrap?.classList.toggle('hidden', t.value !== 'cours');
+        if (t.value === 'cours') {
+            wireStStudentsDnDOnce();
+            renderStStudentsEditLists();
+        }
     });
 
     document.getElementById('stle-delete-btn')?.addEventListener('click', (ev) => {
@@ -576,20 +559,9 @@ function wireStLineEditModal() {
         scheduleStAutoSave();
     });
 
-    document.getElementById('stle-students-wrap')?.addEventListener('click', (ev) => {
-        const t = ev.target;
-        if (!(t instanceof Element)) return;
-        if (t.closest('a, button.st-del')) return;
-        const typ =
-            panel.querySelector('input[name="stle-slot-type"]:checked')?.value === 'reservation'
-                ? 'reservation'
-                : 'cours';
-        if (typ !== 'cours') {
-            showToast('Les inscriptions concernent uniquement les créneaux « Cours ».', 'info');
-            return;
-        }
-        applyStSlotEditFormToCard({ skipSave: true });
-        openStStudentsEditPanel();
+    dlg.addEventListener('close', () => {
+        if (stLineEditTargetTr) applyStSlotEditFormToCard();
+        stLineEditTargetTr = null;
     });
 }
 
@@ -681,20 +653,7 @@ function openStStudentsEditPanel() {
     if (!card) return;
     wireStStudentsDnDOnce();
     renderStStudentsEditLists();
-    document.getElementById('st-slot-edit-panel')?.classList.add('hidden');
-    showStBottomSheet();
-    const panel = document.getElementById('st-students-edit-panel');
-    panel?.classList.remove('hidden');
-    panel?.setAttribute('aria-hidden', 'false');
-    const editTitle = stSlotEditRouteTitle(card);
-    const studentsTitle = stStudentsEditRouteTitle(card);
-    pushPlanningRouteLevel('modal_semaines_types', studentsTitle, editTitle, () => {
-        document.getElementById('st-students-edit-panel')?.classList.add('hidden');
-        document.getElementById('st-students-edit-panel')?.setAttribute('aria-hidden', 'true');
-        const edit = document.getElementById('st-slot-edit-panel');
-        edit?.classList.remove('hidden');
-        edit?.setAttribute('aria-hidden', 'false');
-    });
+    document.getElementById('stle-students-wrap')?.classList.remove('hidden');
 }
 
 function openStSlotEditPanel(card) {
@@ -723,21 +682,15 @@ function openStSlotEditPanel(card) {
         .filter(Boolean);
     refreshStleStudentSummary();
 
-    document.getElementById('stle-students-wrap')?.classList.toggle('hidden', typ !== 'cours');
-
-    hideStSubPanels();
-    showStBottomSheet();
-    const editPanel = document.getElementById('st-slot-edit-panel');
-    editPanel?.classList.remove('hidden');
-    editPanel?.setAttribute('aria-hidden', 'false');
+    const studentsWrap = document.getElementById('stle-students-wrap');
+    studentsWrap?.classList.toggle('hidden', typ !== 'cours');
+    if (typ === 'cours') {
+        wireStStudentsDnDOnce();
+        renderStStudentsEditLists();
+    }
 
     const routeTitle = stSlotEditRouteTitle(card);
-    resetPlanningRouteStack('modal_semaines_types', 'Semaines A / B', 'Menu');
-    pushPlanningRouteLevel('modal_semaines_types', routeTitle, 'Semaines A / B', () => {
-        hideStBottomSheet();
-        document.getElementById('st-main-panel')?.classList.remove('hidden');
-        stLineEditTargetTr = null;
-    });
+    openPlanningRouteDialog('modal_st_slot_edit', routeTitle, 'Semaines A / B');
 }
 
 

@@ -1,0 +1,61 @@
+<dialog id="modal_st_slot_edit" class="modal">
+    <div class="modal-box flex flex-col w-full max-w-lg max-h-[90dvh] p-0 border-0 shadow-xl bg-slate-50 dark:bg-slate-900">
+        <div class="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-4 space-y-3 text-[11px] text-slate-800 dark:text-slate-100">
+            <div class="st-edit-field">
+                <span class="st-edit-label">Type</span>
+                <div class="flex flex-wrap gap-3 mt-1">
+                    <label class="flex items-center gap-1.5 cursor-pointer font-medium">
+                        <input type="radio" name="stle-slot-type" id="stle-type-cours" value="cours" class="radio radio-xs" checked />
+                        Cours
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer font-medium">
+                        <input type="radio" name="stle-slot-type" id="stle-type-reservation" value="reservation" class="radio radio-xs" />
+                        Travail perso.
+                    </label>
+                </div>
+            </div>
+            <label class="st-edit-field block" for="stle-dow">
+                <span class="st-edit-label">Jour</span>
+                <select id="stle-dow" class="select select-bordered select-sm w-full text-[11px] bg-white dark:bg-slate-900 mt-0.5">
+                    <option value="1">Lundi</option>
+                    <option value="2">Mardi</option>
+                    <option value="3">Mercredi</option>
+                    <option value="4">Jeudi</option>
+                    <option value="5">Vendredi</option>
+                    <option value="6">Samedi</option>
+                    <option value="7">Dimanche</option>
+                </select>
+            </label>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-[9px] font-bold text-slate-500 dark:text-slate-400 block mb-0.5" for="stle-start">Début</label>
+                    <input type="time" id="stle-start" step="300" class="input input-bordered input-sm w-full font-mono text-[11px] bg-white dark:bg-slate-900" />
+                </div>
+                <div>
+                    <label class="text-[9px] font-bold text-slate-500 dark:text-slate-400 block mb-0.5" for="stle-end">Fin</label>
+                    <input type="time" id="stle-end" step="300" class="input input-bordered input-sm w-full font-mono text-[11px] bg-white dark:bg-slate-900" />
+                </div>
+            </div>
+            <div>
+                <label class="text-[9px] font-bold text-slate-500 dark:text-slate-400 block mb-0.5" for="stle-title">Titre</label>
+                <input type="text" id="stle-title" class="input input-bordered input-sm w-full text-[11px] bg-white dark:bg-slate-900" maxlength="200" />
+            </div>
+            <div id="stle-students-wrap" class="hidden space-y-2">
+                <p class="text-[9px] font-bold uppercase text-slate-500 dark:text-slate-400 m-0">Élèves</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 min-h-0">
+                    <div>
+                        <p class="text-[9px] font-semibold text-slate-600 dark:text-slate-300 m-0 mb-1">Inscrits</p>
+                        <div id="st-students-list-in" class="st-students-pick-stack space-y-1 min-h-[4rem]"></div>
+                    </div>
+                    <div>
+                        <p class="text-[9px] font-semibold text-slate-600 dark:text-slate-300 m-0 mb-1">Autres élèves</p>
+                        <div id="st-students-list-out" class="st-students-pick-stack space-y-1 min-h-[4rem]"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="pt-2 mt-1 border-t border-slate-200 dark:border-slate-600">
+                <button type="button" id="stle-delete-btn" class="btn btn-error btn-outline btn-sm font-bold text-[11px] w-full sm:w-auto">Supprimer</button>
+            </div>
+        </div>
+    </div>
+</dialog>

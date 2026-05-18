@@ -102,11 +102,11 @@ function ensureRouteBar(el) {
     if (bar) return bar;
     bar = document.createElement('div');
     bar.className =
-        'planning-route-page__bar flex items-center justify-start flex-wrap shrink-0 bg-slate-50 px-3 py-2 max-sm:pt-[max(0.35rem,env(safe-area-inset-top,0px))] dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700';
+        'planning-route-page__bar flex items-center gap-2 justify-start flex-wrap shrink-0 bg-slate-50 px-3 py-2 max-sm:pt-[max(0.35rem,env(safe-area-inset-top,0px))] dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700';
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className =
-        'planning-route-page__back text-left text-sm font-semibold text-slate-700 hover:text-slate-900 hover:underline py-1 px-0 min-h-0 h-auto border-0 bg-transparent cursor-pointer max-w-[min(100%,28rem)] dark:text-slate-200 dark:hover:text-white';
+        'planning-route-page__back text-left text-sm font-semibold text-slate-700 hover:text-slate-900 hover:underline py-1 px-0 min-h-0 h-auto border-0 bg-transparent cursor-pointer shrink-0 dark:text-slate-200 dark:hover:text-white';
     btn.addEventListener('click', () => {
         const custom = routeBackHandlers.get(el.id);
         if (custom) {
@@ -115,7 +115,11 @@ function ensureRouteBar(el) {
         }
         defaultRouteBack(el);
     });
+    const title = document.createElement('span');
+    title.className =
+        'planning-route-page__title text-sm font-semibold text-slate-800 dark:text-slate-100 truncate min-w-0 flex-1';
     bar.appendChild(btn);
+    bar.appendChild(title);
     el.insertBefore(bar, el.firstChild);
     return bar;
 }
@@ -148,6 +152,8 @@ export function updatePlanningRouteDialog(dialogId, ariaLabel, backLabel) {
         back.textContent = backText;
         back.setAttribute('aria-label', `Retour (${short})`);
     }
+    const title = bar.querySelector('.planning-route-page__title');
+    if (title) title.textContent = (ariaLabel || '').trim();
 }
 
 /**

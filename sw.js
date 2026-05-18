@@ -1,5 +1,5 @@
-/* Précache : voir CACHE_NAME dans js/config/cache-name.js (une seule valeur à incrémenter). */
-import { CACHE_NAME } from './js/config/cache-name.js';
+/* Précache : voir APP_VERSION / CACHE_NAME dans js/config/app-version.js */
+import { CACHE_NAME } from './js/config/app-version.js';
 
 /** Ressources locales (hors CDN) pour démarrage rapide / coquille hors-ligne */
 const ASSETS = [
@@ -28,7 +28,9 @@ const ASSETS = [
   './js/core/calendar-bridge.js',
   './js/config/planning.config.js',
   './js/config/version-info.js',
+  './js/config/app-version.js',
   './js/config/cache-name.js',
+  './components/modal-semaines-slot-edit.html',
   './js/config/fc-settings.js',
   './js/utils/loader.js',
   './js/utils/planning-theme.js',

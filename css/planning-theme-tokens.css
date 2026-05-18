@@ -1,0 +1,55 @@
+/**
+ * Charte clair / sombre — variables partagées (modales, cartes, champs).
+ * Utiliser var(--planning-*) plutôt que bg-white en dur dans les nouveaux écrans.
+ */
+:root {
+    --planning-surface: rgb(255 255 255);
+    --planning-surface-muted: rgb(248 250 252);
+    --planning-surface-elevated: rgb(255 255 255 / 0.92);
+    --planning-border: rgb(226 232 240);
+    --planning-text: rgb(30 41 59);
+    --planning-text-muted: rgb(100 116 139);
+    --planning-input-bg: rgb(255 255 255);
+}
+
+[data-theme='dark'] {
+    --planning-surface: rgb(15 23 42);
+    --planning-surface-muted: rgb(30 41 59);
+    --planning-surface-elevated: rgb(30 41 59 / 0.95);
+    --planning-border: rgb(51 65 85);
+    --planning-text: rgb(241 245 249);
+    --planning-text-muted: rgb(148 163 184);
+    --planning-input-bg: rgb(15 23 42);
+}
+
+.planning-surface-card {
+    background: var(--planning-surface-elevated);
+    border: 1px solid var(--planning-border);
+    color: var(--planning-text);
+}
+
+.planning-surface-card .text-slate-500,
+.planning-surface-card .text-slate-600,
+.planning-surface-card .text-slate-700 {
+    color: var(--planning-text-muted);
+}
+
+.st-apply-week-start-group,
+.st-apply-end-group {
+    background: var(--planning-surface-elevated) !important;
+    border-color: var(--planning-border) !important;
+    color: var(--planning-text);
+}
+
+.st-apply-week-start-group label,
+.st-apply-end-group label,
+.st-apply-week-start-group .text-slate-700 {
+    color: var(--planning-text-muted) !important;
+}
+
+.st-apply-week-start-group input,
+.st-apply-end-group input {
+    background: var(--planning-input-bg) !important;
+    border-color: var(--planning-border) !important;
+    color: var(--planning-text) !important;
+}

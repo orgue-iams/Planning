@@ -40,7 +40,6 @@ import {
 import { openCourseStudentsPicker } from './course-students-picker.js';
 import { openCoursSeriesScopeModal } from './cours-series-scope-ui.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
-import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
 
 /** @type {{ getCalendar: () => import('@fullcalendar/core').Calendar | null, getUser: () => object | null, getEvent: () => import('@fullcalendar/core').EventApi | null, setEvent: (ev: import('@fullcalendar/core').EventApi | null) => void } | null} */
 let reservationAutoSaveDeps = null;
@@ -1781,7 +1780,21 @@ function syncReservationModalTimeOptions(calendar, eventRef) {
         }
     }
     injectEditingEventReservationTimes(eventRef, dateValue, startChoices, null, null);
-    const preferredStart = startEl.value;
+    let preferredStart = startEl.value;
+    let preferredEndHint = endEl.value;
+    if (eventRef?.start) {
+        const es = eventRef.start instanceof Date ? eventRef.start : new Date(eventRef.start);
+        if (!Number.isNaN(es.getTime()) && es.toLocaleDateString('en-CA') === dateValue) {
+            preferredStart = formatTimeForSelect(es);
+        }
+        if (eventRef.end) {
+            const ee = eventRef.end instanceof Date ? eventRef.end : new Date(eventRef.end);
+            const endDisp = selectionEndDisplay(ee);
+            if (endDisp.toLocaleDateString('en-CA') === dateValue) {
+                preferredEndHint = formatTimeForSelect(endDisp);
+            }
+        }
+    }
     const selectedStart = setSelectOptions(startEl, startChoices, preferredStart);
     if (!selectedStart) {
         endEl.replaceChildren();
@@ -1795,9 +1808,8 @@ function syncReservationModalTimeOptions(calendar, eventRef) {
     );
     injectEditingEventReservationTimes(eventRef, dateValue, startChoices, startAt, endChoices);
     const plusOneHour = formatTimeForSelect(new Date(startAt.getTime() + 60 * 60 * 1000));
-    const currentEnd = endEl.value;
-    let preferredEnd = endChoices.includes(currentEnd)
-        ? currentEnd
+    let preferredEnd = endChoices.includes(preferredEndHint)
+        ? preferredEndHint
         : endChoices.includes(plusOneHour)
           ? plusOneHour
           : endChoices[0] || '';
@@ -2474,11 +2486,13 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
 
     if (dateEl instanceof HTMLInputElement) dateEl.value = dateStartVal;
     syncReservationDateWeekdayLabel();
-    if (calendarForClip?.getEvents) {
-        syncReservationModalTimeOptions(calendarForClip, event || null);
-    }
     setSelectTime(startEl, startInstant);
     setSelectTime(endEl, endInstant);
+    if (calendarForClip?.getEvents) {
+        syncReservationModalTimeOptions(calendarForClip, event || null);
+        setSelectTime(startEl, startInstant);
+        setSelectTime(endEl, endInstant);
+    }
     if (event) {
         applyReservationEventInfoPanel(
             event,
@@ -2606,11 +2620,27 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         }, { signal: modalSignal });
     }
 
+    const btnDelete = document.getElementById('btn-delete');
+    btnDelete?.addEventListener(
+        'click',
+        (e) => {
+            e.preventDefault();
+            if (!event || !calendarForClip || !currentUser) return;
+            if (!window.confirm('Supprimer ce créneau ?')) return;
+            void deleteReservation(calendarForClip, event, currentUser)
+                .then(() => modal.close())
+                .catch((err) => console.error(err));
+        },
+        { signal: modalSignal }
+    );
+
     btnCancel?.addEventListener(
         'click',
         (e) => {
             e.preventDefault();
+            if (!reservationModalMayCloseNow()) return;
             restoreReservationModalFormBaseline();
+            modal.close();
         },
         { signal: modalSignal }
     );
@@ -2623,8 +2653,10 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         { signal: modalSignal }
     );
 
-    openPlanningRouteDialog('modal_reservation', 'Réservation', 'Réservation');
-    focusPlanningDialogRoot(modal instanceof HTMLDialogElement ? modal : null);
+    modal.classList.remove('planning-route-page');
+    if (!(modal instanceof HTMLDialogElement)) return;
+    modal.showModal();
+    focusPlanningDialogRoot(modal);
 }
 
 function inscritsEmailsCsvFromRpcRow(row) {

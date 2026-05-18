@@ -94,7 +94,7 @@ import { initConfigUi, resetConfigUiBindings } from './config-ui.js';
 import { installAdminClearWeekDelegatedClick } from './admin-clear-week.js';
 import { fetchWeekCycleAnchor, clearProfWeekCycleCache } from './week-cycle.js';
 import { fetchOrganSchoolSettings, getChapelSlotBounds, invalidateOrganSchoolSettingsCache } from './organ-settings.js';
-import { CACHE_NAME } from '../config/cache-name.js';
+import { APP_VERSION } from '../config/app-version.js';
 import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
 import { applyPlanningPortraitSlotFit, bindPlanningPortraitSlotFit } from './planning-viewport-fit.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
@@ -548,7 +548,8 @@ function wireDialogBackdropClose() {
             /* Fenêtre utilisateur admin : fermeture fond / abandon gérés dans admin-users-modal-ui.js */
             if (e.target.id === 'modal_users_admin') return;
             if (e.target.id === 'modal_reservation') {
-                void dismissReservationRouteDialog({ save: true });
+                if (!reservationModalMayCloseNow()) return;
+                e.target.close();
                 return;
             }
             e.target.close();
@@ -571,12 +572,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const loginV = document.getElementById('login-version-badge');
     const headerBuild = document.getElementById('header-build-version');
     if (loginV) {
-        loginV.textContent = CACHE_NAME;
-        loginV.title = CACHE_NAME;
+        loginV.textContent = APP_VERSION;
+        loginV.title = APP_VERSION;
     }
     if (headerBuild) {
-        headerBuild.textContent = CACHE_NAME;
-        headerBuild.title = CACHE_NAME;
+        headerBuild.textContent = APP_VERSION;
+        headerBuild.title = APP_VERSION;
     }
     setLogoutHandler(performLogout);
     setSessionLostHandler((msg) => {

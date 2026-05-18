@@ -1,9 +1,12 @@
 /**
  * Sous-menu Aide dans le tiroir principal.
  */
-import { CACHE_NAME } from '../config/cache-name.js';
+import { APP_VERSION } from '../config/app-version.js';
 import { getOrganSchoolSettingsCached, fetchOrganSchoolSettings } from './organ-settings.js';
 import { closePlanningDrawer } from './planning-drawer-ui.js';
+import { getPlanningSessionUser } from './session-user.js';
+import { sendPlanningSupportEmail } from './slot-notify-api.js';
+import { showToast } from '../utils/toast.js';
 
 let bound = false;
 
@@ -27,12 +30,7 @@ export function showMainDrawerPanel() {
 
 function refreshHelpContent() {
     const ver = document.getElementById('drawer-help-version');
-    if (ver) ver.textContent = CACHE_NAME;
-    const form = document.getElementById('drawer-help-contact-form');
-    const mail = supportEmail();
-    if (form instanceof HTMLFormElement && mail) {
-        form.action = `mailto:${mail}`;
-    }
+    if (ver) ver.textContent = APP_VERSION;
 }
 
 export function initDrawerHelpUi() {
@@ -54,21 +52,42 @@ export function initDrawerHelpUi() {
     });
 
     document.getElementById('drawer-help-contact-form')?.addEventListener('submit', (ev) => {
-        const mail = supportEmail();
-        if (!mail) {
-            ev.preventDefault();
-            return;
-        }
-        const subj = document.getElementById('drawer-help-subject');
-        const body = document.getElementById('drawer-help-message');
-        const s = subj instanceof HTMLInputElement ? encodeURIComponent(subj.value.trim()) : '';
-        const b = body instanceof HTMLTextAreaElement ? encodeURIComponent(body.value.trim()) : '';
-        const a = document.getElementById('drawer-help-mailto-anchor');
-        if (a instanceof HTMLAnchorElement) {
-            a.href = `mailto:${mail}?subject=${s}&body=${b}`;
-            a.click();
-        }
         ev.preventDefault();
+        void (async () => {
+            const mail = supportEmail();
+            if (!mail) {
+                showToast('E-mail support non configuré.', 'error');
+                return;
+            }
+            const u = getPlanningSessionUser();
+            const actorEmail = String(u?.email || '').trim().toLowerCase();
+            if (!actorEmail) {
+                showToast('Connectez-vous pour envoyer un message.', 'error');
+                return;
+            }
+            const subj = document.getElementById('drawer-help-subject');
+            const body = document.getElementById('drawer-help-message');
+            const subject = subj instanceof HTMLInputElement ? subj.value.trim() : '';
+            const message = body instanceof HTMLTextAreaElement ? body.value.trim() : '';
+            if (!message) {
+                showToast('Saisissez un message.', 'error');
+                return;
+            }
+            const res = await sendPlanningSupportEmail({
+                targetEmail: mail,
+                subject: subject || 'Demande support',
+                message,
+                actorEmail,
+                actorDisplayName: String(u?.name || u?.email || '').trim() || actorEmail
+            });
+            if (!res.ok || res.emailSent === false) {
+                showToast(res.error || 'Envoi impossible.', 'error', 10000);
+                return;
+            }
+            showToast('Message envoyé au support.');
+            if (subj instanceof HTMLInputElement) subj.value = '';
+            if (body instanceof HTMLTextAreaElement) body.value = '';
+        })();
     });
 }
 

@@ -119,6 +119,13 @@
     font-size: 0.65rem;
 }
 
+/* Tablette / téléphone : navigation semaine par swipe (pas les chevrons). */
+@media (max-width: 1023px), (hover: none) and (pointer: coarse) {
+    .calendar-toolbar__nav-inline {
+        display: none !important;
+    }
+}
+
 /* Chevrons : pas de cadre, fond rond au survol */
 .cal-tb-nav {
     appearance: none;

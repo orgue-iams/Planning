@@ -112,7 +112,20 @@ dialog.planning-route-page#modal_directory_users .modal-box {
 }
 
 dialog.planning-route-page .planning-route-page__title {
-    display: none !important;
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: rgb(30 41 59);
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+[data-theme='dark'] dialog.planning-route-page .planning-route-page__title {
+    color: rgb(241 245 249);
 }
 
 dialog.planning-route-page .planning-route-section {

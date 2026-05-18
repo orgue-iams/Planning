@@ -72,3 +72,17 @@ export async function invokeSlotNotify(payload) {
     }
     return json;
 }
+
+/**
+ * @param {{ targetEmail: string, subject: string, message: string, actorEmail: string, actorDisplayName?: string }} p
+ */
+export async function sendPlanningSupportEmail(p) {
+    return invokeSlotNotify({
+        action: 'support',
+        targetEmail: p.targetEmail,
+        actorEmail: p.actorEmail,
+        actorDisplayName: p.actorDisplayName || p.actorEmail,
+        subject: p.subject,
+        message: p.message
+    });
+}
