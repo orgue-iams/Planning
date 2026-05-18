@@ -14,6 +14,8 @@ jobs:
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
     steps:
+      - uses: actions/checkout@v6
+
       - name: Check required secrets
         run: |
           set -euo pipefail
@@ -43,5 +45,5 @@ jobs:
       - name: Business keepalive SQL checks
         run: |
           set -euxo pipefail
-          supabase db query --linked "select now() as checked_at_utc, count(*)::int as profiles_count from public.profiles;" -o table
-          supabase db query --linked "select week_type, count(*)::int as lines_count from public.organ_week_template_line group by week_type order by week_type;" -o table
+          supabase db query --linked "select now() as checked_at_utc, count(*)::int as profiles_count from public.profiles;"
+          supabase db query --linked "select week_type, count(*)::int as lines_count from public.organ_week_template_line group by week_type order by week_type;"

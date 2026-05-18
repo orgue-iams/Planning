@@ -1,21 +1,16 @@
-# S’exécute quand un déploiement se termine en échec → ouvre une issue (lien vers les logs).
-# GitHub peut vous envoyer un e-mail selon vos préférences de notification sur le dépôt.
-#
-# Noms des workflows : doivent correspondre EXACTEMENT à la colonne de gauche dans l’onglet Actions.
-# Si une alerte ne part pas pour Pages : Actions → ouvrir le workflow Pages → reprendre le `name:` du YAML GitHub.
-#
-# Ajuster la liste ci-dessous si besoin :
+# S’exécute quand un déploiement se termine en échec → issue GitHub + e-mail Brevo vers planning_error_notify_email.
+# Les e-mails GitHub (compte Actions) restent possibles selon vos préférences de notification sur le dépôt.
 on:
   workflow_run:
     workflows:
       - Deploy Supabase
       - pages build and deployment
       - Supabase Keepalive
+      - Planning nightly report
     types: [completed]
     branches: [main, master]
 
 jobs:
-  # Si ce job est « skipped », c’est normal : le workflow cible s’est terminé avec succès.
   open-issue:
     name: Ouvrir une issue (uniquement si échec déploiement)
     runs-on: ubuntu-latest
@@ -40,7 +35,7 @@ jobs:
 
             ### Suite recommandée
             1. Ouvrir le lien **Logs** ci-dessus et noter l’étape en rouge + le message d’erreur.
-            2. Corriger le dépôt ou coller ce log dans Cursor (l’assistant ne surveille pas les runs tout seul en tâche de fond).
+            2. Corriger le dépôt ou coller ce log dans Cursor (l’agent ne surveille pas les runs tout seul en tâche de fond).
             3. Relancer le workflow manuellement depuis l’onglet Actions si besoin — **pas de relances automatiques en boucle** depuis ce dépôt.
 
             ---
@@ -52,3 +47,35 @@ jobs:
               title,
               body,
             });
+
+      - name: E-mail support (planning_error_notify_email via Brevo)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          PLANNING_CRON_SECRET: ${{ secrets.PLANNING_CRON_SECRET }}
+          WF_NAME: ${{ github.event.workflow_run.name }}
+          WF_URL: ${{ github.event.workflow_run.html_url }}
+          WF_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          WF_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ] || [ -z "${PLANNING_CRON_SECRET:-}" ]; then
+            echo "Secrets SUPABASE_URL / SUPABASE_ANON_KEY / PLANNING_CRON_SECRET absents — pas d'e-mail Brevo (issue GitHub uniquement)."
+            exit 0
+          fi
+          base="${SUPABASE_URL%/}"
+          payload=$(python3 -c "import json,os; print(json.dumps({'ciFailure':{'workflowName':os.environ['WF_NAME'],'runUrl':os.environ['WF_URL'],'branch':os.environ['WF_BRANCH'],'sha':os.environ['WF_SHA']}}))")
+          res=$(curl -sS -w "\n%{http_code}" -X POST \
+            "${base}/functions/v1/planning-nightly" \
+            -H "Authorization: Bearer ${PLANNING_CRON_SECRET}" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "$payload")
+          body=$(echo "$res" | sed '$d')
+          code=$(echo "$res" | tail -n1)
+          echo "HTTP $code"
+          echo "$body"
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            echo "::warning::E-mail support non envoyé (voir corps ci-dessus)."
+            exit 0
+          fi

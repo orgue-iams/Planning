@@ -1,5 +1,6 @@
 /**
  * Rapport nocturne (cron) : santé, digest erreurs infra, audit miroirs Google.
+ * Mode `ciFailure` : alerte e-mail vers planning_error_notify_email (échec CI GitHub).
  * Auth : Authorization: Bearer <PLANNING_CRON_SECRET> (secret Edge, pas JWT utilisateur).
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
@@ -30,6 +31,83 @@ function normalizeBrevoApiKey(raw: string | undefined): string {
         .replace(/^["']|["']$/g, '');
 }
 
+type CiFailurePayload = {
+    workflowName?: string;
+    runUrl?: string;
+    branch?: string;
+    sha?: string;
+    errorSummary?: string;
+};
+
+async function sendBrevoHtml(notifyEmail: string, subject: string, htmlBody: string) {
+    const apiKey = normalizeBrevoApiKey(Deno.env.get('BREVO_API_KEY'));
+    const fromEmail = String(Deno.env.get('NOTIFY_FROM_EMAIL') ?? '').trim();
+    const fromName = String(Deno.env.get('NOTIFY_FROM_NAME') ?? 'Planning Orgue IAMS').trim();
+    if (!apiKey || !fromEmail) {
+        return { ok: false as const, error: 'BREVO_API_KEY ou NOTIFY_FROM_EMAIL manquant' };
+    }
+
+    const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            'api-key': apiKey
+        },
+        body: JSON.stringify({
+            sender: { name: fromName, email: fromEmail },
+            to: [{ email: notifyEmail }],
+            subject,
+            htmlContent: htmlBody
+        })
+    });
+
+    if (!brevoRes.ok) {
+        const t = await brevoRes.text();
+        return { ok: false as const, error: 'BREVO_SEND_FAILED', detail: t.slice(0, 350) };
+    }
+    return { ok: true as const };
+}
+
+async function resolveNotifyEmail(admin: ReturnType<typeof createClient>) {
+    const { data: settings } = await admin
+        .from('organ_school_settings')
+        .select('planning_error_notify_email')
+        .limit(1)
+        .maybeSingle();
+    return String(settings?.planning_error_notify_email ?? '')
+        .trim()
+        .toLowerCase();
+}
+
+async function handleCiFailure(notifyEmail: string, cf: CiFailurePayload) {
+    const nowIso = new Date().toISOString();
+    const lines: string[] = [];
+    lines.push(`<p>Échec d’un workflow GitHub Actions — ${escapeHtml(nowIso)}</p>`);
+    lines.push('<p>Ce message a été envoyé à l’adresse configurée dans l’application (<strong>Configuration du planning → Support technique</strong>), pas à l’e-mail du compte GitHub qui déclenche la CI.</p>');
+    lines.push('<ul>');
+    if (cf.workflowName) lines.push(`<li><strong>Workflow</strong> : ${escapeHtml(cf.workflowName)}</li>`);
+    if (cf.branch) lines.push(`<li><strong>Branche</strong> : ${escapeHtml(cf.branch)}</li>`);
+    if (cf.sha) lines.push(`<li><strong>Commit</strong> : <code>${escapeHtml(cf.sha)}</code></li>`);
+    if (cf.runUrl) {
+        lines.push(
+            `<li><strong>Logs</strong> : <a href="${escapeHtml(cf.runUrl)}">${escapeHtml(cf.runUrl)}</a></li>`
+        );
+    }
+    if (cf.errorSummary) {
+        lines.push(`<li><strong>Résumé</strong> : ${escapeHtml(cf.errorSummary)}</li>`);
+    }
+    lines.push('</ul>');
+
+    const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"/></head><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#222;">${lines.join('\n')}</body></html>`;
+    const subject = `[Planning IAMS] Échec CI — ${String(cf.workflowName || 'workflow').slice(0, 80)}`;
+    const sent = await sendBrevoHtml(notifyEmail, subject, html);
+    if (!sent.ok) {
+        return json({ ok: false, error: sent.error, detail: 'detail' in sent ? sent.detail : undefined }, 502);
+    }
+    return json({ ok: true, emailSent: true, notifyEmail, mode: 'ci_failure' });
+}
+
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
     if (req.method !== 'POST') return json({ ok: false, error: 'POST only' }, 405);
@@ -55,16 +133,23 @@ Deno.serve(async (req) => {
         auth: { persistSession: false, autoRefreshToken: false }
     });
 
-    const { data: settings } = await admin
-        .from('organ_school_settings')
-        .select('planning_error_notify_email')
-        .limit(1)
-        .maybeSingle();
-    const notifyEmail = String(settings?.planning_error_notify_email ?? '')
-        .trim()
-        .toLowerCase();
+    const notifyEmail = await resolveNotifyEmail(admin);
     if (!notifyEmail) {
         return json({ ok: false, error: 'planning_error_notify_email non configuré' }, 400);
+    }
+
+    let payload: { ciFailure?: CiFailurePayload } = {};
+    try {
+        const ct = req.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+            payload = await req.json();
+        }
+    } catch {
+        /* corps vide = rapport nocturne standard */
+    }
+
+    if (payload.ciFailure && typeof payload.ciFailure === 'object') {
+        return handleCiFailure(notifyEmail, payload.ciFailure);
     }
 
     const nowIso = new Date().toISOString();
@@ -109,6 +194,9 @@ Deno.serve(async (req) => {
 
     const lines: string[] = [];
     lines.push(`<p>Rapport automatique Planning IAMS — ${escapeHtml(nowIso)}</p>`);
+    lines.push(
+        `<p>Destinataire : <strong>${escapeHtml(notifyEmail)}</strong> (paramètre <code>planning_error_notify_email</code> en base).</p>`
+    );
     lines.push('<h3>Santé</h3><p>Contrôle exécuté avec succès.</p>');
 
     lines.push(`<h3>Erreurs infra en attente (${(pendingErrors ?? []).length})</h3>`);
@@ -149,31 +237,16 @@ Deno.serve(async (req) => {
 
     const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"/></head><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#222;">${lines.join('\n')}</body></html>`;
 
-    const apiKey = normalizeBrevoApiKey(Deno.env.get('BREVO_API_KEY'));
-    const fromEmail = String(Deno.env.get('NOTIFY_FROM_EMAIL') ?? '').trim();
-    const fromName = String(Deno.env.get('NOTIFY_FROM_NAME') ?? 'Planning Orgue IAMS').trim();
-    if (!apiKey || !fromEmail) {
-        return json({ ok: false, error: 'BREVO_API_KEY ou NOTIFY_FROM_EMAIL manquant' }, 500);
-    }
-
-    const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            'api-key': apiKey
-        },
-        body: JSON.stringify({
-            sender: { name: fromName, email: fromEmail },
-            to: [{ email: notifyEmail }],
-            subject: `[Planning IAMS] Rapport nocturne ${nowIso.slice(0, 10)}`,
-            htmlContent: html
-        })
-    });
-
-    if (!brevoRes.ok) {
-        const t = await brevoRes.text();
-        return json({ ok: false, error: 'BREVO_SEND_FAILED', detail: t.slice(0, 350) }, 502);
+    const sent = await sendBrevoHtml(
+        notifyEmail,
+        `[Planning IAMS] Rapport nocturne ${nowIso.slice(0, 10)}`,
+        html
+    );
+    if (!sent.ok) {
+        return json(
+            { ok: false, error: sent.error, detail: 'detail' in sent ? sent.detail : undefined },
+            502
+        );
     }
 
     const errIds = (pendingErrors ?? []).map((r) => r.id).filter(Boolean);
@@ -200,6 +273,7 @@ Deno.serve(async (req) => {
         ok: true,
         emailSent: true,
         notifyEmail,
+        mode: 'nightly',
         pendingErrors: errIds.length,
         missingMain: missingMain.length,
         mirrorErrors: mirrorErrors.length
