@@ -15,6 +15,7 @@ import { planningAdminInvoke } from './admin-api.js';
 import { isPlanningRole } from './planning-roles.js';
 import {
     openPlanningRouteFromDrawer,
+    planningRouteTitle,
     pushPlanningRouteLevel
 } from '../utils/planning-route-dialog.js';
 import { normalizePlanningRole, PLANNING_ROLE_OPTIONS } from './planning-roles.js';
@@ -38,11 +39,14 @@ function directoryRoleCardClass(role) {
     return 'directory-admin-user-card--role-eleve';
 }
 
-/** @returns {string[]} lignes contact droite (email, tél., planning) */
+/** @returns {string[]} lignes contact droite (email, tél., planning si admin) */
 function directoryUserContactLines(r) {
     const email = String(r?.email || '').trim();
     const phone = formatFrPhone(String(r?.telephone || '').trim());
-    const planning = String(r?.personal_calendar_label || r?.calendar_label || '').trim();
+    const showPlanning = isAdmin(getPlanningSessionUser());
+    const planning = showPlanning
+        ? String(r?.personal_calendar_label || r?.calendar_label || '').trim()
+        : '';
     const shown = new Set();
     const lines = [];
     if (email) {
@@ -274,8 +278,8 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
         list.className = 'space-y-2';
         for (const r of rows) {
             const item = document.createElement('div');
-            item.className =
-                'directory-readonly-user-item directory-admin-user-card--layout py-3 px-3 min-w-0 rounded-xl border border-slate-200 bg-slate-50/80 dark:border-slate-600 dark:bg-slate-800/70';
+            const roleKey = normalizePlanningRole(r.profile_role || r.role);
+            item.className = `directory-readonly-user-item directory-admin-user-card directory-admin-user-card--layout ${directoryRoleCardClass(roleKey)} py-2.5 px-3 min-w-0 rounded-xl border`;
 
             const identity = document.createElement('div');
             identity.className = 'directory-user-card__identity min-w-0 self-stretch flex flex-col justify-center pr-2';
@@ -525,7 +529,7 @@ function openDirectoryUserCreate() {
     resetDirectoryCreateForm();
     pushPlanningRouteLevel(
         'modal_directory_users',
-        'Utilisateurs / Nouvel utilisateur',
+        planningRouteTitle('Nouvel utilisateur'),
         'Utilisateurs',
         showDirectoryListPanel
     );
@@ -646,7 +650,7 @@ function openDirectoryUserEdit(userRow) {
     const titleName = directoryDisplayName(userRow);
     pushPlanningRouteLevel(
         'modal_directory_users',
-        `Utilisateurs / ${titleName}`,
+        planningRouteTitle(titleName),
         'Utilisateurs',
         () => {
             showDirectoryListPanel();

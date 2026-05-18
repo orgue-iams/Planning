@@ -202,22 +202,40 @@ Deno.serve(async (req) => {
                 .toLowerCase();
             const subject = String(body.subject ?? '').trim() || 'Support Planning IAMS';
             const message = String(body.message ?? '').trim();
+            const messageHtmlRaw = String(body.messageHtml ?? '').trim();
             const actorDisplayName = String(body.actorDisplayName ?? '').trim() || me;
-            if (!targetEmail || !message) {
+            if (!targetEmail || (!message && !messageHtmlRaw)) {
                 return json({ ok: false, emailSent: false, error: 'Requête invalide' }, 400);
             }
+            const sanitizeSupportHtml = (raw: string) =>
+                raw
+                    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+                    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+            const messageBody = messageHtmlRaw
+                ? `<div>${sanitizeSupportHtml(messageHtmlRaw)}</div>`
+                : `<p>${escapeHtml(message).replace(/\n/g, '<br/>')}</p>`;
             const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"/></head><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#222;">
 <p>Message de support depuis le planning orgue IAMS.</p>
 <p><strong>${escapeHtml(actorDisplayName)}</strong> (${escapeHtml(me)})</p>
-<p>${escapeHtml(message).replace(/\n/g, '<br/>')}</p>
+${messageBody}
 </body></html>`;
-            const brevoBody = {
+            const attIn = Array.isArray(body.attachments) ? body.attachments : [];
+            const attachments = attIn
+                .slice(0, 5)
+                .map((a: { name?: string; contentBase64?: string }) => ({
+                    name: String(a?.name ?? 'piece').trim() || 'piece',
+                    content: String(a?.contentBase64 ?? '').trim()
+                }))
+                .filter((a) => a.content.length > 0);
+            const brevoBody: Record<string, unknown> = {
                 sender: { name: fromName, email: fromEmail },
                 to: [{ email: targetEmail }],
                 replyTo: { email: me, name: actorDisplayName },
                 subject: `[Support] ${subject}`,
                 htmlContent: html
             };
+            if (attachments.length) brevoBody.attachment = attachments;
             const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
                 method: 'POST',
                 headers: {

@@ -64,7 +64,7 @@ export function openCourseStudentsPicker(opts) {
         inRows.sort(sortFn);
         outRows.sort(sortFn);
         const mkBtn = (id, label) =>
-            `<button type="button" draggable="true" class="csp-student-row cursor-grab active:cursor-grabbing btn btn-ghost btn-sm h-auto min-h-0 py-1.5 px-2 text-left text-[11px] font-normal font-sans w-full justify-start border border-transparent hover:border-slate-200" data-user-id="${escapeAttr(id)}">${escapeAttr(label)}</button>`;
+            `<button type="button" draggable="true" class="csp-student-row cursor-grab active:cursor-grabbing w-full text-left text-[11px] font-normal font-sans py-1.5 px-2 rounded-md border border-slate-300 bg-white text-slate-800 hover:border-sky-400 hover:bg-sky-50/80 dark:border-slate-500 dark:bg-slate-900 dark:text-slate-100" data-user-id="${escapeAttr(id)}">${escapeAttr(label)}</button>`;
         inEl.innerHTML = inRows.length ? inRows.map((r) => mkBtn(r.id, r.label)).join('') : '<p class="text-[10px] text-slate-400 px-1 py-2">Aucun inscrit.</p>';
         outEl.innerHTML = outRows.length ? outRows.map((r) => mkBtn(r.id, r.label)).join('') : '<p class="text-[10px] text-slate-400 px-1 py-2">Aucun élève disponible.</p>';
     };

@@ -1227,3 +1227,97 @@ dialog#modal_reservation:not(.planning-route-page) .modal-box.reservation-route-
     align-items: center;
     justify-content: center;
 }
+
+/* Inscriptions cours : cartes visibles, listes sans hauteur fixe */
+.csp-student-stack {
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+    background: transparent;
+    border: none;
+}
+.csp-student-stack--out {
+    border: 1px dashed rgb(203 213 225);
+    border-radius: 0.5rem;
+    padding: 0.35rem;
+}
+#modal_course_students .csp-student-row {
+    display: block;
+}
+
+/* Annonces : zone ~10 lignes, barre d'outils juste en dessous */
+.planning-quill-mount.planning-quill-mount--announcements {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+.planning-quill-mount.planning-quill-mount--announcements .ql-toolbar.ql-snow {
+    order: 2;
+    margin: 0;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid #e2e8f0 !important;
+    border-top: none !important;
+    border-radius: 0 0 0.75rem 0.75rem !important;
+}
+.planning-quill-mount.planning-quill-mount--announcements .ql-container.ql-snow {
+    order: 1;
+    border-radius: 0.75rem 0.75rem 0 0 !important;
+    border-bottom: none !important;
+}
+.planning-quill-mount.planning-quill-mount--announcements .ql-editor {
+    min-height: 11rem;
+    max-height: 11rem;
+}
+.planning-quill-toolbar--announcements .planning-quill-clear-all {
+    opacity: 1;
+    visibility: visible;
+}
+
+#modal_config .config-rule-row {
+    border-bottom: none;
+    padding: 0.4rem 0;
+}
+
+#modal_semaines_types.st-main-panel--eleve .st-section-col {
+    border-right: none;
+}
+#modal_semaines_types .st-gabarit-section--eleve .st-section-split {
+    border: none;
+}
+
+dialog#modal_st_slot_edit {
+    margin: auto;
+    padding: 0;
+    border: none;
+    background: transparent;
+    max-width: 100vw;
+    max-height: 100dvh;
+}
+dialog#modal_st_slot_edit::backdrop {
+    background: rgb(15 23 42 / 0.4);
+}
+
+.planning-route-page__nav::before {
+    content: none;
+}
+
+#modal_directory_users .directory-route-fab,
+#modal_calendar_pool .calendar-pool-route-fab {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    margin-top: 0.75rem;
+    padding: 0.5rem 0 0.25rem;
+    background: linear-gradient(to top, var(--planning-surface-muted, rgb(248 250 252)) 70%, transparent);
+}
+#modal_directory_users .directory-route-fab .btn,
+#modal_calendar_pool .calendar-pool-route-fab .btn {
+    width: 100%;
+    font-weight: 700;
+}
+
+#modal_calendar_pool .calendar-pool-card {
+    border-width: 1px;
+    border-style: solid;
+}

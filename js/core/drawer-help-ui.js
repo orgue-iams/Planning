@@ -33,9 +33,74 @@ function refreshHelpContent() {
     if (ver) ver.textContent = APP_VERSION;
 }
 
+function helpMessagePlain(ed) {
+    if (!(ed instanceof HTMLElement)) return '';
+    return (ed.innerText || ed.textContent || '').trim();
+}
+
+function helpMessageHtml(ed) {
+    if (!(ed instanceof HTMLElement)) return '';
+    const clone = ed.cloneNode(true);
+    clone.querySelectorAll('script,style').forEach((n) => n.remove());
+    const html = clone.innerHTML.trim();
+    const plain = helpMessagePlain(ed);
+    if (!plain && !html.replace(/<br\s*\/?>/gi, '').trim()) return '';
+    return html || plain.replace(/\n/g, '<br/>');
+}
+
+/** @returns {Promise<Array<{ name: string, contentBase64: string }>>} */
+async function readHelpAttachments() {
+    const input = document.getElementById('drawer-help-attachments');
+    if (!(input instanceof HTMLInputElement) || !input.files?.length) return [];
+    const out = [];
+    const max = Math.min(input.files.length, 5);
+    for (let i = 0; i < max; i++) {
+        const f = input.files[i];
+        if (!f || f.size > 4_500_000) continue;
+        const buf = await f.arrayBuffer();
+        const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+        out.push({ name: f.name || `piece-${i + 1}`, contentBase64: b64 });
+    }
+    return out;
+}
+
+function clearHelpForm() {
+    const subj = document.getElementById('drawer-help-subject');
+    const msg = document.getElementById('drawer-help-message');
+    const files = document.getElementById('drawer-help-attachments');
+    if (subj instanceof HTMLInputElement) subj.value = '';
+    if (msg instanceof HTMLElement) msg.innerHTML = '';
+    if (files instanceof HTMLInputElement) files.value = '';
+}
+
 export function initDrawerHelpUi() {
     if (bound) return;
     bound = true;
+
+    const msgEd = document.getElementById('drawer-help-message');
+    if (msgEd instanceof HTMLElement) {
+        msgEd.addEventListener('paste', (ev) => {
+            const items = ev.clipboardData?.items;
+            if (!items) return;
+            for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                    ev.preventDefault();
+                    const file = item.getAsFile();
+                    if (!file) continue;
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const img = document.createElement('img');
+                        img.src = String(reader.result || '');
+                        img.alt = 'Image collée';
+                        img.className = 'max-w-full h-auto rounded my-1';
+                        msgEd.appendChild(img);
+                    };
+                    reader.readAsDataURL(file);
+                    return;
+                }
+            }
+        });
+    }
 
     document.getElementById('menu-item-help')?.addEventListener('click', (e) => {
         e.preventDefault();
@@ -66,17 +131,21 @@ export function initDrawerHelpUi() {
                 return;
             }
             const subj = document.getElementById('drawer-help-subject');
-            const body = document.getElementById('drawer-help-message');
+            const msgEl = document.getElementById('drawer-help-message');
             const subject = subj instanceof HTMLInputElement ? subj.value.trim() : '';
-            const message = body instanceof HTMLTextAreaElement ? body.value.trim() : '';
-            if (!message) {
+            const message = helpMessagePlain(msgEl);
+            const messageHtml = helpMessageHtml(msgEl);
+            if (!message && !messageHtml.replace(/<[^>]+>/g, '').trim()) {
                 showToast('Saisissez un message.', 'error');
                 return;
             }
+            const attachments = await readHelpAttachments();
             const res = await sendPlanningSupportEmail({
                 targetEmail: mail,
                 subject: subject || 'Demande support',
-                message,
+                message: message || '(voir contenu HTML)',
+                messageHtml,
+                attachments,
                 actorEmail,
                 actorDisplayName: String(u?.name || u?.email || '').trim() || actorEmail
             });
@@ -85,8 +154,7 @@ export function initDrawerHelpUi() {
                 return;
             }
             showToast('Message envoyé au support.');
-            if (subj instanceof HTMLInputElement) subj.value = '';
-            if (body instanceof HTMLTextAreaElement) body.value = '';
+            clearHelpForm();
         })();
     });
 }

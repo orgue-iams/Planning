@@ -74,7 +74,7 @@ export async function invokeSlotNotify(payload) {
 }
 
 /**
- * @param {{ targetEmail: string, subject: string, message: string, actorEmail: string, actorDisplayName?: string }} p
+ * @param {{ targetEmail: string, subject: string, message: string, messageHtml?: string, attachments?: Array<{ name: string, contentBase64: string }>, actorEmail: string, actorDisplayName?: string }} p
  */
 export async function sendPlanningSupportEmail(p) {
     return invokeSlotNotify({
@@ -83,6 +83,8 @@ export async function sendPlanningSupportEmail(p) {
         actorEmail: p.actorEmail,
         actorDisplayName: p.actorDisplayName || p.actorEmail,
         subject: p.subject,
-        message: p.message
+        message: p.message,
+        messageHtml: p.messageHtml || '',
+        attachments: p.attachments || []
     });
 }

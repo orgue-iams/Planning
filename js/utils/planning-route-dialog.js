@@ -8,6 +8,9 @@ import { isPlanningDrawerReopenSuppressed } from './planning-overlay-dismiss.js'
 
 const ROUTE_CLASS = 'planning-route-page';
 
+/** Libellé du menu tiroir (racine uniquement — ne pas inclure dans les titres de sous-niveaux). */
+export const PLANNING_ROUTE_MENU_LABEL = 'Menu';
+
 /** Dialogues ouverts depuis le tiroir : retour / fermeture rouvre le menu principal. */
 const routeFromDrawer = new Set();
 
@@ -47,23 +50,76 @@ function syncPlanningRouteBackFromStack(dialogId) {
  * Met à jour la barre (titre + retour) à partir de la pile courante.
  * @param {string} dialogId
  */
+/**
+ * Titre affiché : sous-niveau → sans le segment « Menu » (implicite via le bouton retour).
+ * @param {PlanningRouteLevel} top
+ * @param {PlanningRouteLevel[]} stack
+ */
+function displayRouteTitle(top, stack) {
+    let title = (top.ariaLabel || '').trim();
+    if (stack.length > 1) {
+        const menuSeg = `${PLANNING_ROUTE_MENU_LABEL} /`;
+        if (title.startsWith(menuSeg)) title = title.slice(menuSeg.length).trim();
+        else if (title === PLANNING_ROUTE_MENU_LABEL) title = stack[stack.length - 2]?.ariaLabel || title;
+    }
+    return title;
+}
+
+/**
+ * @param {...string} segments
+ */
+export function planningRouteTitle(...segments) {
+    return segments
+        .map((s) => String(s || '').trim())
+        .filter((s) => s && s !== PLANNING_ROUTE_MENU_LABEL)
+        .join(' / ');
+}
+
 export function refreshPlanningRouteChrome(dialogId) {
     const stack = routeStacks.get(dialogId);
     if (!stack?.length) return;
     const top = stack[stack.length - 1];
     const el = document.getElementById(dialogId);
     if (!(el instanceof HTMLDialogElement)) return;
-    if (top.ariaLabel) el.setAttribute('aria-label', top.ariaLabel);
+    const titleText = displayRouteTitle(top, stack);
+    if (titleText) el.setAttribute('aria-label', titleText);
     const bar = ensureRouteBar(el);
-    const short = (top.backLabel || 'Menu').trim();
-    const backText = `< ${short}`;
-    const back = bar.querySelector('.planning-route-page__back');
-    if (back instanceof HTMLButtonElement) {
-        back.textContent = backText;
-        back.setAttribute('aria-label', `Retour (${short})`);
+    const short = (top.backLabel || PLANNING_ROUTE_MENU_LABEL).trim();
+    const atRoot = stack.length <= 1;
+    let nav = bar.querySelector('.planning-route-page__nav');
+    if (!(nav instanceof HTMLButtonElement)) {
+        const legacyBack = bar.querySelector('.planning-route-page__back');
+        const legacyTitle = bar.querySelector('.planning-route-page__title');
+        if (legacyBack) legacyBack.remove();
+        if (legacyTitle) legacyTitle.remove();
+        nav = document.createElement('button');
+        nav.type = 'button';
+        nav.className =
+            'planning-route-page__nav w-full min-w-0 text-left text-sm font-semibold text-slate-800 dark:text-slate-100 py-1 px-0 min-h-0 h-auto border-0 bg-transparent cursor-pointer truncate hover:text-slate-900 dark:hover:text-white';
+        nav.addEventListener('click', () => {
+            const stk = routeStacks.get(el.id);
+            if (stk && stk.length > 1) {
+                const custom = routeBackHandlers.get(el.id);
+                if (custom) custom();
+                else popPlanningRouteLevel(el.id);
+                return;
+            }
+            const custom = routeBackHandlers.get(el.id);
+            if (custom) {
+                custom();
+                return;
+            }
+            defaultRouteBack(el);
+        });
+        bar.replaceChildren(nav);
     }
-    const title = bar.querySelector('.planning-route-page__title');
-    if (title) title.textContent = (top.ariaLabel || '').trim();
+    if (atRoot) {
+        nav.textContent = titleText;
+        nav.setAttribute('aria-label', titleText);
+    } else {
+        nav.textContent = `‹ ${titleText}`;
+        nav.setAttribute('aria-label', `Retour vers ${short} (${titleText})`);
+    }
 }
 
 /**
@@ -72,7 +128,7 @@ export function refreshPlanningRouteChrome(dialogId) {
  * @param {string} ariaLabel
  * @param {string} [backLabel]
  */
-export function resetPlanningRouteStack(dialogId, ariaLabel, backLabel = 'Menu') {
+export function resetPlanningRouteStack(dialogId, ariaLabel, backLabel = PLANNING_ROUTE_MENU_LABEL) {
     routeStacks.set(dialogId, [{ ariaLabel, backLabel }]);
     refreshPlanningRouteChrome(dialogId);
     syncPlanningRouteBackFromStack(dialogId);
@@ -90,7 +146,7 @@ export function pushPlanningRouteLevel(dialogId, ariaLabel, backLabel, onPop) {
     const parent = stack[stack.length - 1];
     stack.push({
         ariaLabel,
-        backLabel: (backLabel || parent?.ariaLabel || 'Menu').trim(),
+        backLabel: (backLabel || parent?.ariaLabel || PLANNING_ROUTE_MENU_LABEL).trim(),
         onPop
     });
     routeStacks.set(dialogId, stack);
@@ -113,7 +169,7 @@ export function replacePlanningRouteLevel(dialogId, ariaLabel, backLabel, onPop)
     }
     stack[stack.length - 1] = {
         ariaLabel,
-        backLabel: (backLabel || stack[stack.length - 2]?.ariaLabel || 'Menu').trim(),
+        backLabel: (backLabel || stack[stack.length - 2]?.ariaLabel || PLANNING_ROUTE_MENU_LABEL).trim(),
         onPop
     };
     routeStacks.set(dialogId, stack);
@@ -148,12 +204,19 @@ function ensureRouteBar(el) {
     if (bar) return bar;
     bar = document.createElement('div');
     bar.className =
-        'planning-route-page__bar flex items-center gap-2 justify-start flex-wrap shrink-0 bg-slate-50 px-3 py-2 max-sm:pt-[max(0.35rem,env(safe-area-inset-top,0px))] dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700';
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className =
-        'planning-route-page__back text-left text-sm font-semibold text-slate-700 hover:text-slate-900 hover:underline py-1 px-0 min-h-0 h-auto border-0 bg-transparent cursor-pointer shrink-0 dark:text-slate-200 dark:hover:text-white';
-    btn.addEventListener('click', () => {
+        'planning-route-page__bar shrink-0 bg-slate-50 px-3 py-2 max-sm:pt-[max(0.35rem,env(safe-area-inset-top,0px))] dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700';
+    const nav = document.createElement('button');
+    nav.type = 'button';
+    nav.className =
+        'planning-route-page__nav w-full min-w-0 text-left text-sm font-semibold text-slate-800 dark:text-slate-100 py-1 px-0 min-h-0 h-auto border-0 bg-transparent cursor-pointer truncate hover:text-slate-900 dark:hover:text-white';
+    nav.addEventListener('click', () => {
+        const stack = routeStacks.get(el.id);
+        if (stack && stack.length > 1) {
+            const custom = routeBackHandlers.get(el.id);
+            if (custom) custom();
+            else popPlanningRouteLevel(el.id);
+            return;
+        }
         const custom = routeBackHandlers.get(el.id);
         if (custom) {
             custom();
@@ -161,11 +224,7 @@ function ensureRouteBar(el) {
         }
         defaultRouteBack(el);
     });
-    const title = document.createElement('span');
-    title.className =
-        'planning-route-page__title text-sm font-semibold text-slate-800 dark:text-slate-100 truncate min-w-0 flex-1';
-    bar.appendChild(btn);
-    bar.appendChild(title);
+    bar.appendChild(nav);
     el.insertBefore(bar, el.firstChild);
     return bar;
 }
@@ -192,11 +251,11 @@ export function updatePlanningRouteDialog(dialogId, ariaLabel, backLabel) {
         stack[stack.length - 1] = {
             ...stack[stack.length - 1],
             ariaLabel: ariaLabel.trim(),
-            backLabel: (backLabel ?? stack[stack.length - 1].backLabel ?? 'Menu').trim()
+            backLabel: (backLabel ?? stack[stack.length - 1].backLabel ?? PLANNING_ROUTE_MENU_LABEL).trim()
         };
         routeStacks.set(dialogId, stack);
     } else {
-        routeStacks.set(dialogId, [{ ariaLabel, backLabel: (backLabel || 'Menu').trim() }]);
+        routeStacks.set(dialogId, [{ ariaLabel, backLabel: (backLabel || PLANNING_ROUTE_MENU_LABEL).trim() }]);
     }
     refreshPlanningRouteChrome(dialogId);
 }
@@ -213,7 +272,7 @@ export function openPlanningRouteFromDrawer(dialogId, ariaLabel, backLabel) {
     if (!(el instanceof HTMLDialogElement)) return false;
     blurActiveElement();
     routeFromDrawer.add(dialogId);
-    resetPlanningRouteStack(dialogId, ariaLabel, backLabel || 'Menu');
+    resetPlanningRouteStack(dialogId, ariaLabel, backLabel || PLANNING_ROUTE_MENU_LABEL);
     showMainDrawerPanel();
     openPlanningRouteDialog(dialogId);
     document.getElementById('btn-app-drawer')?.blur();
@@ -233,7 +292,11 @@ export function openPlanningRouteDialog(dialogId, ariaLabel, backLabel) {
     el.classList.add(ROUTE_CLASS);
     ensureRouteBar(el);
     if (!routeStacks.has(dialogId)) {
-        resetPlanningRouteStack(dialogId, ariaLabel || 'Menu', backLabel || 'Menu');
+        resetPlanningRouteStack(
+            dialogId,
+            ariaLabel || PLANNING_ROUTE_MENU_LABEL,
+            backLabel || PLANNING_ROUTE_MENU_LABEL
+        );
     } else {
         refreshPlanningRouteChrome(dialogId);
     }

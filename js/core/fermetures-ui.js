@@ -12,6 +12,7 @@ import { getPlanningSessionUser } from './session-user.js';
 import { showToast } from '../utils/toast.js';
 import {
     openPlanningRouteFromDrawer,
+    planningRouteTitle,
     pushPlanningRouteLevel
 } from '../utils/planning-route-dialog.js';
 import { mountPlanningSwipeCard } from '../utils/planning-card-swipe.js';
@@ -178,7 +179,11 @@ function openClosureEdit(index) {
     setEditFieldsReadonly(!editable);
 
     const title =
-        index < 0 ? 'Fermetures / Nouvelle période' : editable ? 'Fermetures / Édition' : 'Fermetures / Détail';
+        index < 0
+            ? planningRouteTitle('Nouvelle période')
+            : editable
+              ? planningRouteTitle('Édition')
+              : planningRouteTitle('Détail');
     pushPlanningRouteLevel('modal_fermetures', title, 'Fermetures', showFermeturesMainPanel);
 }
 

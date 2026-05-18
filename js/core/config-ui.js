@@ -250,7 +250,7 @@ export function initConfigUi(currentUser) {
 
     document.getElementById('menu-item-config')?.addEventListener('click', (ev) => {
         ev.preventDefault();
-        if (!openPlanningRouteFromDrawer('modal_config', 'Administration', 'Menu')) {
+        if (!openPlanningRouteFromDrawer('modal_config', 'Configuration du planning', 'Menu')) {
             return;
         }
         applyConfigFieldAccess();

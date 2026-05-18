@@ -1,0 +1,46 @@
+# Rapport nocturne (digest infra + audit miroirs Google) → planning_error_notify_email
+name: Planning nightly report
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check secrets
+        run: |
+          set -euo pipefail
+          missing=
+          [ -z "${{ secrets.SUPABASE_URL }}" ] && missing="$missing SUPABASE_URL"
+          [ -z "${{ secrets.SUPABASE_ANON_KEY }}" ] && missing="$missing SUPABASE_ANON_KEY"
+          [ -z "${{ secrets.PLANNING_CRON_SECRET }}" ] && missing="$missing PLANNING_CRON_SECRET"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing secrets:$missing"
+            exit 1
+          fi
+
+      - name: Invoke planning-nightly Edge Function
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          PLANNING_CRON_SECRET: ${{ secrets.PLANNING_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          base="${SUPABASE_URL%/}"
+          res=$(curl -sS -w "\n%{http_code}" -X POST \
+            "${base}/functions/v1/planning-nightly" \
+            -H "Authorization: Bearer ${PLANNING_CRON_SECRET}" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          body=$(echo "$res" | sed '$d')
+          code=$(echo "$res" | tail -n1)
+          echo "HTTP $code"
+          echo "$body"
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            exit 1
+          fi

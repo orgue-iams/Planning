@@ -18,11 +18,9 @@ import {
     runTemplateGoogleBackgroundSync
 } from './template-apply-engine.js';
 import { saveProfWeekCycleFromApply } from './week-cycle.js';
-import {
-    openPlanningRouteDialog,
-    openPlanningRouteFromDrawer,
-    pushPlanningRouteLevel
-} from '../utils/planning-route-dialog.js';
+import { openPlanningRouteFromDrawer } from '../utils/planning-route-dialog.js';
+import { openCourseStudentsPicker } from './course-students-picker.js';
+import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
 
 const ST_DELETE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m2-3h6a1 1 0 011 1v1H8V5a1 1 0 011-1z"/></svg>';
 
@@ -365,7 +363,7 @@ function stSlotEditRouteTitle(card) {
     const dow = dowLongLabel(parseInt(card.dataset.stDow || '1', 10));
     const st = padTime(card.dataset.stStart);
     const en = padTime(card.dataset.stEnd);
-    return `Semaines A / B / ${dow} / ${st} – ${en}`;
+    return `${dow} / ${st} – ${en}`;
 }
 
 /** @param {HTMLElement} card */
@@ -422,6 +420,7 @@ function syncRowReadonlyDisplay(card, elevesById) {
     }
     const roStudents = card.querySelector('.st-ro-students');
     if (!roStudents) return;
+    if (roStudents.classList.contains('hidden') || roStudents.hasAttribute('hidden')) return;
     if (typ !== 'cours') {
         roStudents.textContent = '—';
         return;
@@ -469,9 +468,14 @@ function parseRowsFromList(listEl, weekLetter, ownerId) {
 
 function refreshStleStudentSummary() {
     const el = document.getElementById('stle-students-summary');
-    if (!el) return;
+    const btn = document.getElementById('stle-students-manage-btn');
     const labels = enrolledLabelsSorted(stLineEditPendingStudents, stElevesByIdRef);
-    el.textContent = labels.length ? labels.join(', ') : 'Aucun inscrit';
+    if (el) el.textContent = labels.length ? labels.join(', ') : 'Aucun inscrit';
+    if (btn instanceof HTMLButtonElement) {
+        btn.textContent = labels.length
+            ? `Gérer les inscrits (${labels.length})`
+            : 'Gérer les inscrits';
+    }
 }
 
 /** @type {ReturnType<typeof setTimeout> | null} */
@@ -542,11 +546,28 @@ function wireStLineEditModal() {
         if (!(t instanceof HTMLInputElement) || t.name !== 'stle-slot-type') return;
         const wrap = document.getElementById('stle-students-wrap');
         wrap?.classList.toggle('hidden', t.value !== 'cours');
-        if (t.value === 'cours') {
-            wireStStudentsDnDOnce();
-            renderStStudentsEditLists();
-        }
     });
+
+    document.getElementById('stle-students-manage-btn')?.addEventListener('click', () => {
+        void (async () => {
+            const eleves = await loadEleves();
+            const picked = await openCourseStudentsPicker({
+                title: 'Inscriptions au cours',
+                eleves,
+                selectedUserIds: [...stLineEditPendingStudents]
+            });
+            if (picked === null) return;
+            stLineEditPendingStudents = picked;
+            refreshStleStudentSummary();
+            applyStSlotEditFormToCard();
+        })();
+    });
+
+    document.getElementById('stle-btn-apply')?.addEventListener('click', () => {
+        applyStSlotEditFormToCard();
+        dlg.close();
+    });
+    document.getElementById('stle-btn-cancel')?.addEventListener('click', () => dlg.close());
 
     document.getElementById('stle-delete-btn')?.addEventListener('click', (ev) => {
         ev.preventDefault();
@@ -684,13 +705,16 @@ function openStSlotEditPanel(card) {
 
     const studentsWrap = document.getElementById('stle-students-wrap');
     studentsWrap?.classList.toggle('hidden', typ !== 'cours');
-    if (typ === 'cours') {
-        wireStStudentsDnDOnce();
-        renderStStudentsEditLists();
-    }
 
-    const routeTitle = stSlotEditRouteTitle(card);
-    openPlanningRouteDialog('modal_st_slot_edit', routeTitle, 'Semaines A / B');
+    const titleEl = document.getElementById('stle-dialog-title');
+    if (titleEl) titleEl.textContent = stSlotEditRouteTitle(card);
+
+    const dlg = document.getElementById('modal_st_slot_edit');
+    if (dlg instanceof HTMLDialogElement) {
+        dlg.classList.remove('planning-route-page');
+        dlg.showModal();
+        focusPlanningDialogRoot(dlg);
+    }
 }
 
 
@@ -746,9 +770,11 @@ function appendTemplateCard(listEl, line, _optHtml, ctx) {
     const slotT = line?.slot_type === 'reservation' ? 'reservation' : 'cours';
     const sid = line?.studentIds || [];
 
+    const weekLetter = line?.week_type === 'B' ? 'B' : 'A';
     const card = document.createElement('div');
-    card.className =
-        'st-slot-card grid grid-cols-[auto_minmax(0,0.85fr)_minmax(0,1fr)_minmax(0,0.95fr)] gap-2 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px] text-slate-800';
+    card.className = isEleve
+        ? 'st-slot-card st-slot-card--eleve-view grid grid-cols-[auto_minmax(0,0.75fr)_minmax(0,1.1fr)_minmax(0,0.95fr)] gap-2 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px] text-slate-800'
+        : 'st-slot-card grid grid-cols-[auto_minmax(0,0.85fr)_minmax(0,1fr)_minmax(0,0.95fr)] gap-2 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px] text-slate-800';
     card.classList.add(`st-slot-card--prof-tint-${profTintIndex(lineOwnerId)}`);
     if (!isReadonly) card.classList.add('st-slot-card--editable');
     card.setAttribute('data-st-line', '1');
@@ -768,7 +794,20 @@ function appendTemplateCard(listEl, line, _optHtml, ctx) {
         ? '<span class="w-0" aria-hidden="true"></span>'
         : `<span class="st-drag-handle inline-flex cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 p-0.5 rounded hover:bg-slate-100 shrink-0 self-center" draggable="true" title="Glisser vers l’autre semaine type" aria-label="Glisser vers l’autre semaine type">${ST_DRAG_GRIP_SVG}</span>`;
 
-    card.innerHTML = `
+    if (isEleve) {
+        card.innerHTML = `
+        <span class="st-eleve-week-badge text-[9px] font-black uppercase text-sky-800 dark:text-sky-200 self-center shrink-0">Sem. ${weekLetter}</span>
+        <div class="st-slot-card__left min-w-0 self-stretch flex flex-col justify-center py-0.5">
+            <div class="st-ro-period leading-snug"></div>
+        </div>
+        <div class="st-slot-card__right min-w-0 flex flex-col justify-center py-0.5">
+            <p class="st-ro-headline font-semibold m-0 leading-snug"></p>
+        </div>
+        <div class="st-slot-card__prof min-w-0 self-stretch flex items-center justify-end py-0.5">
+            <span class="st-ro-prof text-[10px] font-medium text-slate-600 dark:text-slate-300 leading-snug block text-right"></span>
+        </div>`;
+    } else {
+        card.innerHTML = `
         ${dragHtml}
         <div class="st-slot-card__left min-w-0 border-r border-slate-200/80 dark:border-slate-500/50 pr-2 self-stretch flex flex-col justify-center py-0.5">
             <div class="st-ro-period leading-snug"></div>
@@ -779,8 +818,8 @@ function appendTemplateCard(listEl, line, _optHtml, ctx) {
         </div>
         <div class="st-slot-card__prof min-w-0 border-l border-slate-200/80 dark:border-slate-500/50 pl-2 self-stretch flex items-center py-0.5">
             <span class="st-ro-prof text-[10px] font-medium text-slate-600 dark:text-slate-300 leading-snug block"></span>
-        </div>
-    `;
+        </div>`;
+    }
 
     syncRowReadonlyDisplay(card, elevesById);
     if (!isReadonly) {
@@ -890,6 +929,9 @@ async function openSemainesTypesModal(user) {
     invalidateOrganSchoolSettingsCache();
     await fetchOrganSchoolSettings();
 
+    document.getElementById('st-tap-hint')?.classList.toggle('hidden', isEleve);
+    document.getElementById('st-main-panel')?.classList.toggle('st-main-panel--eleve', isEleve);
+    document.getElementById('st-gabarit-section')?.classList.toggle('st-gabarit-section--eleve', isEleve);
     document.getElementById('st-add-row-a')?.classList.toggle('hidden', isAdm || isEleve);
     document.getElementById('st-add-row-b')?.classList.toggle('hidden', isAdm || isEleve);
     document.getElementById('st-gabarit-actions')?.classList.toggle('hidden', isAdm || isEleve);

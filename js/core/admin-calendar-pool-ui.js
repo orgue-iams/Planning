@@ -9,6 +9,7 @@ import { normalizeGoogleCalendarId } from '../utils/google-calendar-id.js';
 import { formatProfileFullName } from '../utils/profile-full-name.js';
 import {
     openPlanningRouteFromDrawer,
+    planningRouteTitle,
     pushPlanningRouteLevel
 } from '../utils/planning-route-dialog.js';
 import { syncPlanningDrawerGroupedSections } from './planning-drawer-ui.js';
@@ -76,7 +77,7 @@ function updatePoolSortButtonsUi() {
 function buildPoolCard(row) {
     const card = document.createElement('div');
     card.className =
-        'calendar-pool-card flex items-stretch gap-2 py-2.5 px-3 min-w-0 rounded-xl border border-slate-200 bg-slate-50/80 dark:border-slate-600 dark:bg-slate-800/70';
+        'calendar-pool-card flex items-stretch gap-2 py-2.5 px-3 min-w-0 rounded-xl border border-sky-200/90 bg-sky-50/90 dark:border-sky-800/80 dark:bg-sky-950/35';
     card.dataset.poolJson = JSON.stringify(row);
 
     const main = document.createElement('div');
@@ -217,7 +218,7 @@ function openPoolEdit(row) {
     const titleLabel = label || 'Agenda';
     pushPlanningRouteLevel(
         'modal_calendar_pool',
-        `Calendriers / ${titleLabel}`,
+        planningRouteTitle(titleLabel),
         'Calendriers',
         () => {
             showPoolListPanel();

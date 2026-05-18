@@ -10,3 +10,6 @@ verify_jwt = false
 
 [functions.planning-slot-notify]
 verify_jwt = false
+
+[functions.planning-nightly]
+verify_jwt = false
