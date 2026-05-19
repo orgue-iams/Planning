@@ -22,7 +22,9 @@ export function motifDisplayLabel(motif) {
 export function motifToSlotType(motif) {
     const m = String(motif || '').trim();
     if (m === 'Fermeture') return 'fermeture';
-    if (m === 'Cours' || m === 'Concert') return 'cours';
+    if (m === 'Cours') return 'cours';
+    if (m === 'Concert') return 'concert';
+    if (m === 'Autre') return 'autre';
     return 'reservation';
 }
 

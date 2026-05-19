@@ -1,7 +1,14 @@
 /**
  * Semaines types A/B : gabarit (prof), analyse / application Google.
  */
-import { isAdmin } from './auth-logic.js';
+import { isAdmin, isProf } from './auth-logic.js';
+import {
+    defaultTeachingDow,
+    fetchTeachingDaysForUser,
+    formatTeachingDaysShort,
+    saveTeachingDaysForUser,
+    syncTeachingDaySelectOptions
+} from './teaching-days.js';
 import { parseClosureRangesFromSettings } from './fermetures-ui.js';
 import { getPlanningSessionUser } from './session-user.js';
 import { getSupabaseClient, isBackendAuthConfigured, getPlanningConfig } from './supabase-client.js';
@@ -282,7 +289,7 @@ function familyNameOnly(label) {
 function elevePrenomVirguleNom(e) {
     const n = String(e?.nom || '').trim();
     const p = String(e?.prenom || '').trim();
-    if (p && n) return `${p}, ${n}`;
+    if (p && n) return `${p} ${n}`;
     if (p || n) return p || n;
     const d = String(e?.display_name || '').trim();
     if (d) return d;
@@ -467,6 +474,12 @@ function syncRowReadonlyDisplay(card, elevesById) {
         l2.textContent = `${padTime(card.dataset.stStart)} – ${padTime(card.dataset.stEnd)}`;
         periodEl.appendChild(l1);
         periodEl.appendChild(l2);
+        if (card.classList.contains('st-slot-card--off-teaching-day')) {
+            const l3 = document.createElement('p');
+            l3.className = 'text-[9px] text-amber-800 dark:text-amber-200 m-0 mt-1 leading-snug';
+            l3.textContent = `Hors vos jours (${formatTeachingDaysShort(stTeachingDaysSet)}) — supprimez ou modifiez vos jours en haut.`;
+            periodEl.appendChild(l3);
+        }
     }
     const headlineEl = card.querySelector('.st-ro-headline');
     if (headlineEl) {
@@ -480,6 +493,7 @@ function syncRowReadonlyDisplay(card, elevesById) {
         roStudents.textContent = '—';
         const profElRes = card.querySelector('.st-ro-prof');
         if (profElRes) renderProfTwoLines(profElRes, card);
+        applyStSlotRowColors(card);
         return;
     }
     const ids = String(card.dataset.stStudents || '')
@@ -489,6 +503,22 @@ function syncRowReadonlyDisplay(card, elevesById) {
     roStudents.textContent = enrolledStudentsCommaLine(ids, elevesById) || "pas d'élèves";
     const profEl = card.querySelector('.st-ro-prof');
     if (profEl) renderProfTwoLines(profEl, card);
+    applyStSlotRowColors(card);
+}
+
+function applyStSlotRowColors(card) {
+    const typ = card.dataset.stSlotType || 'cours';
+    const lineOwnerId = card.getAttribute('data-owner-id') || '';
+    const currentUserId = String(getPlanningSessionUser()?.id || '');
+    card.classList.remove('st-row-cours', 'st-row-travail', 'st-row-other-prof');
+    if (typ === 'cours') {
+        card.classList.add('st-row-cours');
+        if (lineOwnerId && lineOwnerId !== currentUserId) {
+            card.classList.add('st-row-other-prof');
+        }
+    } else {
+        card.classList.add('st-row-travail');
+    }
 }
 
 function parseRowsFromList(listEl, weekLetter, ownerId) {
@@ -539,6 +569,8 @@ function refreshStleStudentSummary() {
 let stSaveDebounce = null;
 /** @type {{ startYmd: string, endYmd: string }[]} */
 let stApplyClosureRanges = [];
+/** Jours d’enseignement du prof courant (1–7). Vide = pas encore configuré. */
+let stTeachingDaysSet = new Set();
 
 function scheduleStAutoSave() {
     const u = getPlanningSessionUser();
@@ -746,6 +778,7 @@ function openStSlotEditPanel(card) {
     if (resRadio) resRadio.checked = typ === 'reservation';
 
     const dowSel = /** @type {HTMLSelectElement | null} */ (document.getElementById('stle-dow'));
+    syncTeachingDaySelectOptions(dowSel, stTeachingDaysSet);
     if (dowSel) dowSel.value = String(Math.min(7, Math.max(1, parseInt(card.dataset.stDow || '1', 10))));
 
     const stIn = /** @type {HTMLSelectElement | null} */ (document.getElementById('stle-start'));
@@ -837,7 +870,13 @@ function appendTemplateCard(listEl, line, _optHtml, ctx) {
     const { isAdmin, ownerLabel, ownerPrenom, ownerNom, lineOwnerId, currentUserId, elevesById } = ctx;
     const isOwnRow = String(lineOwnerId) === String(currentUserId);
     const isEleve = String(getPlanningSessionUser()?.role || '').toLowerCase() === 'eleve';
-    const isReadonly = isAdmin || !isOwnRow || isEleve;
+    const dowN = Math.min(7, Math.max(1, Number(line?.day_of_week) || 1));
+    const isOffTeachingDay =
+        isOwnRow &&
+        isProf(getPlanningSessionUser()) &&
+        stTeachingDaysSet.size > 0 &&
+        !stTeachingDaysSet.has(dowN);
+    const isReadonly = isAdmin || !isOwnRow || isEleve || isOffTeachingDay;
     const slotT = line?.slot_type === 'reservation' ? 'reservation' : 'cours';
     const sid = line?.studentIds || [];
 
@@ -847,6 +886,7 @@ function appendTemplateCard(listEl, line, _optHtml, ctx) {
         ? 'st-slot-card st-slot-card--eleve-view grid grid-cols-[minmax(5rem,0.95fr)_minmax(0,1.1fr)_minmax(0,0.95fr)] gap-2 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px] text-slate-800'
         : 'st-slot-card grid grid-cols-[auto_minmax(5.5rem,1.15fr)_minmax(0,1fr)_minmax(0,0.95fr)] gap-2 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px] text-slate-800';
     card.classList.add(`st-slot-card--prof-tint-${profTintIndex(lineOwnerId)}`);
+    if (isOffTeachingDay) card.classList.add('st-slot-card--off-teaching-day');
     if (!isReadonly) card.classList.add('st-slot-card--editable');
     card.setAttribute('data-st-line', '1');
     card.setAttribute('data-line-id', line?.id || '');
@@ -1010,6 +1050,41 @@ function defaultApplyStartYmd() {
     return ymdToday;
 }
 
+function readTeachingDaysFromForm() {
+    const set = new Set();
+    for (const cb of document.querySelectorAll('.st-teaching-day-cb')) {
+        if (!(cb instanceof HTMLInputElement) || !cb.checked) continue;
+        const n = parseInt(cb.value, 10);
+        if (n >= 1 && n <= 7) set.add(n);
+    }
+    return set;
+}
+
+function writeTeachingDaysToForm(set) {
+    for (const cb of document.querySelectorAll('.st-teaching-day-cb')) {
+        if (!(cb instanceof HTMLInputElement)) continue;
+        const n = parseInt(cb.value, 10);
+        cb.checked = set.has(n);
+    }
+}
+
+async function saveTeachingDaysFromModal(user) {
+    const set = readTeachingDaysFromForm();
+    const r = await saveTeachingDaysForUser(user.id, set);
+    if (!r.ok) {
+        showToast(r.error || 'Enregistrement impossible.', 'error');
+        return false;
+    }
+    stTeachingDaysSet = set;
+    const hint = document.getElementById('st-teaching-days-hint');
+    if (hint) {
+        hint.textContent = `Enregistré : ${formatTeachingDaysShort(set)}.`;
+        hint.classList.remove('hidden');
+    }
+    showToast('Jours d’enseignement enregistrés.', 'success');
+    return true;
+}
+
 function defaultApplyEndYmd() {
     const set = getOrganSchoolSettingsCached();
     const endS = set?.school_year_end ? String(set.school_year_end).slice(0, 10) : '';
@@ -1024,9 +1099,14 @@ function defaultApplyEndYmd() {
 async function openSemainesTypesModal(user) {
     const dlg = document.getElementById('modal_semaines_types');
     if (!dlg) return;
+    if (!isProf(user)) {
+        showToast('Semaines A/B : réservé aux professeurs.', 'info');
+        return;
+    }
     showStMainPanel();
-    const isAdm = isAdmin(user);
+    const isAdm = false;
     const isEleve = String(user?.role || '').toLowerCase() === 'eleve';
+    const isProfUser = isProf(user);
     invalidateOrganSchoolSettingsCache();
     await fetchOrganSchoolSettings();
 
@@ -1039,6 +1119,24 @@ async function openSemainesTypesModal(user) {
     document.getElementById('st-apply-admin-hint')?.classList.toggle('hidden', !isAdm);
     document.getElementById('st-apply-controls')?.classList.toggle('hidden', isAdm || isEleve);
     document.getElementById('st-apply-section')?.classList.toggle('hidden', isAdm || isEleve);
+    document.getElementById('st-teaching-days-section')?.classList.toggle('hidden', !isProfUser);
+    document.getElementById('st-gabarit-prof-title')?.classList.toggle('hidden', !isProfUser);
+
+    if (isProfUser) {
+        stTeachingDaysSet = await fetchTeachingDaysForUser(user.id);
+        writeTeachingDaysToForm(stTeachingDaysSet);
+        const hint = document.getElementById('st-teaching-days-hint');
+        if (hint) {
+            if (!stTeachingDaysSet.size) {
+                hint.textContent = 'Cochez vos jours puis enregistrez avant d’ajouter des créneaux.';
+                hint.classList.remove('hidden');
+            } else {
+                hint.classList.add('hidden');
+            }
+        }
+    } else {
+        stTeachingDaysSet = new Set();
+    }
 
     stApplyClosureRanges = parseClosureRangesFromSettings(
         getOrganSchoolSettingsCached()?.template_apply_closure_ranges
@@ -1063,7 +1161,11 @@ async function openSemainesTypesModal(user) {
     };
     stElevesByIdRef = elevesById;
 
-    for (const line of lines) {
+    const linesForModal = isProfUser
+        ? lines.filter((l) => String(l.owner_user_id || '') === String(user.id))
+        : lines;
+
+    for (const line of linesForModal) {
         const listEl = line.week_type === 'A' ? ta : tb;
         if (!listEl) continue;
         const sid = byLineStudents.get(line.id) || [];
@@ -1090,6 +1192,10 @@ async function openSemainesTypesModal(user) {
 }
 
 function addEmptyRow(listEl, elevesHtml, user, elevesById, ownerProfiles) {
+    if (!stTeachingDaysSet.size) {
+        showToast('Enregistrez d’abord au moins un jour d’enseignement.', 'error');
+        return;
+    }
     const oid = String(user.id);
     const prof = ownerProfiles.get(oid) || {
         label: user.email || oid.slice(0, 8),
@@ -1099,7 +1205,7 @@ function addEmptyRow(listEl, elevesHtml, user, elevesById, ownerProfiles) {
     const card = appendTemplateCard(
         listEl,
         {
-            day_of_week: 1,
+            day_of_week: defaultTeachingDow(stTeachingDaysSet),
             start_time: '08:00:00',
             end_time: '09:00:00',
             slot_type: 'cours',
@@ -1141,6 +1247,19 @@ async function runSemainesTypesSaveGabarit(opts = {}) {
     const ra = parseRowsFromList(ta, 'A', u.id);
     const rb = parseRowsFromList(tb, 'B', u.id);
     const all = [...ra, ...rb];
+    if (!stTeachingDaysSet.size) {
+        showToast('Enregistrez au moins un jour d’enseignement.', 'error');
+        return;
+    }
+    for (const r of all) {
+        if (!stTeachingDaysSet.has(r.day_of_week)) {
+            showToast(
+                `${dowLongLabel(r.day_of_week)} n’est pas dans vos jours d’enseignement.`,
+                'error'
+            );
+            return;
+        }
+    }
     const err = validateNoOverlap(all);
     if (err) {
         showToast(err, 'error');
@@ -1208,6 +1327,10 @@ async function runSemainesTypesAnalyze() {
     const u = getPlanningSessionUser();
     const sb = getSupabaseClient();
     if (!u?.id || !sb || isAdmin(u)) return;
+    if (!stTeachingDaysSet.size) {
+        showToast('Enregistrez vos jours d’enseignement avant de préparer l’application.', 'error');
+        return;
+    }
     if (stGoogleSyncInFlight) {
         showToast(
             'Synchronisation Google du gabarit en cours : attendez la fin avant de relancer « Préparer ».',
@@ -1259,8 +1382,11 @@ async function runSemainesTypesAnalyze() {
         const lines = allTemplateLines.filter((l) => String(l.owner_user_id || '') === uid);
         const { data: evs } = await sb.rpc('planning_list_eleves_actifs');
         const byId = new Map((evs || []).map((e) => [e.user_id, e.email]));
+        const allowedDays = stTeachingDaysSet;
         const linePayload = [];
         for (const ln of lines) {
+            const dow = Number(ln.day_of_week) || 1;
+            if (allowedDays.size && !allowedDays.has(dow)) continue;
             const emails = [];
             const ids = byLineStudents.get(ln.id) || [];
             for (const sid of ids) {
@@ -1615,6 +1741,12 @@ function onSemainesTypesDocumentClick(e) {
         void runSemainesTypesApply();
         return;
     }
+    if (t.closest('#st-teaching-days-save')) {
+        e.preventDefault();
+        const u = getPlanningSessionUser();
+        if (u?.id && isProf(u)) void saveTeachingDaysFromModal(u);
+        return;
+    }
     if (t.closest('#st-add-row-a')) {
         e.preventDefault();
         void runSemainesTypesAddRow('A');
@@ -1642,6 +1774,10 @@ export function initSemainesTypesUi() {
             e.preventDefault();
             const u = getPlanningSessionUser();
             if (!u?.id) return;
+            if (!isProf(u)) {
+                showToast('Semaines A/B : réservé aux professeurs.', 'info');
+                return;
+            }
             if (!openPlanningRouteFromDrawer('modal_semaines_types', 'Semaines A / B', 'Menu')) {
                 return;
             }

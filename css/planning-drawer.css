@@ -48,7 +48,57 @@
     transition: none !important;
 }
 
+.planning-drawer__topbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    padding: 0.35rem 0.55rem 0.25rem;
+    border-bottom: 1px solid rgb(226 232 240);
+}
+
+[data-theme='dark'] .planning-drawer__topbar {
+    border-bottom-color: rgb(51 65 85);
+}
+
+.planning-drawer__close-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0.35rem 0.15rem;
+    border: 0;
+    background: transparent;
+    color: rgb(30 41 59);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.planning-drawer__close-btn:hover {
+    color: rgb(15 23 42);
+}
+
+[data-theme='dark'] .planning-drawer__close-btn {
+    color: rgb(226 232 240);
+}
+
+[data-theme='dark'] .planning-drawer__close-btn:hover {
+    color: rgb(255 255 255);
+}
+
+.planning-drawer__close-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+}
+
 @media (min-width: 1024px) {
+    .planning-drawer__topbar {
+        display: none;
+    }
+
     #planning-app-drawer {
         width: min(28rem, 36vw);
     }
@@ -200,6 +250,45 @@
     line-height: 1.35;
     color: rgb(100 116 139);
     margin: -0.15rem 0 0.45rem;
+}
+
+.planning-drawer__next-cours .event-box.st-slot-card,
+#profile-cours-list .event-box.st-slot-card {
+    background: var(--slot-bg-soft);
+    border-color: var(--slot-bg-strong);
+}
+
+.gabarit-cours-card--slot-text,
+.gabarit-cours-card--slot-text .st-ro-headline,
+.gabarit-cours-card--slot-text .st-ro-students,
+.gabarit-cours-card--slot-text .st-ro-prof,
+.gabarit-cours-card--slot-text .st-slot-card__left {
+    color: inherit;
+}
+
+[data-theme='dark'] .gabarit-cours-card--slot-text.event-box {
+    color: #0f172a !important;
+}
+
+[data-theme='dark'] .gabarit-cours-card--slot-text.event-box .st-ro-headline,
+[data-theme='dark'] .gabarit-cours-card--slot-text.event-box .st-ro-students,
+[data-theme='dark'] .gabarit-cours-card--slot-text.event-box .st-ro-prof,
+[data-theme='dark'] .gabarit-cours-card--slot-text.event-box .st-slot-card__left {
+    color: #0f172a !important;
+}
+
+/* Grille 3 colonnes (comme semaines A/B) même si classes Tailwind arbitraires absentes du build */
+.planning-drawer__next-cours .st-slot-card.st-slot-card--eleve-view,
+#profile-cours-list .profile-gabarit-cours-card.st-slot-card--eleve-view {
+    display: grid;
+    grid-template-columns: minmax(5rem, 0.95fr) minmax(0, 1.1fr) minmax(0, 0.95fr);
+    column-gap: 0.5rem;
+    align-items: stretch;
+}
+
+.planning-drawer__next-cours .st-slot-card__prof .st-ro-prof,
+#profile-cours-list .st-slot-card__prof .st-ro-prof {
+    word-break: break-word;
 }
 
 [data-theme='dark'] .planning-drawer__hint {

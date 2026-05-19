@@ -1,0 +1,17 @@
+---
+description: Relancer le serveur local Vite + adb reverse Pixel 7 sur demande « relance le serveur ».
+alwaysApply: true
+---
+
+# Dev local (Mac + Pixel 7 USB)
+
+Quand l’utilisateur dit **« relance le serveur »** (ou équivalent : lancer le serveur local, reprendre le dev local) :
+
+1. **Répertoire** : racine du dépôt `Planning/` (où est `index.html`), **jamais** `_site/`.
+2. **Serveur** : `npx vite --host 127.0.0.1 --port 5173` en arrière-plan depuis cette racine.
+3. **CSS** : ne pas lancer `watch:css` par défaut ; après modifs UI, l’agent lance `npm run build:css` (voir `tailwind-build-before-deploy.mdc`).
+4. **Android USB (Pixel 7 debug)** : `adb reverse tcp:5173 tcp:5173` (après vérif que `adb devices` voit l’appareil ; rapporter si échec).
+5. **Ne pas** lancer `npm run deploy:pages` pour cette demande (réservé livraison / test copie `_site/`).
+6. Rapporter l’URL : http://127.0.0.1:5173/ (identique sur le téléphone via `adb reverse`).
+
+**Pas** la peine de re-bumper `APP_VERSION` pour cette action seule.

@@ -70,7 +70,7 @@ export function mapPlanningDbRowToFcEvent(row, _currentUser) {
             poolGoogleEventId: poolG,
             owner,
             ownerDisplayName: owner ? owner.split('@')[0] : '',
-            ownerRole: '',
+            ownerRole: String(row.owner_role || '').trim().toLowerCase(),
             type: typ,
             inscrits: normalizeInscritsFromRpc(row),
             planningSourceTemplateLineId: row.source_template_line_id
@@ -116,11 +116,37 @@ export async function fetchPlanningEventsForFullCalendar(start, end, currentUser
     });
     if (error) throw new Error(error.message);
     const rows = Array.isArray(data) ? data : [];
+    // owner_role vient de la RPC (security definer) ; repli client limité par RLS profiles (ligne propre).
+    const ownerIds = [...new Set(rows.map((r) => String(r.owner_user_id || '').trim()).filter(Boolean))];
+    const roleByOwnerId = await fetchProfileRolesByUserIds(ownerIds);
     const { fcDragResizePropsForEvent } = await import('./calendar-logic.js');
     return rows.map((row) => {
-        const ev = mapPlanningDbRowToFcEvent(row, currentUser);
+        const oid = String(row.owner_user_id || '').trim();
+        const enriched = {
+            ...row,
+            owner_role: String(row.owner_role || roleByOwnerId.get(oid) || '').trim()
+        };
+        const ev = mapPlanningDbRowToFcEvent(enriched, currentUser);
         return { ...ev, ...fcDragResizePropsForEvent(ev, currentUser) };
     });
+}
+
+/** @param {string[]} userIds @returns {Promise<Map<string, string>>} */
+async function fetchProfileRolesByUserIds(userIds) {
+    const uniq = [...new Set((userIds || []).map((id) => String(id).trim()).filter(Boolean))];
+    const m = new Map();
+    if (!uniq.length) return m;
+    const sb = getSupabaseClient();
+    if (!sb) return m;
+    const { data, error } = await sb.from('profiles').select('id, role').in('id', uniq);
+    if (error) {
+        console.warn('[planning-events-db] profiles roles', error.message);
+        return m;
+    }
+    for (const row of data || []) {
+        m.set(String(row.id), String(row.role || '').trim().toLowerCase());
+    }
+    return m;
 }
 
 /**
@@ -198,42 +224,17 @@ export async function upsertPlanningEventRow(p) {
     }
     const existingId = p.id ? String(p.id).trim() : '';
     if (existingId) {
-        const updateRow = { ...row };
-        if (tplId === undefined) delete updateRow.source_template_line_id;
-        if (p.gabaritWeekType === undefined) delete updateRow.gabarit_week_type;
-        const { data, error } = await sb
-            .from('planning_event')
-            .update(updateRow)
-            .eq('id', existingId)
-            .select('id')
-            .maybeSingle();
+        /** Mise à jour seule (évite upsert + politique INSERT RLS sur lignes existantes). */
+        const updateRow = {
+            start_at: row.start_at,
+            end_at: row.end_at,
+            title: row.title,
+            slot_type: row.slot_type,
+            updated_at: row.updated_at
+        };
+        const { error } = await sb.from('planning_event').update(updateRow).eq('id', existingId);
         if (error) return { ok: false, error: error.message, id: null };
-        if (data?.id) return { ok: true, error: null, id: String(data.id) };
-
-        // Aucun enregistrement mis à jour (créneau optimiste avec id canonique inédit) :
-        // on crée explicitement la ligne avec cet id pour éviter la disparition au refetch.
-        const { data: insData, error: insErr } = await sb
-            .from('planning_event')
-            .insert({ ...row, id: existingId })
-            .select('id')
-            .single();
-        if (!insErr) {
-            return { ok: true, error: null, id: insData?.id ? String(insData.id) : existingId };
-        }
-
-        // Cas course rare : insert en doublon, on retente une mise à jour.
-        const msg = String(insErr?.message || '');
-        if (/23505|duplicate key|already exists/i.test(msg)) {
-            const { data: retryData, error: retryErr } = await sb
-                .from('planning_event')
-                .update(updateRow)
-                .eq('id', existingId)
-                .select('id')
-                .maybeSingle();
-            if (retryErr) return { ok: false, error: retryErr.message, id: null };
-            if (retryData?.id) return { ok: true, error: null, id: String(retryData.id) };
-        }
-        return { ok: false, error: msg || 'Upsert planning_event impossible.', id: null };
+        return { ok: true, error: null, id: existingId };
     }
     const { data, error } = await sb.from('planning_event').insert(row).select('id').single();
     if (error) return { ok: false, error: error.message, id: null };
@@ -256,7 +257,7 @@ export async function deletePlanningEventRow(canonicalId) {
 }
 
 /**
- * @returns {Promise<{ user_id: string, email: string, display_name: string }[]>}
+ * @returns {Promise<{ user_id: string, email: string, display_name: string, nom: string, prenom: string }[]>}
  */
 export async function fetchPlanningListElevesActifs() {
     const sb = getSupabaseClient();
@@ -270,7 +271,9 @@ export async function fetchPlanningListElevesActifs() {
     return rows.map((r) => ({
         user_id: String(r.user_id ?? '').trim(),
         email: String(r.email ?? '').trim(),
-        display_name: String(r.display_name ?? '').trim()
+        display_name: String(r.display_name ?? '').trim(),
+        nom: String(r.nom ?? '').trim(),
+        prenom: String(r.prenom ?? '').trim()
     }));
 }
 

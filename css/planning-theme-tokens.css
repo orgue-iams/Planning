@@ -1,6 +1,6 @@
 /**
- * Charte clair / sombre — variables partagées (modales, cartes, champs).
- * Utiliser var(--planning-*) plutôt que bg-white en dur dans les nouveaux écrans.
+ * Charte clair / sombre — variables partagées (modales, tiroir, champs, boutons, menus).
+ * Utiliser var(--planning-*) et les classes .planning-field / .planning-ui-* plutôt que bg-white en dur.
  */
 :root {
     --planning-surface: rgb(255 255 255);
@@ -10,9 +10,19 @@
     --planning-text: rgb(30 41 59);
     --planning-text-muted: rgb(100 116 139);
     --planning-input-bg: rgb(255 255 255);
+    --planning-input-text: rgb(15 23 42);
+    --planning-input-border: rgb(203 213 225);
+    --planning-input-placeholder: rgb(100 116 139);
+    --planning-btn-primary-text: rgb(255 255 255);
     --planning-accent-bg: rgb(239 246 255);
     --planning-accent-border: rgb(37 99 235);
     --planning-accent-text: rgb(29 78 216);
+    --planning-ui-font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --planning-ui-color: rgb(71 85 105);
+    --planning-ui-size-hero: 0.875rem;
+    --planning-ui-size-body: 0.8125rem;
+    --planning-ui-size-secondary: 0.75rem;
+    --planning-ui-size-caption: 0.625rem;
 }
 
 [data-theme='dark'] {
@@ -22,10 +32,238 @@
     --planning-border: rgb(51 65 85);
     --planning-text: rgb(241 245 249);
     --planning-text-muted: rgb(148 163 184);
-    --planning-input-bg: rgb(15 23 42);
+    /* Champs : fond gris clair, texte noir (lisible, pas blanc sur blanc) */
+    --planning-input-bg: rgb(229 231 235);
+    --planning-input-text: rgb(15 23 42);
+    --planning-input-border: rgb(203 213 225);
+    --planning-input-placeholder: rgb(100 116 139);
+    --planning-btn-primary-text: rgb(255 255 255);
     --planning-accent-bg: rgb(30 58 138 / 0.35);
     --planning-accent-border: rgb(96 165 250);
     --planning-accent-text: rgb(191 219 254);
+    /* Menus / tiroir : une famille, gris clair, tailles hiérarchiques (min. 10px) */
+    --planning-ui-color: rgb(203 213 225);
+    --planning-ui-size-hero: 0.875rem;
+    --planning-ui-size-body: 0.8125rem;
+    --planning-ui-size-secondary: 0.75rem;
+    --planning-ui-size-caption: 0.625rem;
+}
+
+/* ——— Champs de saisie (centralisé) ——— */
+.planning-field.input,
+.planning-field.select,
+.planning-field.textarea,
+.planning-field.file-input,
+input.planning-field,
+select.planning-field,
+textarea.planning-field,
+.drawer-help-message-editable.planning-field {
+    background-color: var(--planning-input-bg);
+    color: var(--planning-input-text);
+    border-color: var(--planning-input-border);
+}
+
+.planning-field::placeholder,
+.textarea.planning-field::placeholder {
+    color: var(--planning-input-placeholder);
+}
+
+[data-theme='dark'] .input,
+[data-theme='dark'] .select,
+[data-theme='dark'] .textarea,
+[data-theme='dark'] .file-input,
+[data-theme='dark'] .drawer-help-message-editable,
+[data-theme='dark'] [contenteditable].textarea,
+[data-theme='dark'] .config-rule-field,
+[data-theme='dark'] .planning-date-input,
+[data-theme='dark'] .planning-field {
+    background-color: var(--planning-input-bg) !important;
+    color: var(--planning-input-text) !important;
+    border-color: var(--planning-input-border) !important;
+}
+
+[data-theme='dark'] .input::placeholder,
+[data-theme='dark'] .textarea::placeholder {
+    color: var(--planning-input-placeholder) !important;
+}
+
+[data-theme='dark'] .drawer-help-message-editable,
+[data-theme='dark'] [contenteditable].drawer-help-message-editable {
+    -webkit-text-fill-color: var(--planning-input-text);
+    caret-color: var(--planning-input-text);
+}
+
+[data-theme='dark'] .file-input::file-selector-button {
+    background-color: rgb(241 245 249);
+    color: var(--planning-input-text);
+    border-color: var(--planning-input-border);
+}
+
+/* ——— Boutons bleus : texte blanc ——— */
+[data-theme='dark'] .btn.btn-primary,
+[data-theme='dark'] .btn-primary:not(.btn-ghost):not(.btn-outline):not(.btn-link) {
+    color: var(--planning-btn-primary-text) !important;
+}
+
+[data-theme='dark'] .btn.btn-primary:hover,
+[data-theme='dark'] .btn-primary:not(.btn-ghost):not(.btn-outline):not(.btn-link):hover {
+    color: var(--planning-btn-primary-text) !important;
+}
+
+/* ——— Menus : typo unifiée (tiroir + modales) ——— */
+.planning-ui-menu {
+    font-family: var(--planning-ui-font-family);
+    color: var(--planning-ui-color);
+}
+
+.planning-ui-menu--hero {
+    font-size: var(--planning-ui-size-hero);
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.planning-ui-menu--body {
+    font-size: var(--planning-ui-size-body);
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.planning-ui-menu--secondary {
+    font-size: var(--planning-ui-size-secondary);
+    font-weight: 500;
+    line-height: 1.35;
+}
+
+.planning-ui-menu--caption {
+    font-size: var(--planning-ui-size-caption);
+    font-weight: 600;
+    line-height: 1.35;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+[data-theme='dark'] #planning-app-drawer,
+[data-theme='dark'] dialog.modal .modal-box {
+    font-family: var(--planning-ui-font-family);
+}
+
+[data-theme='dark'] #planning-app-drawer .planning-drawer__section-title,
+[data-theme='dark'] #planning-app-drawer .planning-drawer__section-title--sub {
+    font-family: var(--planning-ui-font-family);
+    font-size: var(--planning-ui-size-caption);
+    font-weight: 600;
+    color: var(--planning-ui-color);
+    letter-spacing: 0.05em;
+}
+
+[data-theme='dark'] #planning-app-drawer .planning-drawer__hint,
+[data-theme='dark'] #planning-app-drawer .planning-drawer__agenda-hint,
+[data-theme='dark'] #planning-app-drawer .planning-drawer__agenda-help {
+    font-family: var(--planning-ui-font-family);
+    font-size: var(--planning-ui-size-caption);
+    font-weight: 500;
+    color: var(--planning-ui-color);
+}
+
+[data-theme='dark'] #planning-app-drawer .planning-drawer__view-btn,
+[data-theme='dark'] #planning-app-drawer .planning-drawer__link {
+    font-family: var(--planning-ui-font-family);
+    font-size: var(--planning-ui-size-body);
+    font-weight: 500;
+    color: var(--planning-ui-color);
+}
+
+[data-theme='dark'] #planning-app-drawer .planning-drawer__view-btn.is-active {
+    color: rgb(191 219 254);
+}
+
+[data-theme='dark'] #planning-app-drawer .planning-drawer__profile-name {
+    font-family: var(--planning-ui-font-family);
+    font-size: var(--planning-ui-size-hero);
+    font-weight: 600;
+    color: var(--planning-ui-color);
+}
+
+[data-theme='dark'] #planning-app-drawer .planning-drawer__profile-sub {
+    font-family: var(--planning-ui-font-family);
+    font-size: var(--planning-ui-size-secondary);
+    font-weight: 500;
+    color: var(--planning-ui-color);
+}
+
+[data-theme='dark'] #planning-app-drawer .planning-drawer__agenda-label,
+[data-theme='dark'] #planning-app-drawer .planning-drawer__agenda-line-title {
+    font-family: var(--planning-ui-font-family);
+    font-size: var(--planning-ui-size-body);
+    font-weight: 500;
+    color: var(--planning-ui-color);
+}
+
+[data-theme='dark'] #planning-drawer-help-panel .drawer-help-contact > p,
+[data-theme='dark'] #planning-drawer-help-panel label > span,
+[data-theme='dark'] #planning-drawer-help-panel .planning-drawer__help-back {
+    font-family: var(--planning-ui-font-family);
+    color: var(--planning-ui-color);
+}
+
+[data-theme='dark'] #planning-drawer-help-panel .drawer-help-contact > p:first-of-type {
+    font-size: var(--planning-ui-size-caption);
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+[data-theme='dark'] #planning-drawer-help-panel label > span {
+    font-size: var(--planning-ui-size-caption);
+    font-weight: 600;
+}
+
+[data-theme='dark'] #planning-drawer-help-panel .planning-drawer__help-back {
+    font-size: var(--planning-ui-size-body);
+    font-weight: 600;
+}
+
+[data-theme='dark'] dialog.modal .modal-box .label-text,
+[data-theme='dark'] dialog.modal .modal-box .label-text-alt {
+    font-family: var(--planning-ui-font-family);
+    font-size: var(--planning-ui-size-caption);
+    font-weight: 600;
+    color: var(--planning-ui-color);
+}
+
+[data-theme='dark'] dialog.modal .modal-box .text-slate-400,
+[data-theme='dark'] dialog.modal .modal-box .text-slate-500 {
+    font-family: var(--planning-ui-font-family);
+    font-size: var(--planning-ui-size-secondary);
+    color: var(--planning-ui-color) !important;
+}
+
+[data-theme='dark'] dialog.modal .modal-box .text-slate-600,
+[data-theme='dark'] dialog.modal .modal-box .text-slate-700 {
+    font-family: var(--planning-ui-font-family);
+    font-size: var(--planning-ui-size-body);
+    color: var(--planning-ui-color) !important;
+}
+
+/* Préférences d’affichage (tiroir) */
+[data-theme='dark'] #menu-item-display-prefs-wrap .cal-pref-scale-preview {
+    color: var(--planning-ui-color) !important;
+    font-weight: 600;
+}
+
+[data-theme='dark'] #menu-item-display-prefs-wrap .cal-pref-text-range::-webkit-slider-runnable-track {
+    background-color: rgb(71 85 105);
+}
+
+[data-theme='dark'] #menu-item-display-prefs-wrap .cal-pref-text-range::-moz-range-track {
+    background: rgb(71 85 105);
+}
+
+[data-theme='dark'] #menu-item-display-prefs-wrap .cal-pref-text-range::-webkit-slider-thumb {
+    border-color: rgb(229 231 235);
+}
+
+[data-theme='dark'] #menu-item-display-prefs-wrap .cal-pref-text-range::-moz-range-thumb {
+    border-color: rgb(229 231 235);
 }
 
 .planning-surface-card {
@@ -56,8 +294,8 @@
 .st-apply-week-start-group input,
 .st-apply-end-group input {
     background: var(--planning-input-bg) !important;
-    border-color: var(--planning-border) !important;
-    color: var(--planning-text) !important;
+    border-color: var(--planning-input-border) !important;
+    color: var(--planning-input-text) !important;
 }
 
 .planning-btn-accent {
@@ -83,7 +321,7 @@
 }
 
 [data-theme='dark'] .planning-date-input {
-    color-scheme: dark;
+    color-scheme: light;
 }
 
 .planning-date-input::-webkit-calendar-picker-indicator {
@@ -92,6 +330,6 @@
 }
 
 [data-theme='dark'] .planning-date-input::-webkit-calendar-picker-indicator {
-    filter: invert(0.85);
-    opacity: 0.9;
+    filter: none;
+    opacity: 0.85;
 }

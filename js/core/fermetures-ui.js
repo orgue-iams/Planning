@@ -81,15 +81,32 @@ function buildClosureCard(range, index, editable) {
 
     if (!editable) return card;
 
-    return mountPlanningSwipeCard(card, {
-        enabled: true,
-        mode: 'delete-only',
-        onEdit: () => openClosureEdit(index),
-        onDelete: () => {
-            if (!window.confirm('Supprimer cette période de fermeture ?')) return;
-            void deleteClosureAt(index);
-        }
+    card.classList.add('fermeture-card--with-delete');
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'fermeture-card__delete-btn';
+    delBtn.setAttribute('aria-label', 'Supprimer cette période de fermeture');
+    delBtn.innerHTML =
+        '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916A2.25 2.25 0 0013.5 2.25h-3A2.25 2.25 0 008.25 4.5v.916m7.5 0a48.11 48.11 0 01-7.5 0" /></svg>';
+    delBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!window.confirm('Supprimer cette période de fermeture ?')) return;
+        void deleteClosureAt(index);
     });
+    card.appendChild(delBtn);
+    return card;
+}
+
+function todayYmdLocal() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Fermetures dont la date de fin est aujourd’hui ou plus tard. */
+function futureClosureRanges() {
+    const today = todayYmdLocal();
+    return closureRanges.filter((r) => String(r.endYmd || '') >= today);
 }
 
 function renderClosureCards() {
@@ -99,7 +116,9 @@ function renderClosureCards() {
     const u = getPlanningSessionUser();
     const editable = canEditClosures(u);
 
-    if (!closureRanges.length) {
+    const visible = futureClosureRanges();
+
+    if (!visible.length) {
         const empty = document.createElement('p');
         empty.className = 'text-sm text-slate-500 dark:text-slate-400 italic m-0 py-2';
         empty.textContent = editable
@@ -109,8 +128,9 @@ function renderClosureCards() {
         return;
     }
 
-    closureRanges.forEach((r, i) => {
-        host.appendChild(buildClosureCard(r, i, editable));
+    visible.forEach((r) => {
+        const index = closureRanges.indexOf(r);
+        host.appendChild(buildClosureCard(r, index, editable));
     });
 }
 
@@ -227,9 +247,13 @@ export async function loadClosureRangesFromServer() {
 }
 
 export async function openFermeturesModal() {
+    const u = getPlanningSessionUser();
+    if (!canEditClosures(u)) {
+        showToast('Fermetures : réservé à l’administration et aux professeurs.', 'info');
+        return;
+    }
     await loadClosureRangesFromServer();
     showFermeturesMainPanel();
-    const u = getPlanningSessionUser();
     document.getElementById('fermetures-add-wrap')?.classList.toggle('hidden', !canEditClosures(u));
 }
 
@@ -245,6 +269,11 @@ export function initFermeturesUi() {
 
     document.getElementById('menu-item-fermetures')?.addEventListener('click', (e) => {
         e.preventDefault();
+        const u = getPlanningSessionUser();
+        if (!canEditClosures(u)) {
+            showToast('Fermetures : réservé à l’administration et aux professeurs.', 'info');
+            return;
+        }
         if (!openPlanningRouteFromDrawer('modal_fermetures', 'Fermetures', 'Menu')) return;
         void openFermeturesModal();
     });

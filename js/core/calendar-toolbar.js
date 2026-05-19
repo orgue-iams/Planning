@@ -131,7 +131,8 @@ function toolbarWeekCycleLabel(calendar) {
     const start = view.currentStart;
     const u = getPlanningSessionUser();
     const state = isProf(u) ? getProfWeekCycleForToolbar() : null;
-    const weekCycleOkView = type === 'timeGridWeek' || type === 'timeGridDay';
+    const weekCycleOkView =
+        type === 'timeGridWeek' || type === 'timeGridDay' || type === 'listWeek';
     const wc =
         weekCycleOkView &&
         state?.anchorMondayIso &&
@@ -139,14 +140,25 @@ function toolbarWeekCycleLabel(calendar) {
     return wc ? String(wc) : '';
 }
 
+/** Ex. « sem. A » pour le titre de période (prof uniquement). */
+function toolbarWeekCycleShortSuffix(calendar) {
+    const wc = toolbarWeekCycleLabel(calendar);
+    if (!wc) return '';
+    if (wc.includes('B')) return 'sem. B';
+    if (wc.includes('A')) return 'sem. A';
+    return '';
+}
+
 /**
  * Textes pour le bloc paysage (coin grille) : période + semaine type.
  * @param {import('@fullcalendar/core').CalendarApi} calendar
  */
 export function getPlanningCornerHudParts(calendar) {
+    const base = toolbarPeriodBaseTitle(calendar.view);
+    const suffix = isProf(getPlanningSessionUser()) ? toolbarWeekCycleShortSuffix(calendar) : '';
     return {
-        period: toolbarPeriodBaseTitle(calendar.view),
-        week: toolbarWeekCycleLabel(calendar)
+        period: suffix ? `${base} (${suffix})` : base,
+        week: ''
     };
 }
 
@@ -212,8 +224,8 @@ export function syncPlanningGridCornerHud(calendar) {
  */
 export function formatCalendarToolbarTitle(calendar) {
     const base = toolbarPeriodBaseTitle(calendar.view);
-    const wc = toolbarWeekCycleLabel(calendar);
-    return wc ? `${base} · ${wc}` : base;
+    const suffix = isProf(getPlanningSessionUser()) ? toolbarWeekCycleShortSuffix(calendar) : '';
+    return suffix ? `${base} (${suffix})` : base;
 }
 
 /** @param {import('@fullcalendar/core').CalendarApi} calendar */

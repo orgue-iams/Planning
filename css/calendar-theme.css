@@ -376,9 +376,9 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
 }
 
 .fc .fc-day-head-gcal__dow {
-    font-size: 0.65rem;
-    font-weight: 500;
-    color: #64748b;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #475569;
     letter-spacing: 0.02em;
     text-transform: none;
 }
@@ -471,7 +471,7 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     }
 
     .fc .fc-day-head-gcal__dow {
-        font-size: 0.58rem;
+        font-size: 0.68rem;
         line-height: 1;
     }
 

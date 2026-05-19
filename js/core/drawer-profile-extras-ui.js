@@ -5,16 +5,22 @@ import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from '.
 import { getPlanningSessionUser } from './session-user.js';
 import { googleCalendarEmbedUrl } from '../utils/google-calendar-url.js';
 import { showToast } from '../utils/toast.js';
-import { appendEleveGabaritCoursCard } from '../utils/template-cours-card-ui.js';
 import {
-    filterCoursEventsForUser,
-    sortEventsByStart,
-    formatCoursCardLines,
-    fetchCalendarEventsInRange
-} from './planning-courses.js';
+    appendEleveGabaritCoursCard,
+    formatEnrolledStudentsLineFromEmails,
+    formatEnrolledStudentsLineFromIds,
+    padTimeHhmm
+} from '../utils/template-cours-card-ui.js';
+import { formatProfileFullName } from '../utils/profile-full-name.js';
+import { getPlanningEventColorClass } from './calendar-logic.js';
+import { fetchPlanningListElevesActifs } from './planning-events-db.js';
+import { sortEventsByStart } from './planning-courses.js';
+import { fetchPlanningEventsForFullCalendar } from './planning-events-db.js';
 
 const AGENDA_HELP =
     'Ces liens permettent d’afficher le planning dans Google Agenda (lecture seule). Dans Google Agenda : Paramètres → Ajouter un agenda → À partir de l’URL. Collez le lien copié. Le planning complet affiche tous les créneaux ; le planning personnel n’affiche que vos réservations IAMS.';
+
+let nextCoursRefreshGen = 0;
 
 async function loadPersonalPoolRow(userId) {
     if (!isBackendAuthConfigured() || !userId) return { id: '', label: '' };
@@ -92,11 +98,127 @@ export async function refreshDrawerAgendas(user) {
     }
 }
 
-function studentsLineFromIds(ids, labelById) {
-    const names = (ids || [])
-        .map((id) => String(labelById.get(id) || '').trim())
+/** @param {string[]} userIds @returns {Promise<Map<string, { prenom: string, nom: string, display_name?: string }>>} */
+async function loadProfilesPrenomNom(userIds) {
+    const uniq = [...new Set((userIds || []).map((id) => String(id || '').trim()).filter(Boolean))];
+    const m = new Map();
+    if (!uniq.length) return m;
+    const sb = getSupabaseClient();
+    if (!sb) return m;
+    const { data, error } = await sb.from('profiles').select('id, prenom, nom, display_name').in('id', uniq);
+    if (error) {
+        console.warn('[drawer-profile] profiles', error.message);
+        return m;
+    }
+    for (const row of data || []) {
+        m.set(String(row.id), {
+            prenom: String(row.prenom || '').trim(),
+            nom: String(row.nom || '').trim(),
+            display_name: String(row.display_name || '').trim()
+        });
+    }
+    return m;
+}
+
+/** @param {string[]} userIds @returns {Promise<Map<string, string>>} */
+async function loadProfileLabelsForIds(userIds) {
+    const uniq = [...new Set((userIds || []).map((id) => String(id || '').trim()).filter(Boolean))];
+    const m = new Map();
+    if (!uniq.length) return m;
+    const sb = getSupabaseClient();
+    if (!sb) return m;
+    const { data, error } = await sb.rpc('planning_profiles_label_for_ids', { p_ids: uniq });
+    if (error) {
+        console.warn('[drawer-profile] planning_profiles_label_for_ids', error.message);
+        return m;
+    }
+    for (const row of data || []) {
+        const id = String(row.user_id || '').trim();
+        const label = String(row.label || '').trim();
+        if (id && label) m.set(id, label);
+    }
+    return m;
+}
+
+function elevesActifsByUserId(rows) {
+    const m = new Map();
+    for (const r of rows || []) {
+        const id = String(r.user_id || '').trim();
+        if (!id) continue;
+        m.set(id, r);
+    }
+    return m;
+}
+
+function padTimeHhmmFromDate(d) {
+    if (!d || Number.isNaN(d.getTime())) return '';
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/** @param {object} ev @param {object} line gabarit @param {{ studentEmail?: string }} [ctx] */
+function eventMatchesTemplateLine(ev, line, ctx = {}) {
+    const lineId = String(line.id || '').trim();
+    const tpl = String(ev?.extendedProps?.planningSourceTemplateLineId || '').trim();
+    if (tpl && lineId) {
+        if (tpl === lineId) return true;
+        return false;
+    }
+
+    const studentEmail = String(ctx.studentEmail || '')
+        .trim()
+        .toLowerCase();
+    if (studentEmail) {
+        const onEvent = inscritEmailsFromEvent(ev);
+        if (!onEvent.includes(studentEmail)) return false;
+    }
+
+    const ownerId = String(ev?.extendedProps?.ownerUserId || '').trim();
+    const lineOwner = String(line.owner_user_id || '').trim();
+    if (lineOwner && ownerId && ownerId !== lineOwner) return false;
+
+    const start = ev?.start instanceof Date ? ev.start : new Date(String(ev?.start ?? ''));
+    if (Number.isNaN(start.getTime())) return false;
+
+    const lineDow = Number(line.day_of_week) || 0;
+    if (lineDow >= 1 && lineDow <= 7 && jsDateToPlanningDow(start) !== lineDow) return false;
+
+    const lineT = padTimeHhmm(line.start_time);
+    const evT = padTimeHhmmFromDate(start);
+    if (lineT && evT && lineT !== evT) return false;
+
+    // Prochaine occurrence réelle : pas de filtre semaine type gabarit (A/B alterne sur le calendrier).
+    const lineTitle = String(line.title || '').trim().toLowerCase();
+    const evTitle = String(ev.title || '').trim().toLowerCase();
+    if (lineTitle && evTitle && lineTitle !== evTitle) return false;
+
+    return true;
+}
+
+/**
+ * @param {object[]} upcoming triés
+ * @param {object} line
+ * @param {{ studentEmail?: string, usedEventIds?: Set<string> }} ctx
+ */
+function findNextEventForTemplateLine(upcoming, line, ctx = {}) {
+    const used = ctx.usedEventIds;
+    return (
+        upcoming.find((ev) => {
+            const id = String(ev?.id || '').trim();
+            if (used && id && used.has(id)) return false;
+            return eventMatchesTemplateLine(ev, line, ctx);
+        }) || null
+    );
+}
+
+function inscritEmailsFromEvent(ev) {
+    const raw = ev?.extendedProps?.inscrits;
+    if (Array.isArray(raw)) {
+        return raw.map((x) => String(x).trim().toLowerCase()).filter(Boolean);
+    }
+    return String(raw || '')
+        .split(/[,;]/)
+        .map((s) => s.trim().toLowerCase())
         .filter(Boolean);
-    return names.join(', ') || '—';
 }
 
 async function loadEleveGabaritEnrollments(userId) {
@@ -121,23 +243,38 @@ async function loadEleveGabaritEnrollments(userId) {
         if (!studentsByLine.has(l.line_id)) studentsByLine.set(l.line_id, []);
         studentsByLine.get(l.line_id).push(l.student_user_id);
     }
-    const allUserIds = [
-        ...new Set([
-            ...lines.map((l) => l.owner_user_id).filter(Boolean),
-            ...(links || []).map((l) => l.student_user_id)
-        ])
-    ];
-    const { data: labels } = allUserIds.length
-        ? await sb.rpc('planning_profiles_label_for_ids', { p_ids: allUserIds })
-        : { data: [] };
-    const labelMap = new Map((labels || []).map((r) => [r.user_id, r.label]));
+    const ownerIds = [...new Set(lines.map((l) => l.owner_user_id).filter(Boolean))];
+    const [elevesRows, ownerProfiles, ownerLabelsRpc] = await Promise.all([
+        fetchPlanningListElevesActifs(),
+        loadProfilesPrenomNom(ownerIds),
+        ownerIds.length
+            ? sb.rpc('planning_profiles_label_for_ids', { p_ids: ownerIds })
+            : Promise.resolve({ data: [] })
+    ]);
+    const ownerLabelById = new Map((ownerLabelsRpc.data || []).map((r) => [r.user_id, r.label]));
+    const elevesById = elevesActifsByUserId(elevesRows);
     return lines
         .filter((l) => lineIds.has(l.id) && String(l.slot_type || '').toLowerCase() === 'cours')
-        .map((l) => ({
-            ...l,
-            ownerLabel: labelMap.get(l.owner_user_id) || '',
-            studentsLine: studentsLineFromIds(studentsByLine.get(l.id) || [], labelMap)
-        }));
+        .map((l) => {
+            const ownerProf = ownerProfiles.get(l.owner_user_id);
+            const ownerPrenom = ownerProf?.prenom || '';
+            const ownerNom = ownerProf?.nom || '';
+            const ownerLabel =
+                [ownerPrenom, ownerNom].filter(Boolean).join(' ') ||
+                ownerProf?.display_name ||
+                String(ownerLabelById.get(l.owner_user_id) || '').trim() ||
+                '';
+            return {
+                ...l,
+                ownerLabel,
+                ownerPrenom,
+                ownerNom,
+                studentsLine: formatEnrolledStudentsLineFromIds(
+                    studentsByLine.get(l.id) || [],
+                    elevesById
+                )
+            };
+        });
 }
 
 function appendWeekSectionTitle(host, week) {
@@ -166,7 +303,10 @@ function renderProfileCoursGrouped(rows, list) {
                 slotType: line.slot_type,
                 studentsLine: line.studentsLine,
                 ownerLabel: line.ownerLabel,
-                ownerUserId: line.owner_user_id
+                ownerPrenom: line.ownerPrenom,
+                ownerNom: line.ownerNom,
+                ownerUserId: line.owner_user_id,
+                planningColorClass: 'event-cours'
             });
         }
     }
@@ -214,46 +354,93 @@ export async function refreshDrawerNextCours(user) {
     const empty = document.getElementById('drawer-next-cours-empty');
     if (!block || !cardHost) return;
 
+    const gen = ++nextCoursRefreshGen;
     const isEleve = String(user?.role || '').toLowerCase() === 'eleve';
     block.classList.toggle('hidden', !isEleve || !user?.email);
-    cardHost.classList.add('hidden');
     cardHost.replaceChildren();
     if (!isEleve || !user?.email) return;
+
+    let enrollments = [];
+    try {
+        enrollments = await loadEleveGabaritEnrollments(user.id);
+    } catch {
+        /* */
+    }
+    if (!enrollments.length) {
+        if (gen !== nextCoursRefreshGen) return;
+        empty?.classList.remove('hidden');
+        return;
+    }
 
     const start = new Date();
     const end = new Date(start);
     end.setDate(end.getDate() + 120);
-    let items = [];
+    let upcoming = [];
     try {
-        const evs = await fetchCalendarEventsInRange(start, end);
-        items = sortEventsByStart(filterCoursEventsForUser(evs, user));
+        const evs = await fetchPlanningEventsForFullCalendar(start, end, user);
+        const now = Date.now();
+        // Gabarit + lien source_template_line_id ; pas le cache grille (évite dates manquantes).
+        upcoming = sortEventsByStart(
+            evs.filter((ev) => String(ev?.extendedProps?.type ?? '').toLowerCase() === 'cours')
+        ).filter((ev) => {
+            const t = new Date(String(ev?.start ?? '')).getTime();
+            return !Number.isNaN(t) && t >= now;
+        });
     } catch {
         /* */
     }
-    const now = Date.now();
-    const next = items.find((ev) => {
-        const t = new Date(String(ev?.start ?? '')).getTime();
-        return !Number.isNaN(t) && t >= now;
-    });
-    if (!next) {
-        empty?.classList.remove('hidden');
-        return;
-    }
+
+    if (gen !== nextCoursRefreshGen) return;
     empty?.classList.add('hidden');
-    cardHost.classList.remove('hidden');
-    const lines = formatCoursCardLines(next);
-    const startDt = new Date(String(next.start ?? ''));
-    appendEleveGabaritCoursCard(cardHost, {
-        dayOfWeek: jsDateToPlanningDow(startDt),
-        startTime: startDt.toISOString(),
-        endTime: String(next.end ?? ''),
-        title: lines.title,
-        slotType: 'cours',
-        studentsLine: lines.students || '',
-        ownerLabel: lines.prof,
-        ownerUserId: '',
-        dateSubline: lines.dateSubline || ''
-    });
+
+    const usedEventIds = new Set();
+    const matchCtx = {
+        studentEmail: String(user.email || '')
+            .trim()
+            .toLowerCase()
+    };
+
+    for (const line of enrollments) {
+        const nextEv = findNextEventForTemplateLine(upcoming, line, {
+            ...matchCtx,
+            usedEventIds
+        });
+        if (nextEv?.id) usedEventIds.add(String(nextEv.id));
+        const ownerUserId = String(line.owner_user_id || '').trim();
+        let dateSubline = 'Pas de date planifiée';
+        let startTime = line.start_time;
+        let endTime = line.end_time;
+        let title = String(line.title || '').trim() || 'Cours';
+        let colorClass = 'event-cours';
+
+        if (nextEv) {
+            const startDt = new Date(String(nextEv.start ?? ''));
+            dateSubline = startDt.toLocaleDateString('fr-FR', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long'
+            });
+            startTime = startDt.toISOString();
+            endTime = String(nextEv.end ?? line.end_time);
+            title = String(nextEv.title || '').trim() || title;
+            colorClass = getPlanningEventColorClass(nextEv, user);
+        }
+
+        appendEleveGabaritCoursCard(cardHost, {
+            dayOfWeek: line.day_of_week,
+            startTime,
+            endTime,
+            dateSubline,
+            title,
+            slotType: 'cours',
+            studentsLine: line.studentsLine,
+            ownerLabel: line.ownerLabel,
+            ownerPrenom: line.ownerPrenom,
+            ownerNom: line.ownerNom,
+            ownerUserId,
+            planningColorClass: colorClass
+        });
+    }
 }
 
 /** @param {object | null} user */
@@ -271,7 +458,7 @@ export function initDrawerProfileExtrasUi() {
 
     document.addEventListener('planning-profile-saved', () => {
         const u = getPlanningSessionUser();
-        void refreshDrawerProfileExtras(u);
+        void refreshDrawerAgendas(u);
     });
 }
 

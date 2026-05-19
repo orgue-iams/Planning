@@ -34,18 +34,7 @@
     border-color: rgb(51 65 85) !important;
 }
 
-[data-theme='dark'] dialog.modal .input,
-[data-theme='dark'] dialog.modal .select,
-[data-theme='dark'] dialog.modal .textarea {
-    background-color: rgb(15 23 42) !important;
-    color: rgb(241 245 249) !important;
-    border-color: rgb(71 85 105) !important;
-}
-
-[data-theme='dark'] dialog.modal .input::placeholder,
-[data-theme='dark'] dialog.modal .textarea::placeholder {
-    color: rgb(148 163 184);
-}
+/* Champs modales : voir planning-theme-tokens.css (variables --planning-input-*) */
 
 [data-theme='dark'] dialog.modal .input-bordered:focus,
 [data-theme='dark'] dialog.modal .select:focus {
@@ -54,10 +43,7 @@
     box-shadow: 0 0 0 2px rgb(59 130 246 / 0.25);
 }
 
-[data-theme='dark'] dialog.modal .label-text,
-[data-theme='dark'] dialog.modal .label-text-alt {
-    color: rgb(203 213 225);
-}
+/* Labels modales : planning-theme-tokens.css (.label-text) */
 
 /* Semaines types : page plein écran */
 [data-theme='dark'] #modal_semaines_types .semaines-types-modal-box {
@@ -100,12 +86,7 @@
     background-color: rgb(30 41 59) !important;
 }
 
-[data-theme='dark'] #modal_semaines_types .input,
-[data-theme='dark'] #modal_semaines_types .select {
-    background-color: rgb(15 23 42) !important;
-    color: rgb(241 245 249) !important;
-    border-color: rgb(71 85 105) !important;
-}
+/* Champs semaines types : planning-theme-tokens.css */
 
 /* Calendriers pool : tableau */
 [data-theme='dark'] #modal_calendar_pool .pool-cal-table thead {

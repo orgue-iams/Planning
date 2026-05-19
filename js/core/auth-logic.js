@@ -98,6 +98,76 @@ export function setPasswordModalMode(isTokenReset) {
 }
 
 /**
+ * Message lisible pour les refus GoTrue (le POST /auth/v1/token renvoie souvent HTTP 400).
+ * @param {unknown} error
+ */
+function humanMessageFromSupabaseLoginError(error) {
+    if (!error || typeof error !== 'object') {
+        return 'Connexion impossible. Vérifiez votre email et votre mot de passe.';
+    }
+    const o = /** @type {{ code?: string; message?: string; status?: number }} */ (error);
+    const code = String(o.code || '').toLowerCase();
+    const raw = String(o.message || '').toLowerCase();
+
+    if (raw.includes('missing email') || raw.includes('missing phone')) {
+        return 'Veuillez renseigner votre email.';
+    }
+    if (!String(o.message || '').trim() && code === 'invalid_credentials') {
+        return 'Email ou mot de passe incorrect.';
+    }
+    if (
+        code === 'invalid_credentials' ||
+        raw.includes('invalid login credentials') ||
+        raw.includes('invalid email or password') ||
+        raw.includes('invalid credentials')
+    ) {
+        return 'Email ou mot de passe incorrect.';
+    }
+    if (code === 'email_not_confirmed' || raw.includes('email not confirmed')) {
+        return 'Compte non confirmé : ouvrez le lien reçu par e-mail ou demandez une nouvelle invitation.';
+    }
+    if (code === 'user_banned' || raw.includes('user is banned') || raw.includes('banned')) {
+        return 'Ce compte est désactivé. Contactez l’administration.';
+    }
+    if (raw.includes('too many requests') || code === 'over_request_rate_limit') {
+        return 'Trop de tentatives. Patientez une minute puis réessayez.';
+    }
+    if (raw.includes('password') && raw.includes('least')) {
+        return `Le mot de passe doit contenir au moins ${PASSWORD_MIN_LENGTH} caractères.`;
+    }
+    if (raw.includes('signup is disabled') || raw.includes('signups not allowed')) {
+        return 'Création de compte désactivée : utilisez un compte déjà invité.';
+    }
+    const fallback = String(o.message || '').trim();
+    return fallback || 'Connexion refusée. Vérifiez votre email et votre mot de passe.';
+}
+
+/** Nouvelle tentative login uniquement si l’échec vient d’une session locale corrompue (pas d’un mauvais mot de passe). */
+function isStaleLocalSessionBlockingLogin(error) {
+    if (!error || typeof error !== 'object') return false;
+    const o = /** @type {{ code?: string; message?: string }} */ (error);
+    const code = String(o.code || '').toLowerCase();
+    const msg = String(o.message || '').toLowerCase();
+    if (code === 'invalid_credentials') return false;
+    if (
+        rawIncludesInvalidLogin(msg) &&
+        !msg.includes('refresh') &&
+        !msg.includes('token')
+    ) {
+        return false;
+    }
+    return isInvalidRefreshTokenError(error);
+}
+
+function rawIncludesInvalidLogin(msg) {
+    return (
+        msg.includes('invalid login credentials') ||
+        msg.includes('invalid email or password') ||
+        msg.includes('invalid credentials')
+    );
+}
+
+/**
  * @param {boolean} [rememberMe] défaut true : session conservée après fermeture du navigateur / PWA (localStorage).
  * @returns {Promise<{ success: boolean, user?: { name: string, email: string, role: string, id?: string } }>}
  */
@@ -109,6 +179,15 @@ export async function login(email, pass, rememberMe = true) {
     const id = String(email ?? '').trim().toLowerCase();
     if (!id) {
         showToast('Veuillez renseigner votre email.', 'error');
+        return { success: false };
+    }
+    const password = String(pass ?? '');
+    if (!password) {
+        showToast('Veuillez renseigner votre mot de passe.', 'error');
+        return { success: false };
+    }
+    if (password.length < PASSWORD_MIN_LENGTH) {
+        showToast(`Le mot de passe doit contenir au moins ${PASSWORD_MIN_LENGTH} caractères.`, 'error');
         return { success: false };
     }
     const remember = rememberMe !== false;
@@ -125,28 +204,18 @@ export async function login(email, pass, rememberMe = true) {
     await clearCorruptedLocalAuthSession();
     let { data, error } = await supabase.auth.signInWithPassword({
         email: id,
-        password: pass
+        password
     });
-    if (error && isInvalidRefreshTokenError(error)) {
+    if (error && isStaleLocalSessionBlockingLogin(error)) {
         await clearCorruptedLocalAuthSession();
         ({ data, error } = await supabase.auth.signInWithPassword({
             email: id,
-            password: pass
+            password
         }));
     }
     if (error) {
-        const raw = String(error.message || '').toLowerCase();
-        let msg = error.message || 'Identifiants invalides.';
-        if (raw.includes('missing email') || raw.includes('missing phone')) {
-            msg = 'Veuillez renseigner votre email.';
-        } else if (
-            raw.includes('invalid login credentials') ||
-            raw.includes('invalid_credentials') ||
-            raw.includes('invalid email or password')
-        ) {
-            msg = 'Email ou mot de passe incorrect.';
-        }
-        showToast(msg, 'error');
+        console.warn('[auth] signInWithPassword', error.code || '', error.message || error);
+        showToast(humanMessageFromSupabaseLoginError(error), 'error');
         return { success: false };
     }
     const user = await fetchAppUserFromSession(data.session);

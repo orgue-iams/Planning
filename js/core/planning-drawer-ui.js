@@ -2,6 +2,9 @@
  * Menu principal (tiroir) : vues calendrier + liens selon profil.
  */
 import { dismissReservationRouteDialog } from './calendar-logic.js';
+import { refreshDrawerNextCours } from './drawer-profile-extras-ui.js';
+import { showMainDrawerPanel } from './drawer-help-ui.js';
+import { getPlanningSessionUser } from './session-user.js';
 import { dismissPlanningOverlaysToCalendar } from '../utils/planning-overlay-dismiss.js';
 
 /** @type {import('@fullcalendar/core').Calendar | null} */
@@ -14,6 +17,30 @@ function setDrawerAria(open) {
     const v = open ? 'false' : 'true';
     drawer?.setAttribute('aria-hidden', v);
     backdrop?.setAttribute('aria-hidden', v);
+    if (drawer) {
+        if (open) drawer.removeAttribute('inert');
+        else drawer.setAttribute('inert', '');
+    }
+}
+
+/** Évite aria-hidden sur un ancêtre du focus (avertissement navigateur / AT). */
+function releaseDrawerFocus() {
+    const drawer = document.getElementById('planning-app-drawer');
+    if (!drawer) return;
+    const active = document.activeElement;
+    if (!(active instanceof HTMLElement) || !drawer.contains(active)) return;
+    const menuBtn =
+        document.getElementById('btn-app-drawer-fc') ||
+        document.getElementById('btn-app-drawer');
+    if (menuBtn instanceof HTMLElement) {
+        try {
+            menuBtn.focus({ preventScroll: true });
+        } catch {
+            menuBtn.focus();
+        }
+        return;
+    }
+    active.blur();
 }
 
 function closeDrawer() {
@@ -25,6 +52,7 @@ function closeDrawer() {
     if (btn) {
         btn.setAttribute('aria-expanded', 'false');
     }
+    releaseDrawerFocus();
     setDrawerAria(false);
 }
 
@@ -38,6 +66,8 @@ function openDrawer() {
         btn.setAttribute('aria-expanded', 'true');
     }
     setDrawerAria(true);
+    const u = getPlanningSessionUser();
+    if (u) void refreshDrawerNextCours(u);
 }
 
 function toggleDrawer() {
@@ -65,15 +95,26 @@ export function syncDrawerViewSelection(cal) {
 export function initPlanningDrawer(calendar) {
     drawerCalendarRef = calendar;
     syncDrawerViewSelection(calendar);
+    const drawer = document.getElementById('planning-app-drawer');
+    if (drawer && !drawer.classList.contains('planning-app-drawer--open')) {
+        setDrawerAria(false);
+    }
 
     if (drawerUiBound) return;
     drawerUiBound = true;
+
+    document.addEventListener('planning-close-drawer-request', () => closeDrawer());
 
     document.getElementById('btn-app-drawer')?.addEventListener('click', (e) => {
         e.preventDefault();
         toggleDrawer();
     });
     document.getElementById('planning-drawer-backdrop')?.addEventListener('click', () => closeDrawer());
+    document.getElementById('planning-drawer-close')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        showMainDrawerPanel();
+        closeDrawer();
+    });
 
     const closeMenusFromPlanningClick = (e) => {
         const t = e.target;

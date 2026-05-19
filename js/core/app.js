@@ -164,6 +164,7 @@ function performLogout() {
     }
     document.body.classList.add('auth-pending');
     refreshHeaderUser(null);
+    syncPlanningFabCreate(null);
     [
         'modal_forgot',
         'modal_password',
@@ -190,6 +191,26 @@ function performLogout() {
     requestAnimationFrame(() => document.getElementById('login-email')?.focus());
 }
 
+function syncPlanningFabCreate(user) {
+    document.getElementById('planning-fab-create')?.classList.toggle('hidden', !user?.email);
+}
+
+function initPlanningFabCreate(getUser) {
+    const fab = document.getElementById('planning-fab-create');
+    if (!fab || fab.dataset.bound === '1') return;
+    fab.dataset.bound = '1';
+    fab.addEventListener('click', (e) => {
+        e.preventDefault();
+        const user = getUser();
+        if (!calendar || !user?.email) {
+            showToast('Connectez-vous pour réserver.', 'error');
+            return;
+        }
+        currentEvent = null;
+        void openModal(new Date(), null, null, user, calendar).catch((err) => console.error(err));
+    });
+}
+
 function refreshHeaderUser(user) {
     const drawerName = document.getElementById('drawer-profile-name');
     const drawerRole = document.getElementById('drawer-profile-role');
@@ -207,8 +228,10 @@ function refreshHeaderUser(user) {
         shell?.classList.remove('planning-shell--weekstrip');
         document.getElementById('btn-admin-clear-week')?.classList.add('hidden');
         syncPlanningDrawerGroupedSections();
+        syncPlanningFabCreate(null);
         return;
     }
+    syncPlanningFabCreate(user);
     if (drawerName) drawerName.textContent = String(user.name || '').trim() || user.email.split('@')[0];
     if (drawerRole) {
         const rl = roleLabelFr(user.role);
@@ -222,8 +245,14 @@ function refreshHeaderUser(user) {
     syncCalendarPrefControlsUi();
     document.getElementById('menu-item-directory-wrap')?.classList.toggle('hidden', !isBackendAuthConfigured());
     const auth = isBackendAuthConfigured();
-    document.getElementById('menu-item-semaines-types-wrap')?.classList.toggle('hidden', !auth);
-    document.getElementById('menu-item-fermetures-wrap')?.classList.toggle('hidden', !auth);
+    document.getElementById('menu-item-semaines-types-wrap')?.classList.toggle(
+        'hidden',
+        !auth || r !== 'prof'
+    );
+    document.getElementById('menu-item-fermetures-wrap')?.classList.toggle(
+        'hidden',
+        !auth || r === 'eleve'
+    );
     document.getElementById('menu-item-statistics-wrap')?.classList.toggle('hidden', !staff);
     document.getElementById('btn-admin-clear-week')?.classList.toggle('hidden', r !== 'admin');
     if (r !== 'eleve') {
@@ -288,6 +317,7 @@ function initCalendarAndRevealUi() {
         },
         onEventClick: (info) => {
             currentEvent = info.event;
+            closePlanningDrawer();
             void openModal(
                 info.event.start,
                 info.event.end,
@@ -431,6 +461,8 @@ function initCalendarAndRevealUi() {
         initSwipe(calendarEl, calendar);
 
         initPlanningDrawer(calendar);
+        initPlanningFabCreate(() => currentUser);
+        syncPlanningFabCreate(currentUser);
 
         setReservationAutoSaveDeps({
             getCalendar: () => calendar,

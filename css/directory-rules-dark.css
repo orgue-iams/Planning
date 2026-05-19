@@ -114,11 +114,6 @@
     color: rgb(191 219 254);
 }
 
-/* Préférences d’affichage (tiroir) — mode sombre */
-[data-theme='dark'] #planning-app-drawer .cal-pref-scale-preview {
-    color: rgb(248 250 252) !important;
-}
-
 #modal_directory_users .directory-user-email-link {
     color: rgb(37 99 235);
     text-decoration: underline;

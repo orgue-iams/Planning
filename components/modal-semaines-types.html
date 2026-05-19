@@ -7,7 +7,27 @@
                     <p id="st-tap-hint" class="st-swipe-hint text-[10px] text-slate-600 dark:text-slate-300 m-0 mb-2 leading-snug">
                         Appuyez sur un créneau pour le modifier ou le supprimer.
                     </p>
+                    <section id="st-teaching-days-section" class="st-section hidden" aria-labelledby="st-teaching-days-title">
+                        <p id="st-teaching-days-title" class="st-section-title">Mes jours d’enseignement</p>
+                        <p class="text-[9px] text-slate-500 dark:text-slate-400 m-0 mb-2 leading-snug">
+                            Le gabarit ne porte que sur ces journées (journée entière). Modifiable à tout moment.
+                        </p>
+                        <div class="flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] font-medium" id="st-teaching-days-checkboxes">
+                            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="checkbox checkbox-xs st-teaching-day-cb" value="1" /> Lun</label>
+                            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="checkbox checkbox-xs st-teaching-day-cb" value="2" /> Mar</label>
+                            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="checkbox checkbox-xs st-teaching-day-cb" value="3" /> Mer</label>
+                            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="checkbox checkbox-xs st-teaching-day-cb" value="4" /> Jeu</label>
+                            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="checkbox checkbox-xs st-teaching-day-cb" value="5" /> Ven</label>
+                            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="checkbox checkbox-xs st-teaching-day-cb" value="6" /> Sam</label>
+                            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="checkbox checkbox-xs st-teaching-day-cb" value="7" /> Dim</label>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 mt-2">
+                            <button type="button" id="st-teaching-days-save" class="btn btn-sm planning-btn-accent font-semibold text-[10px]">Enregistrer mes jours</button>
+                            <p id="st-teaching-days-hint" class="text-[9px] text-slate-500 m-0 hidden" role="status"></p>
+                        </div>
+                    </section>
                     <section id="st-gabarit-section" class="st-section">
+                        <p id="st-gabarit-prof-title" class="st-section-title hidden">Mon gabarit</p>
                         <div class="st-section-split">
                             <div class="st-section-col">
                                 <div class="st-section-col-head">
@@ -27,7 +47,10 @@
                     </section>
 
                     <section id="st-apply-section" class="st-section">
-                        <p class="st-section-title">Appliquer le gabarit sur Google Agenda</p>
+                        <p class="st-section-title">Recréer mes créneaux depuis le gabarit</p>
+                        <p class="text-[9px] text-slate-500 dark:text-slate-400 m-0 mb-2 leading-snug">
+                            Efface et recrée <strong>vos</strong> créneaux sur la période (pas ceux des autres professeurs). Les fermetures institut sont respectées.
+                        </p>
                         <p id="st-apply-admin-hint" class="hidden text-[9px] text-amber-900 bg-amber-50 border-b border-amber-100 py-2 mb-2">
                             En tant qu’<strong>administrateur</strong>, vous consultez les gabarits. La <strong>préparation</strong> et l’<strong>écriture</strong> dans les agendas sont réservées aux comptes <strong>professeur</strong> (connectez-vous avec un prof pour lancer l’application).
                         </p>

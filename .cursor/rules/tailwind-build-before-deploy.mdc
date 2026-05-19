@@ -10,7 +10,9 @@ alwaysApply: true
 
 ## Règles pour l'assistant
 
-- Après toute modification de markup/classes (`index.html`, `components/*.html`, `js/**/*.js` qui injecte du HTML), exécuter `npm run build:css`.
-- Avant tout push ou déploiement, exécuter `npm run build:css`.
-- Vérifier que `css/tailwind.generated.css` est à jour dans les changements.
+- **Exécuter soi-même** `npm run build:css` dès que c’est nécessaire — **sans** demander à l’utilisateur et **sans** s’appuyer sur `npm run watch:css` en arrière-plan (peu fiable ici).
+- Déclencheurs : modification de markup/classes (`index.html`, `components/*.html`, `css/tailwind.input.css`, `js/**/*.js` qui injecte du HTML avec classes utilitaires).
+- Le faire **dans la même session**, juste après ces changements (dev local Vite sur la racine `Planning/` : un refresh suffit ensuite).
+- Avant tout push ou `deploy:pages`, exécuter `npm run build:css` si pas déjà fait après les derniers changements UI.
+- Vérifier que `css/tailwind.generated.css` est à jour dans les changements commités.
 - Ne pas réintroduire le script CDN Tailwind dans `index.html`.

@@ -1,4 +1,4 @@
-/** Préférence d’affichage clair / sombre (localStorage, pas en base). */
+/** Préférence d’affichage clair / sombre (localStorage, pas en base). Charte CSS : css/planning-theme-tokens.css */
 const STORAGE_KEY = 'planning_ui_theme';
 
 /** Taille du texte des créneaux FullCalendar : `sm` | `md` | `lg` (localStorage). */

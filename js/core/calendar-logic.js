@@ -64,8 +64,10 @@ function scheduleReservationAutoSave() {
     reservationAutoSaveTimer = setTimeout(() => {
         if (!isReservationModalDirty()) return;
         reservationAutoSaveMode = true;
-        void saveReservation(cal, deps.getUser(), deps.getEvent())
+        const eventForSave = reservationModalEventRef || deps.getEvent();
+        void saveReservation(cal, deps.getUser(), eventForSave)
             .then(() => {
+                syncReservationModalLiveEventRef();
                 captureReservationModalFormBaseline();
             })
             .finally(() => {
@@ -85,6 +87,8 @@ let reservationModalFormBaseline = null;
 let reservationModalCalendarRef = null;
 /** @type {import('@fullcalendar/core').EventApi | null} */
 let reservationModalEventRef = null;
+/** Durée initiale du créneau à l’ouverture de la modale (ajustement fin si début change). */
+let reservationModalInitialDurationMs = 60 * 60 * 1000;
 
 export function isReservationMutationInFlight() {
     return saveReservationInFlight || deleteReservationInFlight;
@@ -172,6 +176,7 @@ function applyReservationModalFormSnapshot(json) {
             o.selected = want.has(o.value);
         }
     }
+    syncReservationModalLiveEventRef();
     updateReservationInscritsWrapVisibility(reservationModalUserRef, reservationModalCanEditRef);
     refreshReservationInscritsSummary();
     syncReservationDateWeekdayLabel();
@@ -196,6 +201,7 @@ export async function dismissReservationRouteDialog(options = {}) {
     if (isReservationMutationInFlight()) return;
     const save = Boolean(options.save);
     if (save && reservationModalCanEditRef && reservationModalCalendarRef && reservationModalUserRef) {
+        syncReservationModalLiveEventRef();
         reservationAutoSaveMode = true;
         try {
             await saveReservation(
@@ -318,21 +324,33 @@ function refreshReservationInscritsSummary() {
     summary.textContent = labels.length ? labels.join(', ') : 'Aucun élève (optionnel)';
 }
 
+function reservationModalIsCoursContext(eventRef, motifSelect) {
+    if (String(motifSelect?.value || '').trim() === 'Cours') return true;
+    const xp = safeEventExtendedProps(eventRef);
+    if (!xp) return false;
+    const db = String(xp.planningDbSlotType || '').trim();
+    if (db === 'cours') return true;
+    return String(xp.type || '').trim() === 'cours';
+}
+
 function updateReservationInscritsWrapVisibility(currentUser, canEdit) {
+    syncReservationModalLiveEventRef();
     const wrap = document.getElementById('wrap-reservation-inscrits');
     const multi = document.getElementById('event-inscrits-select');
     const sel = document.getElementById('event-motif-select');
     const toggle = document.getElementById('event-inscrits-users-toggle');
     if (!wrap || !multi || !sel) return;
-    const show = canManageReservationInscrits(currentUser) && sel.value === 'Cours';
+    const show = reservationModalIsCoursContext(reservationModalEventRef, sel);
+    const canManage = canManageReservationInscrits(currentUser);
     wrap.classList.toggle('hidden', !show);
     wrap.setAttribute('aria-hidden', show ? 'false' : 'true');
-    multi.disabled = !canEdit || !show;
+    multi.disabled = !canEdit || !show || !canManage;
     if (toggle instanceof HTMLButtonElement) {
-        toggle.disabled = !canEdit || !show;
+        toggle.disabled = !canEdit || !show || !canManage;
+        toggle.classList.toggle('hidden', !canManage);
     }
     if (show) refreshReservationInscritsSummary();
-    setReservationInscritsEditMode(Boolean(show && canEdit), canEdit);
+    setReservationInscritsEditMode(Boolean(show && canEdit && canManage), canEdit);
 }
 
 /**
@@ -358,13 +376,21 @@ function ensureReservationMotifInscritsListener() {
     if (!sel || sel.dataset.inscritsMotifBound === '1') return;
     sel.dataset.inscritsMotifBound = '1';
     sel.addEventListener('change', () => {
+        const live = syncReservationModalLiveEventRef();
         updateReservationInscritsWrapVisibility(reservationModalUserRef, reservationModalCanEditRef);
         const multi = document.getElementById('event-inscrits-select');
-        // Sécurise le cas "Cours -> Travail perso -> Cours" :
-        // on évite de conserver une sélection d’élèves quand le motif n’est plus "Cours".
         const isCours = String(sel.value || '').trim() === 'Cours';
         if (!isCours && multi instanceof HTMLSelectElement) {
             for (const o of multi.options) o.selected = false;
+        }
+        if (live && typeof live.setExtendedProp === 'function') {
+            try {
+                const slotType = motifToSlotType(sel.value);
+                live.setExtendedProp('type', slotType);
+                live.setExtendedProp('planningDbSlotType', motifToPlanningDbSlotType(sel.value));
+            } catch {
+                /* référence FC retirée après refetch */
+            }
         }
     });
 }
@@ -453,10 +479,6 @@ async function prepareReservationInscritsSelect(currentUser, event, canEdit) {
     const wrap = document.getElementById('wrap-reservation-inscrits');
     const multi = document.getElementById('event-inscrits-select');
     if (!wrap || !multi) return;
-    if (!canManageReservationInscrits(currentUser)) {
-        wrap.classList.add('hidden');
-        return;
-    }
     // Bind UI (icône + fermeture quand on clique ailleurs)
     if (!reservationInscritsUiBound) {
         reservationInscritsUiBound = true;
@@ -506,7 +528,10 @@ async function prepareReservationInscritsSelect(currentUser, event, canEdit) {
         if (!r.user_id) continue;
         const prenom = String(r.prenom || '').trim();
         const nom = String(r.nom || '').trim();
-        const label = `${prenom} ${nom}`.trim() || String(r.display_name || r.email || '').trim();
+        const label =
+            `${prenom} ${nom}`.trim() ||
+            String(r.display_name || '').trim() ||
+            'Élève';
         const opt = new Option(label, r.user_id);
         opt.dataset.email = String(r.email || '').trim().toLowerCase();
         opt.selected = pre.has(opt.dataset.email);
@@ -536,20 +561,15 @@ async function syncPlanningEnrollmentAfterSave(eventId, dbSlotType) {
 
 /** @param {import('@fullcalendar/core').EventApi | null} event */
 export function ownerInfoFromEvent(event, currentUser) {
-    const ownerEmail = String(
-        event?.extendedProps?.owner || currentUser?.email || ''
-    ).trim().toLowerCase();
-    const ownerUserId = String(event?.extendedProps?.ownerUserId ?? '').trim();
+    const xp = safeEventExtendedProps(event) || {};
+    const ownerEmail = String(xp.owner || currentUser?.email || '')
+        .trim()
+        .toLowerCase();
+    const ownerUserId = String(xp.ownerUserId ?? '').trim();
     const ownerName =
-        String(
-            event?.extendedProps?.ownerDisplayName ||
-            event?.extendedProps?.ownerName ||
-            ''
-        ).trim() ||
+        String(xp.ownerDisplayName || xp.ownerName || '').trim() ||
         (ownerEmail ? ownerEmail.split('@')[0] : 'Inconnu');
-    const ownerRoleRaw = normalizeRole(
-        event?.extendedProps?.ownerRole || event?.extendedProps?.owner_role || ''
-    );
+    const ownerRoleRaw = normalizeRole(xp.ownerRole || xp.owner_role || '');
     const ownerRole = ownerRoleRaw || roleFromOwnerEmail(ownerEmail);
     return { ownerEmail, ownerName, ownerRole, ownerUserId };
 }
@@ -650,7 +670,8 @@ function getReservationSlotOwnerEmail(currentUser, currentEventRef) {
     const wrap = document.getElementById('wrap-reservation-owner-target');
     const sel = document.getElementById('reservation-slot-owner-email');
     if (currentEventRef || !wrap || wrap.classList.contains('hidden')) {
-        return String(currentEventRef?.extendedProps?.owner || currentUser?.email || '').trim();
+        const xp = safeEventExtendedProps(currentEventRef);
+        return String(xp?.owner || currentUser?.email || '').trim();
     }
     if (sel && sel.value) return String(sel.value).trim();
     return String(currentUser?.email || '').trim();
@@ -744,7 +765,13 @@ function canCurrentUserEditEventIgnoringPast(currentUser, event) {
         return true;
     }
     if (meRole === 'prof') {
-        return ownerRole === 'eleve' || ownerRole === 'prof';
+        const myEmail = String(currentUser.email).trim().toLowerCase();
+        if (owner.ownerEmail && owner.ownerEmail !== myEmail) return true;
+        if (ownerRole === 'eleve' || ownerRole === 'prof') return true;
+        const ownerId = String(event?.extendedProps?.ownerUserId || '').trim();
+        const myId = String(currentUser.id || '').trim();
+        if (ownerId && myId && ownerId !== myId) return true;
+        return roleFromOwnerEmail(owner.ownerEmail) === 'eleve';
     }
     return false;
 }
@@ -762,6 +789,106 @@ function roleFromOwnerEmail(email) {
     if (e.startsWith('prof')) return 'prof';
     if (e.startsWith('eleve') || e.startsWith('élève')) return 'eleve';
     return '';
+}
+
+/** Propriétaire du créneau = élève (rôle base ou heuristique e-mail). */
+function ownerIsEleveForReservation(event, currentUser) {
+    if (!event) return false;
+    const owner = ownerInfoFromEvent(event, currentUser);
+    return owner.ownerRole === 'eleve' || roleFromOwnerEmail(owner.ownerEmail) === 'eleve';
+}
+
+/** Prof / admin modifie un créneau dont le propriétaire est un élève. */
+function profOrAdminEditingEleveSlot(currentUser, event) {
+    if (!event) return false;
+    const r = normalizeRole(currentUser?.role);
+    if (r !== 'prof' && r !== 'admin') return false;
+    return ownerIsEleveForReservation(event, currentUser);
+}
+
+function isTravailPersoReservationEvent(event) {
+    if (!event) return false;
+    const db = String(event.extendedProps?.planningDbSlotType || '')
+        .trim()
+        .toLowerCase();
+    if (db === 'travail perso') return true;
+    const t = String(event.extendedProps?.type || '')
+        .trim()
+        .toLowerCase();
+    return t === 'reservation';
+}
+
+/** Créneau appartenant au compte connecté (e-mail ou uuid propriétaire). */
+function isReservationOwnedByCurrentUser(event, currentUser) {
+    if (!event || !currentUser) return false;
+    const owner = ownerInfoFromEvent(event, currentUser);
+    const myEmail = String(currentUser.email || '').trim().toLowerCase();
+    const ownerEmail = String(owner.ownerEmail || '').trim().toLowerCase();
+    if (myEmail && ownerEmail && myEmail === ownerEmail) return true;
+    const myId = String(currentUser.id || '').trim();
+    const ownerId = String(
+        owner.ownerUserId || event.extendedProps?.ownerUserId || ''
+    ).trim();
+    return Boolean(myId && ownerId && myId === ownerId);
+}
+
+/**
+ * Prof / admin : masquer le motif sur un travail perso qui n’est pas le leur
+ * (créneau d’un autre utilisateur — ne pas dépendre de ownerRole sur l’événement seul).
+ */
+function shouldHideReservationMotifForPrivilegedEditor(currentUser, event) {
+    if (!event || !currentUser) return false;
+    const r = normalizeRole(currentUser?.role);
+    if (r !== 'prof' && r !== 'admin') return false;
+    if (!isTravailPersoReservationEvent(event)) return false;
+    return !isReservationOwnedByCurrentUser(event, currentUser);
+}
+
+/** @deprecated alias interne */
+function profAdminEditingEleveTravailPersoSlot(currentUser, event) {
+    return shouldHideReservationMotifForPrivilegedEditor(currentUser, event);
+}
+
+/** Motif / slot_type figés (travail perso d’un autre utilisateur). */
+function reservationSlotTypeLockedFromEvent(currentUser, eventRef) {
+    if (!shouldHideReservationMotifForPrivilegedEditor(currentUser, eventRef)) return null;
+    return 'travail perso';
+}
+
+/** Affiche ou masque le sélecteur motif (après remplissage du formulaire). */
+function applyReservationMotifVisibility(currentUser, event, canEditEvent) {
+    const wrapMotif = document.getElementById('wrap-reservation-motif');
+    const sel = document.getElementById('event-motif-select');
+    const hintFerm = document.getElementById('event-motif-hint-fermeture');
+    const r = normalizeRole(currentUser?.role);
+    const hidePrivileged = shouldHideReservationMotifForPrivilegedEditor(currentUser, event);
+    if (!wrapMotif) return;
+    if (r === 'eleve') {
+        wrapMotif.classList.add('hidden');
+        wrapMotif.setAttribute('aria-hidden', 'true');
+        hintFerm?.classList.add('hidden');
+        return;
+    }
+    if (hidePrivileged) {
+        wrapMotif.classList.add('hidden');
+        wrapMotif.setAttribute('aria-hidden', 'true');
+        hintFerm?.classList.add('hidden');
+        if (sel instanceof HTMLSelectElement) {
+            sel.value = 'Travail';
+            sel.disabled = true;
+        }
+        return;
+    }
+    wrapMotif.classList.remove('hidden');
+    wrapMotif.setAttribute('aria-hidden', 'false');
+    if (sel instanceof HTMLSelectElement) {
+        sel.disabled = !canEditEvent;
+    }
+    if (r === 'admin') {
+        hintFerm?.classList.remove('hidden');
+    } else {
+        hintFerm?.classList.add('hidden');
+    }
 }
 
 function allowedMotifsForRole(role) {
@@ -1118,6 +1245,41 @@ function notifySlotOwnerAfterThirdPartyEditNonBlocking(payload) {
     });
 }
 
+/**
+ * Classe CSS créneau (alignée sur la grille FullCalendar).
+ * @param {{ extendedProps?: Record<string, unknown>, title?: string } | null} eventLike
+ * @param {object | null} currentUser
+ */
+export function getPlanningEventColorClass(eventLike, currentUser) {
+    const ownerEmail = String(eventLike?.extendedProps?.owner || '')
+        .trim()
+        .toLowerCase();
+    const me = String(currentUser?.email || '')
+        .trim()
+        .toLowerCase();
+    const isMine = Boolean(me && ownerEmail && ownerEmail === me);
+    const type = eventLike?.extendedProps?.type || 'reservation';
+    const inscritsRaw = eventLike?.extendedProps?.inscrits;
+    const inscritsList = Array.isArray(inscritsRaw)
+        ? inscritsRaw.map((x) => String(x).trim().toLowerCase()).filter(Boolean)
+        : typeof inscritsRaw === 'string'
+          ? String(inscritsRaw)
+                .split(/[,;]/)
+                .map((x) => x.trim().toLowerCase())
+                .filter(Boolean)
+          : [];
+    const amInscribedInCours = Boolean(me && inscritsList.includes(me));
+    if (type === 'fermeture') return 'event-fermeture';
+    if (type === 'cours' || type === 'maintenance') return 'event-cours';
+    if (type === 'concert') return 'event-concert';
+    if (type === 'autre') return 'event-autre';
+    const dbSlot = String(eventLike?.extendedProps?.planningDbSlotType || '').toLowerCase();
+    if (dbSlot === 'travail perso' || type === 'reservation') {
+        return isMine ? 'event-travail-mine' : 'event-travail-other';
+    }
+    return isMine ? 'event-travail-mine' : 'event-travail-other';
+}
+
 // --- 1. RENDU VISUEL DES CRÉNEAUX ---
 export function getEventContent(arg, currentUser) {
     const isMirror = Boolean(arg.isMirror);
@@ -1128,41 +1290,7 @@ export function getEventContent(arg, currentUser) {
     const durationMs = end - start;
     const durationMin = Math.round(durationMs / (1000 * 60));
 
-    const ownerEmail = String(arg.event.extendedProps?.owner || '')
-        .trim()
-        .toLowerCase();
-    const me = String(currentUser?.email || '')
-        .trim()
-        .toLowerCase();
-    const isMine = Boolean(me && ownerEmail && ownerEmail === me);
-    const type = arg.event.extendedProps?.type || 'reservation';
-
-    const inscritsRaw = arg.event.extendedProps?.inscrits;
-    const inscritsList = Array.isArray(inscritsRaw)
-        ? inscritsRaw.map((x) => String(x).trim().toLowerCase()).filter(Boolean)
-        : typeof inscritsRaw === 'string'
-          ? String(inscritsRaw)
-                .split(/[,;]/)
-                .map((x) => x.trim().toLowerCase())
-                .filter(Boolean)
-          : [];
-    const amInscribedInCours = Boolean(me && inscritsList.includes(me));
-
-    let colorClass = 'event-slot-default';
-    if (type === 'fermeture') {
-        colorClass = 'event-fermeture';
-    } else if (type === 'cours' || type === 'maintenance') {
-        colorClass = amInscribedInCours || isMine ? 'event-travail-mine' : 'event-cours';
-    } else if (type === 'concert') {
-        colorClass = 'event-concert';
-    } else if (type === 'autre') {
-        colorClass = 'event-autre';
-    } else if (type === 'reservation') {
-        colorClass = isMine ? 'event-travail-mine' : 'event-travail-other';
-    } else {
-        // Repli : si un type inconnu arrive, l’aligner sur la logique Travail.
-        colorClass = isMine ? 'event-travail-mine' : 'event-travail-other';
-    }
+    const colorClass = getPlanningEventColorClass(arg.event, currentUser);
 
     const formatTime = (date) => formatTimeFr24(date);
 
@@ -1184,11 +1312,6 @@ export function getEventContent(arg, currentUser) {
         timeLine = timeTextFc.replace(/\s*-\s*/g, ' – ');
     } else {
         timeLine = `${formatTime(start)} – ${formatTime(endDisplay)}`;
-    }
-
-    const gw = String(arg.event.extendedProps?.planningGabaritWeekType || '').trim().toUpperCase();
-    if (type === 'cours' && (gw === 'A' || gw === 'B')) {
-        timeLine = `${timeLine} (${gw})`;
     }
 
     const showTitleRow = Boolean(title) && (!sameCalendarDay || durationMin > 30);
@@ -1339,27 +1462,76 @@ function eventRangeForOverlap(ev) {
     return { start: s, end: e };
 }
 
+/** Lecture sûre : EventApi FC obsolète après refetch → getter extendedProps peut lever. */
+function safeEventExtendedProps(eventRef) {
+    if (!eventRef) return null;
+    try {
+        const xp = eventRef.extendedProps;
+        return xp && typeof xp === 'object' ? xp : null;
+    } catch {
+        return null;
+    }
+}
+
+function safeEventId(eventRef) {
+    if (!eventRef) return '';
+    try {
+        return eventRef.id != null ? String(eventRef.id).trim() : '';
+    } catch {
+        return '';
+    }
+}
+
+/** Réaligne reservationModalEventRef sur l’événement affiché après refetch / auto-save. */
+function syncReservationModalLiveEventRef() {
+    const cal = reservationModalCalendarRef;
+    if (!cal) return reservationModalEventRef;
+    const xp = safeEventExtendedProps(reservationModalEventRef);
+    const canon = String(xp?.planningCanonicalId || safeEventId(reservationModalEventRef) || '').trim();
+    return refreshReservationModalEventRef(cal, reservationModalEventRef, canon);
+}
+
 /**
  * Après refetch grille, la modale peut encore référencer le créneau optimiste supprimé (id FC interne ≠ uuid base).
  * Retrouve l’instance affichée pour exclusion au chevauchement et pour l’upsert (planningCanonicalId).
  * @returns {import('@fullcalendar/core').EventApi | null}
  */
 function resolveLivePlanningEventRef(calendar, eventRef) {
-    if (!eventRef || !calendar?.getEvents) return eventRef;
-    const id = eventRef.id != null ? String(eventRef.id).trim() : '';
-    if (id && typeof calendar.getEventById === 'function') {
-        const byId = calendar.getEventById(id);
-        if (byId) return byId;
+    if (!eventRef || !calendar?.getEvents) return null;
+    let id = '';
+    try {
+        id = eventRef.id != null ? String(eventRef.id).trim() : '';
+    } catch {
+        return null;
     }
-    const canon = String(eventRef.extendedProps?.planningCanonicalId || '').trim();
+    if (id && typeof calendar.getEventById === 'function') {
+        try {
+            const byId = calendar.getEventById(id);
+            if (byId) return byId;
+        } catch {
+            /* référence FC obsolète après refetch */
+        }
+    }
+    let canon = '';
+    let owner = '';
+    try {
+        canon = String(eventRef.extendedProps?.planningCanonicalId || '').trim();
+        owner = String(eventRef.extendedProps?.owner || '').trim().toLowerCase();
+    } catch {
+        return null;
+    }
     if (canon) {
         for (const ev of calendar.getEvents()) {
             if (String(ev.extendedProps?.planningCanonicalId || '').trim() === canon) return ev;
         }
     }
-    const r0 = eventRangeForOverlap(eventRef);
-    const owner = String(eventRef.extendedProps?.owner || '').trim().toLowerCase();
-    if (!r0 || !owner) return eventRef;
+    let r0 = null;
+    try {
+        r0 = eventRangeForOverlap(eventRef);
+    } catch {
+        return null;
+    }
+    if (!r0 || !owner) return null;
     const s0 = r0.start.getTime();
     const e0 = r0.end.getTime();
     for (const ev of calendar.getEvents()) {
@@ -1369,20 +1541,44 @@ function resolveLivePlanningEventRef(calendar, eventRef) {
         if (!r) continue;
         if (r.start.getTime() === s0 && r.end.getTime() === e0) return ev;
     }
-    return eventRef;
+    return null;
+}
+
+/** Met à jour la référence modale / app après sauvegarde ou refetch. */
+function refreshReservationModalEventRef(calendar, eventRef, canonicalId = '') {
+    const xp = safeEventExtendedProps(eventRef);
+    const canon = String(
+        canonicalId || xp?.planningCanonicalId || safeEventId(eventRef) || ''
+    ).trim();
+    let next = eventRef ? resolveLivePlanningEventRef(calendar, eventRef) : null;
+    if (!next && canon && calendar?.getEvents) {
+        for (const ev of calendar.getEvents()) {
+            if (String(ev.extendedProps?.planningCanonicalId || '').trim() === canon) {
+                next = ev;
+                break;
+            }
+        }
+    }
+    if (next) {
+        reservationModalEventRef = next;
+        reservationAutoSaveDeps?.setEvent?.(next);
+    }
+    return next;
 }
 
 function isSameFcEvent(a, b) {
     if (!a || !b) return false;
     if (a === b) return true;
-    const ca = String(a.extendedProps?.planningCanonicalId || '').trim();
-    const cb = String(b.extendedProps?.planningCanonicalId || '').trim();
+    const xa = safeEventExtendedProps(a);
+    const xb = safeEventExtendedProps(b);
+    const ca = String(xa?.planningCanonicalId || '').trim();
+    const cb = String(xb?.planningCanonicalId || '').trim();
     if (ca && cb && ca === cb) return true;
-    const ga = String(a.extendedProps?.googleEventId || '').trim();
-    const gb = String(b.extendedProps?.googleEventId || '').trim();
+    const ga = String(xa?.googleEventId || '').trim();
+    const gb = String(xb?.googleEventId || '').trim();
     if (ga && gb && ga === gb) return true;
-    const ida = a.id != null ? String(a.id) : '';
-    const idb = b.id != null ? String(b.id) : '';
+    const ida = safeEventId(a);
+    const idb = safeEventId(b);
     return Boolean(ida && idb && ida === idb);
 }
 
@@ -1535,6 +1731,8 @@ function selectedDowSet() {
 }
 
 function getReservationMotifFromForm(currentUser, eventRef = null) {
+    const lockedType = reservationSlotTypeLockedFromEvent(currentUser, eventRef);
+    if (lockedType) return slotTypeToMotif(lockedType);
     const sel = document.getElementById('event-motif-select');
     const allowed = allowedMotifsForReservationModal(currentUser, eventRef);
     const fallbackMotif =
@@ -1728,6 +1926,35 @@ function setSelectOptions(selectEl, values, preferred) {
     return keep;
 }
 
+function endSelectInstantOnDay(dateYmd, hhmm) {
+    const d = new Date(`${dateYmd}T${hhmm}:00`);
+    return Number.isNaN(d.getTime()) ? NaN : d.getTime();
+}
+
+/**
+ * Heure de fin affichée : conserve la fin si elle reste valide ; sinon début + durée initiale, puis repli 30 min.
+ * @param {Date} startAt
+ * @param {string[]} endChoices
+ * @param {string} preferredEndHint valeur courante du select fin
+ * @param {number} initialDurationMs
+ */
+function pickReservationEndTime(startAt, endChoices, preferredEndHint, initialDurationMs) {
+    const dateYmd = startAt.toLocaleDateString('en-CA');
+    const startMs = startAt.getTime();
+    const prefMs = preferredEndHint ? endSelectInstantOnDay(dateYmd, preferredEndHint) : NaN;
+    if (Number.isFinite(prefMs) && prefMs > startMs && endChoices.includes(preferredEndHint)) {
+        return preferredEndHint;
+    }
+    const targetHhmm = formatTimeForSelect(new Date(startMs + initialDurationMs));
+    if (endChoices.includes(targetHhmm)) return targetHhmm;
+    let best = '';
+    for (const c of endChoices) {
+        const t = endSelectInstantOnDay(dateYmd, c);
+        if (Number.isFinite(t) && t > startMs) best = c;
+    }
+    return best || endChoices[0] || '';
+}
+
 function injectEditingEventReservationTimes(eventRef, dateValue, startChoices, startAt, endChoices) {
     if (!eventRef?.start || !eventRef?.end) return;
     const es = eventRef.start instanceof Date ? eventRef.start : new Date(eventRef.start);
@@ -1780,19 +2007,25 @@ function syncReservationModalTimeOptions(calendar, eventRef) {
         }
     }
     injectEditingEventReservationTimes(eventRef, dateValue, startChoices, null, null);
-    let preferredStart = startEl.value;
-    let preferredEndHint = endEl.value;
-    if (eventRef?.start) {
+    const userPickedStart = String(startEl.value || '').trim();
+    const userPickedEnd = String(endEl.value || '').trim();
+    if (userPickedStart && !startChoices.includes(userPickedStart)) {
+        startChoices.push(userPickedStart);
+        startChoices.sort();
+    }
+    let preferredStart = userPickedStart;
+    let preferredEndHint = userPickedEnd;
+    if (!preferredStart && eventRef?.start) {
         const es = eventRef.start instanceof Date ? eventRef.start : new Date(eventRef.start);
         if (!Number.isNaN(es.getTime()) && es.toLocaleDateString('en-CA') === dateValue) {
             preferredStart = formatTimeForSelect(es);
         }
-        if (eventRef.end) {
-            const ee = eventRef.end instanceof Date ? eventRef.end : new Date(eventRef.end);
-            const endDisp = selectionEndDisplay(ee);
-            if (endDisp.toLocaleDateString('en-CA') === dateValue) {
-                preferredEndHint = formatTimeForSelect(endDisp);
-            }
+    }
+    if (!preferredEndHint && eventRef?.end) {
+        const ee = eventRef.end instanceof Date ? eventRef.end : new Date(eventRef.end);
+        const endDisp = selectionEndDisplay(ee);
+        if (endDisp.toLocaleDateString('en-CA') === dateValue) {
+            preferredEndHint = formatTimeForSelect(endDisp);
         }
     }
     const selectedStart = setSelectOptions(startEl, startChoices, preferredStart);
@@ -1806,21 +2039,18 @@ function syncReservationModalTimeOptions(calendar, eventRef) {
         new Date(startAt.getTime() + 30 * 60 * 1000),
         new Date(Math.min(boundary.getTime(), dayMax.getTime()))
     );
-    injectEditingEventReservationTimes(eventRef, dateValue, startChoices, startAt, endChoices);
-    const plusOneHour = formatTimeForSelect(new Date(startAt.getTime() + 60 * 60 * 1000));
-    let preferredEnd = endChoices.includes(preferredEndHint)
-        ? preferredEndHint
-        : endChoices.includes(plusOneHour)
-          ? plusOneHour
-          : endChoices[0] || '';
-    if (eventRef?.end) {
-        const ee = eventRef.end instanceof Date ? eventRef.end : new Date(eventRef.end);
-        const endDisp = selectionEndDisplay(ee);
-        if (endDisp.toLocaleDateString('en-CA') === dateValue) {
-            const ev = formatTimeForSelect(endDisp);
-            if (endChoices.includes(ev)) preferredEnd = ev;
-        }
+    if (userPickedEnd && !endChoices.includes(userPickedEnd)) {
+        endChoices.push(userPickedEnd);
+        endChoices.sort();
     }
+    injectEditingEventReservationTimes(eventRef, dateValue, startChoices, startAt, endChoices);
+    const currentEndHint = String(endEl.value || preferredEndHint || '').trim();
+    const preferredEnd = pickReservationEndTime(
+        startAt,
+        endChoices,
+        currentEndHint,
+        reservationModalInitialDurationMs
+    );
     setSelectOptions(endEl, endChoices, preferredEnd);
 }
 
@@ -2018,24 +2248,11 @@ function applyReservationEditorShellForRole(
     if (r === 'eleve') {
         editorOwnerEl?.classList.add('hidden');
         wrapTitle?.classList.remove('hidden');
-        wrapMotif?.classList.add('hidden');
-        hintFerm?.classList.add('hidden');
     } else {
         editorOwnerEl?.classList.add('hidden');
         wrapTitle?.classList.remove('hidden');
-        const ownerIsEleve = owner.ownerRole === 'eleve';
-        const currentRole = normalizeRole(currentUser?.role);
-        if (event && ownerIsEleve && (currentRole === 'admin' || currentRole === 'prof')) {
-            wrapMotif?.classList.add('hidden');
-        } else {
-            wrapMotif?.classList.remove('hidden');
-        }
-        if (r === 'admin') {
-            hintFerm?.classList.remove('hidden');
-        } else {
-            hintFerm?.classList.add('hidden');
-        }
     }
+    applyReservationMotifVisibility(currentUser, event, true);
 }
 
 /** Durée d’un pas de snap sur la grille (ex. 00:30:00 → 30 min). */
@@ -2367,6 +2584,7 @@ export async function quickCreateFromDateClick(calendar, clickDate, currentUser,
  * propose une fin cohérente avec les occupations (max 1 h si tout est libre).
  */
 export async function openModal(start, end, event, currentUser, calendarForClip = null) {
+    document.dispatchEvent(new CustomEvent('planning-close-drawer-request'));
     const modal = document.getElementById('modal_reservation');
     if (!modal) return;
     const isPastSlot = Boolean(event && isReservationNonEditablePast(currentUser, event));
@@ -2486,6 +2704,10 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
 
     if (dateEl instanceof HTMLInputElement) dateEl.value = dateStartVal;
     syncReservationDateWeekdayLabel();
+    reservationModalInitialDurationMs = Math.max(
+        30 * 60 * 1000,
+        endInstant.getTime() - startInstant.getTime()
+    );
     setSelectTime(startEl, startInstant);
     setSelectTime(endEl, endInstant);
     if (calendarForClip?.getEvents) {
@@ -2508,15 +2730,17 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
             'change',
             () => {
                 syncReservationDateWeekdayLabel();
-                syncReservationModalTimeOptions(calendarForClip, event || null);
+                syncReservationModalTimeOptions(calendarForClip, reservationModalEventRef);
             },
             { signal: modalSignal }
         );
-        startEl?.addEventListener(
-            'change',
-            () => syncReservationModalTimeOptions(calendarForClip, event || null),
-            { signal: modalSignal }
-        );
+        const onTimeFieldChange = () => {
+            syncReservationModalTimeOptions(calendarForClip, reservationModalEventRef);
+        };
+        startEl?.addEventListener('change', onTimeFieldChange, { signal: modalSignal });
+        startEl?.addEventListener('input', onTimeFieldChange, { signal: modalSignal });
+        endEl?.addEventListener('change', onTimeFieldChange, { signal: modalSignal });
+        endEl?.addEventListener('input', onTimeFieldChange, { signal: modalSignal });
     } else {
         dateEl?.addEventListener('change', () => syncReservationDateWeekdayLabel(), { signal: modalSignal });
     }
@@ -2584,19 +2808,32 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         const cb = document.getElementById(`recur-dow-${i}`);
         if (cb) cb.disabled = !canEditEvent;
     }
+    applyReservationMotifVisibility(currentUser, event, canEditEvent);
 
     document.getElementById('btn-save')?.classList.add('hidden');
+    const footerWrap = document.getElementById('reservation-modal-footer');
     const actionsWrap = document.getElementById('reservation-form-actions');
     const btnCancel = document.getElementById('btn-reservation-cancel');
     const btnSaveFooter = document.getElementById('btn-reservation-save');
+    const btnCloseReadOnly = document.getElementById('btn-reservation-close');
+    const isReadOnlyView = Boolean(event) && !canEditEvent;
+    if (footerWrap) {
+        const showFooter = canEditEvent || isReadOnlyView;
+        footerWrap.classList.toggle('hidden', !showFooter);
+        footerWrap.setAttribute('aria-hidden', showFooter ? 'false' : 'true');
+    }
     if (actionsWrap) {
-        actionsWrap.classList.toggle('hidden', !canEditEvent);
-        actionsWrap.setAttribute('aria-hidden', canEditEvent ? 'false' : 'true');
+        actionsWrap.classList.toggle('hidden', isReadOnlyView);
+        actionsWrap.setAttribute('aria-hidden', isReadOnlyView ? 'true' : 'false');
+    }
+    if (btnCloseReadOnly instanceof HTMLButtonElement) {
+        btnCloseReadOnly.classList.toggle('hidden', !isReadOnlyView);
     }
     if (btnCancel instanceof HTMLButtonElement) btnCancel.disabled = !canEditEvent;
     if (btnSaveFooter instanceof HTMLButtonElement) btnSaveFooter.disabled = !canEditEvent;
     const showDelete =
         Boolean(event) &&
+        canEditEvent &&
         canCurrentUserEditEventIgnoringPast(currentUser, event) &&
         (!isPastSlot || meRoleOpen === 'admin' || meRoleOpen === 'prof');
     document.getElementById('reservation-delete-wrap')?.classList.toggle('hidden', !showDelete);
@@ -2610,29 +2847,17 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         'event-date-start',
         'event-start',
         'event-end',
-        'event-motif-select',
         'event-title-input'
     ];
+    if (!shouldHideReservationMotifForPrivilegedEditor(currentUser, event)) {
+        autoFields.push('event-motif-select');
+    }
     for (const fid of autoFields) {
         const el = document.getElementById(fid);
         el?.addEventListener('change', () => {
             if (canEditEvent) scheduleReservationAutoSave();
         }, { signal: modalSignal });
     }
-
-    const btnDelete = document.getElementById('btn-delete');
-    btnDelete?.addEventListener(
-        'click',
-        (e) => {
-            e.preventDefault();
-            if (!event || !calendarForClip || !currentUser) return;
-            if (!window.confirm('Supprimer ce créneau ?')) return;
-            void deleteReservation(calendarForClip, event, currentUser)
-                .then(() => modal.close())
-                .catch((err) => console.error(err));
-        },
-        { signal: modalSignal }
-    );
 
     btnCancel?.addEventListener(
         'click',
@@ -2649,6 +2874,15 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         (e) => {
             e.preventDefault();
             void dismissReservationRouteDialog({ save: true });
+        },
+        { signal: modalSignal }
+    );
+    btnCloseReadOnly?.addEventListener(
+        'click',
+        (e) => {
+            e.preventDefault();
+            if (!reservationModalMayCloseNow()) return;
+            modal.close();
         },
         { signal: modalSignal }
     );
@@ -2856,9 +3090,22 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         showToast('Veuillez vous connecter pour enregistrer une réservation.', 'error');
         return;
     }
-    const liveEventRef = currentEventRef
-        ? resolveLivePlanningEventRef(calendar, currentEventRef)
-        : null;
+    let eventRef = currentEventRef;
+    if (calendar && eventRef) {
+        const synced = refreshReservationModalEventRef(calendar, eventRef);
+        if (synced) {
+            eventRef = synced;
+            if (currentEventRef === reservationModalEventRef) {
+                reservationModalEventRef = synced;
+            }
+        }
+    }
+    const liveEventRef = eventRef ? resolveLivePlanningEventRef(calendar, eventRef) : null;
+    const xpStale = safeEventExtendedProps(eventRef);
+    const staleCanonicalId =
+        !liveEventRef && xpStale
+            ? String(xpStale.planningCanonicalId || safeEventId(eventRef) || '').trim()
+            : '';
     if (liveEventRef && isReservationNonEditablePast(currentUser, liveEventRef)) {
         showToast('Les créneaux passés ne sont pas modifiables.', 'error');
         return;
@@ -2880,6 +3127,10 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     const title = getReservationTextTitleFromForm(currentUser, motif);
     const slotOwnerEmail = getReservationSlotOwnerEmail(currentUser, liveEventRef);
     const slotType = motifToSlotType(motif);
+    const lockedDbSlotType = reservationSlotTypeLockedFromEvent(
+        currentUser,
+        liveEventRef || eventRef
+    );
     const recurOn =
         isPrivilegedUser(currentUser) &&
         document.getElementById('event-recurring')?.checked &&
@@ -3054,7 +3305,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         showToast('Impossible de résoudre le compte du propriétaire du créneau.', 'error');
         return;
     }
-    const dbSlotType = motifToPlanningDbSlotType(motif);
+    const dbSlotType = lockedDbSlotType || motifToPlanningDbSlotType(motif);
     const rEleveChk = normalizeRole(currentUser?.role);
     if (rEleveChk === 'eleve' && dbSlotType === 'travail perso') {
         await fetchOrganSchoolSettings();
@@ -3083,7 +3334,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     const endIso = new Date(endStr).toISOString();
     const canonicalExisting = liveEventRef
         ? String(liveEventRef.extendedProps?.planningCanonicalId || '').trim()
-        : '';
+        : staleCanonicalId;
 
     const tplLineId =
         liveEventRef && canonicalExisting
@@ -3195,6 +3446,11 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
             liveEventRef.setExtendedProp('inscrits', localInscritsEmails);
         }
     }
+    refreshReservationModalEventRef(
+        calendar,
+        liveEventRef || eventRef,
+        ur.id || canonicalExisting || staleCanonicalId
+    );
     const oiBeforeRefetch =
         liveEventRef && prevSnapshot ? ownerInfoFromEvent(liveEventRef, currentUser) : null;
     if (prevSnapshot && oiBeforeRefetch) {
@@ -3232,6 +3488,11 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         }
         try {
             await refetchPlanningGrid(calendar);
+            refreshReservationModalEventRef(
+                calendar,
+                reservationModalEventRef,
+                ur.id || canonicalExisting || staleCanonicalId
+            );
         } catch (e) {
             console.error(e);
         } finally {
@@ -3247,7 +3508,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
 
 export async function deleteReservation(calendar, currentEventRef, currentUser) {
     if (deleteReservationInFlight || saveReservationInFlight) return;
-    if (!currentEventRef || !confirm('Supprimer cette réservation ?')) return;
+    if (!currentEventRef) return;
     if (!currentUser?.email) {
         showToast('Connectez-vous pour supprimer.', 'error');
         return;
