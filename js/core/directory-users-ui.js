@@ -80,13 +80,13 @@ function buildDirectoryContactColumn(r) {
             const a = document.createElement('a');
             a.href = `mailto:${encodeURIComponent(line)}`;
             a.className =
-                'directory-user-mailto-link text-[11px] sm:text-xs font-medium text-sky-700 hover:underline break-all leading-snug';
+                'directory-user-mailto-link text-[11px] sm:text-xs font-medium text-slate-900 hover:underline break-all leading-snug';
             a.textContent = line;
             col.appendChild(a);
         } else {
             const p = document.createElement('p');
             p.className =
-                'text-[11px] sm:text-xs text-slate-700 dark:text-slate-200 m-0 break-words leading-snug';
+                'text-[11px] sm:text-xs text-slate-900 m-0 break-words leading-snug';
             p.style.overflowWrap = 'anywhere';
             p.textContent = line;
             col.appendChild(p);
@@ -180,7 +180,7 @@ function buildPrivilegedUserCard(r, opts) {
         'directory-user-card__identity min-w-0 self-stretch flex flex-col justify-center pr-2';
     const nameP = document.createElement('p');
     nameP.className =
-        'font-semibold text-slate-900 dark:text-slate-100 leading-snug m-0 break-words text-[13px]';
+        'font-semibold text-slate-900 leading-snug m-0 break-words text-[13px]';
     nameP.style.overflowWrap = 'anywhere';
     nameP.textContent = directoryDisplayName(r);
     const roleP = document.createElement('p');
@@ -285,7 +285,7 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
             identity.className = 'directory-user-card__identity min-w-0 self-stretch flex flex-col justify-center pr-2';
             const nameEl = document.createElement('p');
             nameEl.className =
-                'font-semibold text-slate-900 dark:text-slate-100 leading-snug m-0 break-words';
+                'font-semibold text-slate-900 leading-snug m-0 break-words';
             nameEl.style.overflowWrap = 'anywhere';
             nameEl.textContent = directoryDisplayName(r);
             identity.appendChild(nameEl);

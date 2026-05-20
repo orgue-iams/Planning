@@ -15,17 +15,23 @@ function supportEmail() {
     return String(s?.planning_error_notify_email ?? '').trim();
 }
 
+function setDrawerHelpView(active) {
+    document.getElementById('planning-app-drawer')?.classList.toggle('planning-app-drawer--help-view', active);
+}
+
 function showHelpPanel() {
     document.getElementById('planning-drawer-main-scroll')?.classList.add('hidden');
     const help = document.getElementById('planning-drawer-help-panel');
     help?.classList.remove('hidden');
     help?.setAttribute('aria-hidden', 'false');
+    setDrawerHelpView(true);
 }
 
 export function showMainDrawerPanel() {
     document.getElementById('planning-drawer-help-panel')?.classList.add('hidden');
     document.getElementById('planning-drawer-help-panel')?.setAttribute('aria-hidden', 'true');
     document.getElementById('planning-drawer-main-scroll')?.classList.remove('hidden');
+    setDrawerHelpView(false);
 }
 
 function refreshHelpContent() {

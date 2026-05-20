@@ -48,6 +48,20 @@
     transition: none !important;
 }
 
+#planning-app-drawer.planning-app-drawer--help-view .planning-drawer__topbar {
+    display: none !important;
+}
+
+#planning-drawer-help-panel.planning-drawer__scroll {
+    padding-top: 0.35rem;
+}
+
+.planning-drawer__block--help-head {
+    border-top: 0;
+    margin-top: 0;
+    padding-top: 0;
+}
+
 .planning-drawer__topbar {
     flex: 0 0 auto;
     display: flex;
@@ -180,14 +194,43 @@
     border-color: rgb(148 163 184);
 }
 
-.profile-agendas-section .planning-drawer__agenda-line {
-    align-items: center;
+.planning-drawer__agenda-entry {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+    width: 100%;
+    margin-top: 0.5rem;
+}
+
+.planning-drawer__agenda-entry-label {
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: rgb(30 41 59);
+    word-break: break-word;
+}
+
+.planning-drawer__agenda-entry-kind {
+    font-weight: 700;
+}
+
+.planning-drawer__agenda-entry-name {
+    font-weight: 600;
+}
+
+[data-theme='dark'] .planning-drawer__agenda-entry-label {
+    color: rgb(241 245 249);
+}
+
+.profile-agendas-section .planning-drawer__agenda-entry {
+    align-items: flex-start;
 }
 
 .profile-agendas-section .planning-drawer__agenda-copy-btn {
     max-width: none;
     min-width: 6.5rem;
     text-align: center;
+    align-self: flex-start;
 }
 
 .planning-drawer__profile-chip-text {
@@ -252,10 +295,32 @@
     margin: -0.15rem 0 0.45rem;
 }
 
+/* Mes prochains cours (tiroir) : cartes alignées à gauche, largeur max commune. */
+.planning-drawer__next-cours {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.55rem;
+    padding-inline: 0.65rem;
+    box-sizing: border-box;
+}
+
+.planning-drawer__next-cours .profile-gabarit-cours-card,
+#profile-cours-list.planning-drawer__next-cours .profile-gabarit-cours-card {
+    width: min(22rem, calc(100% - 1.4rem));
+    margin-inline: 0;
+    box-sizing: border-box;
+}
+
 .planning-drawer__next-cours .event-box.st-slot-card,
 #profile-cours-list .event-box.st-slot-card {
     background: var(--slot-bg-soft);
     border-color: var(--slot-bg-strong);
+}
+
+.planning-drawer__next-cours .event-cours-enrolled.st-slot-card,
+#profile-cours-list .event-cours-enrolled.st-slot-card {
+    border-color: #61c71b !important;
 }
 
 .gabarit-cours-card--slot-text,
@@ -264,6 +329,18 @@
 .gabarit-cours-card--slot-text .st-ro-prof,
 .gabarit-cours-card--slot-text .st-slot-card__left {
     color: inherit;
+}
+
+/* Cartes cours : jour + titre en gras (tiroir, profil, semaines types). */
+.gabarit-cours-card__day,
+.gabarit-cours-card__title,
+.gabarit-cours-card--slot-text .gabarit-cours-card__day,
+.gabarit-cours-card--slot-text .gabarit-cours-card__title,
+.st-slot-card--eleve-view .st-ro-date,
+.st-slot-card--eleve-view .st-ro-headline,
+.st-slot-card .st-ro-period > .gabarit-cours-card__day,
+.st-slot-card .st-ro-headline {
+    font-weight: 700;
 }
 
 [data-theme='dark'] .gabarit-cours-card--slot-text.event-box {
@@ -277,18 +354,40 @@
     color: #0f172a !important;
 }
 
-/* Grille 3 colonnes (comme semaines A/B) même si classes Tailwind arbitraires absentes du build */
+/* Grille 3 colonnes + séparateurs verticaux (tiroir « prochains cours », profil « Mes cours »). */
 .planning-drawer__next-cours .st-slot-card.st-slot-card--eleve-view,
-#profile-cours-list .profile-gabarit-cours-card.st-slot-card--eleve-view {
+#profile-cours-list.planning-drawer__next-cours .st-slot-card.st-slot-card--eleve-view {
     display: grid;
-    grid-template-columns: minmax(5rem, 0.95fr) minmax(0, 1.1fr) minmax(0, 0.95fr);
-    column-gap: 0.5rem;
+    grid-template-columns: minmax(6.5rem, auto) minmax(0, 1fr) minmax(0, max-content);
+    column-gap: 0;
     align-items: stretch;
+    padding: 0.6rem 0.2rem !important;
 }
 
-.planning-drawer__next-cours .st-slot-card__prof .st-ro-prof,
-#profile-cours-list .st-slot-card__prof .st-ro-prof {
-    word-break: break-word;
+.planning-drawer__next-cours .st-slot-card__left,
+.planning-drawer__next-cours .st-slot-card__right,
+#profile-cours-list.planning-drawer__next-cours .st-slot-card__left,
+#profile-cours-list.planning-drawer__next-cours .st-slot-card__right {
+    padding: 0.28rem 0.65rem;
+    border-right: 1px solid rgb(15 23 42 / 0.14);
+    min-width: 0;
+}
+
+.planning-drawer__next-cours .st-slot-card__prof,
+#profile-cours-list.planning-drawer__next-cours .st-slot-card__prof {
+    padding: 0.28rem 0.65rem 0.28rem 0.55rem;
+    min-width: 0;
+    overflow: visible;
+}
+
+.planning-drawer__next-cours .st-ro-time,
+.planning-drawer__next-cours .st-ro-prof,
+#profile-cours-list.planning-drawer__next-cours .st-ro-time,
+#profile-cours-list.planning-drawer__next-cours .st-ro-prof {
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+    word-break: normal;
 }
 
 [data-theme='dark'] .planning-drawer__hint {

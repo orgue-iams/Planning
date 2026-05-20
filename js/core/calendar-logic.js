@@ -4,6 +4,7 @@
  */
 
 import { showPersistentToast, showToast } from '../utils/toast.js';
+import { setStudentsLineWithUsersIcon } from '../utils/template-cours-card-ui.js';
 import { formatTimeFr24, formatWeekdayDayTimeFr24 } from '../utils/time-helpers.js';
 import { getAccessToken, isBackendAuthConfigured, isPrivilegedUser } from './auth-logic.js';
 import { bridgeDeleteEvent, invokeCalendarBridge } from './calendar-bridge.js';
@@ -321,7 +322,9 @@ function refreshReservationInscritsSummary() {
     const labels = [...multi.selectedOptions]
         .map((o) => String(o.textContent || '').trim())
         .filter(Boolean);
-    summary.textContent = labels.length ? labels.join(', ') : 'Aucun élève (optionnel)';
+    setStudentsLineWithUsersIcon(summary, labels.length ? labels.join(', ') : '', {
+        emptyFallback: 'Aucun élève (optionnel)'
+    });
 }
 
 function reservationModalIsCoursContext(eventRef, motifSelect) {
@@ -757,6 +760,12 @@ export function fcDragResizePropsForEventStart(startLike, currentUser) {
 function canCurrentUserEditEventIgnoringPast(currentUser, event) {
     if (!currentUser?.email || !event) return false;
     const meRole = normalizeRole(currentUser.role);
+    const xp = safeEventExtendedProps(event);
+    const dbType = String(xp?.planningDbSlotType || '').trim().toLowerCase();
+    const typ = String(xp?.type || '').trim().toLowerCase();
+    if (dbType === 'fermeture' || typ === 'fermeture') {
+        return meRole === 'admin';
+    }
     if (meRole === 'admin') return true;
 
     const owner = ownerInfoFromEvent(event, currentUser);
@@ -1263,9 +1272,9 @@ function inscritEmailsFromExtendedProps(xp) {
  * @param {object | null} currentUser
  */
 export function isEleveEnrolledInCoursEvent(eventLike, currentUser) {
-    if (normalizeRole(currentUser?.role) !== 'eleve') return false;
     const type = String(eventLike?.extendedProps?.type || '').toLowerCase();
-    if (type !== 'cours') return false;
+    const dbSlot = String(eventLike?.extendedProps?.planningDbSlotType || '').toLowerCase();
+    if (type !== 'cours' && dbSlot !== 'cours') return false;
     const me = String(currentUser?.email || '')
         .trim()
         .toLowerCase();
@@ -1286,15 +1295,17 @@ export function getPlanningEventColorClass(eventLike, currentUser) {
         .trim()
         .toLowerCase();
     const isMine = Boolean(me && ownerEmail && ownerEmail === me);
-    const type = eventLike?.extendedProps?.type || 'reservation';
-    if (type === 'fermeture') return 'event-fermeture';
-    if (type === 'cours' && isEleveEnrolledInCoursEvent(eventLike, currentUser)) {
+    const type = String(eventLike?.extendedProps?.type || 'reservation').toLowerCase();
+    const dbSlot = String(eventLike?.extendedProps?.planningDbSlotType || '').toLowerCase();
+    const isCoursSlot = type === 'cours' || type === 'maintenance' || dbSlot === 'cours';
+
+    if (type === 'fermeture' || dbSlot === 'fermeture') return 'event-fermeture';
+    if (isCoursSlot && isEleveEnrolledInCoursEvent(eventLike, currentUser)) {
         return 'event-cours-enrolled';
     }
-    if (type === 'cours' || type === 'maintenance') return 'event-cours';
+    if (isCoursSlot) return 'event-cours';
     if (type === 'concert') return 'event-concert';
     if (type === 'autre') return 'event-autre';
-    const dbSlot = String(eventLike?.extendedProps?.planningDbSlotType || '').toLowerCase();
     if (dbSlot === 'travail perso' || type === 'reservation') {
         return isMine ? 'event-travail-mine' : 'event-travail-other';
     }
@@ -1312,7 +1323,6 @@ export function getEventContent(arg, currentUser) {
     const durationMin = Math.round(durationMs / (1000 * 60));
 
     const colorClass = getPlanningEventColorClass(arg.event, currentUser);
-    const showEnrolledBadge = isEleveEnrolledInCoursEvent(arg.event, currentUser);
 
     const formatTime = (date) => formatTimeFr24(date);
 
@@ -1345,13 +1355,9 @@ export function getEventContent(arg, currentUser) {
     const pastCls = pastReadonly ? ' event-box--past-readonly' : '';
     const aria = isMirror ? ' aria-hidden="true"' : '';
 
-    const enrolledBadge = showEnrolledBadge
-        ? '<span class="event-enrolled-badge" title="Vous êtes inscrit à ce cours" aria-hidden="true"></span>'
-        : '';
-
     let innerHTML = `
         <div class="event-box flex flex-col h-full w-full ${colorClass}${mirrorCls}${pastCls}"${aria}>
-            <div class="event-time event-time-fc">${enrolledBadge}${escapeHtml(timeLine)}</div>`;
+            <div class="event-time event-time-fc">${escapeHtml(timeLine)}</div>`;
     if (showTitleRow) {
         innerHTML += `
             <div class="event-title event-title-fc">${escapeHtml(title)}</div>`;
@@ -1652,8 +1658,15 @@ function findOverlappingCalendarEvent(calendar, rangeStart, rangeEnd, excludeEve
 function overlapToastMessage(conflict) {
     const t = String(conflict?.title || '').trim() || 'Créneau';
     const r = eventRangeForOverlap(conflict);
-    if (!r) return `Ce créneau chevauche une autre réservation : « ${t} ».`;
+    const xp = safeEventExtendedProps(conflict);
+    const isFerm =
+        String(xp?.type || '').toLowerCase() === 'fermeture' ||
+        String(xp?.planningDbSlotType || '').trim().toLowerCase() === 'fermeture';
     const tf = (d) => formatWeekdayDayTimeFr24(d);
+    if (isFerm && r) {
+        return `Période de fermeture « ${t} » (${tf(r.start)} – ${tf(r.end)}). Choisissez un autre horaire.`;
+    }
+    if (!r) return `Ce créneau chevauche une autre réservation : « ${t} ».`;
     return `Chevauchement avec « ${t} » (${tf(r.start)} – ${tf(r.end)}). Choisissez un autre horaire.`;
 }
 

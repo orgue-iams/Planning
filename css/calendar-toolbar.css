@@ -38,7 +38,7 @@
 }
 
 .calendar-toolbar__title-text {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-width: 0;
     max-width: 100%;
     text-align: center;
@@ -78,15 +78,24 @@
 .calendar-toolbar__right {
     flex: 0 0 auto;
     min-width: 0;
+    margin-left: auto;
 }
 
-/* Bouton « Auj. » et déclencheur de vue — plat, arrondi */
+.calendar-toolbar__nav-cluster {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}
+
+/* Boutons bandeau : bleu primaire (charte --planning-action-btn-*). */
 .cal-tb-pill {
     appearance: none;
-    border: 1px solid rgb(203 213 225);
+    border: 1px solid var(--planning-action-btn-border);
     margin: 0;
-    background: rgb(226 232 240);
-    color: #334155;
+    background: var(--planning-action-btn-bg);
+    color: var(--planning-action-btn-text);
     font-size: 0.8125rem;
     font-weight: 600;
     padding: 0.28rem 0.5rem;
@@ -98,13 +107,13 @@
 }
 
 .cal-tb-pill:hover {
-    background: rgb(59 130 246);
-    border-color: rgb(37 99 235);
-    color: #fff;
+    background: var(--planning-action-btn-bg-hover);
+    border-color: var(--planning-action-btn-border);
+    color: var(--planning-action-btn-text);
 }
 
 .cal-tb-pill:active {
-    background: rgb(37 99 235);
+    background: var(--planning-action-btn-bg-active);
 }
 
 .cal-tb-pill--view {
@@ -119,24 +128,17 @@
     font-size: 0.65rem;
 }
 
-/* Tablette / téléphone : navigation semaine par swipe (pas les chevrons). */
-@media (max-width: 1023px), (hover: none) and (pointer: coarse) {
-    .calendar-toolbar__nav-inline {
-        display: none !important;
-    }
-}
-
-/* Chevrons : pas de cadre, fond rond au survol */
+/* Chevrons ‹ › : même charte bleue que « Aujourd’hui ». */
 .cal-tb-nav {
     appearance: none;
-    border: 1px solid rgb(203 213 225);
+    border: 1px solid var(--planning-action-btn-border);
     margin: 0;
     padding: 0;
     width: 2rem;
     height: 2rem;
     border-radius: 9999px;
-    background: rgb(226 232 240);
-    color: #475569;
+    background: var(--planning-action-btn-bg);
+    color: var(--planning-action-btn-text);
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -146,19 +148,47 @@
 }
 
 .cal-tb-nav:hover {
-    background: rgb(59 130 246);
-    border-color: rgb(37 99 235);
-    color: #fff;
+    background: var(--planning-action-btn-bg-hover);
+    border-color: var(--planning-action-btn-border);
+    color: var(--planning-action-btn-text);
 }
 
 .cal-tb-nav:active {
-    background: rgb(37 99 235);
+    background: var(--planning-action-btn-bg-active);
 }
 
 .cal-tb-nav svg {
     display: block;
     width: 1.25rem;
     height: 1.25rem;
+}
+
+/* Menu hamburger : même bleu primaire que ‹ › / Aujourd’hui (--planning-action-btn-*). */
+#calendar-toolbar .calendar-toolbar__menu-btn,
+.planning-fc-corner-hud__menu-btn {
+    appearance: none;
+    border: 1px solid var(--planning-action-btn-border);
+    background: var(--planning-action-btn-bg);
+    color: var(--planning-action-btn-text);
+    -webkit-tap-highlight-color: transparent;
+}
+
+#calendar-toolbar .calendar-toolbar__menu-btn:hover,
+.planning-fc-corner-hud__menu-btn:hover {
+    background: var(--planning-action-btn-bg-hover);
+    border-color: var(--planning-action-btn-border);
+    color: var(--planning-action-btn-text);
+}
+
+#calendar-toolbar .calendar-toolbar__menu-btn:active,
+.planning-fc-corner-hud__menu-btn:active {
+    background: var(--planning-action-btn-bg-active);
+    border-color: var(--planning-action-btn-border);
+    color: var(--planning-action-btn-text);
+}
+
+#calendar-toolbar .calendar-toolbar__menu-btn svg {
+    color: currentColor;
 }
 
 .cal-view-dd {
@@ -253,10 +283,6 @@
     }
 }
 
-[data-theme='dark'] .calendar-toolbar__nav-cluster {
-    border-left-color: rgb(51 65 85) !important;
-}
-
 /*
  * Paysage étroit : menu + période + semaine A/B dans la cellule coin (axe) de l’en-tête FullCalendar.
  * Évite le doublon avec la barre d’outils (titre centré + bouton menu).
@@ -318,17 +344,9 @@
     margin: 0;
     padding: 0;
     border-radius: 0.45rem;
-    border: 1px solid rgb(203 213 225);
-    background: rgb(226 232 240);
-    color: rgb(51 65 85);
     cursor: pointer;
     touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
     pointer-events: auto;
-}
-
-.planning-fc-corner-hud__menu-btn:active {
-    background: rgb(203 213 225);
 }
 
 .planning-fc-corner-hud__menu-icon {
@@ -362,12 +380,6 @@
     font-weight: 700;
     color: #475569;
     text-transform: none;
-}
-
-[data-theme='dark'] .planning-fc-corner-hud__menu-btn {
-    background: rgb(51 65 85) !important;
-    border-color: rgb(71 85 105) !important;
-    color: rgb(226 232 240) !important;
 }
 
 [data-theme='dark'] .planning-fc-corner-hud__period {
@@ -447,10 +459,6 @@
 [data-theme='dark'] .calendar-toolbar__brand-btn:active {
     background: rgb(30 58 138 / 0.55) !important;
     border-color: rgb(59 130 246) !important;
-}
-
-.calendar-toolbar__nav-inline {
-    flex-shrink: 0;
 }
 
 .calendar-toolbar__click-chip {

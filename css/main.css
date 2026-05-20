@@ -283,20 +283,6 @@ textarea:disabled,
     -webkit-text-fill-color: rgb(241 245 249);
 }
 
-[data-theme='dark'] .cal-tb-pill,
-[data-theme='dark'] .cal-tb-nav {
-    background: rgb(51 65 85) !important;
-    border-color: rgb(71 85 105) !important;
-    color: rgb(248 250 252) !important;
-}
-
-[data-theme='dark'] .cal-tb-pill:hover,
-[data-theme='dark'] .cal-tb-nav:hover {
-    background: rgb(59 130 246) !important;
-    border-color: rgb(37 99 235) !important;
-    color: #fff !important;
-}
-
 [data-theme='dark'] .cal-view-dd__menu {
     background: rgb(30 41 59) !important;
     border-color: rgb(71 85 105) !important;

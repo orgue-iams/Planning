@@ -1,37 +1,50 @@
 /**
- * Périodes de fermetures (organ_school_settings.template_apply_closure_ranges).
+ * Menu Fermetures : vue synthétique sur les créneaux planning (slot_type = fermeture).
  */
-import { isAdmin, isProf } from './auth-logic.js';
+import { isAdmin } from './auth-logic.js';
 import { isBackendAuthConfigured } from './supabase-client.js';
-import {
-    fetchOrganSchoolSettings,
-    getOrganSchoolSettingsCached,
-    saveTemplateClosureRanges
-} from './organ-settings.js';
 import { getPlanningSessionUser } from './session-user.js';
 import { showToast } from '../utils/toast.js';
 import {
     openPlanningRouteFromDrawer,
     planningRouteTitle,
+    popPlanningRouteLevel,
     pushPlanningRouteLevel
 } from '../utils/planning-route-dialog.js';
-import { mountPlanningSwipeCard } from '../utils/planning-card-swipe.js';
+import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
+import {
+    deleteClosureRangeEvents,
+    findConflictsForClosureRange,
+    formatConflictLineFr,
+    loadClosureRangesFromPlanning,
+    saveClosureRangeToPlanning
+} from './fermetures-planning.js';
 
 let bound = false;
 
-/** @type {{ startYmd: string, endYmd: string, title?: string }[]} */
+/** @type {{ startYmd: string, endYmd: string, title?: string, eventIds: string[] }[]} */
 let closureRanges = [];
 
 /** @type {number | null} */
 let editingClosureIndex = null;
 
-let saveDebounce = null;
+/** @type {object[]} */
+let pendingConflicts = [];
 
-function canEditClosures(user) {
-    return isAdmin(user) || isProf(user);
+let closureSaveInFlight = false;
+
+/** @type {{ startYmd: string, endYmd: string, title?: string, eventIds: string[] }[] | null} */
+let closureRangesBeforeOptimistic = null;
+
+function canViewClosures(user) {
+    return Boolean(user?.email) && isBackendAuthConfigured();
 }
 
-/** @param {unknown} raw */
+function canEditClosures(user) {
+    return isAdmin(user);
+}
+
+/** Conservé pour compat (semaines types n’utilise plus les réglages JSON). */
 export function parseClosureRangesFromSettings(raw) {
     if (!Array.isArray(raw)) return [];
     const out = [];
@@ -41,7 +54,7 @@ export function parseClosureRangesFromSettings(raw) {
         const endYmd = String(item.endYmd || item.end || '').trim();
         const title = String(item.title || '').trim();
         if (startYmd && endYmd && endYmd >= startYmd) {
-            out.push({ startYmd, endYmd, ...(title ? { title } : {}) });
+            out.push({ startYmd, endYmd, ...(title ? { title } : {}), eventIds: [] });
         }
     }
     return out;
@@ -58,17 +71,84 @@ function formatFrRange(startYmd, endYmd) {
     return `${s.toLocaleDateString('fr-FR', opts)} → ${e.toLocaleDateString('fr-FR', opts)}`;
 }
 
+function todayYmdLocal() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function futureClosureRanges() {
+    const today = todayYmdLocal();
+    return closureRanges.filter((r) => String(r.endYmd || '') >= today);
+}
+
+function closureRangesOverlap(a, b) {
+    return String(a.endYmd) >= String(b.startYmd) && String(a.startYmd) <= String(b.endYmd);
+}
+
+function cloneClosureRanges(list) {
+    return (list || []).map((r) => ({
+        startYmd: r.startYmd,
+        endYmd: r.endYmd,
+        title: r.title,
+        eventIds: [...(r.eventIds || [])],
+        ...(r._optimistic ? { _optimistic: true } : {})
+    }));
+}
+
+/** Affiche tout de suite la période dans la liste (avant fin base / Google). */
+function applyOptimisticClosureRange(entry, prevIndex) {
+    closureRangesBeforeOptimistic = cloneClosureRanges(closureRanges);
+    const keep = closureRanges.filter((r, i) => {
+        if (prevIndex != null && prevIndex >= 0 && i === prevIndex) return false;
+        return !closureRangesOverlap(r, entry);
+    });
+    closureRanges = [
+        ...keep,
+        {
+            startYmd: entry.startYmd,
+            endYmd: entry.endYmd,
+            title: entry.title,
+            eventIds: [...(entry.eventIds || [])],
+            _optimistic: true
+        }
+    ].sort((a, b) => a.startYmd.localeCompare(b.startYmd));
+}
+
+function revertOptimisticClosureRange() {
+    if (!closureRangesBeforeOptimistic) return;
+    closureRanges = closureRangesBeforeOptimistic;
+    closureRangesBeforeOptimistic = null;
+}
+
 function buildClosureCard(range, index, editable) {
+    const pending = Boolean(range._optimistic);
     const card = document.createElement('div');
     card.className =
         'fermeture-card rounded-xl border border-orange-200/80 bg-orange-50/95 dark:border-orange-700/50 dark:bg-orange-950/45 px-3 py-2.5 min-w-0';
+    if (!pending) {
+        card.classList.add('cursor-pointer');
+        card.tabIndex = 0;
+        card.setAttribute('role', 'button');
+        card.addEventListener('click', () => openClosureEdit(index));
+        card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openClosureEdit(index);
+            }
+        });
+    } else {
+        card.classList.add('fermeture-card--pending');
+        card.setAttribute('aria-busy', 'true');
+    }
     card.dataset.closureIndex = String(index);
 
     const body = document.createElement('div');
     body.className = 'flex-1 min-w-0';
     const dates = document.createElement('p');
     dates.className = 'text-[12px] font-mono font-semibold text-slate-800 dark:text-orange-50 m-0 leading-snug';
-    dates.textContent = formatFrRange(range.startYmd, range.endYmd);
+    dates.textContent = pending
+        ? `${formatFrRange(range.startYmd, range.endYmd)} — enregistrement…`
+        : formatFrRange(range.startYmd, range.endYmd);
     const title = document.createElement('p');
     title.className = 'text-[11px] text-slate-600 dark:text-orange-100/90 m-0 mt-0.5 leading-snug break-words';
     body.appendChild(dates);
@@ -79,7 +159,7 @@ function buildClosureCard(range, index, editable) {
     }
     card.appendChild(body);
 
-    if (!editable) return card;
+    if (!editable || pending) return card;
 
     card.classList.add('fermeture-card--with-delete');
     const delBtn = document.createElement('button');
@@ -98,24 +178,12 @@ function buildClosureCard(range, index, editable) {
     return card;
 }
 
-function todayYmdLocal() {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-/** Fermetures dont la date de fin est aujourd’hui ou plus tard. */
-function futureClosureRanges() {
-    const today = todayYmdLocal();
-    return closureRanges.filter((r) => String(r.endYmd || '') >= today);
-}
-
 function renderClosureCards() {
     const host = document.getElementById('fermetures-list');
     if (!host) return;
     host.replaceChildren();
     const u = getPlanningSessionUser();
     const editable = canEditClosures(u);
-
     const visible = futureClosureRanges();
 
     if (!visible.length) {
@@ -134,11 +202,35 @@ function renderClosureCards() {
     });
 }
 
+function hideConflictPanel() {
+    pendingConflicts = [];
+    const panel = document.getElementById('fermetures-conflict-panel');
+    panel?.classList.add('hidden');
+    panel?.setAttribute('aria-hidden', 'true');
+}
+
+function showConflictPanel(conflicts) {
+    pendingConflicts = conflicts;
+    const panel = document.getElementById('fermetures-conflict-panel');
+    const list = document.getElementById('fermetures-conflict-list');
+    if (!panel || !list) return;
+    list.replaceChildren();
+    for (const c of conflicts) {
+        const li = document.createElement('li');
+        li.className = 'text-[11px] leading-snug text-slate-700 dark:text-slate-200';
+        li.textContent = formatConflictLineFr(c);
+        list.appendChild(li);
+    }
+    panel.classList.remove('hidden');
+    panel.setAttribute('aria-hidden', 'false');
+}
+
 function showFermeturesMainPanel() {
     document.getElementById('fermetures-main-panel')?.classList.remove('hidden');
     const edit = document.getElementById('fermetures-edit-panel');
     edit?.classList.add('hidden');
     edit?.setAttribute('aria-hidden', 'true');
+    hideConflictPanel();
     editingClosureIndex = null;
     renderClosureCards();
 }
@@ -165,35 +257,38 @@ function setEditFieldsReadonly(readonly) {
         const el = document.getElementById(id);
         if (el instanceof HTMLInputElement) {
             el.readOnly = readonly;
+            el.disabled = readonly;
             el.classList.toggle('opacity-70', readonly);
         }
     }
+    const saveBtn = document.getElementById('fermeture-edit-save');
+    if (saveBtn instanceof HTMLButtonElement) saveBtn.classList.toggle('hidden', readonly);
 }
 
-async function persistClosures() {
-    const u = getPlanningSessionUser();
-    if (!canEditClosures(u)) return;
-    const r = await saveTemplateClosureRanges(closureRanges);
-    if (!r.ok) {
-        showToast(r.error || 'Enregistrement impossible.', 'error');
+function setClosureSaveBusy(busy) {
+    const saveBtn = document.getElementById('fermeture-edit-save');
+    if (saveBtn instanceof HTMLButtonElement) {
+        saveBtn.disabled = busy;
+        saveBtn.setAttribute('aria-busy', busy ? 'true' : 'false');
     }
-}
-
-function schedulePersist() {
-    if (saveDebounce) clearTimeout(saveDebounce);
-    saveDebounce = setTimeout(() => void persistClosures(), 600);
 }
 
 function openClosureEdit(index) {
     const u = getPlanningSessionUser();
+    if (!canViewClosures(u)) return;
+    if (closureRanges[index]?._optimistic) return;
     const editable = canEditClosures(u);
     editingClosureIndex = index;
-    const range = index >= 0 ? closureRanges[index] : { startYmd: '', endYmd: '', title: '' };
+    const range =
+        index >= 0
+            ? closureRanges[index]
+            : { startYmd: '', endYmd: '', title: '', eventIds: [] };
 
     document.getElementById('fermetures-main-panel')?.classList.add('hidden');
     const panel = document.getElementById('fermetures-edit-panel');
     panel?.classList.remove('hidden');
     panel?.setAttribute('aria-hidden', 'false');
+    hideConflictPanel();
 
     applyEditForm(range);
     setEditFieldsReadonly(!editable);
@@ -207,7 +302,8 @@ function openClosureEdit(index) {
     pushPlanningRouteLevel('modal_fermetures', title, 'Fermetures', showFermeturesMainPanel);
 }
 
-async function saveEditPanel() {
+async function persistClosureEdit(deleteConflicts) {
+    if (closureSaveInFlight) return;
     const u = getPlanningSessionUser();
     if (!canEditClosures(u)) return;
     const f = readEditForm();
@@ -219,37 +315,136 @@ async function saveEditPanel() {
         showToast('La date de fin doit être après le début.', 'error');
         return;
     }
-    const entry = { startYmd: f.startYmd, endYmd: f.endYmd, ...(f.title ? { title: f.title } : {}) };
-    if (editingClosureIndex === null || editingClosureIndex < 0) {
-        closureRanges.push(entry);
-    } else {
-        closureRanges[editingClosureIndex] = entry;
+
+    const prev =
+        editingClosureIndex != null && editingClosureIndex >= 0
+            ? closureRanges[editingClosureIndex]
+            : { eventIds: [] };
+    const excludeIds = deleteConflicts ? [] : [...(prev.eventIds || [])];
+
+    if (!deleteConflicts) {
+        closureSaveInFlight = true;
+        setClosureSaveBusy(true);
     }
-    closureRanges.sort((a, b) => a.startYmd.localeCompare(b.startYmd));
-    await persistClosures();
+    let conflicts = [];
+    try {
+        conflicts = await findConflictsForClosureRange(f.startYmd, f.endYmd, excludeIds);
+    } catch (err) {
+        if (!deleteConflicts) {
+            closureSaveInFlight = false;
+            setClosureSaveBusy(false);
+        }
+        throw err;
+    }
+    if (conflicts.length && !deleteConflicts) {
+        closureSaveInFlight = false;
+        setClosureSaveBusy(false);
+        showConflictPanel(conflicts);
+        return;
+    }
+
+    const entry = {
+        startYmd: f.startYmd,
+        endYmd: f.endYmd,
+        title: f.title,
+        eventIds: [...(prev.eventIds || [])]
+    };
+    const prevIndex = editingClosureIndex;
+
+    applyOptimisticClosureRange(entry, prevIndex);
+    returnToFermeturesList();
+    showToast('Enregistrement de la période en cours…', 'info', 2800);
+
+    closureSaveInFlight = true;
+    setClosureSaveBusy(false);
+    setConflictProceedBusy(true);
+    try {
+        const r = await saveClosureRangeToPlanning(entry, {
+            deleteConflicts: Boolean(deleteConflicts && conflicts.length),
+            conflicts: deleteConflicts ? conflicts : []
+        });
+        if (!r.ok) {
+            revertOptimisticClosureRange();
+            renderClosureCards();
+            showToast(r.error || 'Enregistrement impossible.', 'error', 8000);
+            return;
+        }
+
+        closureRangesBeforeOptimistic = null;
+        invalidateCalendarListCache();
+        document.dispatchEvent(new CustomEvent('planning-events-changed'));
+        await loadClosureRangesFromServer();
+        renderClosureCards();
+        const n = conflicts.length;
+        showToast(
+            deleteConflicts && n
+                ? `Période enregistrée. ${n} créneau(x) supprimé(s).`
+                : 'Période de fermeture enregistrée.',
+            'success'
+        );
+    } finally {
+        closureSaveInFlight = false;
+        setConflictProceedBusy(false);
+    }
+}
+
+function setConflictProceedBusy(busy) {
+    const proceed = document.getElementById('fermetures-conflict-proceed');
+    const cancel = document.getElementById('fermetures-conflict-cancel');
+    if (proceed instanceof HTMLButtonElement) proceed.disabled = busy;
+    if (cancel instanceof HTMLButtonElement) cancel.disabled = busy;
+}
+
+/** Retour liste Fermetures (quitte création / édition / conflits). */
+function returnToFermeturesList() {
+    hideConflictPanel();
+    editingClosureIndex = null;
     showFermeturesMainPanel();
+    popPlanningRouteLevel('modal_fermetures');
 }
 
 async function deleteClosureAt(index) {
     const u = getPlanningSessionUser();
     if (!canEditClosures(u)) return;
     if (index < 0 || index >= closureRanges.length) return;
+    const range = closureRanges[index];
+    const snapshot = {
+        startYmd: range.startYmd,
+        endYmd: range.endYmd,
+        title: range.title,
+        eventIds: [...(range.eventIds || [])]
+    };
+    const eventIds = snapshot.eventIds;
+
     closureRanges.splice(index, 1);
-    await persistClosures();
-    showFermeturesMainPanel();
+    if (editingClosureIndex === index) {
+        editingClosureIndex = null;
+    } else if (editingClosureIndex != null && editingClosureIndex > index) {
+        editingClosureIndex -= 1;
+    }
+    renderClosureCards();
+    showToast('Période de fermeture supprimée.', 'success');
+
+    const r = await deleteClosureRangeEvents(eventIds);
+    if (!r.ok) {
+        closureRanges.splice(index, 0, snapshot);
+        renderClosureCards();
+        showToast(r.error || 'Suppression impossible.', 'error');
+        return;
+    }
+    invalidateCalendarListCache();
+    document.dispatchEvent(new CustomEvent('planning-events-changed'));
+    void loadClosureRangesFromServer().then(() => renderClosureCards());
 }
 
 export async function loadClosureRangesFromServer() {
-    await fetchOrganSchoolSettings();
-    closureRanges = parseClosureRangesFromSettings(
-        getOrganSchoolSettingsCached()?.template_apply_closure_ranges
-    );
+    closureRanges = await loadClosureRangesFromPlanning();
 }
 
 export async function openFermeturesModal() {
     const u = getPlanningSessionUser();
-    if (!canEditClosures(u)) {
-        showToast('Fermetures : réservé à l’administration et aux professeurs.', 'info');
+    if (!canViewClosures(u)) {
+        showToast('Connectez-vous pour consulter les fermetures.', 'info');
         return;
     }
     await loadClosureRangesFromServer();
@@ -261,6 +456,9 @@ export function resetFermeturesUiBindings() {
     bound = false;
     closureRanges = [];
     editingClosureIndex = null;
+    pendingConflicts = [];
+    closureSaveInFlight = false;
+    closureRangesBeforeOptimistic = null;
 }
 
 export function initFermeturesUi() {
@@ -270,8 +468,8 @@ export function initFermeturesUi() {
     document.getElementById('menu-item-fermetures')?.addEventListener('click', (e) => {
         e.preventDefault();
         const u = getPlanningSessionUser();
-        if (!canEditClosures(u)) {
-            showToast('Fermetures : réservé à l’administration et aux professeurs.', 'info');
+        if (!canViewClosures(u)) {
+            showToast('Fermetures : connexion requise.', 'info');
             return;
         }
         if (!openPlanningRouteFromDrawer('modal_fermetures', 'Fermetures', 'Menu')) return;
@@ -282,49 +480,23 @@ export function initFermeturesUi() {
         openClosureEdit(-1);
     });
 
-    const onEditFieldChange = () => {
-        if (!canEditClosures(getPlanningSessionUser())) return;
-        const f = readEditForm();
-        if (!f.startYmd || !f.endYmd || f.endYmd < f.startYmd) return;
-        const entry = {
-            startYmd: f.startYmd,
-            endYmd: f.endYmd,
-            ...(f.title ? { title: f.title } : {})
-        };
-        if (editingClosureIndex === null || editingClosureIndex < 0) {
-            closureRanges.push(entry);
-            closureRanges.sort((a, b) => a.startYmd.localeCompare(b.startYmd));
-            editingClosureIndex = closureRanges.findIndex(
-                (r) => r.startYmd === entry.startYmd && r.endYmd === entry.endYmd
-            );
-        } else {
-            closureRanges[editingClosureIndex] = entry;
-        }
-        schedulePersist();
-    };
-    for (const id of ['fermeture-edit-start', 'fermeture-edit-end', 'fermeture-edit-title']) {
-        document.getElementById(id)?.addEventListener('change', onEditFieldChange);
-    }
-    document.getElementById('fermeture-edit-title')?.addEventListener('input', onEditFieldChange);
+    document.getElementById('fermeture-edit-save')?.addEventListener('click', () => {
+        void persistClosureEdit(false);
+    });
+
+    document.getElementById('fermeture-edit-cancel')?.addEventListener('click', () => {
+        returnToFermeturesList();
+    });
+
+    document.getElementById('fermetures-conflict-cancel')?.addEventListener('click', () => {
+        hideConflictPanel();
+    });
+
+    document.getElementById('fermetures-conflict-proceed')?.addEventListener('click', () => {
+        void persistClosureEdit(true);
+    });
 
     document.getElementById('modal_fermetures')?.addEventListener('close', () => {
         showFermeturesMainPanel();
-        if (saveDebounce) {
-            clearTimeout(saveDebounce);
-            saveDebounce = null;
-        }
-        void persistClosures();
     });
-
-    document.addEventListener('planning-overlay-flush', () => {
-        if (saveDebounce) {
-            clearTimeout(saveDebounce);
-            saveDebounce = null;
-        }
-        void persistClosures();
-    });
-
-    for (const id of ['fermeture-edit-start', 'fermeture-edit-end', 'fermeture-edit-title']) {
-        document.getElementById(id)?.addEventListener('blur', onEditFieldChange);
-    }
 }

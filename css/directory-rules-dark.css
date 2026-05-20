@@ -124,27 +124,9 @@
     color: rgb(29 78 216);
 }
 
-[data-theme='dark'] #modal_directory_users .directory-readonly-user-item {
-    border-color: rgb(71 85 105) !important;
-    background: rgb(30 41 59 / 0.45) !important;
-}
-
-[data-theme='dark'] #modal_directory_users .directory-user-email-link {
-    color: rgb(147 197 253) !important;
-}
-
-[data-theme='dark'] #modal_directory_users .directory-user-email-link:hover {
-    color: rgb(191 219 254) !important;
-}
-
 #modal_directory_users .directory-user-card__role,
 #modal_directory_users .directory-user-card__agenda {
     color: rgb(100 116 139);
-}
-
-[data-theme='dark'] #modal_directory_users .directory-user-card__role,
-[data-theme='dark'] #modal_directory_users .directory-user-card__agenda {
-    color: rgb(148 163 184);
 }
 
 #modal_directory_users .directory-user-delete-btn {

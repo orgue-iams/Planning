@@ -824,6 +824,12 @@
     transition: background-color 0.12s ease;
 }
 
+#modal_fermetures .fermeture-card--pending {
+    opacity: 0.88;
+    border-style: dashed;
+    cursor: wait;
+}
+
 #modal_fermetures .fermeture-card [role='button']:hover {
     background: rgb(241 245 249 / 0.6);
     border-radius: 0.5rem;
@@ -1002,16 +1008,19 @@
 }
 
 .directory-admin-user-card--role-admin {
+    --directory-card-divider: rgb(248 163 163);
     background: rgb(254 226 226 / 0.72);
     border-color: rgb(185 28 28 / 0.4);
 }
 
 .directory-admin-user-card--role-prof {
+    --directory-card-divider: rgb(253 216 120);
     background: rgb(254 243 199 / 0.65);
     border-color: rgb(251 191 36 / 0.55);
 }
 
 .directory-admin-user-card--role-eleve {
+    --directory-card-divider: rgb(147 197 253);
     background: rgb(219 234 254 / 0.55);
     border-color: rgb(147 197 253 / 0.65);
 }
@@ -1027,12 +1036,12 @@
     grid-template-columns: minmax(0, 1fr) minmax(7.5rem, 11.5rem) 2.75rem;
 }
 
-#modal_directory_users .directory-user-card__identity {
-    border-right: 1px solid rgb(226 232 240 / 0.9);
+#modal_directory_users .directory-admin-user-card--layout .directory-user-card__identity,
+#modal_directory_users .directory-admin-user-card--layout .directory-user-card__contact {
+    border-right: 1px solid var(--directory-card-divider, rgb(226 232 240 / 0.9));
 }
 
 #modal_directory_users .directory-user-card__contact {
-    border-right: 1px solid rgb(226 232 240 / 0.9);
     padding-left: 0.5rem;
 }
 
@@ -1055,36 +1064,37 @@
     cursor: pointer;
 }
 
-[data-theme='dark'] #modal_directory_users .directory-user-card__identity,
-[data-theme='dark'] #modal_directory_users .directory-user-card__contact {
-    border-right-color: rgb(71 85 105 / 0.85);
-}
-
-[data-theme='dark'] #modal_directory_users .directory-admin-user-card--layout .directory-user-card__identity p,
-[data-theme='dark'] #modal_directory_users .directory-admin-user-card--layout .directory-user-card__contact p,
-[data-theme='dark'] #modal_directory_users .directory-admin-user-card--layout .directory-user-card__contact a {
-    background: transparent !important;
-}
-
+/* Thème sombre : mêmes pastels que le clair (opacité pleine pour ne pas paraître transparent sur fond sombre). */
+[data-theme='dark'] #modal_directory_users .directory-admin-user-card--role-admin,
 [data-theme='dark'] .directory-admin-user-card--role-admin {
-    background: rgb(254 226 226 / 0.72);
-    border-color: rgb(185 28 28 / 0.4);
+    background: rgb(254 226 226) !important;
+    border-color: rgb(185 28 28 / 0.4) !important;
 }
 
+[data-theme='dark'] #modal_directory_users .directory-admin-user-card--role-prof,
 [data-theme='dark'] .directory-admin-user-card--role-prof {
-    background: rgb(254 243 199 / 0.65);
-    border-color: rgb(251 191 36 / 0.55);
+    background: rgb(254 243 199) !important;
+    border-color: rgb(251 191 36 / 0.55) !important;
 }
 
+[data-theme='dark'] #modal_directory_users .directory-admin-user-card--role-eleve,
 [data-theme='dark'] .directory-admin-user-card--role-eleve {
-    background: rgb(219 234 254 / 0.55);
-    border-color: rgb(147 197 253 / 0.65);
+    background: rgb(219 234 254) !important;
+    border-color: rgb(147 197 253 / 0.65) !important;
 }
 
-[data-theme='dark'] #modal_directory_users .directory-admin-user-card--layout .directory-user-card__identity p,
-[data-theme='dark'] #modal_directory_users .directory-admin-user-card--layout .directory-user-card__contact p,
-[data-theme='dark'] #modal_directory_users .directory-admin-user-card--layout .directory-user-card__contact a {
-    color: #0f172a;
+[data-theme='dark'] #modal_directory_users .directory-admin-user-card .directory-user-card__identity p,
+[data-theme='dark'] #modal_directory_users .directory-admin-user-card .directory-user-card__contact p,
+[data-theme='dark'] #modal_directory_users .directory-admin-user-card .directory-user-card__role,
+[data-theme='dark'] #modal_directory_users .directory-admin-user-card .directory-user-card__agenda,
+[data-theme='dark'] #modal_directory_users .directory-admin-user-card .directory-user-mailto-link,
+[data-theme='dark'] #modal_directory_users .directory-admin-user-card .directory-user-email-link {
+    color: rgb(15 23 42) !important;
+}
+
+[data-theme='dark'] #modal_directory_users .directory-admin-user-card .directory-user-mailto-link:hover,
+[data-theme='dark'] #modal_directory_users .directory-admin-user-card .directory-user-email-link:hover {
+    color: rgb(15 23 42) !important;
 }
 
 #modal_semaines_types .st-closure-card .st-closure-start,
@@ -1365,6 +1375,41 @@ dialog#modal_st_slot_edit::backdrop {
 }
 
 #modal_calendar_pool .calendar-pool-card {
+    --calendar-pool-divider: rgb(147 197 253);
     border-width: 1px;
     border-style: solid;
+    background: rgb(240 249 255 / 0.95);
+    border-color: rgb(125 211 252 / 0.75);
+}
+
+#modal_calendar_pool .calendar-pool-card__assignee {
+    border-left: 1px solid var(--calendar-pool-divider);
+    padding-left: 0.5rem;
+    margin-left: 0.25rem;
+}
+
+#modal_calendar_pool .calendar-pool-card__main {
+    border-right: 1px solid var(--calendar-pool-divider);
+    padding-right: 0.5rem;
+    margin-right: 0.15rem;
+}
+
+[data-theme='dark'] #modal_calendar_pool .calendar-pool-card {
+    background: rgb(240 249 255) !important;
+    border-color: rgb(125 211 252 / 0.75) !important;
+}
+
+[data-theme='dark'] #modal_calendar_pool .calendar-pool-card .calendar-pool-card__left,
+[data-theme='dark'] #modal_calendar_pool .calendar-pool-card .calendar-pool-card__left p,
+[data-theme='dark'] #modal_calendar_pool .calendar-pool-card .calendar-pool-card__left span,
+[data-theme='dark'] #modal_calendar_pool .calendar-pool-card .calendar-pool-card__assignee {
+    color: rgb(15 23 42) !important;
+}
+
+[data-theme='dark'] #modal_calendar_pool .calendar-pool-delete-btn {
+    color: rgb(51 65 85) !important;
+}
+
+[data-theme='dark'] #modal_calendar_pool .calendar-pool-delete-btn:hover {
+    color: rgb(220 38 38) !important;
 }

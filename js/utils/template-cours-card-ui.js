@@ -4,6 +4,10 @@
 
 const DOW_FR = ['', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
 
+/** Classes communes cartes cours (tiroir, profil, semaines A/B vue élève). */
+export const GABARIT_COURS_CARD_DAY_CLASS = 'gabarit-cours-card__day st-ro-date';
+export const GABARIT_COURS_CARD_TITLE_CLASS = 'gabarit-cours-card__title st-ro-headline';
+
 /** Heure « murale » Postgres (`time` / ancre 1970) sans décalage fuseau navigateur. */
 export function wallTimeHhmmFromDb(raw) {
     const s = String(raw ?? '').trim();
@@ -129,6 +133,44 @@ function escapeHtml(s) {
         .replace(/>/g, '&gt;');
 }
 
+/** Heroicons outline « users » (même tracé que cartes tiroir). */
+export const PLANNING_USERS_ICON_PATH =
+    'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z';
+
+export function planningUsersIconSvg(iconClass = 'planning-users-icon') {
+    const cls = String(iconClass || 'planning-users-icon').trim() || 'planning-users-icon';
+    return `<svg class="${escapeHtml(cls)}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="${PLANNING_USERS_ICON_PATH}" /></svg>`;
+}
+
+/**
+ * @param {string} text
+ * @param {{ pClass?: string, rowClass?: string, iconClass?: string, textClass?: string }} [opts]
+ */
+export function htmlStudentsLineWithUsersIcon(text, opts = {}) {
+    const line = String(text ?? '').trim() || "pas d'élèves";
+    const pClass =
+        opts.pClass ||
+        'st-ro-students text-[10px] font-normal m-0 leading-snug break-words';
+    const rowClass = opts.rowClass || 'planning-users-row';
+    const iconClass = opts.iconClass || 'planning-users-icon';
+    const textClass = opts.textClass || 'planning-users-text';
+    return `<p class="${pClass}"><span class="${rowClass}">${planningUsersIconSvg(iconClass)}<span class="${textClass}">${escapeHtml(line)}</span></span></p>`;
+}
+
+/**
+ * @param {HTMLElement|null} hostEl
+ * @param {string} text
+ * @param {{ emptyFallback?: string, rowClass?: string, iconClass?: string, textClass?: string }} [opts]
+ */
+export function setStudentsLineWithUsersIcon(hostEl, text, opts = {}) {
+    if (!(hostEl instanceof HTMLElement)) return;
+    const line = String(text ?? '').trim() || opts.emptyFallback || "pas d'élèves";
+    const rowClass = opts.rowClass || 'planning-users-row';
+    const iconClass = opts.iconClass || 'planning-users-icon';
+    const textClass = opts.textClass || 'planning-users-text';
+    hostEl.innerHTML = `<span class="${rowClass}">${planningUsersIconSvg(iconClass)}<span class="${textClass}">${escapeHtml(line)}</span></span>`;
+}
+
 function renderProfHtml(ownerPrenom, ownerNom, ownerLabel) {
     const label = String(ownerLabel || '').trim();
     if (label) return escapeHtml(label);
@@ -170,11 +212,15 @@ export function appendEleveGabaritCoursCard(host, p) {
     const studentsLine =
         typ === 'cours' ? String(p.studentsLine || '').trim() || "pas d'élèves" : '—';
 
+    const inDrawerStyleHost = Boolean(
+        host.closest?.('#drawer-next-cours-card, #profile-cours-list')
+    );
     card.className = [
         'event-box st-slot-card st-slot-card--eleve-view profile-gabarit-cours-card gabarit-cours-card--slot-text',
         colorCls,
-        'grid grid-cols-[minmax(5rem,0.95fr)_minmax(0,1.1fr)_minmax(0,0.95fr)] gap-2 items-stretch',
-        'rounded-lg border px-2 py-2 min-w-0 text-[10px]',
+        inDrawerStyleHost
+            ? 'rounded-lg border min-w-0 text-[10px]'
+            : 'grid grid-cols-[minmax(5rem,0.95fr)_minmax(0,1.1fr)_minmax(0,0.95fr)] gap-2 items-stretch rounded-lg border px-2 py-2 min-w-0 text-[10px]',
         profTintClass(p.ownerUserId)
     ]
         .filter(Boolean)
@@ -182,17 +228,26 @@ export function appendEleveGabaritCoursCard(host, p) {
 
     const profHtml = renderProfHtml(p.ownerPrenom, p.ownerNom, p.ownerLabel);
 
+    const studentsBlock =
+        typ === 'cours'
+            ? htmlStudentsLineWithUsersIcon(studentsLine, {
+                  pClass: inDrawerStyleHost
+                      ? 'st-ro-students text-[10px] font-normal m-0 leading-snug'
+                      : 'st-ro-students text-[10px] font-normal m-0 leading-snug break-words'
+              })
+            : `<p class="st-ro-students text-[10px] font-normal m-0 leading-snug break-words">${escapeHtml(studentsLine)}</p>`;
+
     card.innerHTML = `
         <div class="st-slot-card__left min-w-0 self-stretch flex flex-col justify-center py-0.5">
-            <div class="font-semibold leading-snug">${escapeHtml(periodLine)}</div>
-            <div class="font-mono text-[10px] opacity-90 mt-0.5 leading-snug">${escapeHtml(padTimeHhmm(p.startTime))} – ${escapeHtml(padTimeHhmm(p.endTime))}</div>
+            <div class="${GABARIT_COURS_CARD_DAY_CLASS} leading-snug">${escapeHtml(periodLine)}</div>
+            <div class="st-ro-time font-mono text-[10px] opacity-90 mt-0.5 leading-snug">${escapeHtml(padTimeHhmm(p.startTime))} – ${escapeHtml(padTimeHhmm(p.endTime))}</div>
         </div>
         <div class="st-slot-card__right min-w-0 flex flex-col justify-center py-0.5">
-            <p class="st-ro-headline font-semibold m-0 leading-snug">${escapeHtml(titleText)}</p>
-            <p class="st-ro-students text-[10px] font-normal m-0 leading-snug break-words">${escapeHtml(studentsLine)}</p>
+            <p class="${GABARIT_COURS_CARD_TITLE_CLASS} m-0 leading-snug">${escapeHtml(titleText)}</p>
+            ${studentsBlock}
         </div>
-        <div class="st-slot-card__prof min-w-0 self-stretch flex items-center justify-end py-0.5">
-            <span class="st-ro-prof text-[10px] font-medium leading-snug block text-right">${profHtml}</span>
+        <div class="st-slot-card__prof min-w-0 self-stretch flex items-center ${inDrawerStyleHost ? 'justify-start' : 'justify-end'} py-0.5">
+            <span class="st-ro-prof text-[10px] font-medium leading-snug block ${inDrawerStyleHost ? 'text-left' : 'text-right'}">${profHtml}</span>
         </div>`;
 
     host.appendChild(card);

@@ -14,6 +14,11 @@
     --planning-input-border: rgb(203 213 225);
     --planning-input-placeholder: rgb(100 116 139);
     --planning-btn-primary-text: rgb(255 255 255);
+    --planning-action-btn-bg: rgb(37 99 235);
+    --planning-action-btn-border: rgb(29 78 216);
+    --planning-action-btn-text: rgb(255 255 255);
+    --planning-action-btn-bg-hover: rgb(29 78 216);
+    --planning-action-btn-bg-active: rgb(30 64 175);
     --planning-accent-bg: rgb(239 246 255);
     --planning-accent-border: rgb(37 99 235);
     --planning-accent-text: rgb(29 78 216);
@@ -38,6 +43,11 @@
     --planning-input-border: rgb(203 213 225);
     --planning-input-placeholder: rgb(100 116 139);
     --planning-btn-primary-text: rgb(255 255 255);
+    --planning-action-btn-bg: rgb(37 99 235);
+    --planning-action-btn-border: rgb(96 165 250);
+    --planning-action-btn-text: rgb(255 255 255);
+    --planning-action-btn-bg-hover: rgb(59 130 246);
+    --planning-action-btn-bg-active: rgb(29 78 216);
     --planning-accent-bg: rgb(30 58 138 / 0.35);
     --planning-accent-border: rgb(96 165 250);
     --planning-accent-text: rgb(191 219 254);
@@ -68,6 +78,30 @@ textarea.planning-field,
     color: var(--planning-input-placeholder);
 }
 
+/* Bouton natif « Choisir un fichier » : style primaire (pas fond blanc par défaut). */
+.planning-field.file-input::file-selector-button {
+    margin-right: 0.5rem;
+    border: 1px solid var(--planning-action-btn-border);
+    border-radius: 0.5rem;
+    background-color: var(--planning-action-btn-bg);
+    color: var(--planning-action-btn-text);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    padding: 0.4rem 0.75rem;
+    cursor: pointer;
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease;
+}
+
+.planning-field.file-input::file-selector-button:hover {
+    background-color: var(--planning-action-btn-bg-hover);
+}
+
+.planning-field.file-input::file-selector-button:active {
+    background-color: var(--planning-action-btn-bg-active);
+}
+
 [data-theme='dark'] .input,
 [data-theme='dark'] .select,
 [data-theme='dark'] .textarea,
@@ -93,10 +127,18 @@ textarea.planning-field,
     caret-color: var(--planning-input-text);
 }
 
-[data-theme='dark'] .file-input::file-selector-button {
-    background-color: rgb(241 245 249);
-    color: var(--planning-input-text);
-    border-color: var(--planning-input-border);
+[data-theme='dark'] .planning-field.file-input::file-selector-button {
+    background-color: var(--planning-action-btn-bg);
+    color: var(--planning-action-btn-text);
+    border-color: var(--planning-action-btn-border);
+}
+
+[data-theme='dark'] .planning-field.file-input::file-selector-button:hover {
+    background-color: var(--planning-action-btn-bg-hover);
+}
+
+[data-theme='dark'] .planning-field.file-input::file-selector-button:active {
+    background-color: var(--planning-action-btn-bg-active);
 }
 
 /* ——— Boutons bleus : texte blanc ——— */
@@ -332,4 +374,28 @@ textarea.planning-field,
 [data-theme='dark'] .planning-date-input::-webkit-calendar-picker-indicator {
     filter: none;
     opacity: 0.85;
+}
+
+/* Ligne élèves inscrits : icône utilisateurs + liste (tiroir, modales, semaines A/B) */
+.planning-users-row,
+.st-ro-students-row {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 0.3rem;
+    max-width: 100%;
+}
+
+.planning-users-icon,
+.st-ro-students-icon {
+    width: 0.9rem;
+    height: 0.9rem;
+    flex-shrink: 0;
+    margin-top: 0.06rem;
+    opacity: 0.88;
+}
+
+.planning-users-text,
+.st-ro-students-text {
+    min-width: 0;
+    word-break: break-word;
 }

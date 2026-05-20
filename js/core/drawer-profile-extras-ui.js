@@ -22,6 +22,25 @@ const AGENDA_HELP =
 
 let nextCoursRefreshGen = 0;
 
+async function loadPoolLabelByCalendarId(calendarId) {
+    const id = String(calendarId || '').trim();
+    if (!id) return '';
+    if (!isBackendAuthConfigured()) return id;
+    const sb = getSupabaseClient();
+    if (!sb) return id;
+    const { data } = await sb
+        .from('google_calendar_pool')
+        .select('label')
+        .eq('google_calendar_id', id)
+        .maybeSingle();
+    const label = String(data?.label ?? '').trim();
+    if (label) return label;
+    if (id.includes('@')) {
+        return id.split('@')[0].replace(/\./g, ' ').trim() || id;
+    }
+    return id;
+}
+
 async function loadPersonalPoolRow(userId) {
     if (!isBackendAuthConfigured() || !userId) return { id: '', label: '' };
     const sb = getSupabaseClient();
@@ -35,6 +54,11 @@ async function loadPersonalPoolRow(userId) {
         id: String(data?.google_calendar_id ?? '').trim(),
         label: String(data?.label ?? '').trim()
     };
+}
+
+function setAgendaEntryName(elId, name) {
+    const el = document.getElementById(elId);
+    if (el) el.textContent = String(name || '').trim() || '—';
 }
 
 async function copyText(text) {
@@ -79,21 +103,26 @@ export async function refreshDrawerAgendas(user) {
     block.classList.remove('hidden');
     showAgendaHelpAlways();
 
-    const { mainGoogleCalendarId } = getPlanningConfig();
+    const { mainGoogleCalendarId, mainGoogleCalendarLabel } = getPlanningConfig();
     const mainUrl = googleCalendarEmbedUrl(mainGoogleCalendarId);
+    const mainLabel =
+        String(mainGoogleCalendarLabel || '').trim() ||
+        (await loadPoolLabelByCalendarId(mainGoogleCalendarId));
+    setAgendaEntryName('drawer-agenda-main-name', mainLabel);
     bindAgendaCopyBtn('drawer-agenda-main-btn', mainUrl);
 
-    const { id: persId } = await loadPersonalPoolRow(user.id);
+    const { id: persId, label: persLabel } = await loadPersonalPoolRow(user.id);
     const persUrl = googleCalendarEmbedUrl(persId);
 
-    const persBtn = document.getElementById('drawer-agenda-personal-btn');
+    const persWrap = document.getElementById('drawer-agenda-personal-wrap');
     const persNone = document.getElementById('drawer-agenda-personal-none');
     if (persUrl) {
+        setAgendaEntryName('drawer-agenda-personal-name', persLabel || persId);
         bindAgendaCopyBtn('drawer-agenda-personal-btn', persUrl);
+        persWrap?.classList.remove('hidden');
         persNone?.classList.add('hidden');
-        persBtn?.classList.remove('hidden');
     } else {
-        persBtn?.classList.add('hidden');
+        persWrap?.classList.add('hidden');
         persNone?.classList.remove('hidden');
     }
 }
@@ -277,38 +306,27 @@ async function loadEleveGabaritEnrollments(userId) {
         });
 }
 
-function appendWeekSectionTitle(host, week) {
-    const h = document.createElement('p');
-    h.className =
-        'profile-cours-week-title text-[10px] font-bold uppercase text-slate-600 dark:text-slate-300 tracking-wide m-0 mt-2 mb-1 first:mt-0';
-    h.textContent = week === 'B' ? 'Semaine B' : 'Semaine A';
-    host.appendChild(h);
-}
-
-function renderProfileCoursGrouped(rows, list) {
-    const byWeek = { A: [], B: [] };
-    for (const line of rows) {
-        const w = line.week_type === 'B' ? 'B' : 'A';
-        byWeek[w].push(line);
-    }
-    for (const w of ['A', 'B']) {
-        if (!byWeek[w].length) continue;
-        appendWeekSectionTitle(list, w);
-        for (const line of byWeek[w]) {
-            appendEleveGabaritCoursCard(list, {
-                dayOfWeek: line.day_of_week,
-                startTime: line.start_time,
-                endTime: line.end_time,
-                title: line.title,
-                slotType: line.slot_type,
-                studentsLine: line.studentsLine,
-                ownerLabel: line.ownerLabel,
-                ownerPrenom: line.ownerPrenom,
-                ownerNom: line.ownerNom,
-                ownerUserId: line.owner_user_id,
-                planningColorClass: 'event-cours'
-            });
-        }
+function renderProfileCoursList(rows, list) {
+    const sorted = [...rows].sort((a, b) => {
+        const da = Number(a.day_of_week) || 1;
+        const db = Number(b.day_of_week) || 1;
+        if (da !== db) return da - db;
+        return String(a.start_time || '').localeCompare(String(b.start_time || ''));
+    });
+    for (const line of sorted) {
+        appendEleveGabaritCoursCard(list, {
+            dayOfWeek: line.day_of_week,
+            startTime: line.start_time,
+            endTime: line.end_time,
+            title: line.title,
+            slotType: line.slot_type,
+            studentsLine: line.studentsLine,
+            ownerLabel: line.ownerLabel,
+            ownerPrenom: line.ownerPrenom,
+            ownerNom: line.ownerNom,
+            ownerUserId: line.owner_user_id,
+            planningColorClass: 'event-cours'
+        });
     }
 }
 
@@ -331,6 +349,7 @@ export async function refreshProfileCoursInscrits(user) {
         return;
     }
 
+    list.className = 'planning-drawer__next-cours profile-cours-list min-w-0';
     list.replaceChildren();
     let rows = [];
     try {
@@ -344,7 +363,7 @@ export async function refreshProfileCoursInscrits(user) {
         return;
     }
     empty?.classList.add('hidden');
-    renderProfileCoursGrouped(rows, list);
+    renderProfileCoursList(rows, list);
 }
 
 /** @param {object | null} user */

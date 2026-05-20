@@ -44,6 +44,7 @@ function releaseDrawerFocus() {
 }
 
 function closeDrawer() {
+    showMainDrawerPanel();
     const drawer = document.getElementById('planning-app-drawer');
     const backdrop = document.getElementById('planning-drawer-backdrop');
     const btn = document.getElementById('btn-app-drawer');
@@ -112,7 +113,6 @@ export function initPlanningDrawer(calendar) {
     document.getElementById('planning-drawer-backdrop')?.addEventListener('click', () => closeDrawer());
     document.getElementById('planning-drawer-close')?.addEventListener('click', (e) => {
         e.preventDefault();
-        showMainDrawerPanel();
         closeDrawer();
     });
 

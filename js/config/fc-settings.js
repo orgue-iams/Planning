@@ -13,7 +13,8 @@ import {
 } from '../core/calendar-events-list-cache.js';
 import {
     fcDragResizePropsForEvent,
-    applyDragResizePropsToFcEvent
+    applyDragResizePropsToFcEvent,
+    isEleveEnrolledInCoursEvent
 } from '../core/calendar-logic.js';
 import { fetchPlanningEventsForFullCalendar } from '../core/planning-events-db.js';
 import { scheduleTimeGridColumnSync } from '../utils/timegrid-column-sync.js';
@@ -253,6 +254,9 @@ export const getCalendarConfig = (handlers, currentUser) => {
         },
 
         eventContent: (arg) => handlers.renderEventContent(arg),
+
+        eventClassNames: (arg) =>
+            isEleveEnrolledInCoursEvent(arg.event, currentUser) ? ['fc-event--cours-enrolled'] : [],
 
         eventTimeFormat: {
             hour: '2-digit',

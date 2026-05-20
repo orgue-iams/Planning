@@ -76,6 +76,7 @@ const ASSETS = [
   './components/modal-semaines-shift.html',
   './components/modal-fermetures.html',
   './js/core/fermetures-ui.js',
+  './js/core/fermetures-planning.js',
   './js/utils/planning-card-swipe.js',
   './components/modal-course-students.html',
   './components/modal-statistics.html',

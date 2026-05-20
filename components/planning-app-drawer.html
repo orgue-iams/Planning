@@ -43,7 +43,7 @@
 
         <div id="drawer-section-next-cours" class="planning-drawer__block hidden">
             <p class="planning-drawer__section-title">Mes prochains cours</p>
-            <div id="drawer-next-cours-card" class="planning-drawer__next-cours flex flex-col gap-2"></div>
+            <div id="drawer-next-cours-card" class="planning-drawer__next-cours"></div>
             <p id="drawer-next-cours-empty" class="planning-drawer__hint hidden">Aucun cours inscrit dans les semaines types.</p>
         </div>
 
@@ -157,8 +157,9 @@
 
     <div id="planning-drawer-help-panel" class="planning-drawer__scroll hidden" aria-hidden="true">
         <div class="planning-drawer__block planning-drawer__block--help-head">
-            <button type="button" id="drawer-help-back" class="planning-drawer__help-back planning-ui-menu planning-ui-menu--body text-left hover:underline py-1 px-0 border-0 bg-transparent cursor-pointer text-slate-700 dark:text-inherit">
-                &lt; Aide
+            <button type="button" id="drawer-help-back" class="planning-drawer__close-btn planning-drawer__help-back" aria-label="Retour au menu principal">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="planning-drawer__close-icon" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
+                <span>Aide</span>
             </button>
         </div>
         <div class="planning-drawer__block planning-drawer__block--help-body space-y-5 mt-4">
@@ -170,7 +171,7 @@
                 <p class="planning-ui-menu planning-ui-menu--caption text-slate-700 m-0">Nous contacter</p>
                 <label class="block">
                     <span class="planning-ui-menu planning-ui-menu--caption text-slate-500">Objet</span>
-                    <input type="text" id="drawer-help-subject" name="subject" class="planning-field input input-bordered input-sm w-full mt-0.5 text-[11px]" maxlength="200" />
+                    <input type="text" id="drawer-help-subject" name="subject" class="planning-field input input-bordered input-sm w-full mt-0.5 text-[11px]" maxlength="200" placeholder="Ex. titre du message" autocomplete="off" />
                 </label>
                 <label class="block">
                     <span class="planning-ui-menu planning-ui-menu--caption text-slate-500">Message</span>

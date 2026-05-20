@@ -249,10 +249,7 @@ function refreshHeaderUser(user) {
         'hidden',
         !auth || r !== 'prof'
     );
-    document.getElementById('menu-item-fermetures-wrap')?.classList.toggle(
-        'hidden',
-        !auth || r === 'eleve'
-    );
+    document.getElementById('menu-item-fermetures-wrap')?.classList.toggle('hidden', !auth);
     document.getElementById('menu-item-statistics-wrap')?.classList.toggle('hidden', !staff);
     document.getElementById('btn-admin-clear-week')?.classList.toggle('hidden', r !== 'admin');
     if (r !== 'eleve') {

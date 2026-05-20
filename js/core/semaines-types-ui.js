@@ -9,7 +9,6 @@ import {
     saveTeachingDaysForUser,
     syncTeachingDaySelectOptions
 } from './teaching-days.js';
-import { parseClosureRangesFromSettings } from './fermetures-ui.js';
 import { getPlanningSessionUser } from './session-user.js';
 import { getSupabaseClient, isBackendAuthConfigured, getPlanningConfig } from './supabase-client.js';
 import { showToast } from '../utils/toast.js';
@@ -35,6 +34,7 @@ import { openPlanningRouteFromDrawer } from '../utils/planning-route-dialog.js';
 import { openCourseStudentsPicker } from './course-students-picker.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
 import { populateTimeSelects } from '../utils/time-helpers.js';
+import { setStudentsLineWithUsersIcon } from '../utils/template-cours-card-ui.js';
 
 const ST_DELETE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m2-3h6a1 1 0 011 1v1H8V5a1 1 0 011-1z"/></svg>';
 
@@ -504,7 +504,7 @@ function syncRowReadonlyDisplay(card, elevesById) {
     if (periodEl) {
         periodEl.replaceChildren();
         const l1 = document.createElement('div');
-        l1.className = 'font-semibold leading-snug';
+        l1.className = 'gabarit-cours-card__day leading-snug';
         l1.textContent = dowLongLabel(dow);
         const l2 = document.createElement('div');
         l2.className = 'font-mono text-[10px] opacity-90 mt-0.5';
@@ -537,7 +537,10 @@ function syncRowReadonlyDisplay(card, elevesById) {
         .split(',')
         .map((x) => x.trim())
         .filter(Boolean);
-    roStudents.textContent = enrolledStudentsCommaLine(ids, elevesById) || "pas d'élèves";
+    setStudentsLineWithUsersIcon(
+        roStudents,
+        enrolledStudentsCommaLine(ids, elevesById) || "pas d'élèves"
+    );
     const profEl = card.querySelector('.st-ro-prof');
     if (profEl) renderProfTwoLines(profEl, card);
     applyStSlotRowColors(card);
@@ -594,7 +597,11 @@ function refreshStleStudentSummary() {
     const el = document.getElementById('stle-students-summary');
     const btn = document.getElementById('stle-students-manage-btn');
     const labels = enrolledLabelsSorted(stLineEditPendingStudents, stElevesByIdRef);
-    if (el) el.textContent = labels.length ? labels.join(', ') : 'Aucun inscrit';
+    if (el) {
+        setStudentsLineWithUsersIcon(el, labels.length ? labels.join(', ') : '', {
+            emptyFallback: 'Aucun inscrit'
+        });
+    }
     if (btn instanceof HTMLButtonElement) {
         btn.textContent = labels.length
             ? `Gérer les inscrits (${labels.length})`
@@ -604,8 +611,6 @@ function refreshStleStudentSummary() {
 
 /** @type {ReturnType<typeof setTimeout> | null} */
 let stSaveDebounce = null;
-/** @type {{ startYmd: string, endYmd: string }[]} */
-let stApplyClosureRanges = [];
 /** Jours d’enseignement du prof courant (1–7). Vide = pas encore configuré. */
 let stTeachingDaysSet = new Set();
 
@@ -950,7 +955,7 @@ function appendTemplateCard(listEl, line, _optHtml, ctx) {
             <div class="st-ro-period leading-snug"></div>
         </div>
         <div class="st-slot-card__right min-w-0 flex flex-col justify-center py-0.5">
-            <p class="st-ro-headline font-semibold m-0 leading-snug"></p>
+            <p class="gabarit-cours-card__title st-ro-headline m-0 leading-snug"></p>
             <p class="st-ro-students text-[10px] font-normal text-slate-700 dark:text-slate-300 m-0 leading-snug break-words"></p>
         </div>
         <div class="st-slot-card__prof min-w-0 self-stretch flex items-center justify-end py-0.5">
@@ -963,7 +968,7 @@ function appendTemplateCard(listEl, line, _optHtml, ctx) {
             <div class="st-ro-period leading-snug"></div>
         </div>
         <div class="st-slot-card__right min-w-0 pl-1 flex flex-col gap-0.5 self-stretch justify-center py-0.5">
-            <p class="st-ro-headline font-semibold m-0 leading-snug"></p>
+            <p class="gabarit-cours-card__title st-ro-headline m-0 leading-snug"></p>
             <p class="st-ro-students text-[10px] font-normal text-slate-700 dark:text-slate-300 m-0 leading-snug break-words"></p>
         </div>
         <div class="st-slot-card__prof min-w-0 border-l border-slate-200/80 dark:border-slate-500/50 pl-2 self-stretch flex items-center py-0.5">
@@ -1165,10 +1170,6 @@ async function openSemainesTypesModal(user) {
             hint.classList.add('hidden');
         }
     }
-
-    stApplyClosureRanges = parseClosureRangesFromSettings(
-        getOrganSchoolSettingsCached()?.template_apply_closure_ranges
-    );
 
     const eleves = await loadEleves();
     const elevesById = new Map(eleves.map((e) => [e.user_id, e]));
@@ -1454,9 +1455,6 @@ async function runSemainesTypesAnalyze() {
                 return;
             }
         }
-        stApplyClosureRanges = parseClosureRangesFromSettings(
-            getOrganSchoolSettingsCached()?.template_apply_closure_ranges
-        );
         const analysis = await analyzeTemplateApply({
             profUserId: u.id,
             profEmail: u.email,
@@ -1464,8 +1462,7 @@ async function runSemainesTypesAnalyze() {
             applyEndYmd: applyEnd,
             firstWeekLetter,
             lines: linePayload,
-            mainCalendarId: mainId,
-            extraClosureRanges: stApplyClosureRanges
+            mainCalendarId: mainId
         });
         if (!analysis.ok) {
             const err = analysis.error || 'Préparation impossible.';
