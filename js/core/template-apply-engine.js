@@ -8,7 +8,7 @@ import { bridgeListEvents, bridgeDeleteEvent, bridgeUpsertEvents } from './calen
 import {
     upsertPlanningEventRow,
     replacePlanningEventEnrollment,
-    fetchPlanningMirrorTargetsForDelete,
+    fetchPlanningMirrorCleanupTasksForEvents,
     deletePlanningEventRow,
     planningUserIdForEmail,
     fetchPlanningEventRowsInRange,
@@ -24,8 +24,10 @@ import {
 const APPLY_RETRIES = 3;
 /** Pause entre suppressions Google (client) pour limiter les quotas. */
 const GOOGLE_BG_DELETE_GAP_MS = 450;
-/** Pause entre deux appels bridge d’upsert (souvent 1 événement par requête côté Edge). */
-const GOOGLE_BG_UPSERT_GAP_MS = 550;
+/** Créneaux par requête upsert (calendar-bridge enchaîne ~55 ms entre événements). */
+const GOOGLE_BG_UPSERT_BATCH_SIZE = 15;
+/** Pause entre deux lots upsert côté client. */
+const GOOGLE_BG_UPSERT_BATCH_GAP_MS = 160;
 
 /**
  * Bilan lisible quand l’application s’arrête en cours (Google n’offre pas de transaction globale).
@@ -578,20 +580,22 @@ export async function executeTemplateDatabasePhase(analysis, ctx) {
 
     report('Grille Postgres : analyse des suppressions…', 0, activeGt);
 
+    const clearIds = toClearDb.map((row) => String(row.id || '').trim()).filter(Boolean);
+    const bulkMirrorTasks = await fetchPlanningMirrorCleanupTasksForEvents(clearIds);
+    for (const t of bulkMirrorTasks) {
+        const k = `${normCalKey(t.calendarId)}|${String(t.googleEventId || '').trim()}`;
+        if (!k.endsWith('|') && !seenCleanup.has(k)) {
+            seenCleanup.add(k);
+            googleCleanupTasks.push({
+                googleEventId: String(t.googleEventId).trim(),
+                calendarId: String(t.calendarId).trim()
+            });
+        }
+    }
+
     for (const row of toClearDb) {
         const canonicalId = String(row.id || '').trim();
         if (!canonicalId) continue;
-        const targets = await fetchPlanningMirrorTargetsForDelete(canonicalId);
-        for (const t of targets) {
-            const k = `${normCalKey(t.calendarId)}|${String(t.googleEventId || '').trim()}`;
-            if (!k.endsWith('|') && !seenCleanup.has(k)) {
-                seenCleanup.add(k);
-                googleCleanupTasks.push({
-                    googleEventId: String(t.googleEventId).trim(),
-                    calendarId: String(t.calendarId).trim()
-                });
-            }
-        }
         const drow = await deletePlanningEventRow(canonicalId);
         if (!drow.ok) return { ok: false, error: drow.error || 'Suppression base' };
         grandDone += 1;
@@ -600,6 +604,8 @@ export async function executeTemplateDatabasePhase(analysis, ctx) {
 
     /** @type {Record<string, unknown>[]} */
     const bridgeDbPayloads = [];
+    /** @type {Map<string, string | null>} */
+    const uidCacheByEmail = new Map();
 
     for (const g of groupedCours) {
         const titleC = String(g.line?.title || 'Cours').trim() || 'Cours';
@@ -623,9 +629,15 @@ export async function executeTemplateDatabasePhase(analysis, ctx) {
         const userIds = [];
         const emailsLower = [];
         for (const em of g.studentEmails) {
-            const uid = await planningUserIdForEmail(em);
+            const emNorm = normEmail(em);
+            if (!emNorm) continue;
+            emailsLower.push(emNorm);
+            let uid = uidCacheByEmail.get(emNorm);
+            if (uid === undefined) {
+                uid = await planningUserIdForEmail(emNorm);
+                uidCacheByEmail.set(emNorm, uid);
+            }
             if (uid) userIds.push(uid);
-            if (em) emailsLower.push(normEmail(em));
         }
         const enr = await replacePlanningEventEnrollment(ur.id, userIds);
         if (!enr.ok) return { ok: false, error: enr.error || 'Inscriptions cours base' };
@@ -750,17 +762,26 @@ export async function runTemplateGoogleBackgroundSync(p) {
                     if (i < cleanup.length - 1 || ups.length > 0) await sleepMsLocal(GOOGLE_BG_DELETE_GAP_MS);
                 }
 
-                for (let i = 0; i < ups.length; i++) {
-                    const rUp = await bridgeUpsertEvents(token, [ups[i]], undefined);
+                const upsertBatches = Math.ceil(ups.length / GOOGLE_BG_UPSERT_BATCH_SIZE) || 0;
+                for (let bi = 0; bi < upsertBatches; bi++) {
+                    const batch = ups.slice(
+                        bi * GOOGLE_BG_UPSERT_BATCH_SIZE,
+                        (bi + 1) * GOOGLE_BG_UPSERT_BATCH_SIZE
+                    );
+                    const rUp = await bridgeUpsertEvents(token, batch, undefined);
                     if (rUp.skipped) {
                         report('Pont Google indisponible — arrêt des écritures.', grandDone, activeGt);
                         return { ok: true, skipped: true, stats: { deleteTotal: deletesDone, upsertTotal: upsertsDone } };
                     }
                     if (!rUp.ok) throw new Error(rUp.error || 'Écriture Google');
-                    grandDone += 1;
-                    upsertsDone += 1;
-                    report(`Écriture Google ${i + 1}/${ups.length}`, grandDone, activeGt);
-                    if (i < ups.length - 1) await sleepMsLocal(GOOGLE_BG_UPSERT_GAP_MS);
+                    grandDone += batch.length;
+                    upsertsDone += batch.length;
+                    report(
+                        `Écriture Google lot ${bi + 1}/${upsertBatches} (général → élèves inscrits, ${batch.length} créneau(x))`,
+                        grandDone,
+                        activeGt
+                    );
+                    if (bi < upsertBatches - 1) await sleepMsLocal(GOOGLE_BG_UPSERT_BATCH_GAP_MS);
                 }
 
                 if (totalSteps === 0) {
@@ -797,14 +818,23 @@ export async function runTemplateGoogleBackgroundSync(p) {
                 if (i < orderedDel.length - 1 || upserts.length > 0) await sleepMsLocal(GOOGLE_BG_DELETE_GAP_MS);
             }
 
-            for (let i = 0; i < upserts.length; i++) {
-                const rUp = await bridgeUpsertEvents(token, [upserts[i]], undefined);
+            const upsertBatches = Math.ceil(upserts.length / GOOGLE_BG_UPSERT_BATCH_SIZE) || 0;
+            for (let bi = 0; bi < upsertBatches; bi++) {
+                const batch = upserts.slice(
+                    bi * GOOGLE_BG_UPSERT_BATCH_SIZE,
+                    (bi + 1) * GOOGLE_BG_UPSERT_BATCH_SIZE
+                );
+                const rUp = await bridgeUpsertEvents(token, batch, undefined);
                 if (rUp.skipped) throw new Error('Pont agenda non configuré.');
                 if (!rUp.ok) throw new Error(rUp.error || 'Écriture Google');
-                grandDone += 1;
-                upsertsDone += 1;
-                report(`Écriture ${i + 1}/${upserts.length}`, grandDone, activeGt);
-                if (i < upserts.length - 1) await sleepMsLocal(GOOGLE_BG_UPSERT_GAP_MS);
+                grandDone += batch.length;
+                upsertsDone += batch.length;
+                report(
+                    `Écriture lot ${bi + 1}/${upsertBatches} (${batch.length} créneau(x))`,
+                    grandDone,
+                    activeGt
+                );
+                if (bi < upsertBatches - 1) await sleepMsLocal(GOOGLE_BG_UPSERT_BATCH_GAP_MS);
             }
 
             if (totalSteps === 0) {

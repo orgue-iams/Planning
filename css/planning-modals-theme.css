@@ -46,6 +46,8 @@
 /* Labels modales : planning-theme-tokens.css (.label-text) */
 
 /* Semaines types : page plein écran */
+[data-theme='dark'] #modal_semaines_apply .st-submodal-box,
+[data-theme='dark'] #modal_semaines_shift .st-submodal-box,
 [data-theme='dark'] #modal_semaines_types .semaines-types-modal-box {
     background-color: rgb(15 23 42) !important;
     color: rgb(226 232 240);

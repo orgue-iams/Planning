@@ -25,6 +25,12 @@ import {
     runTemplateGoogleBackgroundSync
 } from './template-apply-engine.js';
 import { saveProfWeekCycleFromApply } from './week-cycle.js';
+import {
+    analyzeProfSlotsShift,
+    defaultProfShiftEffectiveYmd,
+    executeProfSlotsShift,
+    formatProfShiftPrepareSummary
+} from './prof-slots-shift-engine.js';
 import { openPlanningRouteFromDrawer } from '../utils/planning-route-dialog.js';
 import { openCourseStudentsPicker } from './course-students-picker.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
@@ -121,13 +127,42 @@ function setStGoogleSyncHintVisible(visible) {
     el.classList.toggle('hidden', !visible);
 }
 
+function setStShiftBusyHint(visible) {
+    document.getElementById('st-shift-busy-hint')?.classList.toggle('hidden', !visible);
+}
+
+function stShiftShowResult(text) {
+    const ph = document.getElementById('st-shift-placeholder');
+    const out = document.getElementById('st-shift-out');
+    if (ph) ph.classList.add('hidden');
+    if (out) {
+        out.textContent = String(text || '').trim();
+        out.classList.remove('hidden');
+    }
+}
+
+function stShiftShowError(title, detail) {
+    stShiftShowResult(`${title}\n${detail}`.trim());
+}
+
+function resetStShiftOutput() {
+    const ph = document.getElementById('st-shift-placeholder');
+    const out = document.getElementById('st-shift-out');
+    if (ph) ph.classList.remove('hidden');
+    if (out) {
+        out.textContent = '';
+        out.classList.add('hidden');
+    }
+}
+
 /** Grise et désactive les actions pendant une opération réseau. Préparation / application aussi bloquées pendant la synchro Google en arrière-plan. */
 function setStModalActionsBusy(busy) {
     const analyze = document.getElementById('st-btn-analyze');
     const apply = document.getElementById('st-btn-apply');
+    const shift = document.getElementById('st-btn-shift');
     const analyzeApplyLocked = busy || stGoogleSyncInFlight;
 
-    for (const btn of [analyze]) {
+    for (const btn of [analyze, shift]) {
         if (!btn) continue;
         if (analyzeApplyLocked) {
             btn.setAttribute('disabled', 'disabled');
@@ -179,6 +214,8 @@ function formatPrepareSummaryText(s, applyStart, firstWeekLetter, applyEnd) {
     return [
         alternanceLine,
         '',
+        'Les créneaux des autres professeurs ne sont pas modifiés.',
+        '',
         ...(closureLine ? [closureLine, ''] : []),
         '——— Bilan des opérations prévues ———',
         `Suppressions — planning général : ${s.deleteMainCount}`,
@@ -188,7 +225,7 @@ function formatPrepareSummaryText(s, applyStart, firstWeekLetter, applyEnd) {
         `Créations — travail perso : ${s.createTravailCount}`,
         '',
         ...conflictBlock,
-        'Vérifiez le résumé puis « 2. Appliquer » : la base est mise à jour en premier, puis Google en arrière-plan (avec pauses anti-quota). Pendant la synchro Google, les boutons Préparer / Appliquer restent indisponibles jusqu’à la fin.'
+        'Vérifiez le résumé puis « 2. Appliquer » : la base est mise à jour en premier (grille visible tout de suite), puis Google en arrière-plan par lots (général puis élèves inscrits). Pendant la synchro Google, les boutons Préparer / Appliquer restent indisponibles jusqu’à la fin.'
     ].join('\n');
 }
 
@@ -1104,38 +1141,29 @@ async function openSemainesTypesModal(user) {
         return;
     }
     showStMainPanel();
-    const isAdm = false;
-    const isEleve = String(user?.role || '').toLowerCase() === 'eleve';
-    const isProfUser = isProf(user);
     invalidateOrganSchoolSettingsCache();
     await fetchOrganSchoolSettings();
 
-    document.getElementById('st-tap-hint')?.classList.toggle('hidden', isEleve);
-    document.getElementById('st-main-panel')?.classList.toggle('st-main-panel--eleve', isEleve);
-    document.getElementById('st-gabarit-section')?.classList.toggle('st-gabarit-section--eleve', isEleve);
-    document.getElementById('st-add-row-a')?.classList.toggle('hidden', isAdm || isEleve);
-    document.getElementById('st-add-row-b')?.classList.toggle('hidden', isAdm || isEleve);
-    document.getElementById('st-gabarit-actions')?.classList.toggle('hidden', isAdm || isEleve);
-    document.getElementById('st-apply-admin-hint')?.classList.toggle('hidden', !isAdm);
-    document.getElementById('st-apply-controls')?.classList.toggle('hidden', isAdm || isEleve);
-    document.getElementById('st-apply-section')?.classList.toggle('hidden', isAdm || isEleve);
-    document.getElementById('st-teaching-days-section')?.classList.toggle('hidden', !isProfUser);
-    document.getElementById('st-gabarit-prof-title')?.classList.toggle('hidden', !isProfUser);
+    document.getElementById('st-tap-hint')?.classList.remove('hidden');
+    document.getElementById('st-main-panel')?.classList.remove('st-main-panel--eleve');
+    document.getElementById('st-gabarit-section')?.classList.remove('st-gabarit-section--eleve');
+    document.getElementById('st-add-row-a')?.classList.remove('hidden');
+    document.getElementById('st-add-row-b')?.classList.remove('hidden');
+    document.getElementById('st-gabarit-actions')?.classList.remove('hidden');
+    document.getElementById('st-actions-section')?.classList.remove('hidden');
+    document.getElementById('st-teaching-days-section')?.classList.remove('hidden');
+    document.getElementById('st-gabarit-prof-title')?.classList.remove('hidden');
 
-    if (isProfUser) {
-        stTeachingDaysSet = await fetchTeachingDaysForUser(user.id);
-        writeTeachingDaysToForm(stTeachingDaysSet);
-        const hint = document.getElementById('st-teaching-days-hint');
-        if (hint) {
-            if (!stTeachingDaysSet.size) {
-                hint.textContent = 'Cochez vos jours puis enregistrez avant d’ajouter des créneaux.';
-                hint.classList.remove('hidden');
-            } else {
-                hint.classList.add('hidden');
-            }
+    stTeachingDaysSet = await fetchTeachingDaysForUser(user.id);
+    writeTeachingDaysToForm(stTeachingDaysSet);
+    const hint = document.getElementById('st-teaching-days-hint');
+    if (hint) {
+        if (!stTeachingDaysSet.size) {
+            hint.textContent = 'Cochez vos jours puis enregistrez avant d’ajouter des créneaux.';
+            hint.classList.remove('hidden');
+        } else {
+            hint.classList.add('hidden');
         }
-    } else {
-        stTeachingDaysSet = new Set();
     }
 
     stApplyClosureRanges = parseClosureRangesFromSettings(
@@ -1155,15 +1183,13 @@ async function openSemainesTypesModal(user) {
     if (tb) tb.replaceChildren();
 
     const ctxBase = {
-        isAdmin: isAdm,
+        isAdmin: false,
         currentUserId: String(user.id),
         elevesById
     };
     stElevesByIdRef = elevesById;
 
-    const linesForModal = isProfUser
-        ? lines.filter((l) => String(l.owner_user_id || '') === String(user.id))
-        : lines;
+    const linesForModal = lines.filter((l) => String(l.owner_user_id || '') === String(user.id));
 
     for (const line of linesForModal) {
         const listEl = line.week_type === 'A' ? ta : tb;
@@ -1182,13 +1208,32 @@ async function openSemainesTypesModal(user) {
     sortTemplateListDOM(ta);
     sortTemplateListDOM(tb);
 
-    const applyStart = document.getElementById('st-apply-start');
-    if (applyStart) applyStart.value = defaultApplyStartYmd();
-    const applyEnd = document.getElementById('st-apply-end');
-    if (applyEnd) applyEnd.value = defaultApplyEndYmd();
+}
 
+function openStApplyModal() {
+    const dlg = document.getElementById('modal_semaines_apply');
+    if (!(dlg instanceof HTMLDialogElement)) return;
+    const applyStart = document.getElementById('st-apply-start');
+    if (applyStart instanceof HTMLInputElement) applyStart.value = defaultApplyStartYmd();
+    const applyEnd = document.getElementById('st-apply-end');
+    if (applyEnd instanceof HTMLInputElement) applyEnd.value = defaultApplyEndYmd();
     resetStAnalyzeOutput();
     lastAnalysis = null;
+    setStApplyButtonReady(false);
+    dlg.showModal();
+    focusPlanningDialogRoot(dlg);
+}
+
+function openStShiftModal() {
+    const dlg = document.getElementById('modal_semaines_shift');
+    if (!(dlg instanceof HTMLDialogElement)) return;
+    const shiftEffective = document.getElementById('st-shift-effective');
+    if (shiftEffective instanceof HTMLInputElement) {
+        shiftEffective.value = defaultProfShiftEffectiveYmd();
+    }
+    resetStShiftOutput();
+    dlg.showModal();
+    focusPlanningDialogRoot(dlg);
 }
 
 function addEmptyRow(listEl, elevesHtml, user, elevesById, ownerProfiles) {
@@ -1615,7 +1660,7 @@ async function runSemainesTypesApply() {
                         bilan,
                         '',
                         'Vous pouvez vérifier les agendas.',
-                        'Libellé « Semaine A / B » dans la barre du planning : uniquement en vue Semaine, Jour ou liste Planning (pas en vue Mois).',
+                        'Libellé « Semaine A (vous) / B (vous) » dans la barre du planning : uniquement en vue Semaine, Jour ou liste Planning (pas en vue Mois).',
                         savWarn
                     ]
                         .join('\n')
@@ -1719,6 +1764,97 @@ async function runSemainesTypesAddRow(week) {
     addEmptyRow(listEl, makeStudentOptionsHtml(eleves), u, elevesById, ownerProfiles);
 }
 
+async function runSemainesTypesShift() {
+    const u = getPlanningSessionUser();
+    if (!u?.email || !isProf(u)) return;
+    if (stGoogleSyncInFlight) {
+        showToast('Synchronisation Google du gabarit encore en cours.', 'info', 5000);
+        return;
+    }
+
+    const effectiveYmd = document.getElementById('st-shift-effective')?.value?.trim() || '';
+    const weeksRaw = document.querySelector('input[name="st-shift-weeks"]:checked')?.value;
+    const weekDelta = weeksRaw === '2' ? 2 : 1;
+
+    setStModalActionsBusy(true);
+    setStShiftBusyHint(true);
+    const shiftBtn = document.getElementById('st-btn-shift');
+    const shiftLabelRest = shiftBtn?.getAttribute('data-label-rest') || 'Décaler mes créneaux';
+    if (shiftBtn && !shiftBtn.getAttribute('data-label-rest')) {
+        shiftBtn.setAttribute('data-label-rest', shiftLabelRest);
+    }
+    if (shiftBtn) shiftBtn.textContent = 'Vérification…';
+
+    try {
+        const analysis = await analyzeProfSlotsShift({
+            profUserId: u.id,
+            profEmail: u.email,
+            effectiveYmd,
+            weekDelta
+        });
+
+        if (!analysis.ok) {
+            stShiftShowError('Décalage impossible', analysis.error || 'Aucun créneau à décaler.');
+            showToast(analysis.error?.split('\n')[0] || 'Décalage impossible.', 'error', 8000);
+            return;
+        }
+
+        stShiftShowResult(formatProfShiftPrepareSummary(analysis));
+
+        const wLabel = weekDelta === 2 ? '2 semaines' : '1 semaine';
+        if (
+            !confirm(
+                `Décaler ${analysis.count} créneau(x) de +${wLabel} à partir du ${effectiveYmd} ?\n\nLa base est mise à jour en premier, puis Google Agenda (avec pauses anti-quota). Votre repère semaine A/B ne change pas.`
+            )
+        ) {
+            return;
+        }
+
+        if (shiftBtn) shiftBtn.textContent = 'Décalage en cours…';
+        const exec = await executeProfSlotsShift({
+            profUserId: u.id,
+            profEmail: u.email,
+            effectiveYmd,
+            weekDelta,
+            onProgress: (detail) => {
+                if (shiftBtn && detail) shiftBtn.textContent = detail.slice(0, 40);
+            },
+            onDbComplete: () => {
+                document.dispatchEvent(new CustomEvent('planning-events-changed'));
+            }
+        });
+
+        if (!exec.ok) {
+            stShiftShowError('Décalage interrompu', exec.error || 'Erreur inconnue.');
+            showToast(exec.error?.split('\n')[0] || 'Décalage interrompu.', 'error', 8000);
+            return;
+        }
+
+        const googleNote = exec.googleSkipped
+            ? ' (Google non configuré — base seulement).'
+            : ' Base et Google mis à jour.';
+        stShiftShowResult(
+            [
+                `Décalage terminé : ${exec.count} créneau(x) déplacé(s) de +${wLabel}.`,
+                googleNote,
+                '',
+                'Consultez le planning pour vérifier les nouvelles dates.'
+            ].join('\n')
+        );
+        showToast(`${exec.count} créneau(x) décalé(s).`, 'success', 5000);
+        document.dispatchEvent(new CustomEvent('planning-events-changed'));
+    } catch (e) {
+        console.error('[semaines-types] runSemainesTypesShift', e);
+        const msg = String(e?.message || e);
+        stShiftShowError('Erreur inattendue', msg);
+        showToast(msg.split('\n')[0] || 'Erreur lors du décalage.', 'error', 8000);
+    } finally {
+        if (shiftBtn) shiftBtn.textContent = shiftLabelRest;
+        setStShiftBusyHint(false);
+        setStModalActionsBusy(false);
+    }
+}
+
 /**
  * Clics dans la modale : délégation sur document (fiable même si le fragment HTML a été injecté
  * après un premier bind, ou si les boutons ont été recréés).
@@ -1726,19 +1862,57 @@ async function runSemainesTypesAddRow(week) {
 function onSemainesTypesDocumentClick(e) {
     const t = e.target;
     if (!(t instanceof Element)) return;
+
+    const applyDlg = document.getElementById('modal_semaines_apply');
+    if (applyDlg?.open && applyDlg.contains(t)) {
+        if (t.closest('#st-apply-close')) {
+            e.preventDefault();
+            applyDlg.close();
+            return;
+        }
+        if (t.closest('#st-btn-analyze')) {
+            e.preventDefault();
+            void runSemainesTypesAnalyze();
+            return;
+        }
+        const applyEl = t.closest('#st-btn-apply');
+        if (applyEl instanceof HTMLButtonElement) {
+            e.preventDefault();
+            if (applyEl.disabled) return;
+            void runSemainesTypesApply();
+            return;
+        }
+        return;
+    }
+
+    const shiftDlg = document.getElementById('modal_semaines_shift');
+    if (shiftDlg?.open && shiftDlg.contains(t)) {
+        if (t.closest('#st-shift-close')) {
+            e.preventDefault();
+            shiftDlg.close();
+            return;
+        }
+        if (t.closest('#st-btn-shift')) {
+            e.preventDefault();
+            const shiftBtn = document.getElementById('st-btn-shift');
+            if (shiftBtn instanceof HTMLButtonElement && shiftBtn.disabled) return;
+            void runSemainesTypesShift();
+            return;
+        }
+        return;
+    }
+
     const dlg = document.getElementById('modal_semaines_types');
     if (!dlg?.open || !dlg.contains(t)) return;
 
-    if (t.closest('#st-btn-analyze')) {
+    if (t.closest('#st-open-apply-modal')) {
         e.preventDefault();
-        void runSemainesTypesAnalyze();
+        openStApplyModal();
         return;
     }
-    const applyEl = t.closest('#st-btn-apply');
-    if (applyEl instanceof HTMLButtonElement) {
+    if (t.closest('#st-open-shift-modal')) {
         e.preventDefault();
-        if (applyEl.disabled) return;
-        void runSemainesTypesApply();
+        openStShiftModal();
         return;
     }
     if (t.closest('#st-teaching-days-save')) {

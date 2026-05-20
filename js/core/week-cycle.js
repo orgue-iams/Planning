@@ -2,6 +2,9 @@
  * Semaine A / B : repère **par professeur** (`organ_prof_week_cycle`).
  * Chaque prof a ses semaines « type A » et « type B » ; un autre prof peut avoir l’inverse la même semaine calendaire.
  * Libellé dans la barre du calendrier : **uniquement** si le profil connecté est `prof` et qu’une ligne existe (souvent après « Appliquer » le gabarit).
+ *
+ * **Legacy** : la table `organ_week_cycle` (migration 009) n’est plus lue ni écrite par l’app ;
+ * ne pas la réutiliser côté UI (voir `supabase/manual/DEPRECATED_organ_week_cycle.md`).
  */
 import { getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
 import { isProf } from './auth-logic.js';
@@ -95,10 +98,11 @@ function pgDateToYmd(raw) {
 }
 
 /**
- * Charge le repère A/B du prof connecté (une ligne par `user_id`).
+ * Charge le repère A/B du prof connecté (`organ_prof_week_cycle`, une ligne par `user_id`).
+ * No-op pour admin / élève (pas de requête réseau).
  * @param {{ id?: string, role?: string } | null} user
  */
-export async function fetchWeekCycleAnchor(user) {
+export async function fetchProfWeekCycleForToolbar(user) {
     cachedProfWeekCycle = null;
     if (!isBackendAuthConfigured() || !user?.id || !isProf(user)) {
         return null;
@@ -158,4 +162,24 @@ export async function saveProfWeekCycleFromApply(userId, applyStartYmd, letterFo
 
     cachedProfWeekCycle = { anchorMondayIso: mondayIso, letterAtAnchor };
     return { ok: true };
+}
+
+/** @deprecated Préférer `fetchProfWeekCycleForToolbar`. */
+export const fetchWeekCycleAnchor = fetchProfWeekCycleForToolbar;
+
+/**
+ * Met à jour le cache A/B et notifie la barre du planning (`planning-week-cycle-updated`).
+ * Prof : charge `organ_prof_week_cycle`. Autres rôles : cache vidé uniquement.
+ * @param {{ id?: string, role?: string } | null} user
+ */
+export function refreshProfWeekCycleToolbarUi(user) {
+    clearProfWeekCycleCache();
+    if (!isProf(user)) {
+        document.dispatchEvent(new CustomEvent('planning-week-cycle-updated'));
+        return Promise.resolve(null);
+    }
+    return fetchProfWeekCycleForToolbar(user).then((state) => {
+        document.dispatchEvent(new CustomEvent('planning-week-cycle-updated'));
+        return state;
+    });
 }

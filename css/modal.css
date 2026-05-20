@@ -624,13 +624,17 @@
 }
 
 /* Semaines types : bouton Appliquer — état actif (attribut + propriété) */
-#modal_semaines_types #st-btn-apply:not([disabled]) {
+#modal_semaines_apply #st-btn-apply:not([disabled]) {
     opacity: 1;
     cursor: pointer;
 }
-#modal_semaines_types #st-btn-apply[disabled] {
+#modal_semaines_apply #st-btn-apply[disabled] {
     opacity: 0.55;
     cursor: not-allowed;
+}
+
+#modal_semaines_types .st-actions-row .btn {
+    justify-content: center;
 }
 
 /* Semaines types : cartes créneaux + rappel couleur type. */

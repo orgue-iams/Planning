@@ -1,0 +1,70 @@
+<dialog id="modal_semaines_shift" class="modal modal-semaines-sub">
+    <div class="modal-box st-submodal-box p-5 w-[96%] max-w-xl max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 shadow-2xl">
+        <h3 class="st-section-title m-0 mb-2">Décaler mes créneaux existants</h3>
+        <p class="text-[9px] text-slate-500 dark:text-slate-400 m-0 mb-3 leading-snug">
+            Déplace <strong>tous</strong> vos créneaux déjà planifiés (cours, travail perso., etc.) de +1 ou +2 semaines,
+            sans recréer le gabarit. Votre alternance A/B en base reste inchangée.
+        </p>
+        <div id="st-shift-controls" class="space-y-3">
+            <div class="st-apply-period-row grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 items-stretch">
+                <div class="planning-surface-card rounded-xl p-2.5 sm:p-3 shadow-sm flex flex-col gap-2">
+                    <label class="text-[9px] font-bold block" for="st-shift-effective">Date effective (inclus)</label>
+                    <input
+                        type="date"
+                        id="st-shift-effective"
+                        class="input input-sm h-9 font-mono text-sm rounded-lg w-full min-w-0 planning-date-input"
+                    />
+                    <p class="text-[9px] text-slate-500 m-0 leading-snug">
+                        Créneaux dont le début est à partir de cette date (00:00) et dans le futur.
+                    </p>
+                </div>
+                <div class="planning-surface-card rounded-xl p-2.5 sm:p-3 shadow-sm flex flex-col gap-2">
+                    <p class="text-[9px] font-bold m-0">Décalage</p>
+                    <div class="flex flex-col gap-1.5 text-[11px] font-bold">
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                            <input type="radio" name="st-shift-weeks" id="st-shift-weeks-1" value="1" class="radio radio-xs" checked />
+                            +1 semaine
+                        </label>
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                            <input type="radio" name="st-shift-weeks" id="st-shift-weeks-2" value="2" class="radio radio-xs" />
+                            +2 semaines
+                        </label>
+                    </div>
+                    <label class="flex items-start gap-1.5 cursor-pointer text-[9px] font-normal text-slate-600 dark:text-slate-300 mt-1">
+                        <input type="checkbox" id="st-shift-closures-ack" class="checkbox checkbox-xs mt-0.5 shrink-0" />
+                        <span>J’ai relu les dates après fermetures institut</span>
+                    </label>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-2 items-center pt-2 border-t border-slate-200 dark:border-slate-600">
+                <button
+                    type="button"
+                    id="st-btn-shift"
+                    class="btn btn-warning btn-sm font-black text-[11px]"
+                    data-label-rest="Décaler mes créneaux"
+                >
+                    Décaler mes créneaux
+                </button>
+                <span
+                    id="st-shift-busy-hint"
+                    class="hidden text-[9px] text-amber-900 max-w-md leading-snug self-center"
+                    role="status"
+                >
+                    Décalage en cours…
+                </span>
+            </div>
+            <div id="st-shift-out-wrap" class="border-t border-slate-200 dark:border-slate-600 pt-3 max-w-4xl min-h-[2.5rem] mt-2" aria-live="polite">
+                <p id="st-shift-placeholder" class="text-[9px] text-slate-500 m-0 leading-relaxed">
+                    Choisissez la date et le décalage, puis cliquez sur <strong>Décaler mes créneaux</strong> : vérification des conflits, confirmation, puis mise à jour base et Google.
+                </p>
+                <pre
+                    id="st-shift-out"
+                    class="text-[10px] sm:text-xs text-slate-800 dark:text-slate-100 whitespace-pre-wrap font-sans m-0 leading-relaxed hidden"
+                ></pre>
+            </div>
+        </div>
+        <div class="modal-action mt-4 pt-3 border-t border-slate-100 dark:border-slate-600 flex justify-end shrink-0">
+            <button type="button" id="st-shift-close" class="btn btn-ghost btn-sm font-black text-[11px]">Fermer</button>
+        </div>
+    </div>
+</dialog>

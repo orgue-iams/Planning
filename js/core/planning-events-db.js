@@ -346,6 +346,81 @@ export async function fetchPlanningMirrorTargetsForDelete(eventId, options = {})
  * @param {string} eventId
  * @returns {Promise<{ mainGoogleEventId: string, poolGoogleEventId: string }>}
  */
+/**
+ * Miroirs Google (tous targets) pour plusieurs créneaux — une requête.
+ * @param {string[]} eventIds
+ * @returns {Promise<Map<string, { mainGoogleEventId: string, poolGoogleEventId: string }>>}
+ */
+export async function fetchPlanningMainPoolGoogleIdsForEvents(eventIds) {
+    const sb = getSupabaseClient();
+    const out = new Map();
+    if (!sb || !isBackendAuthConfigured()) return out;
+    const ids = [...new Set(eventIds.map((x) => String(x || '').trim()).filter(Boolean))];
+    if (!ids.length) return out;
+    const { data, error } = await sb
+        .from('planning_event_google_mirror')
+        .select('event_id,target,google_event_id,sync_status')
+        .in('event_id', ids)
+        .in('target', ['main', 'pool_owner']);
+    if (error) {
+        console.warn('[planning-events-db] fetchPlanningMainPoolGoogleIdsForEvents', error.message);
+        return out;
+    }
+    for (const r of Array.isArray(data) ? data : []) {
+        if (String(r?.sync_status || '') !== 'ok') continue;
+        const ge = String(r?.google_event_id || '').trim();
+        if (!ge) continue;
+        const eid = String(r.event_id || '').trim();
+        if (!eid) continue;
+        let entry = out.get(eid);
+        if (!entry) {
+            entry = { mainGoogleEventId: '', poolGoogleEventId: '' };
+            out.set(eid, entry);
+        }
+        if (r.target === 'main') entry.mainGoogleEventId = ge;
+        if (r.target === 'pool_owner') entry.poolGoogleEventId = ge;
+    }
+    return out;
+}
+
+/**
+ * Tâches de suppression Google pour une liste de créneaux (avant DELETE base).
+ * @param {string[]} eventIds
+ * @param {{ anySyncStatus?: boolean }} [options]
+ * @returns {Promise<{ googleEventId: string, calendarId: string }[]>}
+ */
+export async function fetchPlanningMirrorCleanupTasksForEvents(eventIds, options = {}) {
+    const sb = getSupabaseClient();
+    if (!sb || !isBackendAuthConfigured()) return [];
+    const ids = [...new Set(eventIds.map((x) => String(x || '').trim()).filter(Boolean))];
+    if (!ids.length) return [];
+    const anySyncStatus = Boolean(options.anySyncStatus);
+    const { data, error } = await sb
+        .from('planning_event_google_mirror')
+        .select('event_id,google_calendar_id,google_event_id,sync_status')
+        .in('event_id', ids);
+    if (error) {
+        console.warn('[planning-events-db] fetchPlanningMirrorCleanupTasksForEvents', error.message);
+        return [];
+    }
+    const seen = new Set();
+    const tasks = [];
+    for (const r of Array.isArray(data) ? data : []) {
+        if (!r) continue;
+        if (!String(r.google_event_id || '').trim()) continue;
+        if (!String(r.google_calendar_id || '').trim()) continue;
+        if (!anySyncStatus && String(r.sync_status || '') !== 'ok') continue;
+        const k = `${String(r.google_calendar_id).trim().toLowerCase()}|${String(r.google_event_id).trim()}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        tasks.push({
+            calendarId: String(r.google_calendar_id).trim(),
+            googleEventId: String(r.google_event_id).trim()
+        });
+    }
+    return tasks;
+}
+
 export async function fetchPlanningMainPoolGoogleIdsForEvent(eventId) {
     const sb = getSupabaseClient();
     if (!sb || !isBackendAuthConfigured()) return { mainGoogleEventId: '', poolGoogleEventId: '' };

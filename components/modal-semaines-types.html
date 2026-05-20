@@ -46,70 +46,22 @@
                         </div>
                     </section>
 
-                    <section id="st-apply-section" class="st-section">
-                        <p class="st-section-title">Recréer mes créneaux depuis le gabarit</p>
-                        <p class="text-[9px] text-slate-500 dark:text-slate-400 m-0 mb-2 leading-snug">
-                            Efface et recrée <strong>vos</strong> créneaux sur la période (pas ceux des autres professeurs). Les fermetures institut sont respectées.
-                        </p>
-                        <p id="st-apply-admin-hint" class="hidden text-[9px] text-amber-900 bg-amber-50 border-b border-amber-100 py-2 mb-2">
-                            En tant qu’<strong>administrateur</strong>, vous consultez les gabarits. La <strong>préparation</strong> et l’<strong>écriture</strong> dans les agendas sont réservées aux comptes <strong>professeur</strong> (connectez-vous avec un prof pour lancer l’application).
-                        </p>
-                        <div id="st-apply-controls" class="space-y-3">
-                            <p class="text-[9px] text-slate-500 m-0">Étape 1 : préparer (compte des créations / suppressions). Étape 2 : appliquer sur le planning général et les agendas pool concernés.</p>
-                            <div class="st-apply-period pt-2 border-t border-slate-200 dark:border-slate-600 space-y-2">
-                                <p class="text-[9px] font-bold text-slate-600 dark:text-slate-300 m-0">Période d’application</p>
-                                <div class="st-apply-period-row grid grid-cols-2 gap-2 sm:gap-3 items-stretch">
-                                    <div class="st-apply-week-start-group planning-surface-card rounded-xl p-2.5 sm:p-3 shadow-sm flex flex-col gap-2">
-                                        <label class="text-[9px] font-bold block" for="st-apply-start">Date de début (inclus)</label>
-                                        <input type="date" id="st-apply-start" class="input input-sm h-9 font-mono text-sm rounded-lg w-full min-w-0 planning-date-input" />
-                                        <div class="flex flex-col gap-1.5 text-[11px] font-bold pt-0.5">
-                                            <label class="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="st-apply-first-week" id="st-apply-week-a" value="A" class="radio radio-xs" checked /> Semaine A</label>
-                                            <label class="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="st-apply-first-week" id="st-apply-week-b" value="B" class="radio radio-xs" /> Semaine B</label>
-                                        </div>
-                                    </div>
-                                    <div class="st-apply-end-group planning-surface-card rounded-xl p-2.5 sm:p-3 shadow-sm flex flex-col gap-2">
-                                        <label class="text-[9px] font-bold block" for="st-apply-end">Date de fin (inclus)</label>
-                                        <input type="date" id="st-apply-end" class="input input-sm h-9 font-mono text-sm rounded-lg w-full min-w-0 planning-date-input" />
-                                    </div>
-                                </div>
-                            </div>
-                            <p class="text-[9px] text-slate-500 leading-snug m-0">La semaine type porte sur la semaine <strong>lundi → dimanche</strong> qui <strong>contient</strong> la date de début. Le <strong>lundi suivant</strong> bascule A ↔ B, etc. Ce repère est <strong>personnel</strong> (chaque prof le sien).</p>
-                            <div class="flex flex-wrap gap-2 items-center pt-2 border-t border-slate-200 dark:border-slate-600">
-                                <button type="button" id="st-btn-analyze" class="btn btn-outline btn-sm font-black text-[11px]">1. Préparer l’application</button>
-                                <button
-                                    type="button"
-                                    id="st-btn-apply"
-                                    disabled
-                                    class="btn btn-error btn-sm font-black text-[11px]"
-                                    title="Terminez d’abord l’étape 1 (Préparer l’application)."
-                                >
-                                    2. Appliquer sur Google Agenda
-                                </button>
-                                <span
-                                    id="st-google-sync-hint"
-                                    class="hidden text-[9px] text-amber-900 max-w-md leading-snug self-center"
-                                    role="status"
-                                >
-                                    Synchro Google en cours — Préparer / Appliquer indisponibles jusqu’à la fin.
-                                </span>
-                            </div>
-                            <p id="st-btn-apply-hint" class="text-[9px] text-slate-500 m-0 max-w-4xl leading-snug">
-                                Le bouton <strong>2</strong> reste inactif tant que la préparation n’a pas réussi ; le résumé s’affiche dans l’encadré ci-dessous.
-                            </p>
-                            <div id="st-apply-progress-wrap" class="hidden mt-3 max-w-4xl space-y-1" aria-live="polite">
-                                <progress id="st-apply-progress" class="progress progress-primary w-full h-2.5" max="100" value="0"></progress>
-                                <p id="st-apply-progress-text" class="text-[9px] text-slate-600 m-0 leading-snug"></p>
-                            </div>
-                            <div id="st-analyze-out-wrap" class="border-t border-slate-200 dark:border-slate-600 pt-3 max-w-4xl min-h-[3.5rem] mt-2" aria-live="polite" aria-atomic="true">
-                                <p id="st-analyze-placeholder" class="text-[9px] text-slate-500 m-0 leading-relaxed" style="display: block">
-                                    Cliquez sur <strong>1. Préparer l’application</strong> : le résumé (bilan, conflits) s’affiche dans cet encadré. Ensuite activez <strong>2. Appliquer sur Google Agenda</strong> (à droite du bouton 1).
-                                </p>
-                                <pre
-                                    id="st-analyze-out"
-                                    class="text-[10px] sm:text-xs text-slate-800 dark:text-slate-100 whitespace-pre-wrap font-sans m-0 leading-relaxed"
-                                    style="display: none"
-                                ></pre>
-                            </div>
+                    <section id="st-actions-section" class="st-section">
+                        <div class="st-actions-row flex flex-col sm:flex-row flex-wrap gap-2">
+                            <button
+                                type="button"
+                                id="st-open-apply-modal"
+                                class="btn btn-error btn-sm font-black text-[11px] flex-1 min-w-[12rem]"
+                            >
+                                Recréer mes créneaux depuis le gabarit
+                            </button>
+                            <button
+                                type="button"
+                                id="st-open-shift-modal"
+                                class="btn btn-warning btn-sm font-black text-[11px] flex-1 min-w-[12rem]"
+                            >
+                                Décaler mes créneaux existants
+                            </button>
                         </div>
                     </section>
                 </div>

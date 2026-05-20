@@ -122,15 +122,17 @@ function toolbarPeriodBaseTitle(view) {
 }
 
 /**
- * Libellé semaine A/B pour la vue courante (prof + repère en base), sinon chaîne vide.
+ * Libellé semaine A/B pour la vue courante (prof + repère `organ_prof_week_cycle` en base).
+ * Admin / élève : toujours chaîne vide (pas de semaine type globale).
  * @param {import('@fullcalendar/core').CalendarApi} calendar
  */
 function toolbarWeekCycleLabel(calendar) {
+    const u = getPlanningSessionUser();
+    if (!isProf(u)) return '';
     const view = calendar.view;
     const type = view.type;
     const start = view.currentStart;
-    const u = getPlanningSessionUser();
-    const state = isProf(u) ? getProfWeekCycleForToolbar() : null;
+    const state = getProfWeekCycleForToolbar();
     const weekCycleOkView =
         type === 'timeGridWeek' || type === 'timeGridDay' || type === 'listWeek';
     const wc =
@@ -140,12 +142,12 @@ function toolbarWeekCycleLabel(calendar) {
     return wc ? String(wc) : '';
 }
 
-/** Ex. « sem. A » pour le titre de période (prof uniquement). */
+/** Ex. « Semaine A (vous) » pour le titre de période (prof uniquement). */
 function toolbarWeekCycleShortSuffix(calendar) {
     const wc = toolbarWeekCycleLabel(calendar);
     if (!wc) return '';
-    if (wc.includes('B')) return 'sem. B';
-    if (wc.includes('A')) return 'sem. A';
+    if (wc.includes('B')) return 'Semaine B (vous)';
+    if (wc.includes('A')) return 'Semaine A (vous)';
     return '';
 }
 

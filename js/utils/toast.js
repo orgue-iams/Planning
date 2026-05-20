@@ -6,8 +6,10 @@
  * @param {number} [durationMs] temps d’affichage avant fondu (défaut 3200 ms)
  */
 function getToastMountParent() {
-    const semaines = document.getElementById('modal_semaines_types');
-    if (semaines?.open) return semaines;
+    for (const id of ['modal_semaines_shift', 'modal_semaines_apply', 'modal_semaines_types']) {
+        const d = document.getElementById(id);
+        if (d?.open) return d;
+    }
     const opened = document.querySelectorAll('dialog[open]');
     if (opened.length) return opened[opened.length - 1];
     return document.body;

@@ -11,6 +11,37 @@
     color: #3f3f1e !important;
 }
 
+/* Élève inscrit : bandeau horaire vert léger + pastille (phase 4) */
+.event-cours-enrolled {
+    --slot-bg-strong: #f6e36a;
+    --slot-bg-soft: #fbef9b;
+    color: #3f3f1e !important;
+}
+
+.event-cours-enrolled .event-time-fc {
+    position: relative;
+    --slot-bg-strong: #6eb83a;
+    --slot-bg-soft: #9ed46f;
+    color: #163310 !important;
+    background: var(--slot-bg-strong);
+}
+
+.event-cours-enrolled .event-title-fc {
+    background: var(--slot-bg-soft);
+}
+
+.event-cours-enrolled .event-enrolled-badge {
+    position: absolute;
+    top: 0.14rem;
+    right: 0.1rem;
+    width: 0.44rem;
+    height: 0.44rem;
+    border-radius: 9999px;
+    background: #166534;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9);
+    pointer-events: none;
+}
+
 .event-concert {
     --slot-bg-strong: #a855f7;
     --slot-bg-soft: #ddd6fe;
@@ -163,8 +194,8 @@ html[data-planning-fc-text='lg'] .event-title-fc {
     color: inherit !important;
     opacity: 1;
     flex: 0 0 auto;
-    min-height: 1.35rem;
-    padding: 0.22rem 0.14rem 0.18rem;
+    min-height: 1.48rem;
+    padding: 0.26rem 0.14rem 0.2rem;
     margin: 0;
     background: var(--slot-bg-strong, #cbd5e1);
     font-variant-numeric: tabular-nums;
@@ -186,8 +217,8 @@ html[data-planning-fc-text='lg'] .event-time-fc {
 
 /* Échelle moyenne : bandeau horaire un peu plus haut ; titre un peu plus compact pour 2 lignes / 1 h */
 html[data-planning-fc-text='md'] .event-time-fc {
-    min-height: 1.32rem;
-    padding: 0.18rem 0.12rem 0.14rem;
+    min-height: 1.46rem;
+    padding: 0.22rem 0.12rem 0.16rem;
     line-height: 1.15;
 }
 
@@ -210,8 +241,8 @@ html[data-planning-fc-text='md'] .event-title-fc {
     }
 
     html[data-planning-fc-text='md'] .event-time-fc {
-        min-height: 1.28rem;
-        padding: 0.16rem 0.1rem 0.12rem;
+        min-height: 1.42rem;
+        padding: 0.2rem 0.1rem 0.14rem;
         font-size: 0.74rem;
     }
 

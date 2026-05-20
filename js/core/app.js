@@ -91,7 +91,7 @@ import { initDirectoryUsersUi, resetDirectoryUsersUiBindings } from './directory
 import { initCoursSeriesScopeUi, resetCoursSeriesScopeUiBindings } from './cours-series-scope-ui.js';
 import { initConfigUi, resetConfigUiBindings } from './config-ui.js';
 import { installAdminClearWeekDelegatedClick } from './admin-clear-week.js';
-import { fetchWeekCycleAnchor, clearProfWeekCycleCache } from './week-cycle.js';
+import { refreshProfWeekCycleToolbarUi, clearProfWeekCycleCache } from './week-cycle.js';
 import { fetchOrganSchoolSettings, getChapelSlotBounds, invalidateOrganSchoolSettingsCache } from './organ-settings.js';
 import { APP_VERSION } from '../config/app-version.js';
 import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
@@ -260,6 +260,9 @@ function refreshHeaderUser(user) {
     }
     void refreshHeaderWeekStrip(user);
     syncPlanningDrawerGroupedSections();
+    if (calendar) {
+        void refreshProfWeekCycleToolbarUi(user);
+    }
 }
 
 function initCalendarAndRevealUi() {
@@ -427,9 +430,15 @@ function initCalendarAndRevealUi() {
             updatePlanningSundayColumnVisibility(calendar, currentUser);
         };
         handlers.onDatesSet();
-        void fetchWeekCycleAnchor(currentUser).then(() => toolbarCtl?.refreshTitle());
+        void refreshProfWeekCycleToolbarUi(currentUser);
         document.addEventListener('planning-week-cycle-updated', () => toolbarCtl?.refreshTitle());
         document.addEventListener('planning-template-applied', () => {
+            void refetchPlanningGrid(calendar).catch(() => {
+                /* */
+            });
+        });
+        document.addEventListener('planning-events-changed', () => {
+            invalidateCalendarListCache();
             void refetchPlanningGrid(calendar).catch(() => {
                 /* */
             });

@@ -139,8 +139,9 @@ Voir phase 3 — boutons placés **sous** le bloc alternance ou à côté, **dis
 
 ## Phase 5 — Nettoyage & cohérence
 
-- **Ne plus** utiliser `organ_week_cycle` côté UI (legacy global) ; documenter dépréciation.
-- Vérifier qu’aucun écran admin / élève n’appelle `fetchWeekCycleAnchor` ni n’affiche `toolbarWeekCycleLabel`.
+- **Ne plus** utiliser `organ_week_cycle` côté UI (legacy global) ; documenter dépréciation → `supabase/manual/DEPRECATED_organ_week_cycle.md`, commentaire SQL 038.
+- **Admin / élève** : pas de requête `organ_prof_week_cycle`, pas de suffixe « Semaine A (vous) » dans la barre (`refreshProfWeekCycleToolbarUi`, garde `isProf` dans `calendar-toolbar.js`).
+- **Modale Semaines A/B** : ouverture réservée au prof (code mort admin/élève retiré).
 - Tests manuels : deux profs, repères décalés d’une semaine, même semaine civile = lettres différentes barre planning ; élève voit uniquement dates + pastilles.
 
 ---

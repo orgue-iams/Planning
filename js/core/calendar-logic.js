@@ -1245,6 +1245,34 @@ function notifySlotOwnerAfterThirdPartyEditNonBlocking(payload) {
     });
 }
 
+/** @param {Record<string, unknown> | undefined} xp */
+function inscritEmailsFromExtendedProps(xp) {
+    const raw = xp?.inscrits;
+    if (Array.isArray(raw)) {
+        return raw.map((x) => String(x).trim().toLowerCase()).filter(Boolean);
+    }
+    return String(raw || '')
+        .split(/[,;]/)
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean);
+}
+
+/**
+ * Élève inscrit sur un créneau « cours » (planning_event_enrollment exposé via RPC).
+ * @param {{ extendedProps?: Record<string, unknown> } | null} eventLike
+ * @param {object | null} currentUser
+ */
+export function isEleveEnrolledInCoursEvent(eventLike, currentUser) {
+    if (normalizeRole(currentUser?.role) !== 'eleve') return false;
+    const type = String(eventLike?.extendedProps?.type || '').toLowerCase();
+    if (type !== 'cours') return false;
+    const me = String(currentUser?.email || '')
+        .trim()
+        .toLowerCase();
+    if (!me) return false;
+    return inscritEmailsFromExtendedProps(eventLike?.extendedProps).includes(me);
+}
+
 /**
  * Classe CSS créneau (alignée sur la grille FullCalendar).
  * @param {{ extendedProps?: Record<string, unknown>, title?: string } | null} eventLike
@@ -1259,17 +1287,10 @@ export function getPlanningEventColorClass(eventLike, currentUser) {
         .toLowerCase();
     const isMine = Boolean(me && ownerEmail && ownerEmail === me);
     const type = eventLike?.extendedProps?.type || 'reservation';
-    const inscritsRaw = eventLike?.extendedProps?.inscrits;
-    const inscritsList = Array.isArray(inscritsRaw)
-        ? inscritsRaw.map((x) => String(x).trim().toLowerCase()).filter(Boolean)
-        : typeof inscritsRaw === 'string'
-          ? String(inscritsRaw)
-                .split(/[,;]/)
-                .map((x) => x.trim().toLowerCase())
-                .filter(Boolean)
-          : [];
-    const amInscribedInCours = Boolean(me && inscritsList.includes(me));
     if (type === 'fermeture') return 'event-fermeture';
+    if (type === 'cours' && isEleveEnrolledInCoursEvent(eventLike, currentUser)) {
+        return 'event-cours-enrolled';
+    }
     if (type === 'cours' || type === 'maintenance') return 'event-cours';
     if (type === 'concert') return 'event-concert';
     if (type === 'autre') return 'event-autre';
@@ -1291,6 +1312,7 @@ export function getEventContent(arg, currentUser) {
     const durationMin = Math.round(durationMs / (1000 * 60));
 
     const colorClass = getPlanningEventColorClass(arg.event, currentUser);
+    const showEnrolledBadge = isEleveEnrolledInCoursEvent(arg.event, currentUser);
 
     const formatTime = (date) => formatTimeFr24(date);
 
@@ -1323,9 +1345,13 @@ export function getEventContent(arg, currentUser) {
     const pastCls = pastReadonly ? ' event-box--past-readonly' : '';
     const aria = isMirror ? ' aria-hidden="true"' : '';
 
+    const enrolledBadge = showEnrolledBadge
+        ? '<span class="event-enrolled-badge" title="Vous êtes inscrit à ce cours" aria-hidden="true"></span>'
+        : '';
+
     let innerHTML = `
         <div class="event-box flex flex-col h-full w-full ${colorClass}${mirrorCls}${pastCls}"${aria}>
-            <div class="event-time event-time-fc">${timeLine}</div>`;
+            <div class="event-time event-time-fc">${enrolledBadge}${escapeHtml(timeLine)}</div>`;
     if (showTitleRow) {
         innerHTML += `
             <div class="event-title event-title-fc">${escapeHtml(title)}</div>`;
