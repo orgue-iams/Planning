@@ -551,3 +551,26 @@ dialog.modal .btn.btn-warning:not(.btn-ghost) {
     min-width: 0;
     word-break: break-word;
 }
+
+/* Noms de profil (tiroir, cartes annuaire, champ « Nom » du profil) */
+.planning-profile-name-text,
+.planning-drawer__profile-name,
+.planning-profile-name-input {
+    font-variant-caps: small-caps;
+    letter-spacing: 0.03em;
+}
+
+/* Annuaire : prénom + nom sur une seule ligne */
+.directory-user-card__name {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.directory-user-card__name .directory-user-card__prenom,
+.directory-user-card__name .directory-user-card__nom {
+    display: inline;
+}

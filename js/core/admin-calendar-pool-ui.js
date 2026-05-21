@@ -60,7 +60,7 @@ function appendPoolUpdateButton(actions, opts) {
     const inFlight = mainResync
         ? poolResyncInFlight === '__main__'
         : poolResyncInFlight === String(poolId ?? '');
-    upd.textContent = inFlight ? '…' : 'Update';
+    upd.textContent = inFlight ? '…' : 'Resynchroniser';
     upd.disabled = inFlight;
     actions.appendChild(upd);
 }

@@ -1973,4 +1973,24 @@ export function initSemainesTypesUi() {
     document.addEventListener('dragend', onStTemplateDragEnd, { signal });
     document.addEventListener('dragover', onStTemplateDragOver, { signal });
     document.addEventListener('drop', onStTemplateDrop, { signal });
+
+    document.addEventListener(
+        'planning-template-line-schedule-updated',
+        (ev) => {
+            const dlg = document.getElementById('modal_semaines_types');
+            if (!(dlg instanceof HTMLDialogElement) || !dlg.open) return;
+            const d = ev.detail;
+            if (!d?.lineId) return;
+            const card = document.querySelector(
+                `#modal_semaines_types .st-slot-card[data-line-id="${CSS.escape(String(d.lineId))}"]`
+            );
+            if (!(card instanceof HTMLElement)) return;
+            if (d.day_of_week != null) card.dataset.stDow = String(d.day_of_week);
+            if (d.start_time) card.dataset.stStart = String(d.start_time).slice(0, 5);
+            if (d.end_time) card.dataset.stEnd = String(d.end_time).slice(0, 5);
+            if (d.title != null) card.dataset.stTitle = String(d.title).trim();
+            syncRowReadonlyDisplay(card, stElevesByIdRef);
+        },
+        { signal }
+    );
 }

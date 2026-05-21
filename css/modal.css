@@ -886,6 +886,42 @@
     color: rgb(187 247 208);
 }
 
+#modal_fermetures .fermeture-card--past {
+    opacity: 0.52;
+}
+
+#modal_fermetures .fermeture-card--past.fermeture-card--with-delete {
+    opacity: 0.58;
+}
+
+[data-theme='dark'] #modal_fermetures .fermeture-card--past {
+    opacity: 0.45;
+}
+
+#modal_fermetures .fermetures-route-fab {
+    position: sticky;
+    bottom: 0;
+    z-index: 6;
+    margin-top: auto;
+    padding: 0.65rem 0 0.5rem;
+    background: linear-gradient(to top, var(--planning-surface, rgb(255 255 255)) 72%, transparent);
+}
+
+[data-theme='dark'] #modal_fermetures .fermetures-route-fab {
+    background: linear-gradient(to top, var(--planning-surface, rgb(15 23 42)) 72%, transparent);
+}
+
+#modal_fermetures .fermetures-route-fab .btn {
+    width: 100%;
+    font-weight: 700;
+}
+
+#modal_reservation .reservation-inscrits-text,
+#modal_reservation #reservation-inscrits-summary .reservation-inscrits-text {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+}
+
 #modal_fermetures.fermetures-modal--busy #fermetures-add,
 #modal_fermetures.fermetures-modal--busy #fermetures-apply-pending,
 #modal_fermetures.fermetures-modal--busy .fermeture-card {

@@ -138,6 +138,11 @@
     padding-top: 0;
 }
 
+.planning-drawer__block--views .planning-drawer__section-title,
+#menu-item-display-prefs-wrap > .planning-drawer__section-title {
+    padding-inline: 0.5rem;
+}
+
 /* Profil en tête du tiroir (sans titre de section) */
 .planning-drawer__block--profile {
     border-top: 0;
@@ -260,6 +265,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-variant-caps: small-caps;
+    letter-spacing: 0.03em;
 }
 
 .planning-drawer__profile-sub {
@@ -461,16 +468,20 @@
 /* Thème clair / sombre sur une seule ligne */
 .planning-drawer__view-row--inline {
     flex-direction: row;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 0.35rem;
+    justify-content: flex-start;
+    padding-inline: 0.5rem;
+    box-sizing: border-box;
 }
 
 .planning-drawer__view-row--inline .planning-drawer__view-btn {
-    flex: 1 1 0;
+    flex: 0 1 auto;
     min-width: 0;
-    justify-content: center;
+    width: auto;
+    justify-content: flex-start;
     font-size: 0.75rem;
-    padding: 0.4rem 0.35rem;
+    padding: 0.4rem 0.5rem;
 }
 
 .planning-drawer__view-row--inline .planning-drawer__view-btn svg {

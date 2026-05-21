@@ -4,11 +4,17 @@
             <div id="wrap-reservation-info" class="hidden" aria-hidden="true"></div>
             <div id="wrap-reservation-readonly" class="hidden" aria-hidden="true"></div>
             <div id="wrap-reservation-editor" class="space-y-4 reservation-editor-simple relative">
-                <p id="event-creator-badge" class="reservation-creator-badge hidden text-[9px] text-slate-500 dark:text-slate-400 text-right m-0 leading-tight" aria-live="polite"></p>
+                <h2 id="reservation-modal-headline" class="reservation-modal-headline hidden text-sm font-bold text-slate-900 dark:text-slate-100 m-0 leading-snug" aria-live="polite"></h2>
 
-                <label class="form-control block" for="event-date-start">
+                <label class="form-control block" for="event-date-display-label">
                     <span class="label-text font-bold text-[11px] uppercase text-slate-500 py-0">Jour</span>
-                    <input type="date" id="event-date-start" class="input input-bordered input-sm w-full font-mono text-sm mt-0.5 bg-white dark:bg-slate-900 planning-date-input" />
+                    <div class="flex items-center gap-2 mt-0.5 min-w-0">
+                        <input type="text" id="event-date-display-label" class="planning-field input input-bordered input-sm flex-1 min-w-0 text-sm" readonly />
+                        <input type="date" id="event-date-start" class="sr-only" tabindex="-1" aria-hidden="true" />
+                        <button type="button" id="event-date-picker-btn" class="btn btn-sm btn-square planning-btn-accent shrink-0" title="Choisir une date" aria-label="Ouvrir le calendrier">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5a2.25 2.25 0 002.25-2.25m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5a2.25 2.25 0 012.25 2.25v7.5m-15 0h3.75m9 0H18" /></svg>
+                        </button>
+                    </div>
                 </label>
 
                 <div class="form-control">
@@ -22,9 +28,9 @@
                 </div>
 
                 <div id="wrap-reservation-motif" class="form-control">
-                    <label class="label py-0" for="event-motif-select"><span class="label-text font-bold text-[11px] uppercase text-slate-500">Motif</span></label>
-                    <p id="event-motif-hint-fermeture" class="hidden text-[10px] text-slate-500 -mt-1 mb-1">Le motif <strong>Fermeture</strong> est réservé aux administrateurs.</p>
-                    <select id="event-motif-select" class="select select-sm w-full bg-white dark:bg-slate-900"></select>
+                    <span class="label-text font-bold text-[11px] uppercase text-slate-500 block mb-1">Motif</span>
+                    <p id="event-motif-hint-fermeture" class="hidden" aria-hidden="true"></p>
+                    <select id="event-motif-select" class="planning-field select select-sm select-bordered w-full" aria-label="Motif"></select>
                 </div>
 
                 <div id="wrap-reservation-title" class="form-control">
@@ -35,7 +41,7 @@
                 <div id="event-recurring-wrap" class="hidden" aria-hidden="true"></div>
                 <div id="wrap-reservation-inscrits" class="hidden form-control" aria-hidden="true">
                     <span class="label-text font-bold text-[11px] uppercase text-slate-500 py-0">Élèves inscrits</span>
-                    <p id="reservation-inscrits-summary" class="text-[11px] text-slate-700 dark:text-slate-200 mt-1 mb-2 leading-snug">Aucun élève (optionnel)</p>
+                    <p id="reservation-inscrits-summary" class="text-sm text-slate-700 dark:text-slate-200 mt-1 mb-2 leading-snug">Aucun élève (optionnel)</p>
                     <button type="button" id="event-inscrits-users-toggle" class="btn btn-outline btn-sm font-bold text-[11px] w-full sm:w-auto">Gérer les inscrits</button>
                     <select id="event-inscrits-select" multiple class="hidden"></select>
                 </div>

@@ -33,6 +33,7 @@ import {
     onCalendarEventDragStart,
     onCalendarEventDragStop,
     syncReservationEventToGoogle,
+    seriesPrevSnapshotFromEvent,
     captureResizeStart,
     maybeNotifySlotOwnerAfterThirdPartyEdit,
     ownerInfoFromEvent,
@@ -357,7 +358,13 @@ function initCalendarAndRevealUi() {
                 showToast('Vous ne pouvez pas déplacer ce créneau.', 'error');
                 return;
             }
-            const sync = await syncReservationEventToGoogle(info.event, info.view.calendar);
+            const prevSnap = seriesPrevSnapshotFromEvent(info.oldEvent);
+            const sync = await syncReservationEventToGoogle(
+                info.event,
+                info.view.calendar,
+                currentUser,
+                prevSnap
+            );
             if (!sync.ok) {
                 info.revert();
                 return;

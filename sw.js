@@ -83,6 +83,7 @@ const ASSETS = [
   './components/modal-cours-series-scope.html',
   './js/core/course-students-picker.js',
   './js/core/cours-series-scope-ui.js',
+  './js/core/template-line-schedule-sync.js',
   './js/core/statistics-ui.js',
   './js/core/planning-eleve-quota.js',
   './js/core/profile-ui.js',

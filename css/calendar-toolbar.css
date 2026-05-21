@@ -89,13 +89,13 @@
     flex-shrink: 0;
 }
 
-/* Boutons bandeau : bleu primaire (charte --planning-action-btn-*). */
+/* Boutons bandeau : style accent (comme modales), moins saturé que le bleu plein. */
 .cal-tb-pill {
     appearance: none;
-    border: 1px solid var(--planning-action-btn-border);
+    border: 1px solid var(--planning-accent-border);
     margin: 0;
-    background: var(--planning-action-btn-bg);
-    color: var(--planning-action-btn-text);
+    background: var(--planning-accent-bg);
+    color: var(--planning-accent-text);
     font-size: 0.8125rem;
     font-weight: 600;
     padding: 0.28rem 0.5rem;
@@ -107,13 +107,15 @@
 }
 
 .cal-tb-pill:hover {
-    background: var(--planning-action-btn-bg-hover);
-    border-color: var(--planning-action-btn-border);
-    color: var(--planning-action-btn-text);
+    filter: brightness(0.97);
+}
+
+[data-theme='dark'] .cal-tb-pill:hover {
+    filter: brightness(1.08);
 }
 
 .cal-tb-pill:active {
-    background: var(--planning-action-btn-bg-active);
+    filter: brightness(0.94);
 }
 
 .cal-tb-pill--view {
@@ -128,17 +130,17 @@
     font-size: 0.65rem;
 }
 
-/* Chevrons ‹ › : même charte bleue que « Aujourd’hui ». */
+/* Chevrons ‹ › : style accent. */
 .cal-tb-nav {
     appearance: none;
-    border: 1px solid var(--planning-action-btn-border);
+    border: 1px solid var(--planning-accent-border);
     margin: 0;
     padding: 0;
     width: 2rem;
     height: 2rem;
     border-radius: 9999px;
-    background: var(--planning-action-btn-bg);
-    color: var(--planning-action-btn-text);
+    background: var(--planning-accent-bg);
+    color: var(--planning-accent-text);
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -148,13 +150,15 @@
 }
 
 .cal-tb-nav:hover {
-    background: var(--planning-action-btn-bg-hover);
-    border-color: var(--planning-action-btn-border);
-    color: var(--planning-action-btn-text);
+    filter: brightness(0.97);
+}
+
+[data-theme='dark'] .cal-tb-nav:hover {
+    filter: brightness(1.08);
 }
 
 .cal-tb-nav:active {
-    background: var(--planning-action-btn-bg-active);
+    filter: brightness(0.94);
 }
 
 .cal-tb-nav svg {
@@ -163,28 +167,29 @@
     height: 1.25rem;
 }
 
-/* Menu hamburger : même bleu primaire que ‹ › / Aujourd’hui (--planning-action-btn-*). */
+/* Menu hamburger : style accent. */
 #calendar-toolbar .calendar-toolbar__menu-btn,
 .planning-fc-corner-hud__menu-btn {
     appearance: none;
-    border: 1px solid var(--planning-action-btn-border);
-    background: var(--planning-action-btn-bg);
-    color: var(--planning-action-btn-text);
+    border: 1px solid var(--planning-accent-border);
+    background: var(--planning-accent-bg);
+    color: var(--planning-accent-text);
     -webkit-tap-highlight-color: transparent;
 }
 
 #calendar-toolbar .calendar-toolbar__menu-btn:hover,
 .planning-fc-corner-hud__menu-btn:hover {
-    background: var(--planning-action-btn-bg-hover);
-    border-color: var(--planning-action-btn-border);
-    color: var(--planning-action-btn-text);
+    filter: brightness(0.97);
+}
+
+[data-theme='dark'] #calendar-toolbar .calendar-toolbar__menu-btn:hover,
+[data-theme='dark'] .planning-fc-corner-hud__menu-btn:hover {
+    filter: brightness(1.08);
 }
 
 #calendar-toolbar .calendar-toolbar__menu-btn:active,
 .planning-fc-corner-hud__menu-btn:active {
-    background: var(--planning-action-btn-bg-active);
-    border-color: var(--planning-action-btn-border);
-    color: var(--planning-action-btn-text);
+    filter: brightness(0.94);
 }
 
 #calendar-toolbar .calendar-toolbar__menu-btn svg {

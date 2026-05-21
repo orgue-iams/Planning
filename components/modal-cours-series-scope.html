@@ -1,21 +1,23 @@
 <dialog id="modal_cours_series_scope" class="modal" tabindex="-1">
     <div class="modal-box p-5 w-[96%] max-w-lg rounded-2xl border border-slate-200 shadow-2xl">
-        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest">Série de cours (gabarit)</h3>
+        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest">Modifier le cours</h3>
         <p class="text-[11px] text-slate-600 mb-3 leading-snug">
-            Ce créneau est lié aux semaines types. Vous avez modifié l’horaire ou le titre. Souhaitez-vous appliquer ce changement à d’autres occurrences ?
+            Ce cours est lié à une ligne des <strong>Semaines A/B</strong>. Vous avez changé l’horaire ou le titre. Comme sur Google Agenda, choisissez la portée de la modification.
         </p>
         <div class="space-y-2 text-[11px] text-slate-800">
             <label class="flex gap-2 items-start cursor-pointer">
                 <input type="radio" name="cours-series-scope" value="single" class="mt-0.5" checked />
-                <span><strong>Cette occurrence uniquement</strong> — les autres cours de la même ligne gabarit restent inchangés.</span>
+                <span
+                    ><strong>Ce créneau uniquement</strong> — exception locale : les autres occurrences et la ligne gabarit
+                    restent inchangées ; les agendas Google des élèves inscrits sont mis à jour pour ce créneau seulement.</span
+                >
             </label>
             <label class="flex gap-2 items-start cursor-pointer">
                 <input type="radio" name="cours-series-scope" value="future" class="mt-0.5" />
                 <span
-                    ><strong>Cette occurrence et les suivantes</strong> — tous les cours de la même ligne gabarit à partir de
-                    celui-ci, jusqu’à la fin d’année scolaire configurée (ou ~12 mois si la date de fin n’est pas renseignée). Le
-                    même décalage horaire et le nouveau titre s’appliquent ; seules les inscriptions du cours en cours
-                    d’édition sont modifiées.</span
+                    ><strong>Ce créneau et les suivants</strong> — tous les cours de la même ligne gabarit à partir de celui-ci
+                    (jusqu’à la fin d’année scolaire). Le gabarit Semaines A/B est aligné ; les agendas Google des élèves
+                    concernés sont resynchronisés pour chaque occurrence.</span
                 >
             </label>
         </div>

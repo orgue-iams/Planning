@@ -166,6 +166,30 @@ function directoryDisplayName(r) {
     return String(r?.display_name || '').trim() || '—';
 }
 
+/** Prénom et nom sur une ligne (petites capitales via `.directory-user-card__name`). */
+function fillDirectoryUserNameElement(el, r) {
+    if (!(el instanceof HTMLElement)) return;
+    const p = String(r?.prenom || '').trim();
+    const n = String(r?.nom || '').trim();
+    el.replaceChildren();
+    if (p) {
+        const sp = document.createElement('span');
+        sp.className = 'directory-user-card__prenom';
+        sp.textContent = p;
+        el.appendChild(sp);
+        if (n) el.appendChild(document.createTextNode(' '));
+    }
+    if (n) {
+        const sn = document.createElement('span');
+        sn.className = 'directory-user-card__nom';
+        sn.textContent = n;
+        el.appendChild(sn);
+    }
+    if (!p && !n) {
+        el.textContent = String(r?.display_name || '').trim() || '—';
+    }
+}
+
 function isDirectoryPrivileged(u) {
     return isAdmin(u) || isProf(u);
 }
@@ -192,15 +216,14 @@ function buildPrivilegedUserCard(r, opts) {
     avatar.innerHTML = DIRECTORY_USER_ICON_SVG;
 
     const identityText = document.createElement('div');
-    identityText.className = 'min-w-0 flex flex-col justify-center';
+    identityText.className = 'min-w-0 flex-1 flex flex-col justify-center';
     const nameP = document.createElement('p');
     nameP.className =
-        'font-semibold text-slate-900 leading-snug m-0 break-words text-[13px]';
-    nameP.style.overflowWrap = 'anywhere';
-    nameP.textContent = directoryDisplayName(r);
+        'directory-user-card__name planning-profile-name-text font-semibold text-slate-900 leading-snug m-0 text-[13px]';
+    fillDirectoryUserNameElement(nameP, r);
     const roleP = document.createElement('p');
     roleP.className =
-        'directory-user-card__role font-bold text-[11px] sm:text-xs leading-snug m-0 mt-0.5';
+        'directory-user-card__role planning-profile-name-text font-bold text-[11px] sm:text-xs leading-snug m-0 mt-0.5';
     roleP.textContent = roleLabel(r.profile_role || r.role);
     identityText.appendChild(nameP);
     identityText.appendChild(roleP);
@@ -303,9 +326,8 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
             identity.className = 'directory-user-card__identity min-w-0 self-stretch flex flex-col justify-center pr-2';
             const nameEl = document.createElement('p');
             nameEl.className =
-                'font-semibold text-slate-900 leading-snug m-0 break-words';
-            nameEl.style.overflowWrap = 'anywhere';
-            nameEl.textContent = directoryDisplayName(r);
+                'directory-user-card__name planning-profile-name-text font-semibold text-slate-900 leading-snug m-0 text-[13px]';
+            fillDirectoryUserNameElement(nameEl, r);
             identity.appendChild(nameEl);
             item.appendChild(identity);
             const contact = buildDirectoryContactColumn(r);
