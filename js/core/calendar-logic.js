@@ -2231,22 +2231,33 @@ function syncReservationModalTimeOptions(calendar, eventRef) {
     }
     const startAt = new Date(`${dateValue}T${selectedStart}:00`);
     const boundary = nextExclusiveFreeBoundaryWithExclude(startAt, calendar, eventRef, dayIntervals);
-    const endChoices = buildHalfHourChoices(
+    const boundaryCap = new Date(Math.min(boundary.getTime(), dayMax.getTime()));
+    let endChoices = buildHalfHourChoices(
         new Date(startAt.getTime() + 30 * 60 * 1000),
-        new Date(Math.min(boundary.getTime(), dayMax.getTime()))
+        boundaryCap
     );
-    if (userPickedEnd && !endChoices.includes(userPickedEnd)) {
-        endChoices.push(userPickedEnd);
-        endChoices.sort();
+    endChoices = endChoices.filter((hhmm) => {
+        const t = endSelectInstantOnDay(dateValue, hhmm);
+        return Number.isFinite(t) && t <= boundary.getTime();
+    });
+    if (userPickedEnd) {
+        const pickedMs = endSelectInstantOnDay(dateValue, userPickedEnd);
+        if (Number.isFinite(pickedMs) && pickedMs <= boundary.getTime() && !endChoices.includes(userPickedEnd)) {
+            endChoices.push(userPickedEnd);
+            endChoices.sort();
+        }
     }
     injectEditingEventReservationTimes(eventRef, dateValue, startChoices, startAt, endChoices);
+    endChoices = endChoices.filter((hhmm) => {
+        const t = endSelectInstantOnDay(dateValue, hhmm);
+        return Number.isFinite(t) && t <= boundary.getTime();
+    });
     const currentEndHint = String(endEl.value || preferredEndHint || '').trim();
-    const preferredEnd = pickReservationEndTime(
-        startAt,
-        endChoices,
-        currentEndHint,
-        reservationModalInitialDurationMs
+    const maxDurationMs = Math.max(
+        30 * 60 * 1000,
+        Math.min(reservationModalInitialDurationMs, boundary.getTime() - startAt.getTime())
     );
+    const preferredEnd = pickReservationEndTime(startAt, endChoices, currentEndHint, maxDurationMs);
     setSelectOptions(endEl, endChoices, preferredEnd);
 }
 
@@ -2413,19 +2424,23 @@ export function isCalendarDbPersistBusy() {
 function syncSlotWorkflowBanner() {
     const banner = document.getElementById('planning-slot-workflow-banner');
     const text = document.getElementById('planning-slot-workflow-banner-text');
+    const spinner = document.getElementById('planning-slot-workflow-banner-spinner');
     if (!banner || !text) return;
     if (isCalendarDbPersistBusy()) {
         banner.classList.remove('hidden');
+        spinner?.classList.remove('hidden');
         text.textContent = 'Enregistrement en base de données… Merci de patienter.';
         return;
     }
     if (googleCalendarSyncInFlight > 0) {
         banner.classList.remove('hidden');
+        spinner?.classList.remove('hidden');
         text.textContent =
             'Synchronisation des agendas Google… Vous pouvez consulter le planning.';
         return;
     }
     banner.classList.add('hidden');
+    spinner?.classList.add('hidden');
     text.textContent = '';
 }
 
@@ -2510,7 +2525,18 @@ function collectDayReservationIntervals(calendar, dayAnchor, eventRef) {
         intervals.push({ startMs: r.start.getTime(), endMs: r.end.getTime() });
     }
     intervals.sort((a, b) => a.startMs - b.startMs);
-    return intervals;
+    if (intervals.length < 2) return intervals;
+    const merged = [intervals[0]];
+    for (let i = 1; i < intervals.length; i++) {
+        const cur = intervals[i];
+        const last = merged[merged.length - 1];
+        if (cur.startMs <= last.endMs) {
+            last.endMs = Math.max(last.endMs, cur.endMs);
+        } else {
+            merged.push(cur);
+        }
+    }
+    return merged;
 }
 
 function nextExclusiveFreeBoundaryFromIntervals(startMs, limitMs, intervals) {
@@ -2924,7 +2950,8 @@ export async function quickCreateFromSelection(calendar, selectInfo, currentUser
          * selectMinDistance:0 fait qu’un « clic » ouvre souvent une sélection d’une case snap (30 min)
          * et supprime dateClick : même règle métier que le clic simple (1 h si libre, sinon réduction).
          */
-        if (selMs <= snapMs + 1000) {
+        const maxProposeMs = DEFAULT_NEW_RESERVATION_DURATION_MS + snapMs + 1000;
+        if (selMs <= maxProposeMs) {
             const prop = proposeReservationRangeFromAnchor(rangeStart, calendar);
             rangeStart = prop.start;
             rangeEnd = prop.end;
@@ -2966,6 +2993,10 @@ export async function quickCreateFromDateClick(calendar, clickDate, currentUser,
     }
     if (isCalendarDbPersistBusy()) {
         showToast('Enregistrement en cours : attendez la fin du créneau précédent.', 'info');
+        return;
+    }
+    /* Vue semaine/jour : la sélection (select) gère déjà le clic ; dateClick doublonne sinon. */
+    if (viewType === 'timeGridWeek' || viewType === 'timeGridDay') {
         return;
     }
     if (viewType.startsWith('list')) {

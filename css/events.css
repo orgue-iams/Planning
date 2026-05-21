@@ -141,25 +141,42 @@
     cursor: wait;
 }
 
-.planning-slot-workflow-banner {
+/* Bandeau workflow (BD / Google) : flottant bas-droite, à la place de l’ancien FAB « + ». */
+.planning-slot-workflow-float {
+    position: fixed;
+    right: max(0.85rem, env(safe-area-inset-right, 0px));
+    bottom: max(0.85rem, env(safe-area-inset-bottom, 0px));
+    z-index: 240;
+    max-width: min(20rem, calc(100vw - 1.75rem));
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin: 0 0.35rem;
-    padding: 0.45rem 0.65rem;
-    border-radius: 0.5rem;
+    align-items: flex-start;
+    gap: 0.45rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: 0.65rem;
     font-size: 0.6875rem;
     font-weight: 600;
     line-height: 1.35;
     color: rgb(30 64 175);
-    background: rgb(239 246 255 / 0.95);
+    background: rgb(239 246 255 / 0.97);
     border: 1px solid rgb(147 197 253 / 0.85);
+    box-shadow: 0 4px 14px rgb(15 23 42 / 0.22);
+    pointer-events: none;
 }
 
-[data-theme='dark'] .planning-slot-workflow-banner {
+.planning-slot-workflow-float.hidden {
+    display: none !important;
+}
+
+.planning-slot-workflow-float #planning-slot-workflow-banner-spinner:not(.hidden) {
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+}
+
+[data-theme='dark'] .planning-slot-workflow-float {
     color: rgb(191 219 254);
-    background: rgb(30 58 138 / 0.45);
+    background: rgb(30 58 138 / 0.92);
     border-color: rgb(59 130 246 / 0.45);
+    box-shadow: 0 4px 16px rgb(0 0 0 / 0.45);
 }
 
 /* Sélection clic / étirement (prof, élève) : aperçu travail perso = vert, pas bleu « autre ». */

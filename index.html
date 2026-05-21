@@ -40,16 +40,6 @@
 
     <main id="app-shell" class="planning-app-shell px-0 sm:px-1 w-full sm:max-w-5xl sm:mx-auto flex flex-col gap-0 max-sm:gap-0 min-h-0">
         <div class="planning-page-bg" aria-hidden="true"></div>
-        <div
-            id="planning-slot-workflow-banner"
-            class="planning-slot-workflow-banner hidden shrink-0"
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-        >
-            <span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
-            <span id="planning-slot-workflow-banner-text"></span>
-        </div>
         <div id="calendar" class="planning-calendar-transparent w-full"></div>
         <div id="planning-legend" class="planning-legend planning-legend-frosted planning-legend--mobile-flush flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 shrink-0" aria-label="Légende des créneaux">
             <span class="legend-item"><span class="legend-swatch legend-swatch--travail-mine" aria-hidden="true"></span>Mes résa / cours</span>
@@ -63,7 +53,16 @@
 
     <div id="app-modals"></div>
 
-    <button type="button" id="planning-fab-create" class="planning-fab-create hidden" aria-label="Créer un créneau" title="Créer un créneau">+</button>
+    <div
+        id="planning-slot-workflow-banner"
+        class="planning-slot-workflow-float hidden"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+    >
+        <span id="planning-slot-workflow-banner-spinner" class="loading loading-spinner loading-xs hidden" aria-hidden="true"></span>
+        <span id="planning-slot-workflow-banner-text"></span>
+    </div>
 
     <script src="js/config/planning.config.js"></script>
     <script type="module" src="js/core/app.js"></script>

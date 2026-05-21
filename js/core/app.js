@@ -197,24 +197,13 @@ function performLogout() {
     requestAnimationFrame(() => document.getElementById('login-email')?.focus());
 }
 
-function syncPlanningFabCreate(user) {
-    document.getElementById('planning-fab-create')?.classList.toggle('hidden', !user?.email);
+/** Ancien FAB « + » retiré : création via la grille ou le menu. */
+function syncPlanningFabCreate(_user) {
+    document.getElementById('planning-fab-create')?.remove();
 }
 
-function initPlanningFabCreate(getUser) {
-    const fab = document.getElementById('planning-fab-create');
-    if (!fab || fab.dataset.bound === '1') return;
-    fab.dataset.bound = '1';
-    fab.addEventListener('click', (e) => {
-        e.preventDefault();
-        const user = getUser();
-        if (!calendar || !user?.email) {
-            showToast('Connectez-vous pour réserver.', 'error');
-            return;
-        }
-        currentEvent = null;
-        void openModal(new Date(), null, null, user, calendar).catch((err) => console.error(err));
-    });
+function initPlanningFabCreate(_getUser) {
+    document.getElementById('planning-fab-create')?.remove();
 }
 
 function syncCalendarDefaultSlotDataset(user) {
@@ -296,7 +285,7 @@ function initCalendarAndRevealUi() {
          * Enregistrement rapide sur la plage choisie (sans modale en vue semaine/jour).
          */
         onSelect: (info) => {
-            suppressDateClickUntil = Date.now() + 900;
+            suppressDateClickUntil = Date.now() + 4000;
             currentEvent = null;
             if (!currentUser?.email) {
                 showToast('Connectez-vous pour réserver.', 'error');
@@ -307,8 +296,10 @@ function initCalendarAndRevealUi() {
                 console.error(err)
             );
         },
-        /** Clic simple : création rapide 1 h / 30 min (sans modale), sauf vue liste → modale. */
+        /** Clic simple : création rapide (mois / année). Semaine/jour → select uniquement. */
         onDateClick: (info) => {
+            const vtClick = info.view?.type ?? '';
+            if (vtClick === 'timeGridWeek' || vtClick === 'timeGridDay') return;
             queueMicrotask(() => {
                 if (Date.now() < suppressDateClickUntil) return;
                 const slotMs = info?.date instanceof Date ? info.date.getTime() : Number.NaN;
