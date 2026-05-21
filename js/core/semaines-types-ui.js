@@ -1923,11 +1923,6 @@ function onSemainesTypesDocumentClick(e) {
         openStApplyModal();
         return;
     }
-    if (t.closest('#st-open-shift-modal')) {
-        e.preventDefault();
-        openStShiftModal();
-        return;
-    }
     if (t.closest('#st-teaching-days-save')) {
         e.preventDefault();
         const u = getPlanningSessionUser();

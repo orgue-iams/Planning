@@ -1,9 +1,17 @@
 <dialog id="modal_fermetures" class="modal">
     <div class="modal-box p-4 w-[96%] max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 shadow-2xl flex flex-col dark:border-slate-600">
         <div id="fermetures-main-panel" class="min-w-0 flex-1">
+            <p id="fermetures-school-year-hint" class="text-[10px] text-slate-500 dark:text-slate-400 m-0 mb-2 leading-snug hidden"></p>
+            <div id="fermetures-apply-progress-wrap" class="hidden mb-3" aria-hidden="true">
+                <p id="fermetures-apply-progress-label" class="text-[10px] font-semibold text-slate-600 dark:text-slate-300 m-0 mb-1">Application…</p>
+                <progress id="fermetures-apply-progress" class="progress progress-primary w-full h-2" value="0" max="100"></progress>
+            </div>
             <div id="fermetures-list" class="fermetures-card-list space-y-2 min-w-0"></div>
-            <div id="fermetures-add-wrap" class="hidden mt-4 pt-3 border-t border-slate-200 dark:border-slate-600">
-                <button type="button" id="fermetures-add" class="btn btn-primary btn-sm font-bold text-[11px]">+ Période de fermeture</button>
+            <div id="fermetures-actions-row" class="hidden mt-4 pt-3 border-t border-slate-200 dark:border-slate-600 flex flex-wrap gap-2 items-center">
+                <button type="button" id="fermetures-apply-pending" class="btn btn-primary btn-sm font-bold text-[11px] flex-1 min-w-[8rem]">
+                    Appliquer les absences
+                </button>
+                <button type="button" id="fermetures-add" class="btn btn-outline btn-sm font-bold text-[11px]">+ Période</button>
             </div>
         </div>
 
@@ -18,12 +26,12 @@
             </label>
             <label class="flex flex-col gap-1 min-w-0">
                 <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Titre (optionnel)</span>
-                <input type="text" id="fermeture-edit-title" class="input input-bordered input-sm w-full bg-white dark:bg-slate-900 dark:text-slate-100" maxlength="120" placeholder="Ex. Vacances de Pâques" />
+                <input type="text" id="fermeture-edit-title" class="input input-bordered input-sm w-full bg-white dark:bg-slate-900 dark:text-slate-100" maxlength="120" placeholder="Ex. Vacances, absence personnelle" />
             </label>
             <div id="fermetures-conflict-panel" class="hidden rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40 p-3 space-y-2" aria-hidden="true">
-                <p class="text-[11px] font-bold text-amber-900 dark:text-amber-100 m-0">Créneaux déjà présents sur cette période</p>
+                <p class="text-[11px] font-bold text-amber-900 dark:text-amber-100 m-0">Créneaux déjà présents sur ces périodes</p>
                 <ul id="fermetures-conflict-list" class="list-disc pl-4 m-0 space-y-1 max-h-[10rem] overflow-y-auto"></ul>
-                <p class="text-[10px] text-slate-600 dark:text-slate-300 m-0">Poursuivre supprimera ces créneaux (agendas + e-mails habituels).</p>
+                <p class="text-[10px] text-slate-600 dark:text-slate-300 m-0">Poursuivre supprimera ces créneaux (agendas + e-mails habituels), puis appliquera les absences et décalera vos créneaux si besoin.</p>
                 <div class="flex flex-wrap gap-2 justify-end">
                     <button type="button" id="fermetures-conflict-cancel" class="btn btn-ghost btn-sm text-[11px] font-bold">Annuler</button>
                     <button type="button" id="fermetures-conflict-proceed" class="btn btn-warning btn-sm text-[11px] font-bold">Poursuivre quand même</button>

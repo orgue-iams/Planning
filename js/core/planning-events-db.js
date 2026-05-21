@@ -229,6 +229,10 @@ export async function upsertPlanningEventRow(p) {
         const g = String(p.gabaritWeekType || '').trim().toUpperCase();
         row.gabarit_week_type = g === 'A' || g === 'B' ? g : null;
     }
+    if (p.absencePeriodId !== undefined) {
+        const ap = String(p.absencePeriodId || '').trim();
+        row.absence_period_id = ap || null;
+    }
     const existingId = p.id ? String(p.id).trim() : '';
     if (existingId) {
         /** Mise à jour seule (évite upsert + politique INSERT RLS sur lignes existantes). */

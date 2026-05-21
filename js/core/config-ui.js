@@ -1,5 +1,5 @@
 /**
- * Modale Configuration (année scolaire + plage chapelle + règles élèves). Admin : écriture ; prof : lecture seule.
+ * Modale Configuration (année scolaire + plage chapelle + règles élèves). Réservée aux administrateurs.
  */
 import { isAdmin } from './auth-logic.js';
 import { isBackendAuthConfigured } from './supabase-client.js';
@@ -239,7 +239,7 @@ function applyConfigFieldAccess() {
 }
 
 export function initConfigUi(currentUser) {
-    const show = isBackendAuthConfigured() && (currentUser?.role === 'admin' || currentUser?.role === 'prof');
+    const show = isBackendAuthConfigured() && isAdmin(currentUser);
     document.getElementById('menu-item-config-wrap')?.classList.toggle('hidden', !show);
     syncPlanningDrawerGroupedSections();
     if (!show || bound) return;
@@ -250,6 +250,10 @@ export function initConfigUi(currentUser) {
 
     document.getElementById('menu-item-config')?.addEventListener('click', (ev) => {
         ev.preventDefault();
+        if (!isAdmin(getPlanningSessionUser())) {
+            showToast('Réservé aux administrateurs.', 'error');
+            return;
+        }
         if (!openPlanningRouteFromDrawer('modal_config', 'Configuration du planning', 'Menu')) {
             return;
         }

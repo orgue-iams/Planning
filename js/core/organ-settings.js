@@ -85,6 +85,27 @@ export function getOrganSchoolSettingsCached() {
     return cache;
 }
 
+/** Bornes année scolaire (YYYY-MM-DD), vides si non configurées. */
+export function getSchoolYearBoundsFromSettings(settings = cache) {
+    const startYmd = String(settings?.school_year_start ?? '').slice(0, 10);
+    const endYmd = String(settings?.school_year_end ?? '').slice(0, 10);
+    return {
+        startYmd: /^\d{4}-\d{2}-\d{2}$/.test(startYmd) ? startYmd : '',
+        endYmd: /^\d{4}-\d{2}-\d{2}$/.test(endYmd) ? endYmd : ''
+    };
+}
+
+/** Une période chevauche l’année scolaire courante. */
+export function rangeOverlapsSchoolYear(startYmd, endYmd, schoolYear = null) {
+    const { startYmd: sy, endYmd: ey } = getSchoolYearBoundsFromSettings(schoolYear);
+    const s = String(startYmd || '').slice(0, 10);
+    const e = String(endYmd || '').slice(0, 10);
+    if (!s || !e) return true;
+    if (sy && e < sy) return false;
+    if (ey && s > ey) return false;
+    return true;
+}
+
 /**
  * @param {{
  *   school_year_start: string | null,

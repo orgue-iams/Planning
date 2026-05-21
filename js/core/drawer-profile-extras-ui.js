@@ -108,7 +108,7 @@ export async function refreshDrawerAgendas(user) {
     const mainLabel =
         String(mainGoogleCalendarLabel || '').trim() ||
         (await loadPoolLabelByCalendarId(mainGoogleCalendarId));
-    setAgendaEntryName('drawer-agenda-main-name', mainLabel ? `Planning principal (${mainLabel})` : 'Planning principal');
+    setAgendaEntryName('drawer-agenda-main-name', 'Planning complet (Orgue IAMS)');
     bindAgendaCopyBtn('drawer-agenda-main-btn', mainUrl);
 
     const { id: persId, label: persLabel } = await loadPersonalPoolRow(user.id);

@@ -761,7 +761,6 @@ function canCurrentUserEditEventIgnoringPast(currentUser, event) {
     }
     if (meRole === 'admin') return true;
 
-    const xp = safeEventExtendedProps(event);
     const creatorRole = String(xp.createdByRole || '').trim().toLowerCase();
     const creatorId = String(xp.createdByUserId || '').trim();
     const myId = String(currentUser.id || '').trim();

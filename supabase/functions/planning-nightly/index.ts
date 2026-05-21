@@ -165,7 +165,7 @@ Deno.serve(async (req) => {
 
     const { data: futureEvents } = await admin
         .from('planning_event')
-        .select('id, start_at, end_at, title, slot_type, owner_email')
+        .select('id, start_at, end_at, title, slot_type, owner_email, owner_user_id')
         .gte('start_at', nowIso)
         .lte('start_at', horizon.toISOString())
         .order('start_at', { ascending: true })
@@ -187,10 +187,38 @@ Deno.serve(async (req) => {
             .filter((m) => m.target === 'main' && m.sync_status === 'ok')
             .map((m) => m.event_id)
     );
+    const poolOwnerOk = new Set(
+        mirrors
+            .filter((m) => m.target === 'pool_owner' && m.sync_status === 'ok')
+            .map((m) => m.event_id)
+    );
     const mirrorErrors = mirrors.filter((m) => m.sync_status && m.sync_status !== 'ok');
+
+    const { data: poolAssign } = await admin
+        .from('google_calendar_pool')
+        .select('assigned_user_id')
+        .not('assigned_user_id', 'is', null);
+    const poolUserIds = new Set(
+        (poolAssign ?? []).map((r) => String(r.assigned_user_id || '').trim()).filter(Boolean)
+    );
+
+    function needsPoolMirror(slotType: string): boolean {
+        const s = String(slotType || '').toLowerCase();
+        if (s === 'fermeture' || s === 'concert' || s === 'autre') return false;
+        if (s === 'cours' || s === 'travail perso') return true;
+        return false;
+    }
+
     const missingMain = (futureEvents ?? []).filter(
         (e) => String(e.slot_type || '').toLowerCase() !== 'fermeture' && !mainOk.has(e.id)
     );
+    const missingPoolOwner = (futureEvents ?? []).filter((e) => {
+        const st = String(e.slot_type || '').toLowerCase();
+        if (!needsPoolMirror(st)) return false;
+        const ownerId = String(e.owner_user_id || '').trim();
+        if (!ownerId || !poolUserIds.has(ownerId)) return false;
+        return !poolOwnerOk.has(e.id);
+    });
 
     const lines: string[] = [];
     lines.push(`<p>Rapport automatique Planning IAMS — ${escapeHtml(nowIso)}</p>`);
@@ -214,7 +242,10 @@ Deno.serve(async (req) => {
 
     lines.push(`<h3>Audit miroirs Google (30 jours)</h3>`);
     lines.push(
-        `<p>Créneaux sans miroir principal OK : <strong>${missingMain.length}</strong> — miroirs en erreur : <strong>${mirrorErrors.length}</strong>.</p>`
+        `<p>Créneaux sans miroir <strong>principal</strong> OK : <strong>${missingMain.length}</strong> — sans miroir <strong>agenda perso</strong> (pool) : <strong>${missingPoolOwner.length}</strong> — miroirs en erreur : <strong>${mirrorErrors.length}</strong>.</p>`
+    );
+    lines.push(
+        '<p><em>L’audit agenda perso concerne les profs/élèves avec calendrier pool assigné (cours + travail perso). Une passe de réparation automatique est lancée après ce rapport.</em></p>'
     );
     if (missingMain.length) {
         lines.push('<p>Exemples sans miroir principal :</p><ul>');
@@ -233,6 +264,56 @@ Deno.serve(async (req) => {
             );
         }
         lines.push('</ul>');
+    }
+    if (missingPoolOwner.length) {
+        lines.push('<p>Exemples sans miroir agenda perso :</p><ul>');
+        for (const ev of missingPoolOwner.slice(0, 12)) {
+            lines.push(
+                `<li>${escapeHtml(String(ev.title || ''))} — ${escapeHtml(String(ev.start_at))} (${escapeHtml(String(ev.owner_email || ''))})</li>`
+            );
+        }
+        lines.push('</ul>');
+    }
+
+    let repairResult: Record<string, unknown> = { skipped: true };
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    if (anonKey && cronSecret) {
+        try {
+            const repairRes = await fetch(`${supabaseUrl.replace(/\/$/, '')}/functions/v1/calendar-bridge`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${cronSecret}`,
+                    apikey: anonKey,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ action: 'cron_repair_google_sync' })
+            });
+            const repairText = await repairRes.text();
+            try {
+                repairResult = repairText ? (JSON.parse(repairText) as Record<string, unknown>) : {};
+            } catch {
+                repairResult = { ok: false, error: repairText.slice(0, 200) };
+            }
+        } catch (e) {
+            repairResult = { ok: false, error: e instanceof Error ? e.message : String(e) };
+        }
+    }
+
+    lines.push('<h3>Réparation automatique Google</h3>');
+    if (repairResult.skipped) {
+        lines.push('<p>Réparation non lancée (configuration cron incomplète).</p>');
+    } else {
+        lines.push(
+            `<p>Miroirs pool créés/réalignés : <strong>${escapeHtml(String(repairResult.repairedPool ?? 0))}</strong> — agendas resynchronisés : <strong>${escapeHtml(String(repairResult.resyncedCalendars ?? 0))}</strong> — statut : <strong>${repairResult.ok === false ? 'erreurs' : 'OK'}</strong>.</p>`
+        );
+        const rErrs = repairResult.errors;
+        if (Array.isArray(rErrs) && rErrs.length) {
+            lines.push('<ul>');
+            for (const err of rErrs.slice(0, 8)) {
+                lines.push(`<li>${escapeHtml(String(err))}</li>`);
+            }
+            lines.push('</ul>');
+        }
     }
 
     const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"/></head><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#222;">${lines.join('\n')}</body></html>`;
@@ -257,13 +338,15 @@ Deno.serve(async (req) => {
             .in('id', errIds);
     }
 
-    if (missingMain.length || mirrorErrors.length) {
+    if (missingMain.length || mirrorErrors.length || missingPoolOwner.length) {
         await admin.from('planning_infra_error_log').insert({
             source: 'nightly_calendar_audit',
-            message: `${missingMain.length} créneau(x) sans miroir principal OK ; ${mirrorErrors.length} miroir(s) en erreur`,
+            message: `${missingMain.length} sans miroir principal ; ${missingPoolOwner.length} sans miroir agenda perso ; ${mirrorErrors.length} miroir(s) en erreur`,
             detail: {
                 missing_main_count: missingMain.length,
+                missing_pool_owner_count: missingPoolOwner.length,
                 mirror_error_count: mirrorErrors.length,
+                repair: repairResult,
                 checked_at: nowIso
             }
         });
@@ -276,6 +359,8 @@ Deno.serve(async (req) => {
         mode: 'nightly',
         pendingErrors: errIds.length,
         missingMain: missingMain.length,
-        mirrorErrors: mirrorErrors.length
+        missingPoolOwner: missingPoolOwner.length,
+        mirrorErrors: mirrorErrors.length,
+        repair: repairResult
     });
 });

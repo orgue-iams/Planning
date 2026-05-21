@@ -390,7 +390,8 @@ export async function saveClosureRangeToPlanning(range, opts = {}) {
             title,
             dbSlotType: 'fermeture',
             ownerEmail,
-            ownerUserId
+            ownerUserId,
+            absencePeriodId: range.absencePeriodId || null
         });
         if (!ur.ok || !ur.id) {
             return { ok: false, error: ur.error || 'Enregistrement fermeture impossible.' };

@@ -85,7 +85,11 @@ import {
     syncCalendarPrefControlsUi
 } from './calendar-preferences-ui.js';
 import { initSemainesTypesUi, resetSemainesTypesUiBindings } from './semaines-types-ui.js';
-import { initFermeturesUi, resetFermeturesUiBindings } from './fermetures-ui.js';
+import {
+    initFermeturesUi,
+    resetFermeturesUiBindings,
+    syncFermeturesMenuVisibility
+} from './fermetures-ui.js';
 import { initStatisticsUi, resetStatisticsUiBindings } from './statistics-ui.js';
 import { initDirectoryUsersUi, resetDirectoryUsersUiBindings } from './directory-users-ui.js';
 import { initCoursSeriesScopeUi, resetCoursSeriesScopeUiBindings } from './cours-series-scope-ui.js';
@@ -223,7 +227,7 @@ function refreshHeaderUser(user) {
         document.getElementById('menu-item-logout-wrap')?.classList.add('hidden');
         document.getElementById('menu-item-directory-wrap')?.classList.add('hidden');
         document.getElementById('menu-item-semaines-types-wrap')?.classList.add('hidden');
-        document.getElementById('menu-item-fermetures-wrap')?.classList.add('hidden');
+        syncFermeturesMenuVisibility(null);
         document.getElementById('menu-item-statistics-wrap')?.classList.add('hidden');
         shell?.classList.remove('planning-shell--weekstrip');
         document.getElementById('btn-admin-clear-week')?.classList.add('hidden');
@@ -249,7 +253,7 @@ function refreshHeaderUser(user) {
         'hidden',
         !auth || r !== 'prof'
     );
-    document.getElementById('menu-item-fermetures-wrap')?.classList.toggle('hidden', !auth);
+    syncFermeturesMenuVisibility(user);
     document.getElementById('menu-item-statistics-wrap')?.classList.toggle('hidden', !staff);
     document.getElementById('btn-admin-clear-week')?.classList.toggle('hidden', r !== 'admin');
     if (r !== 'eleve') {

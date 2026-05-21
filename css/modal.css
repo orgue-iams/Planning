@@ -835,6 +835,64 @@
     border-radius: 0.5rem;
 }
 
+#modal_fermetures .fermeture-card--admin {
+    border-color: rgb(147 197 253 / 0.9);
+    background: rgb(239 246 255 / 0.98);
+}
+
+#modal_fermetures .fermeture-card--prof {
+    border-color: rgb(253 186 116 / 0.85);
+    background: rgb(255 247 237 / 0.98);
+}
+
+[data-theme='dark'] #modal_fermetures .fermeture-card--admin {
+    border-color: rgb(59 130 246 / 0.45);
+    background: rgb(30 58 138 / 0.35);
+}
+
+[data-theme='dark'] #modal_fermetures .fermeture-card--prof {
+    border-color: rgb(234 88 12 / 0.4);
+    background: rgb(124 45 18 / 0.35);
+}
+
+#modal_fermetures .fermeture-card__badge {
+    display: inline-block;
+    font-size: 0.5625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.1rem 0.35rem;
+    border-radius: 0.25rem;
+    margin-top: 0.25rem;
+}
+
+#modal_fermetures .fermeture-card__badge--draft {
+    background: rgb(254 243 199);
+    color: rgb(146 64 14);
+}
+
+#modal_fermetures .fermeture-card__badge--applied {
+    background: rgb(220 252 231);
+    color: rgb(22 101 52);
+}
+
+[data-theme='dark'] #modal_fermetures .fermeture-card__badge--draft {
+    background: rgb(120 53 15 / 0.5);
+    color: rgb(254 243 199);
+}
+
+[data-theme='dark'] #modal_fermetures .fermeture-card__badge--applied {
+    background: rgb(20 83 45 / 0.5);
+    color: rgb(187 247 208);
+}
+
+#modal_fermetures.fermetures-modal--busy #fermetures-add,
+#modal_fermetures.fermetures-modal--busy #fermetures-apply-pending,
+#modal_fermetures.fermetures-modal--busy .fermeture-card {
+    pointer-events: none;
+    opacity: 0.65;
+}
+
 #modal_config .config-rule-row {
     display: flex;
     flex-wrap: wrap;

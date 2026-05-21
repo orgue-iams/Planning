@@ -1779,6 +1779,157 @@ async function upsertSingleCalendarEvent(
     };
 }
 
+function eventNeedsOwnerPoolMirror(slotType: string): boolean {
+    const bridgeType = planningSlotTypeToBridgeType(slotType);
+    return shouldMirrorToOwnerPersonalPool({
+        type: bridgeType,
+        owner: 'x@y.z'
+    } as NonNullable<BridgeBody['events']>[0]);
+}
+
+/** Cron : crée les miroirs pool_owner manquants puis resync les agendas concernés. */
+async function handleCronRepairGoogleSync(
+    supabaseUrl: string,
+    serviceKey: string,
+    accessToken: string
+): Promise<{
+    ok: boolean;
+    repairedPool: number;
+    resyncedCalendars: number;
+    errors: string[];
+}> {
+    const base = supabaseUrl.replace(/\/$/, '');
+    const hdrs = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
+    const nowIso = new Date().toISOString();
+    const horizon = new Date();
+    horizon.setDate(horizon.getDate() + 30);
+    const errors: string[] = [];
+    const mainCal = calendarId();
+
+    const poolRes = await fetch(
+        `${base}/rest/v1/google_calendar_pool?assigned_user_id=not.is.null&select=assigned_user_id,google_calendar_id`,
+        { headers: hdrs }
+    );
+    const poolRows = poolRes.ok ? ((await poolRes.json()) as Array<{ assigned_user_id?: string; google_calendar_id?: string }>) : [];
+    const poolByUser = new Map<string, string>();
+    for (const pr of poolRows || []) {
+        const uid = String(pr.assigned_user_id || '').trim();
+        const cal = normalizeGoogleCalendarId(String(pr.google_calendar_id || ''));
+        if (uid && cal) poolByUser.set(uid, cal);
+    }
+
+    const evRes = await fetch(
+        `${base}/rest/v1/planning_event?end_at=gt.${encodeURIComponent(nowIso)}&start_at=lte.${encodeURIComponent(horizon.toISOString())}&select=id,title,start_at,end_at,slot_type,owner_email,owner_user_id&order=start_at.asc&limit=500`,
+        { headers: hdrs }
+    );
+    if (!evRes.ok) {
+        return { ok: false, repairedPool: 0, resyncedCalendars: 0, errors: [`Événements : HTTP ${evRes.status}`] };
+    }
+    const events = (await evRes.json()) as Array<{
+        id?: string;
+        title?: string;
+        start_at?: string;
+        end_at?: string;
+        slot_type?: string;
+        owner_email?: string;
+        owner_user_id?: string;
+    }>;
+
+    const eventIds = (events || []).map((e) => String(e.id || '').trim()).filter(Boolean);
+    const poolOkByEvent = new Set<string>();
+    const mainGidByEvent = new Map<string, string>();
+    if (eventIds.length) {
+        for (let i = 0; i < eventIds.length; i += 80) {
+            const chunk = eventIds.slice(i, i + 80);
+            const mirRes = await fetch(
+                `${base}/rest/v1/planning_event_google_mirror?event_id=in.(${chunk.map((id) => encodeURIComponent(id)).join(',')})&select=event_id,target,sync_status,google_event_id,google_calendar_id`,
+                { headers: hdrs }
+            );
+            if (!mirRes.ok) continue;
+            const mirs = (await mirRes.json()) as Array<{
+                event_id?: string;
+                target?: string;
+                sync_status?: string;
+                google_event_id?: string;
+            }>;
+            for (const m of mirs || []) {
+                const eid = String(m.event_id || '').trim();
+                if (!eid) continue;
+                if (m.target === 'main' && m.sync_status === 'ok' && m.google_event_id) {
+                    mainGidByEvent.set(eid, String(m.google_event_id).trim());
+                }
+                if (m.target === 'pool_owner' && m.sync_status === 'ok') {
+                    poolOkByEvent.add(eid);
+                }
+            }
+        }
+    }
+
+    const calendarsToResync = new Set<string>();
+    let repairedPool = 0;
+    const maxRepair = 40;
+
+    for (const ev of events || []) {
+        if (repairedPool >= maxRepair) break;
+        const eventId = String(ev.id || '').trim();
+        const ownerId = String(ev.owner_user_id || '').trim();
+        const slotType = String(ev.slot_type || '');
+        if (!eventId || !ownerId || !eventNeedsOwnerPoolMirror(slotType)) continue;
+        if (poolOkByEvent.has(eventId)) continue;
+        const poolCal = poolByUser.get(ownerId);
+        if (!poolCal || sameGoogleCalendarId(poolCal, mainCal)) continue;
+
+        const mainGid = mainGidByEvent.get(eventId);
+        if (!mainGid) {
+            errors.push(`Pas de miroir principal pour ${eventId.slice(0, 8)}…`);
+            continue;
+        }
+
+        const bridgeType = planningSlotTypeToBridgeType(slotType);
+        const ownerEmail = String(ev.owner_email || '').trim().toLowerCase();
+        let inscritsCsv = '';
+        if (bridgeType === 'cours') {
+            inscritsCsv = await fetchEnrollmentEmailsCsv(supabaseUrl, serviceKey, eventId);
+        }
+        const baseFields: EventPayloadInput = {
+            title: String(ev.title || '').trim() || 'Créneau',
+            start: String(ev.start_at || ''),
+            end: String(ev.end_at || ''),
+            type: bridgeType,
+            owner: ownerEmail,
+            planningEventId: eventId,
+            ...(inscritsCsv ? { inscrits: inscritsCsv } : {})
+        };
+
+        const gid = await createOrUpdatePoolCalendarEventCopy(accessToken, poolCal, [mainGid], baseFields);
+        if (!gid) {
+            errors.push(`Échec copie pool ${eventId.slice(0, 8)}…`);
+            continue;
+        }
+        await patchMirrorRowAfterResync(supabaseUrl, serviceKey, eventId, 'pool_owner', null, poolCal, gid);
+        poolOkByEvent.add(eventId);
+        calendarsToResync.add(poolCal);
+        repairedPool += 1;
+        await sleepMs(50);
+    }
+
+    let resyncedCalendars = 0;
+    for (const cal of calendarsToResync) {
+        const r = await resyncGoogleCalendarFutureFromDb(accessToken, supabaseUrl, serviceKey, cal);
+        if (r.errors.length) errors.push(...r.errors.slice(0, 3));
+        resyncedCalendars += 1;
+        await sleepMs(120);
+    }
+
+    if (repairedPool > 0 || calendarsToResync.size === 0) {
+        const mainSync = await resyncGoogleCalendarFutureFromDb(accessToken, supabaseUrl, serviceKey, mainCal);
+        if (mainSync.errors.length) errors.push(...mainSync.errors.slice(0, 2));
+        resyncedCalendars += 1;
+    }
+
+    return { ok: errors.length === 0, repairedPool, resyncedCalendars, errors };
+}
+
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
@@ -1801,6 +1952,30 @@ Deno.serve(async (req) => {
             return jsonResponse({ error: 'Missing Authorization' }, 401);
         }
 
+        let body: BridgeBody;
+        try {
+            body = (await req.json()) as BridgeBody;
+        } catch {
+            return jsonResponse({ ok: false, error: 'JSON invalide' }, 400);
+        }
+
+        const cronSecret = (
+            Deno.env.get('PLANNING_CRON_SECRET') ?? Deno.env.get('CRON_SECRET') ?? ''
+        ).trim();
+        if (cronSecret && jwt === cronSecret && body.action === 'cron_repair_google_sync') {
+            const serviceKey = (
+                Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
+                Deno.env.get('SERVICE_ROLE_KEY') ??
+                ''
+            ).trim();
+            if (!serviceKey) {
+                return jsonResponse({ ok: false, error: 'SERVICE_ROLE_KEY manquante' }, 500);
+            }
+            const accessToken = await getGoogleAccessToken();
+            const result = await handleCronRepairGoogleSync(supabaseUrl, serviceKey, accessToken);
+            return jsonResponse({ ok: result.ok, mode: 'cron_repair_google_sync', ...result });
+        }
+
         const { user, error: authErr } = await fetchAuthUser(supabaseUrl, supabaseAnonKey, jwt);
         if (authErr || !user) {
             return jsonResponse({ error: authErr || 'Unauthorized' }, 401);
@@ -1808,13 +1983,6 @@ Deno.serve(async (req) => {
 
         const resolvedEmail = (user.email?.trim() || emailFromSupabaseJwt(jwt)).trim();
         const calendarUser = { id: user.id, email: resolvedEmail || user.email?.trim() || '' };
-
-        let body: BridgeBody;
-        try {
-            body = (await req.json()) as BridgeBody;
-        } catch {
-            return jsonResponse({ ok: false, error: 'JSON invalide' }, 400);
-        }
 
         const accessToken = await getGoogleAccessToken();
 

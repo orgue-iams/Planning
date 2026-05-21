@@ -1,7 +1,7 @@
 /**
- * Menu Fermetures : vue synthétique sur les créneaux planning (slot_type = fermeture).
+ * Indisponibilités / fermetures : périodes brouillon → application (créneaux + décalage prof).
  */
-import { isAdmin } from './auth-logic.js';
+import { isAdmin, isProf } from './auth-logic.js';
 import { isBackendAuthConfigured } from './supabase-client.js';
 import { getPlanningSessionUser } from './session-user.js';
 import { showToast } from '../utils/toast.js';
@@ -11,18 +11,28 @@ import {
     popPlanningRouteLevel,
     pushPlanningRouteLevel
 } from '../utils/planning-route-dialog.js';
-import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
+import { invalidateCalendarListCache } from './calendar-events-db.js';
 import {
     deleteClosureRangeEvents,
     findConflictsForClosureRange,
-    formatConflictLineFr,
-    loadClosureRangesFromPlanning,
-    saveClosureRangeToPlanning
+    formatConflictLineFr
 } from './fermetures-planning.js';
+import {
+    deleteAbsencePeriodDraft,
+    loadAllAbsencePeriodsForUi,
+    pendingAbsencePeriodsForUser,
+    saveAbsencePeriodDraft
+} from './absence-period-db.js';
+import { applyPendingAbsencePeriods } from './absence-apply-engine.js';
+import {
+    fetchOrganSchoolSettings,
+    getSchoolYearBoundsFromSettings
+} from './organ-settings.js';
+import { syncPlanningDrawerGroupedSections } from './planning-drawer-ui.js';
 
 let bound = false;
 
-/** @type {{ startYmd: string, endYmd: string, title?: string, eventIds: string[] }[]} */
+/** @type {import('./absence-period-db.js').AbsencePeriodRow[]} */
 let closureRanges = [];
 
 /** @type {number | null} */
@@ -32,32 +42,34 @@ let editingClosureIndex = null;
 let pendingConflicts = [];
 
 let closureSaveInFlight = false;
+let closureApplyInFlight = false;
 
-/** @type {{ startYmd: string, endYmd: string, title?: string, eventIds: string[] }[] | null} */
+/** @type {import('./absence-period-db.js').AbsencePeriodRow[] | null} */
 let closureRangesBeforeOptimistic = null;
 
-function canViewClosures(user) {
-    return Boolean(user?.email) && isBackendAuthConfigured();
+export function canViewClosures(user) {
+    if (!Boolean(user?.email) || !isBackendAuthConfigured()) return false;
+    return isProf(user) || isAdmin(user);
 }
 
-function canEditClosures(user) {
-    return isAdmin(user);
+export function canManageOwnClosures(user) {
+    return canViewClosures(user);
 }
 
-/** Conservé pour compat (semaines types n’utilise plus les réglages JSON). */
-export function parseClosureRangesFromSettings(raw) {
-    if (!Array.isArray(raw)) return [];
-    const out = [];
-    for (const item of raw) {
-        if (!item || typeof item !== 'object') continue;
-        const startYmd = String(item.startYmd || item.start || '').trim();
-        const endYmd = String(item.endYmd || item.end || '').trim();
-        const title = String(item.title || '').trim();
-        if (startYmd && endYmd && endYmd >= startYmd) {
-            out.push({ startYmd, endYmd, ...(title ? { title } : {}), eventIds: [] });
-        }
-    }
-    return out;
+function ownsClosurePeriod(range, user) {
+    return String(range?.createdByUserId || '') === String(user?.id || '');
+}
+
+function canEditClosureRange(range, user) {
+    if (!canManageOwnClosures(user)) return false;
+    if (range?.legacy) return false;
+    if (range?.appliedAt) return false;
+    return ownsClosurePeriod(range, user);
+}
+
+function todayYmdLocal() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function formatFrRange(startYmd, endYmd) {
@@ -71,61 +83,76 @@ function formatFrRange(startYmd, endYmd) {
     return `${s.toLocaleDateString('fr-FR', opts)} → ${e.toLocaleDateString('fr-FR', opts)}`;
 }
 
-function todayYmdLocal() {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+function closureCardToneClass(range) {
+    if (range?.creatorRole === 'admin') return 'fermeture-card--admin';
+    if (range?.creatorRole === 'prof') return 'fermeture-card--prof';
+    return '';
 }
 
-function futureClosureRanges() {
-    const today = todayYmdLocal();
-    return closureRanges.filter((r) => String(r.endYmd || '') >= today);
+function setFermeturesModalBusy(busy) {
+    const dlg = document.getElementById('modal_fermetures');
+    dlg?.classList.toggle('fermetures-modal--busy', busy);
+    const progWrap = document.getElementById('fermetures-apply-progress-wrap');
+    if (busy) {
+        progWrap?.classList.remove('hidden');
+        progWrap?.setAttribute('aria-hidden', 'false');
+    } else {
+        progWrap?.classList.add('hidden');
+        progWrap?.setAttribute('aria-hidden', 'true');
+    }
 }
 
-function closureRangesOverlap(a, b) {
-    return String(a.endYmd) >= String(b.startYmd) && String(a.startYmd) <= String(b.endYmd);
+function setApplyProgress(pct, label) {
+    const bar = document.getElementById('fermetures-apply-progress');
+    const lab = document.getElementById('fermetures-apply-progress-label');
+    if (bar instanceof HTMLProgressElement) bar.value = Math.max(0, Math.min(100, pct));
+    if (lab) lab.textContent = label || 'Application…';
 }
 
-function cloneClosureRanges(list) {
-    return (list || []).map((r) => ({
-        startYmd: r.startYmd,
-        endYmd: r.endYmd,
-        title: r.title,
-        eventIds: [...(r.eventIds || [])],
-        ...(r._optimistic ? { _optimistic: true } : {})
-    }));
+function syncFermeturesActionsRow() {
+    const u = getPlanningSessionUser();
+    const row = document.getElementById('fermetures-actions-row');
+    const applyBtn = document.getElementById('fermetures-apply-pending');
+    const addBtn = document.getElementById('fermetures-add');
+    if (!row) return;
+    const canManage = canManageOwnClosures(u);
+    row.classList.toggle('hidden', !canManage);
+    const pending = pendingAbsencePeriodsForUser(closureRanges, u);
+    if (applyBtn instanceof HTMLButtonElement) {
+        applyBtn.classList.toggle('hidden', !pending.length);
+        applyBtn.textContent =
+            pending.length === 1
+                ? 'Appliquer 1 absence'
+                : `Appliquer ${pending.length} absences`;
+        applyBtn.disabled = closureApplyInFlight;
+    }
+    if (addBtn instanceof HTMLButtonElement) {
+        addBtn.disabled = closureApplyInFlight || closureSaveInFlight;
+    }
 }
 
-/** Affiche tout de suite la période dans la liste (avant fin base / Google). */
-function applyOptimisticClosureRange(entry, prevIndex) {
-    closureRangesBeforeOptimistic = cloneClosureRanges(closureRanges);
-    const keep = closureRanges.filter((r, i) => {
-        if (prevIndex != null && prevIndex >= 0 && i === prevIndex) return false;
-        return !closureRangesOverlap(r, entry);
-    });
-    closureRanges = [
-        ...keep,
-        {
-            startYmd: entry.startYmd,
-            endYmd: entry.endYmd,
-            title: entry.title,
-            eventIds: [...(entry.eventIds || [])],
-            _optimistic: true
-        }
-    ].sort((a, b) => a.startYmd.localeCompare(b.startYmd));
+function updateSchoolYearHint() {
+    const el = document.getElementById('fermetures-school-year-hint');
+    if (!el) return;
+    const { startYmd, endYmd } = getSchoolYearBoundsFromSettings();
+    if (startYmd && endYmd) {
+        el.textContent = `Année scolaire affichée : ${formatFrRange(startYmd, endYmd)}. Seules les périodes de cette plage sont listées ; l’application ne touche pas le passé.`;
+        el.classList.remove('hidden');
+    } else {
+        el.textContent =
+            'Dates d’année scolaire non configurées (Configuration du planning).';
+        el.classList.remove('hidden');
+    }
 }
 
-function revertOptimisticClosureRange() {
-    if (!closureRangesBeforeOptimistic) return;
-    closureRanges = closureRangesBeforeOptimistic;
-    closureRangesBeforeOptimistic = null;
-}
-
-function buildClosureCard(range, index, editable) {
+function buildClosureCard(range, index) {
+    const u = getPlanningSessionUser();
+    const editable = canEditClosureRange(range, u);
     const pending = Boolean(range._optimistic);
+    const isDraft = !range.appliedAt && !range.legacy;
     const card = document.createElement('div');
-    card.className =
-        'fermeture-card rounded-xl border border-orange-200/80 bg-orange-50/95 dark:border-orange-700/50 dark:bg-orange-950/45 px-3 py-2.5 min-w-0';
-    if (!pending) {
+    card.className = `fermeture-card rounded-xl border px-3 py-2.5 min-w-0 ${closureCardToneClass(range)}`;
+    if (!pending && !closureApplyInFlight) {
         card.classList.add('cursor-pointer');
         card.tabIndex = 0;
         card.setAttribute('role', 'button');
@@ -140,38 +167,50 @@ function buildClosureCard(range, index, editable) {
         card.classList.add('fermeture-card--pending');
         card.setAttribute('aria-busy', 'true');
     }
-    card.dataset.closureIndex = String(index);
 
     const body = document.createElement('div');
     body.className = 'flex-1 min-w-0';
     const dates = document.createElement('p');
-    dates.className = 'text-[12px] font-mono font-semibold text-slate-800 dark:text-orange-50 m-0 leading-snug';
+    dates.className = 'text-[12px] font-mono font-semibold text-slate-800 dark:text-slate-50 m-0 leading-snug';
     dates.textContent = pending
         ? `${formatFrRange(range.startYmd, range.endYmd)} — enregistrement…`
         : formatFrRange(range.startYmd, range.endYmd);
-    const title = document.createElement('p');
-    title.className = 'text-[11px] text-slate-600 dark:text-orange-100/90 m-0 mt-0.5 leading-snug break-words';
     body.appendChild(dates);
+
+    const meta = document.createElement('p');
+    meta.className = 'text-[10px] text-slate-600 dark:text-slate-300 m-0 mt-0.5';
+    meta.textContent = range.creatorLabel || (range.creatorRole === 'admin' ? 'Administration' : 'Professeur');
+    body.appendChild(meta);
+
     const titleText = String(range.title || '').trim();
     if (titleText) {
+        const title = document.createElement('p');
+        title.className =
+            'text-[11px] text-slate-600 dark:text-orange-100/90 m-0 mt-0.5 leading-snug break-words';
         title.textContent = titleText;
         body.appendChild(title);
     }
+
+    const badge = document.createElement('span');
+    badge.className = `fermeture-card__badge ${isDraft ? 'fermeture-card__badge--draft' : 'fermeture-card__badge--applied'}`;
+    badge.textContent = isDraft ? 'À appliquer' : 'Appliquée';
+    body.appendChild(badge);
+
     card.appendChild(body);
 
-    if (!editable || pending) return card;
+    if (!editable || pending || closureApplyInFlight) return card;
 
     card.classList.add('fermeture-card--with-delete');
     const delBtn = document.createElement('button');
     delBtn.type = 'button';
     delBtn.className = 'fermeture-card__delete-btn';
-    delBtn.setAttribute('aria-label', 'Supprimer cette période de fermeture');
+    delBtn.setAttribute('aria-label', 'Supprimer cette période');
     delBtn.innerHTML =
         '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916A2.25 2.25 0 0013.5 2.25h-3A2.25 2.25 0 008.25 4.5v.916m7.5 0a48.11 48.11 0 01-7.5 0" /></svg>';
     delBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (!window.confirm('Supprimer cette période de fermeture ?')) return;
+        if (!window.confirm('Supprimer cette période ?')) return;
         void deleteClosureAt(index);
     });
     card.appendChild(delBtn);
@@ -183,23 +222,22 @@ function renderClosureCards() {
     if (!host) return;
     host.replaceChildren();
     const u = getPlanningSessionUser();
-    const editable = canEditClosures(u);
-    const visible = futureClosureRanges();
 
-    if (!visible.length) {
+    if (!closureRanges.length) {
         const empty = document.createElement('p');
         empty.className = 'text-sm text-slate-500 dark:text-slate-400 italic m-0 py-2';
-        empty.textContent = editable
-            ? 'Aucune période. Utilisez « + Période de fermeture ».'
-            : 'Aucune période de fermeture définie.';
+        empty.textContent = canManageOwnClosures(u)
+            ? 'Aucune période sur l’année en cours. Utilisez « + Période ».'
+            : 'Aucune période sur l’année en cours.';
         host.appendChild(empty);
+        syncFermeturesActionsRow();
         return;
     }
 
-    visible.forEach((r) => {
-        const index = closureRanges.indexOf(r);
-        host.appendChild(buildClosureCard(r, index, editable));
+    closureRanges.forEach((r, index) => {
+        host.appendChild(buildClosureCard(r, index));
     });
+    syncFermeturesActionsRow();
 }
 
 function hideConflictPanel() {
@@ -266,23 +304,25 @@ function setEditFieldsReadonly(readonly) {
 }
 
 function setClosureSaveBusy(busy) {
+    closureSaveInFlight = busy;
     const saveBtn = document.getElementById('fermeture-edit-save');
     if (saveBtn instanceof HTMLButtonElement) {
-        saveBtn.disabled = busy;
+        saveBtn.disabled = busy || closureApplyInFlight;
         saveBtn.setAttribute('aria-busy', busy ? 'true' : 'false');
     }
+    syncFermeturesActionsRow();
 }
 
 function openClosureEdit(index) {
     const u = getPlanningSessionUser();
     if (!canViewClosures(u)) return;
-    if (closureRanges[index]?._optimistic) return;
-    const editable = canEditClosures(u);
+    if (closureRanges[index]?._optimistic || closureApplyInFlight) return;
+    const editable = canEditClosureRange(closureRanges[index], u);
     editingClosureIndex = index;
     const range =
         index >= 0
             ? closureRanges[index]
-            : { startYmd: '', endYmd: '', title: '', eventIds: [] };
+            : { startYmd: todayYmdLocal(), endYmd: todayYmdLocal(), title: '', eventIds: [] };
 
     document.getElementById('fermetures-main-panel')?.classList.add('hidden');
     const panel = document.getElementById('fermetures-edit-panel');
@@ -299,13 +339,13 @@ function openClosureEdit(index) {
             : editable
               ? planningRouteTitle('Édition')
               : planningRouteTitle('Détail');
-    pushPlanningRouteLevel('modal_fermetures', title, 'Fermetures', showFermeturesMainPanel);
+    pushPlanningRouteLevel('modal_fermetures', title, 'Indisponibilités', showFermeturesMainPanel);
 }
 
-async function persistClosureEdit(deleteConflicts) {
-    if (closureSaveInFlight) return;
+async function persistClosureEdit() {
+    if (closureSaveInFlight || closureApplyInFlight) return;
     const u = getPlanningSessionUser();
-    if (!canEditClosures(u)) return;
+    if (!canManageOwnClosures(u)) return;
     const f = readEditForm();
     if (!f.startYmd || !f.endYmd) {
         showToast('Indiquez les dates de début et de fin.', 'error');
@@ -315,77 +355,112 @@ async function persistClosureEdit(deleteConflicts) {
         showToast('La date de fin doit être après le début.', 'error');
         return;
     }
+    if (f.endYmd < todayYmdLocal()) {
+        showToast('La période ne peut pas être entièrement dans le passé.', 'error');
+        return;
+    }
 
     const prev =
         editingClosureIndex != null && editingClosureIndex >= 0
             ? closureRanges[editingClosureIndex]
-            : { eventIds: [] };
-    const excludeIds = deleteConflicts ? [] : [...(prev.eventIds || [])];
+            : null;
 
-    if (!deleteConflicts) {
-        closureSaveInFlight = true;
-        setClosureSaveBusy(true);
-    }
-    let conflicts = [];
-    try {
-        conflicts = await findConflictsForClosureRange(f.startYmd, f.endYmd, excludeIds);
-    } catch (err) {
-        if (!deleteConflicts) {
-            closureSaveInFlight = false;
-            setClosureSaveBusy(false);
-        }
-        throw err;
-    }
-    if (conflicts.length && !deleteConflicts) {
-        closureSaveInFlight = false;
-        setClosureSaveBusy(false);
-        showConflictPanel(conflicts);
+    setClosureSaveBusy(true);
+    const r = await saveAbsencePeriodDraft({
+        id: prev?.legacy ? undefined : prev?.id,
+        startYmd: f.startYmd,
+        endYmd: f.endYmd,
+        title: f.title
+    });
+    setClosureSaveBusy(false);
+    if (!r.ok || !r.period) {
+        showToast(r.error || 'Enregistrement impossible.', 'error');
         return;
     }
 
-    const entry = {
-        startYmd: f.startYmd,
-        endYmd: f.endYmd,
-        title: f.title,
-        eventIds: [...(prev.eventIds || [])]
-    };
-    const prevIndex = editingClosureIndex;
-
-    applyOptimisticClosureRange(entry, prevIndex);
     returnToFermeturesList();
-    showToast('Enregistrement de la période en cours…', 'info', 2800);
+    await loadClosureRangesFromServer();
+    showToast('Période enregistrée. Utilisez « Appliquer » pour la publier.', 'success');
+}
 
-    closureSaveInFlight = true;
-    setClosureSaveBusy(false);
-    setConflictProceedBusy(true);
-    try {
-        const r = await saveClosureRangeToPlanning(entry, {
-            deleteConflicts: Boolean(deleteConflicts && conflicts.length),
-            conflicts: deleteConflicts ? conflicts : []
-        });
-        if (!r.ok) {
-            revertOptimisticClosureRange();
+async function collectConflictsForPendingApply() {
+    const u = getPlanningSessionUser();
+    const pending = pendingAbsencePeriodsForUser(closureRanges, u);
+    /** @type {object[]} */
+    const all = [];
+    /** @type {Map<string, object[]>} */
+    const byPeriod = new Map();
+    for (const p of pending) {
+        const conflicts = await findConflictsForClosureRange(p.startYmd, p.endYmd, []);
+        if (conflicts.length) byPeriod.set(p.id, conflicts);
+        for (const c of conflicts) {
+            if (!all.some((x) => x.id === c.id)) all.push(c);
+        }
+    }
+    return { all, byPeriod };
+}
+
+async function runApplyPendingClosures(deleteConflicts) {
+    if (closureApplyInFlight) return;
+    const u = getPlanningSessionUser();
+    const pending = pendingAbsencePeriodsForUser(closureRanges, u);
+    if (!pending.length) {
+        showToast('Aucune nouvelle période à appliquer.', 'info');
+        return;
+    }
+
+    closureApplyInFlight = true;
+    setFermeturesModalBusy(true);
+    setApplyProgress(0, 'Préparation…');
+    syncFermeturesActionsRow();
+    renderClosureCards();
+
+    let conflictsByPeriod = new Map();
+    if (!deleteConflicts) {
+        const { all, byPeriod } = await collectConflictsForPendingApply();
+        if (all.length) {
+            closureApplyInFlight = false;
+            setFermeturesModalBusy(false);
+            syncFermeturesActionsRow();
             renderClosureCards();
-            showToast(r.error || 'Enregistrement impossible.', 'error', 8000);
+            showConflictPanel(all);
+            window.__fermeturesApplyConflictMap = byPeriod;
             return;
         }
+        conflictsByPeriod = byPeriod;
+    } else {
+        conflictsByPeriod = window.__fermeturesApplyConflictMap || new Map();
+        hideConflictPanel();
+    }
 
-        closureRangesBeforeOptimistic = null;
-        invalidateCalendarListCache();
-        document.dispatchEvent(new CustomEvent('planning-events-changed'));
+    const r = await applyPendingAbsencePeriods(closureRanges, {
+        deleteConflicts,
+        conflictsByPeriodId: conflictsByPeriod,
+        onProgress: (pct, label) => setApplyProgress(pct, label)
+    });
+
+    closureApplyInFlight = false;
+    setFermeturesModalBusy(false);
+    window.__fermeturesApplyConflictMap = null;
+    syncFermeturesActionsRow();
+
+    if (!r.ok) {
+        showToast(r.error || 'Application impossible.', 'error', 8000);
         await loadClosureRangesFromServer();
         renderClosureCards();
-        const n = conflicts.length;
-        showToast(
-            deleteConflicts && n
-                ? `Période enregistrée. ${n} créneau(x) supprimé(s).`
-                : 'Période de fermeture enregistrée.',
-            'success'
-        );
-    } finally {
-        closureSaveInFlight = false;
-        setConflictProceedBusy(false);
+        return;
     }
+
+    invalidateCalendarListCache();
+    document.dispatchEvent(new CustomEvent('planning-events-changed'));
+    await loadClosureRangesFromServer();
+    renderClosureCards();
+    showToast(
+        r.applied === 1
+            ? 'Absence appliquée (fermetures + décalage si nécessaire).'
+            : `${r.applied} absences appliquées.`,
+        'success'
+    );
 }
 
 function setConflictProceedBusy(busy) {
@@ -395,7 +470,6 @@ function setConflictProceedBusy(busy) {
     if (cancel instanceof HTMLButtonElement) cancel.disabled = busy;
 }
 
-/** Retour liste Fermetures (quitte création / édition / conflits). */
 function returnToFermeturesList() {
     hideConflictPanel();
     editingClosureIndex = null;
@@ -405,51 +479,50 @@ function returnToFermeturesList() {
 
 async function deleteClosureAt(index) {
     const u = getPlanningSessionUser();
-    if (!canEditClosures(u)) return;
-    if (index < 0 || index >= closureRanges.length) return;
     const range = closureRanges[index];
-    const snapshot = {
-        startYmd: range.startYmd,
-        endYmd: range.endYmd,
-        title: range.title,
-        eventIds: [...(range.eventIds || [])]
-    };
-    const eventIds = snapshot.eventIds;
+    if (!range || !canEditClosureRange(range, u)) return;
+
+    if (range.legacy) {
+        const r = await deleteClosureRangeEvents(range.eventIds);
+        if (!r.ok) {
+            showToast(r.error || 'Suppression impossible.', 'error');
+            return;
+        }
+    } else {
+        const r = await deleteAbsencePeriodDraft(range.id);
+        if (!r.ok) {
+            showToast(r.error || 'Suppression impossible.', 'error');
+            return;
+        }
+    }
 
     closureRanges.splice(index, 1);
-    if (editingClosureIndex === index) {
-        editingClosureIndex = null;
-    } else if (editingClosureIndex != null && editingClosureIndex > index) {
-        editingClosureIndex -= 1;
-    }
     renderClosureCards();
-    showToast('Période de fermeture supprimée.', 'success');
-
-    const r = await deleteClosureRangeEvents(eventIds);
-    if (!r.ok) {
-        closureRanges.splice(index, 0, snapshot);
-        renderClosureCards();
-        showToast(r.error || 'Suppression impossible.', 'error');
-        return;
-    }
+    showToast('Période supprimée.', 'success');
     invalidateCalendarListCache();
     document.dispatchEvent(new CustomEvent('planning-events-changed'));
-    void loadClosureRangesFromServer().then(() => renderClosureCards());
 }
 
 export async function loadClosureRangesFromServer() {
-    closureRanges = await loadClosureRangesFromPlanning();
+    closureRanges = await loadAllAbsencePeriodsForUi();
 }
 
 export async function openFermeturesModal() {
     const u = getPlanningSessionUser();
     if (!canViewClosures(u)) {
-        showToast('Connectez-vous pour consulter les fermetures.', 'info');
+        showToast('Indisponibilités : réservé aux professeurs et administrateurs.', 'info');
         return;
     }
+    await fetchOrganSchoolSettings();
+    updateSchoolYearHint();
     await loadClosureRangesFromServer();
     showFermeturesMainPanel();
-    document.getElementById('fermetures-add-wrap')?.classList.toggle('hidden', !canEditClosures(u));
+}
+
+export function syncFermeturesMenuVisibility(user) {
+    const show = canViewClosures(user);
+    document.getElementById('menu-item-fermetures-wrap')?.classList.toggle('hidden', !show);
+    syncPlanningDrawerGroupedSections();
 }
 
 export function resetFermeturesUiBindings() {
@@ -458,6 +531,7 @@ export function resetFermeturesUiBindings() {
     editingClosureIndex = null;
     pendingConflicts = [];
     closureSaveInFlight = false;
+    closureApplyInFlight = false;
     closureRangesBeforeOptimistic = null;
 }
 
@@ -469,19 +543,24 @@ export function initFermeturesUi() {
         e.preventDefault();
         const u = getPlanningSessionUser();
         if (!canViewClosures(u)) {
-            showToast('Fermetures : connexion requise.', 'info');
+            showToast('Indisponibilités : réservé aux professeurs et administrateurs.', 'info');
             return;
         }
-        if (!openPlanningRouteFromDrawer('modal_fermetures', 'Fermetures', 'Menu')) return;
+        if (!openPlanningRouteFromDrawer('modal_fermetures', 'Indisponibilités', 'Menu')) return;
         void openFermeturesModal();
     });
 
     document.getElementById('fermetures-add')?.addEventListener('click', () => {
+        if (closureApplyInFlight) return;
         openClosureEdit(-1);
     });
 
+    document.getElementById('fermetures-apply-pending')?.addEventListener('click', () => {
+        void runApplyPendingClosures(false);
+    });
+
     document.getElementById('fermeture-edit-save')?.addEventListener('click', () => {
-        void persistClosureEdit(false);
+        void persistClosureEdit();
     });
 
     document.getElementById('fermeture-edit-cancel')?.addEventListener('click', () => {
@@ -493,10 +572,27 @@ export function initFermeturesUi() {
     });
 
     document.getElementById('fermetures-conflict-proceed')?.addEventListener('click', () => {
-        void persistClosureEdit(true);
+        setConflictProceedBusy(true);
+        void runApplyPendingClosures(true).finally(() => setConflictProceedBusy(false));
     });
 
     document.getElementById('modal_fermetures')?.addEventListener('close', () => {
         showFermeturesMainPanel();
     });
+}
+
+/** Conservé pour compat (semaines types). */
+export function parseClosureRangesFromSettings(raw) {
+    if (!Array.isArray(raw)) return [];
+    const out = [];
+    for (const item of raw) {
+        if (!item || typeof item !== 'object') continue;
+        const startYmd = String(item.startYmd || item.start || '').trim();
+        const endYmd = String(item.endYmd || item.end || '').trim();
+        const title = String(item.title || '').trim();
+        if (startYmd && endYmd && endYmd >= startYmd) {
+            out.push({ startYmd, endYmd, ...(title ? { title } : {}), eventIds: [] });
+        }
+    }
+    return out;
 }
