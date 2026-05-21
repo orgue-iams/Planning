@@ -11,7 +11,7 @@ import {
     popPlanningRouteLevel,
     pushPlanningRouteLevel
 } from '../utils/planning-route-dialog.js';
-import { invalidateCalendarListCache } from './calendar-events-db.js';
+import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
 import {
     deleteClosureRangeEvents,
     findConflictsForClosureRange,
