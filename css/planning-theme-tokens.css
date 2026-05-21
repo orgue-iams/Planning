@@ -22,6 +22,14 @@
     --planning-accent-bg: rgb(239 246 255);
     --planning-accent-border: rgb(37 99 235);
     --planning-accent-text: rgb(29 78 216);
+    --planning-btn-ghost-text: rgb(71 85 105);
+    --planning-btn-ghost-hover-bg: rgb(241 245 249);
+    --planning-btn-error-bg: rgb(254 226 226);
+    --planning-btn-error-border: rgb(248 113 113);
+    --planning-btn-error-text: rgb(185 28 28);
+    --planning-btn-warning-bg: rgb(254 243 199);
+    --planning-btn-warning-border: rgb(251 191 36);
+    --planning-btn-warning-text: rgb(146 64 14);
     --planning-ui-font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     --planning-ui-color: rgb(71 85 105);
     --planning-ui-size-hero: 0.875rem;
@@ -51,6 +59,14 @@
     --planning-accent-bg: rgb(30 58 138 / 0.35);
     --planning-accent-border: rgb(96 165 250);
     --planning-accent-text: rgb(191 219 254);
+    --planning-btn-ghost-text: rgb(203 213 225);
+    --planning-btn-ghost-hover-bg: rgb(51 65 85);
+    --planning-btn-error-bg: rgb(69 10 10 / 0.45);
+    --planning-btn-error-border: rgb(248 113 113);
+    --planning-btn-error-text: rgb(254 202 202);
+    --planning-btn-warning-bg: rgb(69 26 3 / 0.5);
+    --planning-btn-warning-border: rgb(251 191 36);
+    --planning-btn-warning-text: rgb(253 230 138);
     /* Menus / tiroir : une famille, gris clair, tailles hiérarchiques (min. 10px) */
     --planning-ui-color: rgb(203 213 225);
     --planning-ui-size-hero: 0.875rem;
@@ -338,6 +354,142 @@ textarea.planning-field,
     background: var(--planning-input-bg) !important;
     border-color: var(--planning-input-border) !important;
     color: var(--planning-input-text) !important;
+}
+
+/* ——— Champs : toutes les modales + tiroir (clair / sombre via variables) ——— */
+dialog.modal .input,
+dialog.modal .select,
+dialog.modal .textarea,
+dialog.modal .config-rule-field,
+dialog.modal .planning-date-input,
+#planning-drawer-help-panel .input,
+#planning-drawer-help-panel .textarea,
+#planning-drawer-help-panel .drawer-help-message-editable,
+#modal_login .login-field,
+#modal_forgot_password .input,
+#modal_password .input,
+#modal_admin_password .input,
+#modal_admin_confirm .input {
+    background-color: var(--planning-input-bg) !important;
+    color: var(--planning-input-text) !important;
+    border-color: var(--planning-input-border) !important;
+}
+
+dialog.modal .input::placeholder,
+dialog.modal .textarea::placeholder,
+#planning-drawer-help-panel .input::placeholder,
+#modal_login .login-field::placeholder,
+#modal_forgot_password .input::placeholder,
+#modal_password .input::placeholder {
+    color: var(--planning-input-placeholder) !important;
+    opacity: 1;
+}
+
+#planning-drawer-help-panel .drawer-help-message-editable:empty::before {
+    color: var(--planning-input-placeholder);
+}
+
+dialog.modal .input:focus,
+dialog.modal .select:focus,
+dialog.modal .textarea:focus,
+dialog.modal .config-rule-field:focus,
+dialog.modal .planning-date-input:focus,
+#planning-drawer-help-panel .input:focus,
+#planning-drawer-help-panel .drawer-help-message-editable:focus,
+#modal_login .login-field:focus,
+#modal_forgot_password .input:focus,
+#modal_password .input:focus {
+    outline: none;
+    border-color: var(--planning-accent-border) !important;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--planning-accent-border) 28%, transparent) !important;
+}
+
+/* ——— Boutons : primaire (plein), accent (contour), ghost, danger, avertissement ——— */
+dialog.modal .btn.btn-primary:not(.btn-outline):not(.btn-ghost):not(.btn-link),
+#planning-drawer-help-panel .btn.btn-primary:not(.btn-outline):not(.btn-ghost),
+#planning-drawer-help-panel .planning-btn-accent,
+#modal_login .btn.btn-primary:not(.btn-outline):not(.btn-ghost),
+#modal_forgot_password .btn.btn-primary:not(.btn-outline):not(.btn-ghost),
+#modal_password .btn.btn-primary:not(.btn-outline):not(.btn-ghost),
+#modal_admin_password .btn.btn-primary:not(.btn-outline):not(.btn-ghost),
+#modal_admin_confirm .btn.btn-primary:not(.btn-outline):not(.btn-ghost) {
+    background-color: var(--planning-action-btn-bg) !important;
+    border: 1px solid var(--planning-action-btn-border) !important;
+    color: var(--planning-action-btn-text) !important;
+    box-shadow: none;
+}
+
+dialog.modal .btn.btn-primary:not(.btn-outline):not(.btn-ghost):not(.btn-link):hover,
+#planning-drawer-help-panel .btn.btn-primary:not(.btn-outline):not(.btn-ghost):hover,
+#modal_login .btn.btn-primary:hover,
+#modal_forgot_password .btn.btn-primary:hover,
+#modal_password .btn.btn-primary:hover,
+#modal_admin_password .btn.btn-primary:hover,
+#modal_admin_confirm .btn.btn-primary:hover {
+    background-color: var(--planning-action-btn-bg-hover) !important;
+    border-color: var(--planning-action-btn-border) !important;
+    color: var(--planning-action-btn-text) !important;
+}
+
+dialog.modal .btn.btn-primary:not(.btn-outline):not(.btn-ghost):not(.btn-link):active,
+#planning-drawer-help-panel .btn.btn-primary:not(.btn-outline):not(.btn-ghost):active,
+#modal_login .btn.btn-primary:active {
+    background-color: var(--planning-action-btn-bg-active) !important;
+}
+
+dialog.modal .btn.btn-outline:not(.btn-error):not(.btn-warning),
+dialog.modal .planning-btn-accent,
+dialog.modal .calendar-pool-update-btn.planning-btn-accent {
+    background: var(--planning-accent-bg) !important;
+    border: 1px solid var(--planning-accent-border) !important;
+    color: var(--planning-accent-text) !important;
+    box-shadow: none;
+    font-weight: 600;
+}
+
+dialog.modal .btn.btn-outline:not(.btn-error):not(.btn-warning):hover,
+dialog.modal .planning-btn-accent:hover,
+dialog.modal .calendar-pool-update-btn.planning-btn-accent:hover {
+    filter: brightness(0.97);
+}
+
+[data-theme='dark'] dialog.modal .btn.btn-outline:not(.btn-error):not(.btn-warning):hover,
+[data-theme='dark'] dialog.modal .planning-btn-accent:hover,
+[data-theme='dark'] dialog.modal .calendar-pool-update-btn.planning-btn-accent:hover,
+[data-theme='dark'] #planning-drawer-help-panel .planning-btn-accent:hover {
+    filter: brightness(1.08);
+}
+
+dialog.modal .btn.btn-ghost:not(.btn-link),
+#planning-drawer-help-panel .btn.btn-ghost,
+#modal_admin_confirm .btn.btn-ghost,
+#modal_admin_password .btn.btn-ghost {
+    background: transparent !important;
+    border-color: transparent !important;
+    color: var(--planning-btn-ghost-text) !important;
+    box-shadow: none;
+}
+
+dialog.modal .btn.btn-ghost:not(.btn-link):hover,
+#planning-drawer-help-panel .btn.btn-ghost:hover,
+#modal_admin_confirm .btn.btn-ghost:hover {
+    background: var(--planning-btn-ghost-hover-bg) !important;
+    color: var(--planning-text) !important;
+}
+
+dialog.modal .btn.btn-error.btn-outline,
+dialog.modal .btn.btn-error:not(.btn-outline):not(.btn-ghost) {
+    background: var(--planning-btn-error-bg) !important;
+    border: 1px solid var(--planning-btn-error-border) !important;
+    color: var(--planning-btn-error-text) !important;
+    box-shadow: none;
+}
+
+dialog.modal .btn.btn-warning:not(.btn-ghost) {
+    background: var(--planning-btn-warning-bg) !important;
+    border: 1px solid var(--planning-btn-warning-border) !important;
+    color: var(--planning-btn-warning-text) !important;
+    box-shadow: none;
 }
 
 .planning-btn-accent {

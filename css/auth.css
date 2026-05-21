@@ -26,13 +26,13 @@
 }
 
 #modal_login .login-field {
-    background-color: #fff !important;
-    border-color: rgb(203 213 225) !important;
-    color: rgb(15 23 42) !important;
+    background-color: var(--planning-input-bg) !important;
+    border-color: var(--planning-input-border) !important;
+    color: var(--planning-input-text) !important;
 }
 
 #modal_login .login-field::placeholder {
-    color: rgb(100 116 139);
+    color: var(--planning-input-placeholder);
     opacity: 1;
 }
 
@@ -75,14 +75,8 @@
     color: rgb(219 234 254) !important;
 }
 
-[data-theme='dark'] #modal_login .login-field {
-    background-color: rgb(15 23 42) !important;
-    border-color: rgb(71 85 105) !important;
-    color: rgb(248 250 252) !important;
-}
-
 [data-theme='dark'] #modal_login .login-field::placeholder {
-    color: rgb(148 163 184) !important;
+    color: var(--planning-input-placeholder) !important;
 }
 
 [data-theme='dark'] #modal_login .login-remember__label {
@@ -118,14 +112,9 @@
 }
 
 #modal_login .login-field:focus {
-    border-color: #3b82f6 !important;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    border-color: var(--planning-accent-border) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--planning-accent-border) 28%, transparent) !important;
     outline: none;
-}
-
-[data-theme='dark'] #modal_login .login-field:focus {
-    border-color: rgb(96 165 250) !important;
-    box-shadow: 0 0 0 3px rgb(59 130 246 / 0.35) !important;
 }
 
 #modal_login #login-email:-webkit-autofill,
