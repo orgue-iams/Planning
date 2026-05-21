@@ -746,10 +746,12 @@ Deno.serve(async (req) => {
                 const p = uid ? pmap.get(uid) : undefined;
                 const nom = String(p?.nom ?? '').trim();
                 const prenom = String(p?.prenom ?? '').trim();
+                const displayName = String(p?.display_name ?? '').trim();
                 return {
                     ...row,
                     assignee_nom: nom,
-                    assignee_prenom: prenom
+                    assignee_prenom: prenom,
+                    assignee_display_name: displayName || null
                 };
             });
             return new Response(JSON.stringify({ ok: true, rows }), {

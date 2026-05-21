@@ -12,6 +12,7 @@ import { getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js
 import { showToast } from '../utils/toast.js';
 import { openPlanningRouteFromDrawer } from '../utils/planning-route-dialog.js';
 import { refreshDrawerProfileExtras } from './drawer-profile-extras-ui.js';
+import { formatProfileFullName, parseDisplayNameToNomPrenom } from '../utils/profile-full-name.js';
 
 let profileUiBound = false;
 let profileSaveInFlight = false;
@@ -166,10 +167,14 @@ export async function persistProfileFields() {
     try {
         const form = readProfileFormState();
         const telephone = String(form.phone || '').slice(0, 40);
+        const { nom, prenom } = parseDisplayNameToNomPrenom(form.name);
+        const display_name = formatProfileFullName(nom, prenom) || form.name;
         const { error } = await sb
             .from('profiles')
             .update({
-                display_name: form.name,
+                nom,
+                prenom,
+                display_name,
                 telephone,
                 directory_share_email: form.shareEmail,
                 directory_share_phone: form.sharePhone,
@@ -184,7 +189,7 @@ export async function persistProfileFields() {
         if (current) {
             setPlanningSessionUser({
                 ...current,
-                name: form.name,
+                name: display_name,
                 telephone,
                 directory_share_email: form.shareEmail,
                 directory_share_phone: form.sharePhone,
@@ -289,18 +294,32 @@ export function initProfileUi(currentUser) {
         void persistProfileFields();
     });
 
+    const applyShowSundayToSession = () => {
+        const form = readProfileFormState();
+        const cur = getPlanningSessionUser();
+        if (!cur) return;
+        setPlanningSessionUser({ ...cur, planning_show_sunday: form.showSunday });
+        document.dispatchEvent(new CustomEvent('planning-profile-saved'));
+    };
+
     for (const id of [
         'profile-display-name-input',
         'profile-email-input',
         'profile-share-email',
-        'profile-share-phone',
-        'profile-show-sunday'
+        'profile-share-phone'
     ]) {
         const el = document.getElementById(id);
         el?.addEventListener('input', scheduleProfileFieldsPersist);
         el?.addEventListener('change', scheduleProfileFieldsPersist);
         el?.addEventListener('blur', () => void persistProfileFields());
     }
+
+    const showSundayEl = document.getElementById('profile-show-sunday');
+    showSundayEl?.addEventListener('change', () => {
+        applyShowSundayToSession();
+        scheduleProfileFieldsPersist();
+    });
+    showSundayEl?.addEventListener('blur', () => void persistProfileFields());
 
     document.getElementById('profile-pass-new')?.addEventListener('input', syncProfilePassApplyState);
     document.getElementById('profile-pass-confirm')?.addEventListener('input', syncProfilePassApplyState);

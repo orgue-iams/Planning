@@ -424,11 +424,11 @@ function initCalendarAndRevealUi() {
             calendar.setOption('slotMinTime', b.slotMinTime);
             calendar.setOption('slotMaxTime', b.slotMaxTime);
             toolbarCtl?.refreshTitle();
-            updatePlanningSundayColumnVisibility(calendar, currentUser);
+            updatePlanningSundayColumnVisibility(calendar, getPlanningSessionUser());
             applyPlanningPortraitSlotFit(calendarEl);
         };
         handlers.onEventsSet = () => {
-            updatePlanningSundayColumnVisibility(calendar, currentUser);
+            updatePlanningSundayColumnVisibility(calendar, getPlanningSessionUser());
         };
         handlers.onDatesSet();
         void refreshProfWeekCycleToolbarUi(currentUser);
@@ -457,7 +457,7 @@ function initCalendarAndRevealUi() {
             await refetchPlanningGrid(calendar).catch(() => {
                 /* */
             });
-            updatePlanningSundayColumnVisibility(calendar, currentUser);
+            updatePlanningSundayColumnVisibility(calendar, getPlanningSessionUser());
             calendar.updateSize();
             requestAnimationFrame(() => {
                 calendar.updateSize();
@@ -526,9 +526,14 @@ function initCalendarAndRevealUi() {
         initCalendarPreferencesUi({ getCalendar: () => calendar });
         document.addEventListener('planning-profile-saved', () => {
             const u = getPlanningSessionUser();
+            currentUser = u;
             refreshHeaderUser(u);
             updatePlanningSundayColumnVisibility(calendar, u);
             calendar?.updateSize();
+            requestAnimationFrame(() => {
+                scheduleTimeGridColumnSync(calendarEl);
+                applyPlanningPortraitSlotFit(calendarEl);
+            });
         });
         initSemainesTypesUi();
         initFermeturesUi();

@@ -1,8 +1,8 @@
 /**
- * Pool calendriers Google secondaires — modale route Calendriers (admin).
+ * Pool calendriers Google secondaires — modale Agendas Google pour les utilisateurs (admin).
  */
 import { isAdmin } from './auth-logic.js';
-import { isBackendAuthConfigured } from './supabase-client.js';
+import { getPlanningConfig, isBackendAuthConfigured } from './supabase-client.js';
 import { planningAdminInvoke } from './admin-api.js';
 import { showToast } from '../utils/toast.js';
 import { normalizeGoogleCalendarId } from '../utils/google-calendar-id.js';
@@ -33,10 +33,53 @@ let poolResyncInFlight = null;
 const DELETE_POOL_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m2-3h6a1 1 0 011 1v1H8V5a1 1 0 011-1z"/></svg>';
 
+const CALENDAR_POOL_ROUTE_LABEL = 'Agendas Google pour les utilisateurs';
+
 function assigneeDisplayName(row) {
     const nom = String(row.assignee_nom ?? '').trim();
     const prenom = String(row.assignee_prenom ?? '').trim();
-    return formatProfileFullName(nom, prenom) || '—';
+    const fromParts = formatProfileFullName(nom, prenom);
+    if (fromParts) return fromParts;
+    return String(row.assignee_display_name ?? '').trim() || '—';
+}
+
+function buildMainPlanningCalendarCard() {
+    const { mainGoogleCalendarId, mainGoogleCalendarLabel } = getPlanningConfig();
+    const gid = String(mainGoogleCalendarId || '').trim();
+    if (!gid) return null;
+
+    const label =
+        String(mainGoogleCalendarLabel || '').trim() || 'Planning complet (Orgue IAMS)';
+    const card = document.createElement('div');
+    card.className =
+        'calendar-pool-card calendar-pool-card--main flex items-stretch gap-2 py-2.5 px-3 min-w-0 rounded-xl border';
+
+    const main = document.createElement('div');
+    main.className = 'calendar-pool-card__main flex flex-1 min-w-0 gap-2';
+
+    const left = document.createElement('div');
+    left.className = 'calendar-pool-card__left flex-1 min-w-0 max-w-full';
+    const line1 = document.createElement('div');
+    line1.className =
+        'flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-[13px] leading-snug';
+    const labelP = document.createElement('span');
+    labelP.className = 'font-semibold text-slate-900 break-words text-left';
+    labelP.textContent = label;
+    const userP = document.createElement('span');
+    userP.className =
+        'calendar-pool-card__assignee text-[11px] sm:text-xs text-slate-600 shrink-0 text-right italic';
+    userP.textContent = 'Agenda principal';
+    line1.appendChild(labelP);
+    line1.appendChild(userP);
+    const idP = document.createElement('p');
+    idP.className =
+        'text-[10px] sm:text-[11px] font-mono text-slate-900 m-0 mt-0.5 break-all leading-snug';
+    idP.textContent = gid;
+    left.appendChild(line1);
+    left.appendChild(idP);
+    main.appendChild(left);
+    card.appendChild(main);
+    return card;
 }
 
 function cmpPoolRows(a, b) {
@@ -110,7 +153,7 @@ function buildPoolCard(row) {
     left.appendChild(idP);
 
     const actions = document.createElement('div');
-    actions.className = 'calendar-pool-card__actions flex shrink-0 gap-1 items-center self-center';
+    actions.className = 'calendar-pool-card__actions flex shrink-0 items-center self-center';
 
     const upd = document.createElement('button');
     upd.type = 'button';
@@ -179,11 +222,14 @@ function renderPoolCards(rows) {
     const host = document.getElementById('calendar-pool-list');
     if (!host) return;
     host.replaceChildren();
+    const mainCard = buildMainPlanningCalendarCard();
+    if (mainCard) host.appendChild(mainCard);
+
     const list = Array.isArray(rows) ? rows : [];
-    if (!list.length) {
+    if (!list.length && !mainCard) {
         const empty = document.createElement('p');
         empty.className = 'text-sm text-slate-500 dark:text-slate-400 italic m-0 py-4 text-center';
-        empty.textContent = 'Aucune entrée. Utilisez « Rajouter un agenda Google ».';
+        empty.textContent = 'Aucun agenda personnel dans le pool.';
         host.appendChild(empty);
         updatePoolSortButtonsUi();
         return;
@@ -274,7 +320,7 @@ function openPoolEdit(row) {
     pushPlanningRouteLevel(
         'modal_calendar_pool',
         planningRouteTitle(titleLabel),
-        'Calendriers',
+        CALENDAR_POOL_ROUTE_LABEL,
         () => {
             showPoolListPanel();
             void refreshCalendarPoolModalTable();
@@ -361,7 +407,7 @@ export function initAdminCalendarPoolUi(currentUser) {
         }
         poolSort = { key: 'label', dir: 'asc' };
         showPoolListPanel();
-        if (!openPlanningRouteFromDrawer('modal_calendar_pool', 'Calendriers', 'Menu')) {
+        if (!openPlanningRouteFromDrawer('modal_calendar_pool', CALENDAR_POOL_ROUTE_LABEL, 'Menu')) {
             return;
         }
         const status = document.getElementById('calendar-pool-status');
@@ -391,20 +437,6 @@ export function initAdminCalendarPoolUi(currentUser) {
         renderPoolCards(lastPoolRows);
     });
 
-    document.getElementById('calendar-pool-open-add')?.addEventListener('click', () => {
-        const gid = document.getElementById('calendar-pool-add-google-id');
-        const lb = document.getElementById('calendar-pool-add-label');
-        if (gid instanceof HTMLInputElement) gid.value = '';
-        if (lb instanceof HTMLInputElement) lb.value = '';
-        const addDlg = document.getElementById('modal_calendar_pool_add');
-        addDlg?.showModal();
-        focusPlanningDialogRoot(addDlg instanceof HTMLDialogElement ? addDlg : null);
-    });
-
-    document.getElementById('calendar-pool-add-cancel')?.addEventListener('click', () => {
-        document.getElementById('modal_calendar_pool_add')?.close();
-    });
-
     document.getElementById('calendar-pool-list')?.addEventListener('click', (ev) => {
         const t = ev.target;
         if (!(t instanceof Element)) return;
@@ -431,6 +463,7 @@ export function initAdminCalendarPoolUi(currentUser) {
         }
         const main = t.closest('.calendar-pool-card__main');
         const card = main?.closest('.calendar-pool-card');
+        if (card?.classList.contains('calendar-pool-card--main')) return;
         if (!card?.dataset.poolJson) return;
         try {
             openPoolEdit(JSON.parse(card.dataset.poolJson));
@@ -443,6 +476,7 @@ export function initAdminCalendarPoolUi(currentUser) {
         if (ev.key !== 'Enter' && ev.key !== ' ') return;
         const main = ev.target instanceof Element ? ev.target.closest('.calendar-pool-card__main') : null;
         const card = main?.closest('.calendar-pool-card');
+        if (card?.classList.contains('calendar-pool-card--main')) return;
         if (!card?.dataset.poolJson) return;
         ev.preventDefault();
         try {
@@ -459,44 +493,7 @@ export function initAdminCalendarPoolUi(currentUser) {
         void savePoolField('google_calendar_id')
     );
 
-    document.getElementById('calendar-pool-edit-delete')?.addEventListener('click', () => {
-        const poolId = document.getElementById('calendar-pool-edit-id')?.value?.trim();
-        if (poolId) void deletePoolRow(poolId, editingPoolRow);
-    });
-
     document.getElementById('modal_calendar_pool')?.addEventListener('close', () => {
         showPoolListPanel();
-    });
-
-    const submitPoolAdd = async () => {
-        const google_calendar_id = normalizeGoogleCalendarId(
-            document.getElementById('calendar-pool-add-google-id')?.value ?? ''
-        );
-        const label = document.getElementById('calendar-pool-add-label')?.value?.trim() || '';
-        if (!google_calendar_id) {
-            showToast('Indiquez l’ID du calendrier Google.', 'error');
-            return;
-        }
-        try {
-            await planningAdminInvoke('add_calendar_pool', {
-                google_calendar_id,
-                label: label || undefined,
-                sort_order: 0
-            });
-            document.getElementById('modal_calendar_pool_add')?.close();
-            await refreshCalendarPoolModalTable();
-        } catch (err) {
-            showToast(err instanceof Error ? err.message : String(err), 'error');
-        }
-    };
-
-    document.getElementById('calendar-pool-add-submit')?.addEventListener('click', () => void submitPoolAdd());
-    document.getElementById('modal_calendar_pool_add')?.addEventListener('keydown', (e) => {
-        if (e.key !== 'Enter') return;
-        const t = e.target;
-        if (!(t instanceof HTMLElement)) return;
-        if (!t.closest('#calendar-pool-add-google-id, #calendar-pool-add-label')) return;
-        e.preventDefault();
-        void submitPoolAdd();
     });
 }

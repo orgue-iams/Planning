@@ -1100,7 +1100,8 @@
 }
 
 #modal_directory_users .directory-user-card__contact {
-    padding-left: 0.5rem;
+    padding-left: 0.875rem;
+    padding-right: 0.25rem;
 }
 
 #modal_directory_users .directory-admin-user-card--layout:not(.directory-admin-user-card--with-delete) .directory-user-card__contact {
@@ -1450,6 +1451,28 @@ dialog#modal_st_slot_edit::backdrop {
     border-right: 1px solid var(--calendar-pool-divider);
     padding-right: 0.5rem;
     margin-right: 0.15rem;
+}
+
+#modal_calendar_pool .calendar-pool-card__actions {
+    gap: 0;
+    padding-left: 0.35rem;
+    border-left: 1px solid var(--calendar-pool-divider);
+}
+
+#modal_calendar_pool .calendar-pool-card__actions .calendar-pool-update-btn {
+    margin-right: 0.35rem;
+    padding-right: 0.35rem;
+    border-right: 1px solid var(--calendar-pool-divider);
+}
+
+#modal_calendar_pool .calendar-pool-card--main {
+    --calendar-pool-divider: rgb(148 163 184);
+    background: rgb(241 245 249 / 0.95);
+    border-color: rgb(148 163 184 / 0.75);
+}
+
+#modal_calendar_pool .calendar-pool-card--main .calendar-pool-card__main {
+    cursor: default;
 }
 
 [data-theme='dark'] #modal_calendar_pool .calendar-pool-card {

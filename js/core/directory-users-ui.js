@@ -16,7 +16,9 @@ import { isPlanningRole } from './planning-roles.js';
 import {
     openPlanningRouteFromDrawer,
     planningRouteTitle,
-    pushPlanningRouteLevel
+    pushPlanningRouteLevel,
+    popPlanningRouteLevel,
+    setPlanningRouteBackHandler
 } from '../utils/planning-route-dialog.js';
 import { normalizePlanningRole, PLANNING_ROLE_OPTIONS } from './planning-roles.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
@@ -28,6 +30,9 @@ let editingUser = null;
 let editSnapshot = null;
 /** @type {object[] | null} */
 let privilegedUsersCache = null;
+
+const DIRECTORY_PW_MASK = '********';
+let directoryPasswordMasked = false;
 
 const DELETE_USER_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m2-3h6a1 1 0 011 1v1H8V5a1 1 0 011-1z"/></svg>';
@@ -427,16 +432,76 @@ async function loadPrivilegedDirectoryIntoModal() {
     }
 }
 
+function getDirectoryEditPasswordEl() {
+    return document.getElementById('directory-edit-password');
+}
+
+function resetDirectoryEditPasswordField() {
+    const pw = getDirectoryEditPasswordEl();
+    if (pw instanceof HTMLInputElement) {
+        pw.value = '';
+        pw.disabled = false;
+        delete pw.dataset.masked;
+    }
+    directoryPasswordMasked = false;
+}
+
+function setDirectoryPasswordMaskedUi() {
+    const pw = getDirectoryEditPasswordEl();
+    if (!(pw instanceof HTMLInputElement)) return;
+    pw.value = DIRECTORY_PW_MASK;
+    pw.disabled = true;
+    pw.dataset.masked = '1';
+    directoryPasswordMasked = true;
+}
+
+function isDirectoryPasswordPending() {
+    const pw = getDirectoryEditPasswordEl();
+    if (!(pw instanceof HTMLInputElement)) return false;
+    if (directoryPasswordMasked || pw.dataset.masked === '1') return false;
+    return pw.value.trim().length > 0;
+}
+
+async function confirmLeaveDirectoryEditIfNeeded() {
+    if (!isDirectoryPasswordPending()) return true;
+    return confirmDirectoryAsync(
+        'Un nouveau mot de passe a été saisi sans être appliqué. Quitter sans l’enregistrer ?'
+    );
+}
+
+async function applyDirectoryEditPassword() {
+    if (!editingUser?.id) return;
+    const f = readDirectoryEditForm();
+    if (!f.password) {
+        showToast('Indiquez un mot de passe.', 'error');
+        return;
+    }
+    if (f.password.length < PASSWORD_MIN_LENGTH) {
+        showToast(`Mot de passe : au moins ${PASSWORD_MIN_LENGTH} caractères.`, 'error');
+        return;
+    }
+    try {
+        await planningAdminInvoke('set_password', { user_id: editingUser.id, password: f.password });
+        setDirectoryPasswordMaskedUi();
+        showToast('Mot de passe mis à jour.', 'success');
+    } catch (err) {
+        showToast(err instanceof Error ? err.message : String(err), 'error');
+    }
+}
+
 function showDirectoryListPanel() {
     document.getElementById('directory-users-list-panel')?.classList.remove('hidden');
+    document.getElementById('directory-users-list-panel')?.setAttribute('aria-hidden', 'false');
     const edit = document.getElementById('directory-user-edit-panel');
     edit?.classList.add('hidden');
     edit?.setAttribute('aria-hidden', 'true');
     const create = document.getElementById('directory-user-create-panel');
     create?.classList.add('hidden');
     create?.setAttribute('aria-hidden', 'true');
+    resetDirectoryEditPasswordField();
     editingUser = null;
     editSnapshot = null;
+    setPlanningRouteBackHandler('modal_directory_users', () => popPlanningRouteLevel('modal_directory_users'));
 }
 
 function getDirectoryCreateMode() {
@@ -579,15 +644,6 @@ async function saveDirectoryField(field) {
             editSnapshot.role = f.role;
             privilegedUsersCache = null;
         }
-        if (adminUser && field === 'password' && f.password) {
-            if (f.password.length < PASSWORD_MIN_LENGTH) {
-                showToast(`Mot de passe : au moins ${PASSWORD_MIN_LENGTH} caractères.`, 'error');
-                return;
-            }
-            await planningAdminInvoke('set_password', { user_id: uid, password: f.password });
-            const pw = document.getElementById('directory-edit-password');
-            if (pw instanceof HTMLInputElement) pw.value = '';
-        }
     } catch (err) {
         showToast(err instanceof Error ? err.message : String(err), 'error');
     }
@@ -609,6 +665,10 @@ function openDirectoryUserEdit(userRow) {
 
     const adminUser = isAdmin(u);
     document.getElementById('directory-users-list-panel')?.classList.add('hidden');
+    document.getElementById('directory-users-list-panel')?.setAttribute('aria-hidden', 'true');
+    document.getElementById('directory-admin-users-wrap')?.classList.add('hidden');
+    document.getElementById('directory-admin-users-wrap')?.setAttribute('aria-hidden', 'true');
+    document.getElementById('directory-user-create-panel')?.classList.add('hidden');
     const editPanel = document.getElementById('directory-user-edit-panel');
     editPanel?.classList.remove('hidden');
     editPanel?.setAttribute('aria-hidden', 'false');
@@ -628,7 +688,7 @@ function openDirectoryUserEdit(userRow) {
     }
     if (phone) phone.value = editSnapshot.telephone;
     if (roleEl) roleEl.value = editSnapshot.role;
-    if (pw) pw.value = '';
+    resetDirectoryEditPasswordField();
     document.getElementById('directory-edit-role-wrap')?.classList.toggle('hidden', !adminUser);
     document.getElementById('directory-edit-password-wrap')?.classList.toggle('hidden', !adminUser);
 
@@ -648,6 +708,13 @@ function openDirectoryUserEdit(userRow) {
     document.getElementById('directory-edit-save-hint')?.remove();
 
     const titleName = directoryDisplayName(userRow);
+    setPlanningRouteBackHandler('modal_directory_users', () => {
+        void (async () => {
+            if (!(await confirmLeaveDirectoryEditIfNeeded())) return;
+            popPlanningRouteLevel('modal_directory_users');
+        })();
+    });
+
     pushPlanningRouteLevel(
         'modal_directory_users',
         planningRouteTitle(titleName),
@@ -745,12 +812,27 @@ export function initDirectoryUsersUi() {
     bindBlur('directory-edit-prenom', 'identity');
     bindBlur('directory-edit-phone', 'identity');
     bindBlur('directory-edit-email', 'email');
-    bindBlur('directory-edit-password', 'password');
     document.getElementById('directory-edit-role')?.addEventListener('change', () =>
         void saveDirectoryField('role')
     );
+    document.getElementById('directory-edit-password-apply')?.addEventListener('click', () => {
+        void applyDirectoryEditPassword();
+    });
+    getDirectoryEditPasswordEl()?.addEventListener('focus', () => {
+        if (directoryPasswordMasked) resetDirectoryEditPasswordField();
+    });
 
-    document.getElementById('modal_directory_users')?.addEventListener('close', () => {
+    const directoryDlg = document.getElementById('modal_directory_users');
+    directoryDlg?.addEventListener('cancel', (e) => {
+        if (!editingUser || !isDirectoryPasswordPending()) return;
+        e.preventDefault();
+        void (async () => {
+            if (await confirmLeaveDirectoryEditIfNeeded()) {
+                directoryDlg.close();
+            }
+        })();
+    });
+    directoryDlg?.addEventListener('close', () => {
         showDirectoryListPanel();
     });
 }

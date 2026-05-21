@@ -9,3 +9,14 @@ export function formatProfileFullName(nom, prenom) {
     if (n && p) return `${p} ${n}`;
     return p || n || '';
 }
+
+/** Découpe « Prénom Nom » (dernier mot = nom de famille). */
+export function parseDisplayNameToNomPrenom(displayName) {
+    const parts = String(displayName ?? '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+    if (!parts.length) return { nom: '', prenom: '' };
+    if (parts.length === 1) return { nom: parts[0], prenom: '' };
+    return { nom: parts[parts.length - 1], prenom: parts.slice(0, -1).join(' ') };
+}
