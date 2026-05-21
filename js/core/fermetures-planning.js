@@ -62,6 +62,17 @@ export function enumerateYmdInRange(startYmd, endYmd) {
     return out;
 }
 
+/** Jours calendaires (YYYY-MM-DD) en fermeture institut. */
+export function collectClosureYmdSetFromDbRows(rows) {
+    const set = new Set();
+    for (const row of rows || []) {
+        if (String(row?.slot_type || '').toLowerCase() !== 'fermeture') continue;
+        const ymd = localYmdFromIso(row.start_at);
+        if (ymd) set.add(ymd);
+    }
+    return set;
+}
+
 /** @param {string} ymd */
 export function daySlotBoundsIsoFromYmd(ymd) {
     const { slotMinTime, slotMaxTime } = getChapelSlotBounds();

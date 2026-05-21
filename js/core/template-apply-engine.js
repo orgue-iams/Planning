@@ -20,7 +20,12 @@ import {
     toLocalDateFromIsoDate,
     formatLocalYmd
 } from './week-cycle.js';
-import { groupFermetureRowsIntoRanges, mergeClosureMondayRanges } from './fermetures-planning.js';
+import {
+    collectClosureYmdSetFromDbRows,
+    groupFermetureRowsIntoRanges,
+    mergeClosureMondayRanges
+} from './fermetures-planning.js';
+import { formatWeekdayDayTimeFr24 } from '../utils/time-helpers.js';
 
 const APPLY_RETRIES = 3;
 /** Pause entre suppressions Google (client) pour limiter les quotas. */
@@ -221,7 +226,9 @@ function collectFullClosureMondayIsoSet(mainEvents, rangeStart, rangeEnd) {
 /**
  * Lettre A/B pour un jour, en sautant les semaines entièrement en fermeture (sans avancer l’alternance).
  */
-export function templateWeekLetterForDate(d, applyStartYmd, firstWeekLetter, closureMondaySet) {
+export function templateWeekLetterForDate(d, applyStartYmd, firstWeekLetter, closureMondaySet, closureDaySet) {
+    const dayYmd = formatLocalYmd(d);
+    if (closureDaySet?.has(dayYmd)) return null;
     const mon = mondayOfLocalWeek(d);
     const monIso = formatLocalYmd(mon);
     if (closureMondaySet?.has(monIso)) return null;
@@ -350,6 +357,9 @@ export async function analyzeTemplateApply(p) {
         dbRows.filter((r) => String(r?.slot_type || '').toLowerCase() === 'fermeture')
     ).map((r) => ({ startYmd: r.startYmd, endYmd: r.endYmd }));
     mergeClosureMondayRanges(closureMondaySet, fermRanges);
+    const closureDaySet = collectClosureYmdSetFromDbRows(
+        dbRows.filter((r) => String(r?.slot_type || '').toLowerCase() === 'fermeture')
+    );
 
     /** @type {{ start: Date, end: Date, line: object, studentEmail: string }[]} */
     const slotsWithStudent = [];
@@ -359,7 +369,8 @@ export async function analyzeTemplateApply(p) {
             d,
             p.applyStartYmd,
             p.firstWeekLetter,
-            closureMondaySet
+            closureMondaySet,
+            closureDaySet
         );
         if (!letter) continue;
         for (const line of p.lines) {
@@ -387,11 +398,12 @@ export async function analyzeTemplateApply(p) {
     const travailSlots = slotsWithStudent.filter((s) => s.studentEmail === '__travail__');
     const coursSlots = slotsWithStudent.filter((s) => s.studentEmail !== '__travail__');
 
-    let skippedOtherProf = 0;
+    /** @type {{ start: Date, end: Date, slotType: string, ownerEmail: string, ownerDisplayName: string, title: string, planningEventId: string }[]} */
+    const otherProfConflicts = [];
     const mainCreates = [];
 
     for (const slot of coursSlots) {
-        let blocked = false;
+        let conflictEv = null;
         for (const ev of mainEvents) {
             const xp = ev.extendedProps || {};
             const own = normEmail(xp.owner);
@@ -400,12 +412,23 @@ export async function analyzeTemplateApply(p) {
             const ee = new Date(ev.end);
             if (!rangesOverlap(slot.start, slot.end, es, ee)) continue;
             if (typ === 'cours' && own && own !== profEmail) {
-                blocked = true;
+                conflictEv = ev;
                 break;
             }
         }
-        if (blocked) {
-            skippedOtherProf += 1;
+        if (conflictEv) {
+            const xp = conflictEv.extendedProps || {};
+            const own = normEmail(xp.owner);
+            otherProfConflicts.push({
+                start: slot.start,
+                end: slot.end,
+                slotType: String(xp.type || 'cours'),
+                ownerEmail: own,
+                ownerDisplayName:
+                    String(xp.ownerDisplayName || '').trim() || own.split('@')[0] || own,
+                title: String(conflictEv.title || '').trim() || 'Cours',
+                planningEventId: String(xp.planningCanonicalId || conflictEv.id || '').trim()
+            });
             continue;
         }
         mainCreates.push(slot);
@@ -498,8 +521,9 @@ export async function analyzeTemplateApply(p) {
         createMainCoursCount: mainCreates.length,
         createStudentCoursCount: mainCreates.length,
         createTravailCount: travailSlots.length,
-        skippedOtherProfCount: skippedOtherProf,
+        skippedOtherProfCount: otherProfConflicts.length,
         closureFullWeekCount: closureMondaySet.size,
+        closureDayCount: closureDaySet.size,
         hasCoursLines: coursSlots.length > 0,
         hasTravailLines: travailSlots.length > 0
     };
@@ -515,9 +539,23 @@ export async function analyzeTemplateApply(p) {
         profPoolId,
         studentCalByEmail,
         summary,
+        otherProfConflicts,
+        closureDaySet,
         timeMinIso,
         timeMaxIso
     };
+}
+
+/** @param {Awaited<ReturnType<typeof analyzeTemplateApply>>['otherProfConflicts']} conflicts */
+export function formatTemplateOtherProfConflictLines(conflicts) {
+    return (conflicts || []).map((c) => {
+        const st = c.start instanceof Date ? c.start : new Date(c.start);
+        const en = c.end instanceof Date ? c.end : new Date(c.end);
+        const when = `${formatWeekdayDayTimeFr24(st)} – ${formatWeekdayDayTimeFr24(en)}`;
+        const typ = String(c.slotType || 'cours');
+        const who = [c.ownerDisplayName, c.ownerEmail].filter(Boolean).join(' · ') || '?';
+        return `${when} — ${typ} — ${who} (« ${c.title} »)`;
+    });
 }
 
 /**

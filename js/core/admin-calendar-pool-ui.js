@@ -27,6 +27,9 @@ let editingPoolRow = null;
 /** @type {{ label: string; google_calendar_id: string } | null} */
 let poolEditSnapshot = null;
 
+/** @type {string | null} */
+let poolResyncInFlight = null;
+
 const DELETE_POOL_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m2-3h6a1 1 0 011 1v1H8V5a1 1 0 011-1z"/></svg>';
 
@@ -106,19 +109,70 @@ function buildPoolCard(row) {
     left.appendChild(line1);
     left.appendChild(idP);
 
+    const actions = document.createElement('div');
+    actions.className = 'calendar-pool-card__actions flex shrink-0 gap-1 items-center self-center';
+
+    const upd = document.createElement('button');
+    upd.type = 'button';
+    upd.className =
+        'calendar-pool-update-btn btn btn-sm planning-btn-accent font-semibold text-[10px] min-h-8 px-2';
+    upd.dataset.poolId = String(row.id ?? '');
+    upd.setAttribute('aria-label', 'Resynchroniser cet agenda avec la base');
+    upd.title = 'Resynchroniser les créneaux futurs depuis la base';
+    upd.textContent = 'Update';
+    if (poolResyncInFlight === String(row.id ?? '')) {
+        upd.disabled = true;
+        upd.textContent = '…';
+    }
+
     const del = document.createElement('button');
     del.type = 'button';
     del.className =
-        'calendar-pool-delete-btn btn btn-ghost btn-xs btn-square shrink-0 self-center border border-transparent text-slate-500 hover:text-error';
+        'calendar-pool-delete-btn btn btn-ghost btn-xs btn-square shrink-0 border border-transparent text-slate-500 hover:text-error';
     del.dataset.poolId = String(row.id ?? '');
     del.setAttribute('aria-label', 'Supprimer cet agenda');
     del.title = 'Supprimer';
     del.innerHTML = DELETE_POOL_SVG;
 
+    actions.appendChild(upd);
+    actions.appendChild(del);
     main.appendChild(left);
     card.appendChild(main);
-    card.appendChild(del);
+    card.appendChild(actions);
     return card;
+}
+
+async function resyncPoolCalendarRow(poolId, rowForLabel) {
+    const pid = String(poolId || '').trim();
+    if (!pid || poolResyncInFlight) return;
+    poolResyncInFlight = pid;
+    renderPoolCards(lastPoolRows);
+    const status = document.getElementById('calendar-pool-status');
+    const label = String(rowForLabel?.label || '').trim() || 'Agenda';
+    if (status) status.textContent = `Resynchronisation de « ${label} »…`;
+    try {
+        const res = await planningAdminInvoke('resync_calendar_pool', { pool_id: pid });
+        const nUp = Number(res?.upserted ?? 0);
+        const nRm = Number(res?.removed ?? 0);
+        const errs = Array.isArray(res?.errors) ? res.errors : [];
+        if (res?.ok === false && errs.length) {
+            showToast(String(errs[0] || 'Resynchronisation partielle.'), 'error', 8000);
+        } else if (errs.length) {
+            showToast(
+                `« ${label} » : ${nUp} mis à jour, ${nRm} retiré(s). ${errs.length} avertissement(s).`,
+                'info',
+                6000
+            );
+        } else {
+            showToast(`« ${label} » : ${nUp} créneau(x) futur(s) resynchronisé(s), ${nRm} retiré(s) de Google.`, 'success');
+        }
+    } catch (err) {
+        showToast(err instanceof Error ? err.message : String(err), 'error', 8000);
+    } finally {
+        poolResyncInFlight = null;
+        if (status) status.textContent = '';
+        renderPoolCards(lastPoolRows);
+    }
 }
 
 function renderPoolCards(rows) {
@@ -354,6 +408,20 @@ export function initAdminCalendarPoolUi(currentUser) {
     document.getElementById('calendar-pool-list')?.addEventListener('click', (ev) => {
         const t = ev.target;
         if (!(t instanceof Element)) return;
+        const updBtn = t.closest('.calendar-pool-update-btn');
+        if (updBtn instanceof HTMLButtonElement) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            let row = null;
+            try {
+                const card = updBtn.closest('.calendar-pool-card');
+                row = card?.dataset.poolJson ? JSON.parse(card.dataset.poolJson) : null;
+            } catch {
+                row = null;
+            }
+            void resyncPoolCalendarRow(updBtn.dataset.poolId || '', row);
+            return;
+        }
         const delBtn = t.closest('.calendar-pool-delete-btn');
         if (delBtn instanceof HTMLButtonElement) {
             ev.preventDefault();

@@ -3,13 +3,8 @@
         <div id="wrap-reservation-body" class="space-y-4 overflow-y-auto flex-1 min-w-0 py-1">
             <div id="wrap-reservation-info" class="hidden" aria-hidden="true"></div>
             <div id="wrap-reservation-readonly" class="hidden" aria-hidden="true"></div>
-            <div id="wrap-reservation-editor" class="space-y-4 reservation-editor-simple">
-                <div id="wrap-reservation-owner-target" class="hidden form-control">
-                    <label class="label py-0" for="reservation-slot-owner-email">
-                        <span class="label-text font-bold text-[11px] uppercase text-slate-500">Créneau pour</span>
-                    </label>
-                    <select id="reservation-slot-owner-email" class="select select-sm w-full"></select>
-                </div>
+            <div id="wrap-reservation-editor" class="space-y-4 reservation-editor-simple relative">
+                <p id="event-creator-badge" class="reservation-creator-badge hidden text-[9px] text-slate-500 dark:text-slate-400 text-right m-0 leading-tight" aria-live="polite"></p>
 
                 <label class="form-control block" for="event-date-start">
                     <span class="label-text font-bold text-[11px] uppercase text-slate-500 py-0">Jour</span>

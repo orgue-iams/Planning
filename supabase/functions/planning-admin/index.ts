@@ -285,6 +285,7 @@ Deno.serve(async (req) => {
         'add_calendar_pool',
         'update_calendar_pool',
         'delete_calendar_pool',
+        'resync_calendar_pool',
         'reactivate_user'
     ]);
     if (ADMIN_ONLY_ACTIONS.has(action)) {
@@ -825,6 +826,65 @@ Deno.serve(async (req) => {
             return new Response(JSON.stringify({ ok: true, row: data ?? null }), {
                 headers: { ...cors, 'Content-Type': 'application/json' }
             });
+        }
+
+        if (action === 'resync_calendar_pool') {
+            const poolId = String(body.pool_id ?? '').trim();
+            if (!poolId) {
+                return new Response(JSON.stringify({ error: 'pool_id requis' }), {
+                    status: 400,
+                    headers: { ...cors, 'Content-Type': 'application/json' }
+                });
+            }
+            const { data: poolRow, error: poolErr } = await admin
+                .from('google_calendar_pool')
+                .select('google_calendar_id,label')
+                .eq('id', poolId)
+                .maybeSingle();
+            if (poolErr) throw poolErr;
+            const calId = normalizeGoogleCalendarId(String(poolRow?.google_calendar_id ?? ''));
+            if (!calId) {
+                return new Response(JSON.stringify({ error: 'Agenda sans ID Google valide.' }), {
+                    status: 400,
+                    headers: { ...cors, 'Content-Type': 'application/json' }
+                });
+            }
+            const bridgeRes = await fetch(`${url}/functions/v1/calendar-bridge`, {
+                method: 'POST',
+                headers: {
+                    Authorization: authHeader ?? '',
+                    apikey: anonKey,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ action: 'resync_calendar', googleCalendarId: calId })
+            });
+            const bridgeText = await bridgeRes.text();
+            let bridgeJson: Record<string, unknown> = {};
+            try {
+                bridgeJson = bridgeText ? (JSON.parse(bridgeText) as Record<string, unknown>) : {};
+            } catch {
+                bridgeJson = { error: bridgeText.slice(0, 300) };
+            }
+            if (!bridgeRes.ok) {
+                const err =
+                    typeof bridgeJson.error === 'string'
+                        ? bridgeJson.error
+                        : `calendar-bridge HTTP ${bridgeRes.status}`;
+                return new Response(JSON.stringify({ ok: false, error: err }), {
+                    status: bridgeRes.status >= 400 ? bridgeRes.status : 502,
+                    headers: { ...cors, 'Content-Type': 'application/json' }
+                });
+            }
+            return new Response(
+                JSON.stringify({
+                    ok: bridgeJson.ok !== false,
+                    label: poolRow?.label ?? null,
+                    upserted: bridgeJson.upserted ?? 0,
+                    removed: bridgeJson.removed ?? 0,
+                    errors: bridgeJson.errors ?? []
+                }),
+                { headers: { ...cors, 'Content-Type': 'application/json' } }
+            );
         }
 
         if (action === 'delete_calendar_pool') {

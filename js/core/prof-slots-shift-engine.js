@@ -12,12 +12,20 @@ import {
     planningDbSlotTypeToBridgeType,
     upsertPlanningEventRow
 } from './planning-events-db.js';
-import { mondayOfLocalWeek, formatLocalYmd, toLocalDateFromIsoDate } from './week-cycle.js';
+import {
+    collectClosureYmdSetFromDbRows,
+    deletePlanningSlotForClosureConflict
+} from './fermetures-planning.js';
+import {
+    mondayOfLocalWeek,
+    formatLocalYmd,
+    toLocalDateFromIsoDate,
+    weekTypeLetterForAlternance
+} from './week-cycle.js';
+import { formatWeekdayDayTimeFr24 } from '../utils/time-helpers.js';
 
 const MS_DAY = 24 * 60 * 60 * 1000;
-/** Mises à jour Postgres en parallèle (borné). */
 const DB_SHIFT_CHUNK = 14;
-/** Événements par appel calendar-bridge (pause courte entre lots). */
 const GOOGLE_SHIFT_BATCH_SIZE = 18;
 const GOOGLE_SHIFT_BATCH_GAP_MS = 140;
 
@@ -80,18 +88,93 @@ function rowToShiftItem(row) {
 }
 
 /**
+ * Décale de `weekDelta` semaines ; si le jour d’arrivée est en fermeture, saute au même jour la semaine suivante.
+ * @param {Date} start
+ * @param {Date} end
+ * @param {number} weekDelta
+ * @param {Set<string>} closureYmdSet
+ */
+export function computeShiftedRange(start, end, weekDelta, closureYmdSet) {
+    const ns = new Date(start);
+    const ne = new Date(end);
+    for (let w = 0; w < weekDelta; w++) {
+        ns.setDate(ns.getDate() + 7);
+        ne.setDate(ne.getDate() + 7);
+        let guard = 0;
+        while (closureYmdSet?.has(formatLocalYmd(ns)) && guard < 60) {
+            ns.setDate(ns.getDate() + 7);
+            ne.setDate(ne.getDate() + 7);
+            guard += 1;
+        }
+    }
+    return { newStart: ns, newEnd: ne };
+}
+
+/**
+ * Décalage partiel d’alternance A/B : dans une même semaine calendaire, certains jours changent de lettre, d’autres non.
+ * @param {ReturnType<typeof rowToShiftItem>[]} shiftItems
+ * @param {Set<string>} closureYmdSet
+ * @param {{ anchorMondayIso: string, letterAtAnchor: 'A'|'B' } | null} cycle
+ * @param {number} weekDelta
+ */
+export function detectShiftPartialAlternanceImpact(shiftItems, closureYmdSet, cycle, weekDelta) {
+    if (!cycle?.anchorMondayIso || !shiftItems?.length) {
+        return { partial: false, lines: [] };
+    }
+    const anchor = cycle.anchorMondayIso;
+    const letter = cycle.letterAtAnchor === 'B' ? 'B' : 'A';
+    /** @type {Map<string, Set<string>>} */
+    const transitionsByWeek = new Map();
+
+    for (const it of shiftItems) {
+        const oldL = weekTypeLetterForAlternance(it.start, anchor, letter);
+        const { newStart } = computeShiftedRange(it.start, it.end, weekDelta, closureYmdSet);
+        const newL = weekTypeLetterForAlternance(newStart, anchor, letter);
+        if (!oldL || !newL || oldL === newL) continue;
+        const monIso = formatLocalYmd(mondayOfLocalWeek(it.start));
+        const tr = `${oldL}→${newL}`;
+        if (!transitionsByWeek.has(monIso)) transitionsByWeek.set(monIso, new Set());
+        transitionsByWeek.get(monIso).add(tr);
+    }
+
+    const lines = [];
+    for (const [monIso, set] of transitionsByWeek) {
+        if (set.size > 1) {
+            lines.push(
+                `Semaine du ${monIso} : alternance A/B affectée différemment selon les jours (${[...set].join(', ')}).`
+            );
+        }
+    }
+    return { partial: lines.length > 0, lines };
+}
+
+function conflictRowFromOther(other, newStart, newEnd) {
+    const typ = String(other.slotType || other.extType || 'créneau').trim();
+    return {
+        id: other.id,
+        title: other.title,
+        ownerEmail: other.ownerEmail,
+        ownerName: other.ownerEmail ? other.ownerEmail.split('@')[0] : '',
+        slotType: typ,
+        startIso: newStart.toISOString(),
+        endIso: newEnd.toISOString(),
+        reason: `chevauchement avec « ${other.title} » (${other.ownerEmail || 'autre'})`
+    };
+}
+
+/**
  * @param {{
  *   profUserId: string,
  *   profEmail: string,
  *   effectiveYmd: string,
- *   weekDelta: 1 | 2
+ *   weekDelta: 1 | 2,
+ *   profWeekCycle?: { anchorMondayIso: string, letterAtAnchor: 'A'|'B' } | null
  * }} p
  */
 export async function analyzeProfSlotsShift(p) {
     const profUserId = String(p.profUserId || '').trim();
     const profEmail = normEmail(p.profEmail);
     const weekDelta = p.weekDelta === 2 ? 2 : 1;
-    const deltaMs = weekDelta * 7 * MS_DAY;
     const effectiveYmd = String(p.effectiveYmd || '').trim();
     if (!profUserId || !profEmail) {
         return { ok: false, error: 'Professeur non identifié.', count: 0 };
@@ -113,6 +196,8 @@ export async function analyzeProfSlotsShift(p) {
         return { ok: false, error: String(e?.message || e), count: 0 };
     }
 
+    const closureYmdSet = collectClosureYmdSetFromDbRows(rows);
+
     /** @type {ReturnType<typeof rowToShiftItem>[]} */
     const allItems = [];
     for (const row of rows) {
@@ -129,49 +214,6 @@ export async function analyzeProfSlotsShift(p) {
         return true;
     });
 
-    const shiftIds = new Set(shiftItems.map((it) => it.id));
-    const fixed = allItems.filter((it) => !shiftIds.has(it.id));
-
-    /** @type {{ id: string, title: string, reason: string }[]} */
-    const conflicts = [];
-
-    for (const it of shiftItems) {
-        const newStart = new Date(it.start.getTime() + deltaMs);
-        const newEnd = new Date(it.end.getTime() + deltaMs);
-
-        for (const other of fixed) {
-            if (!rangesOverlap(newStart, newEnd, other.start, other.end)) continue;
-            const otherIsCours = other.extType === 'cours';
-            const mineIsCours = it.extType === 'cours';
-            if (mineIsCours && otherIsCours && other.ownerEmail && other.ownerEmail !== profEmail) {
-                conflicts.push({
-                    id: it.id,
-                    title: it.title,
-                    reason: `chevauchement avec le cours « ${other.title} » (${other.ownerEmail}) après décalage`
-                });
-                break;
-            }
-            if (other.ownerEmail === profEmail || !mineIsCours || !otherIsCours) {
-                conflicts.push({
-                    id: it.id,
-                    title: it.title,
-                    reason: `chevauchement avec « ${other.title} » après décalage`
-                });
-                break;
-            }
-        }
-    }
-
-    if (conflicts.length) {
-        const first = conflicts[0];
-        return {
-            ok: false,
-            error: `${conflicts.length} créneau(x) en conflit après décalage. Ex. « ${first.title} » : ${first.reason}.`,
-            count: shiftItems.length,
-            conflictCount: conflicts.length
-        };
-    }
-
     if (!shiftItems.length) {
         return {
             ok: false,
@@ -180,13 +222,41 @@ export async function analyzeProfSlotsShift(p) {
         };
     }
 
+    const shiftIds = new Set(shiftItems.map((it) => it.id));
+    const fixed = allItems.filter((it) => !shiftIds.has(it.id));
+
+    /** @type {ReturnType<typeof conflictRowFromOther>[]} */
+    const conflictsToDelete = [];
+
+    for (const it of shiftItems) {
+        const { newStart, newEnd } = computeShiftedRange(it.start, it.end, weekDelta, closureYmdSet);
+        for (const other of fixed) {
+            if (!rangesOverlap(newStart, newEnd, other.start, other.end)) continue;
+            conflictsToDelete.push(conflictRowFromOther(other, newStart, newEnd));
+            break;
+        }
+    }
+
+    const partialAlt = detectShiftPartialAlternanceImpact(
+        shiftItems,
+        closureYmdSet,
+        p.profWeekCycle || null,
+        weekDelta
+    );
+
+    const closureDaysInRange = [...closureYmdSet].filter((ymd) => ymd >= effectiveYmd).length;
+
     return {
         ok: true,
         error: null,
         count: shiftItems.length,
         weekDelta,
         effectiveYmd,
-        deltaMs
+        deltaMs: weekDelta * 7 * MS_DAY,
+        closureYmdSet,
+        conflictsToDelete,
+        partialAlternance: partialAlt,
+        closureDaysInRange
     };
 }
 
@@ -194,15 +264,51 @@ export async function analyzeProfSlotsShift(p) {
 export function formatProfShiftPrepareSummary(analysis) {
     if (!analysis?.ok) return '';
     const w = analysis.weekDelta === 2 ? '2' : '1';
-    return [
+    const nDel = analysis.conflictsToDelete?.length || 0;
+    const lines = [
         `Décalage prévu : +${w} semaine${analysis.weekDelta === 2 ? 's' : ''} sur ${analysis.count} créneau(x).`,
         `À partir du ${analysis.effectiveYmd} (00:00, heure locale).`,
+        'Les jours de fermeture institut sont contournés (même jour de la semaine, semaine suivante).',
         'Les créneaux passés et ceux des autres professeurs ne sont pas modifiés.',
-        'Votre repère semaine A/B (alternance gabarit) reste inchangé.',
-        '',
-        'La base est mise à jour en premier (grille rafraîchie), puis Google par lots (agenda général, agenda prof, agendas des élèves inscrits uniquement).',
+        'Votre repère semaine A/B (alternance gabarit) reste inchangé en base.',
+        ''
+    ];
+    if (analysis.closureDaysInRange > 0) {
+        lines.push(
+            `Jours fermés sur la période : ${analysis.closureDaysInRange} (prise en compte au décalage).`,
+            ''
+        );
+    }
+    if (nDel > 0) {
+        lines.push(
+            `——— Créneaux en conflit (suppression automatique) ———`,
+            `${nDel} créneau(x) seront supprimés (comme une suppression normale, avec notification du propriétaire si besoin).`,
+            ''
+        );
+        for (const c of analysis.conflictsToDelete.slice(0, 12)) {
+            const st = new Date(c.startIso);
+            const en = new Date(c.endIso);
+            lines.push(
+                `• ${formatWeekdayDayTimeFr24(st)} – ${formatWeekdayDayTimeFr24(en)} : « ${c.title} » (${c.ownerEmail || '?'})`
+            );
+        }
+        if (nDel > 12) lines.push(`… et ${nDel - 12} autre(s).`);
+        lines.push('');
+    }
+    if (analysis.partialAlternance?.partial) {
+        lines.push(
+            '——— Alternance A/B (par jour) ———',
+            'Attention : le décalage ne déplace pas tous les jours de la même semaine de la même façon (ex. jeudi férié, vendredi normal).',
+            ...(analysis.partialAlternance.lines || []),
+            'Une confirmation vous sera demandée avant d’appliquer.',
+            ''
+        );
+    }
+    lines.push(
+        'La base est mise à jour en premier (grille rafraîchie), puis Google par lots.',
         'Une confirmation vous sera demandée avant d’appliquer le décalage.'
-    ].join('\n');
+    );
+    return lines.join('\n');
 }
 
 /**
@@ -211,6 +317,7 @@ export function formatProfShiftPrepareSummary(analysis) {
  *   profEmail: string,
  *   effectiveYmd: string,
  *   weekDelta: 1 | 2,
+ *   currentUser: object,
  *   onProgress?: (detail: string) => void,
  *   onDbComplete?: () => void
  * }} p
@@ -223,7 +330,7 @@ export async function executeProfSlotsShift(p) {
 
     const profUserId = String(p.profUserId || '').trim();
     const profEmail = normEmail(p.profEmail);
-    const deltaMs = analysis.deltaMs;
+    const closureYmdSet = analysis.closureYmdSet || new Set();
     const effectiveMs = effectiveLocalMidnight(analysis.effectiveYmd).getTime();
     const nowMs = Date.now();
 
@@ -242,6 +349,27 @@ export async function executeProfSlotsShift(p) {
         shiftItems.push(it);
     }
 
+    const currentUser = p.currentUser || { email: profEmail };
+
+    for (const c of analysis.conflictsToDelete || []) {
+        p.onProgress?.(`Suppression conflit « ${c.title} »…`);
+        const row = rows.find((r) => String(r.id) === c.id) || {
+            id: c.id,
+            title: c.title,
+            owner_email: c.ownerEmail,
+            start_at: c.startIso,
+            end_at: c.endIso
+        };
+        const dr = await deletePlanningSlotForClosureConflict(row, currentUser);
+        if (!dr.ok) {
+            return {
+                ok: false,
+                error: dr.error || `Suppression impossible pour « ${c.title} ».`,
+                count: 0
+            };
+        }
+    }
+
     const total = shiftItems.length;
     p.onProgress?.(`Mise à jour base (0 / ${total})…`);
 
@@ -255,8 +383,12 @@ export async function executeProfSlotsShift(p) {
         await runInChunks(shiftItems, DB_SHIFT_CHUNK, async (chunk) => {
             const results = await Promise.all(
                 chunk.map(async (it) => {
-                    const newStart = new Date(it.start.getTime() + deltaMs);
-                    const newEnd = new Date(it.end.getTime() + deltaMs);
+                    const { newStart, newEnd } = computeShiftedRange(
+                        it.start,
+                        it.end,
+                        analysis.weekDelta,
+                        closureYmdSet
+                    );
                     const startIso = newStart.toISOString();
                     const endIso = newEnd.toISOString();
                     const ur = await upsertPlanningEventRow({

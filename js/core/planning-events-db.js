@@ -62,6 +62,7 @@ export function mapPlanningDbRowToFcEvent(row, _currentUser) {
             planningRowSource: 'supabase',
             planningCanonicalId: row.id,
             createdByUserId: String(row.created_by_user_id ?? row.owner_user_id ?? '').trim(),
+            createdByRole: String(row.created_by_role || '').trim().toLowerCase(),
             lastModifiedByUserId: String(row.last_modified_by_user_id ?? row.owner_user_id ?? '').trim(),
             /** Colonne `slot_type` brute (déplacement / redimensionnement sans ambiguïté concert/autre). */
             planningDbSlotType: row.slot_type,
@@ -118,13 +119,19 @@ export async function fetchPlanningEventsForFullCalendar(start, end, currentUser
     const rows = Array.isArray(data) ? data : [];
     // owner_role vient de la RPC (security definer) ; repli client limité par RLS profiles (ligne propre).
     const ownerIds = [...new Set(rows.map((r) => String(r.owner_user_id || '').trim()).filter(Boolean))];
+    const creatorIds = [
+        ...new Set(rows.map((r) => String(r.created_by_user_id || '').trim()).filter(Boolean))
+    ];
     const roleByOwnerId = await fetchProfileRolesByUserIds(ownerIds);
+    const roleByCreatorId = await fetchProfileRolesByUserIds(creatorIds);
     const { fcDragResizePropsForEvent } = await import('./calendar-logic.js');
     return rows.map((row) => {
         const oid = String(row.owner_user_id || '').trim();
+        const cid = String(row.created_by_user_id || '').trim();
         const enriched = {
             ...row,
-            owner_role: String(row.owner_role || roleByOwnerId.get(oid) || '').trim()
+            owner_role: String(row.owner_role || roleByOwnerId.get(oid) || '').trim(),
+            created_by_role: String(roleByCreatorId.get(cid) || '').trim()
         };
         const ev = mapPlanningDbRowToFcEvent(enriched, currentUser);
         return { ...ev, ...fcDragResizePropsForEvent(ev, currentUser) };
@@ -132,7 +139,7 @@ export async function fetchPlanningEventsForFullCalendar(start, end, currentUser
 }
 
 /** @param {string[]} userIds @returns {Promise<Map<string, string>>} */
-async function fetchProfileRolesByUserIds(userIds) {
+export async function fetchProfileRolesByUserIds(userIds) {
     const uniq = [...new Set((userIds || []).map((id) => String(id).trim()).filter(Boolean))];
     const m = new Map();
     if (!uniq.length) return m;

@@ -142,12 +142,12 @@ function toolbarWeekCycleLabel(calendar) {
     return wc ? String(wc) : '';
 }
 
-/** Ex. « Semaine A (vous) » pour le titre de période (prof uniquement). */
+/** Ex. « (A) » pour le titre de période (prof uniquement). */
 function toolbarWeekCycleShortSuffix(calendar) {
     const wc = toolbarWeekCycleLabel(calendar);
     if (!wc) return '';
-    if (wc.includes('B')) return 'Semaine B (vous)';
-    if (wc.includes('A')) return 'Semaine A (vous)';
+    if (wc.includes('B')) return 'B';
+    if (wc.includes('A')) return 'A';
     return '';
 }
 

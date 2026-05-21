@@ -241,6 +241,10 @@
 
 /* Smartphone : bandeau calendrier plus bas + relié visuellement à la navbar (moins de hauteur perdue). */
 @media (max-width: 639px) {
+    .calendar-toolbar__nav-cluster .cal-tb-nav {
+        display: none !important;
+    }
+
     .calendar-toolbar {
         gap: 0.15rem;
         min-height: 2.15rem;

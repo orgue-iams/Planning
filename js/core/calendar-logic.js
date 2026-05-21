@@ -666,17 +666,10 @@ async function prepareReservationOwnerSelect(currentUser, event, canEditEvent) {
 }
 
 function getReservationSlotOwnerEmail(currentUser, currentEventRef) {
-    const r = normalizeRole(currentUser?.role);
-    if (r === 'eleve') {
-        return String(currentUser?.email || '').trim();
-    }
-    const wrap = document.getElementById('wrap-reservation-owner-target');
-    const sel = document.getElementById('reservation-slot-owner-email');
-    if (currentEventRef || !wrap || wrap.classList.contains('hidden')) {
+    if (currentEventRef) {
         const xp = safeEventExtendedProps(currentEventRef);
         return String(xp?.owner || currentUser?.email || '').trim();
     }
-    if (sel && sel.value) return String(sel.value).trim();
     return String(currentUser?.email || '').trim();
 }
 
@@ -767,6 +760,14 @@ function canCurrentUserEditEventIgnoringPast(currentUser, event) {
         return meRole === 'admin';
     }
     if (meRole === 'admin') return true;
+
+    const xp = safeEventExtendedProps(event);
+    const creatorRole = String(xp.createdByRole || '').trim().toLowerCase();
+    const creatorId = String(xp.createdByUserId || '').trim();
+    const myId = String(currentUser.id || '').trim();
+    if (meRole === 'prof' && creatorRole === 'admin' && creatorId && creatorId !== myId) {
+        return false;
+    }
 
     const owner = ownerInfoFromEvent(event, currentUser);
     const ownerRole = owner.ownerRole || roleFromOwnerEmail(owner.ownerEmail);
@@ -1339,11 +1340,9 @@ export function getEventContent(arg, currentUser) {
     if (!sameCalendarDay) {
         timeLine = `${formatShortDay(start)} ${formatTime(start)} → ${formatShortDay(endDisplay)} ${formatTime(endDisplay)}`;
     } else if (timeTextFc) {
-        // Utiliser le libellé horaire calculé par FullCalendar (source affichée sur la grille),
-        // pour éviter tout décalage visuel entre position du créneau et bandeau horaire.
-        timeLine = timeTextFc.replace(/\s*-\s*/g, ' – ');
+        timeLine = timeTextFc.replace(/\s*-\s*/g, '–').replace(/\s+/g, '');
     } else {
-        timeLine = `${formatTime(start)} – ${formatTime(endDisplay)}`;
+        timeLine = `${formatTime(start)}–${formatTime(endDisplay)}`;
     }
 
     const showTitleRow = Boolean(title) && (!sameCalendarDay || durationMin > 30);
@@ -1778,7 +1777,9 @@ function getReservationMotifFromForm(currentUser, eventRef = null) {
         !eventRef && normalizeRole(currentUser?.role) === 'eleve'
             ? 'Cours'
             : defaultMotifForRole(currentUser?.role);
-    const v = normalizeMotif(sel?.value || fallbackMotif);
+    const raw = String(sel?.value || '').trim();
+    if (!raw) return '';
+    const v = normalizeMotif(raw || fallbackMotif);
     if (allowed.includes(v)) return v;
     return allowed[0] || fallbackMotif;
 }
@@ -1790,7 +1791,8 @@ function getReservationTextTitleFromForm(currentUser, motif) {
     const input = document.getElementById('event-title-input');
     const typed = String(input?.value || '').trim();
     if (typed) return typed;
-    return motifDisplayLabel(motif);
+    if (motif) return motifDisplayLabel(motif);
+    return '';
 }
 
 /** Fin de journée affichable (slotMaxTime) le même jour calendaire que `start`. */
@@ -2183,6 +2185,10 @@ export function buildReservationFormFields(currentUser, event) {
 
     const allowed = allowedMotifsForReservationModal(currentUser, event);
     sel.innerHTML = '';
+    if (!event) {
+        sel.add(new Option('— Choisir un motif —', '', true, true));
+        sel.required = true;
+    }
     for (const lab of allowed) sel.add(new Option(motifDisplayLabel(lab), lab));
 
     const inferredMotif = event
@@ -2199,13 +2205,12 @@ export function buildReservationFormFields(currentUser, event) {
         : normalizeRole(currentUser?.role) === 'eleve'
           ? 'Cours'
           : defaultMotifForRole(currentUser?.role);
-    sel.value = allowed.includes(inferredMotif) ? inferredMotif : allowed[0] || inferredMotif;
-
     if (event) {
+        sel.value = allowed.includes(inferredMotif) ? inferredMotif : allowed[0] || inferredMotif;
         titleInput.value = String(event.title || '').trim();
     } else {
-        const m = sel.value || inferredMotif;
-        titleInput.value = motifDisplayLabel(m);
+        sel.value = '';
+        titleInput.value = '';
     }
 }
 
@@ -2292,6 +2297,17 @@ function applyReservationEditorShellForRole(
         wrapTitle?.classList.remove('hidden');
     }
     applyReservationMotifVisibility(currentUser, event, true);
+    const badge = document.getElementById('event-creator-badge');
+    if (badge) {
+        const creatorText = (createdByLabelOverride || '').trim();
+        if (event && creatorText) {
+            badge.textContent = creatorText;
+            badge.classList.remove('hidden');
+        } else {
+            badge.textContent = '';
+            badge.classList.add('hidden');
+        }
+    }
 }
 
 /** Durée d’un pas de snap sur la grille (ex. 00:30:00 → 30 min). */
@@ -2877,7 +2893,6 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         (!isPastSlot || meRoleOpen === 'admin' || meRoleOpen === 'prof');
     document.getElementById('reservation-delete-wrap')?.classList.toggle('hidden', !showDelete);
 
-    await prepareReservationOwnerSelect(currentUser, event || null, canEditEvent);
     await prepareReservationInscritsSelect(currentUser, event || null, canEditEvent);
 
     captureReservationModalFormBaseline();
@@ -3163,6 +3178,10 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         return;
     }
     const motif = getReservationMotifFromForm(currentUser, liveEventRef);
+    if (!liveEventRef && !motif) {
+        showToast('Choisissez un motif.', 'error');
+        return;
+    }
     const title = getReservationTextTitleFromForm(currentUser, motif);
     const slotOwnerEmail = getReservationSlotOwnerEmail(currentUser, liveEventRef);
     const slotType = motifToSlotType(motif);

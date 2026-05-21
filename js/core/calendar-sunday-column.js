@@ -79,5 +79,8 @@ function applyHiddenDays(calendar, want) {
         Array.isArray(cur) &&
         cur.length === want.length &&
         cur.every((v, i) => v === want[i]);
-    if (!same) calendar.setOption('hiddenDays', want);
+    if (!same) {
+        calendar.setOption('hiddenDays', want);
+        if (typeof calendar.render === 'function') calendar.render();
+    }
 }

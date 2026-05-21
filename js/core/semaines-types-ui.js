@@ -21,9 +21,11 @@ import {
     analyzeTemplateApply,
     executeTemplateDatabasePhase,
     formatTemplateApplyPartialSummary,
+    formatTemplateOtherProfConflictLines,
     runTemplateGoogleBackgroundSync
 } from './template-apply-engine.js';
-import { saveProfWeekCycleFromApply } from './week-cycle.js';
+import { deletePlanningSlotForClosureConflict } from './fermetures-planning.js';
+import { saveProfWeekCycleFromApply, getProfWeekCycleForToolbar } from './week-cycle.js';
 import {
     analyzeProfSlotsShift,
     defaultProfShiftEffectiveYmd,
@@ -202,13 +204,13 @@ function formatPrepareSummaryText(s, applyStart, firstWeekLetter, applyEnd) {
     const conflictBlock =
         skipped === 0
             ? [
-                  '——— Conflits / blocages ———',
-                  'Aucun conflit détecté : pas de cours laissé de côté pour chevauchement avec un autre professeur sur le planning général.',
+                  '——— Conflits avec d’autres professeurs ———',
+                  'Aucun conflit : tous les créneaux du gabarit peuvent être posés.',
                   ''
               ]
             : [
-                  '——— Conflits / blocages ———',
-                  `${skipped} créneau(x) cours non posé(s) sur le planning général (chevauchement avec un autre professeur).`,
+                  '——— Conflits avec d’autres professeurs ———',
+                  `${skipped} créneau(x) en chevauchement. À l’application, confirmation puis suppression de ces créneaux avant de poser le vôtre.`,
                   ''
               ];
     return [
@@ -913,11 +915,7 @@ function appendTemplateCard(listEl, line, _optHtml, ctx) {
     const isOwnRow = String(lineOwnerId) === String(currentUserId);
     const isEleve = String(getPlanningSessionUser()?.role || '').toLowerCase() === 'eleve';
     const dowN = Math.min(7, Math.max(1, Number(line?.day_of_week) || 1));
-    const isOffTeachingDay =
-        isOwnRow &&
-        isProf(getPlanningSessionUser()) &&
-        stTeachingDaysSet.size > 0 &&
-        !stTeachingDaysSet.has(dowN);
+    const isOffTeachingDay = false;
     const isReadonly = isAdmin || !isOwnRow || isEleve || isOffTeachingDay;
     const slotT = line?.slot_type === 'reservation' ? 'reservation' : 'cours';
     const sid = line?.studentIds || [];
@@ -1156,20 +1154,8 @@ async function openSemainesTypesModal(user) {
     document.getElementById('st-add-row-b')?.classList.remove('hidden');
     document.getElementById('st-gabarit-actions')?.classList.remove('hidden');
     document.getElementById('st-actions-section')?.classList.remove('hidden');
-    document.getElementById('st-teaching-days-section')?.classList.remove('hidden');
-    document.getElementById('st-gabarit-prof-title')?.classList.remove('hidden');
-
-    stTeachingDaysSet = await fetchTeachingDaysForUser(user.id);
-    writeTeachingDaysToForm(stTeachingDaysSet);
-    const hint = document.getElementById('st-teaching-days-hint');
-    if (hint) {
-        if (!stTeachingDaysSet.size) {
-            hint.textContent = 'Cochez vos jours puis enregistrez avant d’ajouter des créneaux.';
-            hint.classList.remove('hidden');
-        } else {
-            hint.classList.add('hidden');
-        }
-    }
+    document.getElementById('st-teaching-days-section')?.classList.add('hidden');
+    document.getElementById('st-gabarit-prof-title')?.classList.add('hidden');
 
     const eleves = await loadEleves();
     const elevesById = new Map(eleves.map((e) => [e.user_id, e]));
@@ -1238,10 +1224,6 @@ function openStShiftModal() {
 }
 
 function addEmptyRow(listEl, elevesHtml, user, elevesById, ownerProfiles) {
-    if (!stTeachingDaysSet.size) {
-        showToast('Enregistrez d’abord au moins un jour d’enseignement.', 'error');
-        return;
-    }
     const oid = String(user.id);
     const prof = ownerProfiles.get(oid) || {
         label: user.email || oid.slice(0, 8),
@@ -1251,7 +1233,7 @@ function addEmptyRow(listEl, elevesHtml, user, elevesById, ownerProfiles) {
     const card = appendTemplateCard(
         listEl,
         {
-            day_of_week: defaultTeachingDow(stTeachingDaysSet),
+            day_of_week: 1,
             start_time: '08:00:00',
             end_time: '09:00:00',
             slot_type: 'cours',
@@ -1293,19 +1275,6 @@ async function runSemainesTypesSaveGabarit(opts = {}) {
     const ra = parseRowsFromList(ta, 'A', u.id);
     const rb = parseRowsFromList(tb, 'B', u.id);
     const all = [...ra, ...rb];
-    if (!stTeachingDaysSet.size) {
-        showToast('Enregistrez au moins un jour d’enseignement.', 'error');
-        return;
-    }
-    for (const r of all) {
-        if (!stTeachingDaysSet.has(r.day_of_week)) {
-            showToast(
-                `${dowLongLabel(r.day_of_week)} n’est pas dans vos jours d’enseignement.`,
-                'error'
-            );
-            return;
-        }
-    }
     const err = validateNoOverlap(all);
     if (err) {
         showToast(err, 'error');
@@ -1373,10 +1342,6 @@ async function runSemainesTypesAnalyze() {
     const u = getPlanningSessionUser();
     const sb = getSupabaseClient();
     if (!u?.id || !sb || isAdmin(u)) return;
-    if (!stTeachingDaysSet.size) {
-        showToast('Enregistrez vos jours d’enseignement avant de préparer l’application.', 'error');
-        return;
-    }
     if (stGoogleSyncInFlight) {
         showToast(
             'Synchronisation Google du gabarit en cours : attendez la fin avant de relancer « Préparer ».',
@@ -1428,11 +1393,9 @@ async function runSemainesTypesAnalyze() {
         const lines = allTemplateLines.filter((l) => String(l.owner_user_id || '') === uid);
         const { data: evs } = await sb.rpc('planning_list_eleves_actifs');
         const byId = new Map((evs || []).map((e) => [e.user_id, e.email]));
-        const allowedDays = stTeachingDaysSet;
         const linePayload = [];
         for (const ln of lines) {
             const dow = Number(ln.day_of_week) || 1;
-            if (allowedDays.size && !allowedDays.has(dow)) continue;
             const emails = [];
             const ids = byLineStudents.get(ln.id) || [];
             for (const sid of ids) {
@@ -1481,7 +1444,14 @@ async function runSemainesTypesAnalyze() {
             showToast('Erreur d’affichage du résumé (voir la console).', 'error');
             return;
         }
-        stAnalyzeShowResult(summaryText);
+        const conflictLines = formatTemplateOtherProfConflictLines(analysis.otherProfConflicts);
+        if (conflictLines.length) {
+            stAnalyzeShowResult(
+                `${summaryText}\n\n——— Détail des conflits ———\n${conflictLines.join('\n')}`
+            );
+        } else {
+            stAnalyzeShowResult(summaryText);
+        }
         setStApplyButtonReady(true);
         showToast(
             'Préparation terminée : résumé dans l’encadré ci-dessous, bouton 2 activé à droite du bouton 1.',
@@ -1508,6 +1478,47 @@ async function runSemainesTypesApply() {
     if (stGoogleSyncInFlight) {
         showToast('Synchronisation Google du gabarit encore en cours.', 'info', 5000);
         return;
+    }
+    const conflicts = lastAnalysis?.otherProfConflicts || [];
+    if (conflicts.length) {
+        const lines = formatTemplateOtherProfConflictLines(conflicts);
+        const ok = confirm(
+            [
+                `${conflicts.length} créneau(x) d’un autre professeur chevauchent votre gabarit.`,
+                'En continuant, ces créneaux seront supprimés (comme une suppression normale), puis votre gabarit sera appliqué.',
+                '',
+                ...lines.slice(0, 15),
+                lines.length > 15 ? `… et ${lines.length - 15} autre(s).` : '',
+                '',
+                'Confirmer l’écrasement et l’application ?'
+            ]
+                .filter(Boolean)
+                .join('\n')
+        );
+        if (!ok) return;
+        setStModalActionsBusy(true);
+        try {
+            for (const c of conflicts) {
+                const id = String(c.planningEventId || '').trim();
+                if (!id) continue;
+                const dr = await deletePlanningSlotForClosureConflict(
+                    {
+                        id,
+                        title: c.title,
+                        owner_email: c.ownerEmail,
+                        start_at: c.start instanceof Date ? c.start.toISOString() : c.start,
+                        end_at: c.end instanceof Date ? c.end.toISOString() : c.end
+                    },
+                    u
+                );
+                if (!dr.ok) {
+                    showToast(dr.error || 'Suppression d’un conflit impossible.', 'error');
+                    return;
+                }
+            }
+        } finally {
+            setStModalActionsBusy(false);
+        }
     }
     if (
         !confirm(
@@ -1787,7 +1798,8 @@ async function runSemainesTypesShift() {
             profUserId: u.id,
             profEmail: u.email,
             effectiveYmd,
-            weekDelta
+            weekDelta,
+            profWeekCycle: getProfWeekCycleForToolbar()
         });
 
         if (!analysis.ok) {
@@ -1799,11 +1811,14 @@ async function runSemainesTypesShift() {
         stShiftShowResult(formatProfShiftPrepareSummary(analysis));
 
         const wLabel = weekDelta === 2 ? '2 semaines' : '1 semaine';
-        if (
-            !confirm(
-                `Décaler ${analysis.count} créneau(x) de +${wLabel} à partir du ${effectiveYmd} ?\n\nLa base est mise à jour en premier, puis Google Agenda (avec pauses anti-quota). Votre repère semaine A/B ne change pas.`
-            )
-        ) {
+        let confirmMsg = `Décaler ${analysis.count} créneau(x) de +${wLabel} à partir du ${effectiveYmd} ?\n\nLa base est mise à jour en premier, puis Google Agenda. Votre repère semaine A/B en base ne change pas.`;
+        if (analysis.conflictsToDelete?.length) {
+            confirmMsg += `\n\n${analysis.conflictsToDelete.length} créneau(x) en conflit seront supprimés automatiquement.`;
+        }
+        if (analysis.partialAlternance?.partial) {
+            confirmMsg += `\n\nAlternance A/B : certains jours de la semaine ne basculent pas comme les autres (fermetures / ponts). Les élèves d’un jour peuvent voir un décalage d’une semaine sans les autres.\n${(analysis.partialAlternance.lines || []).join('\n')}`;
+        }
+        if (!confirm(confirmMsg)) {
             return;
         }
 
@@ -1813,6 +1828,7 @@ async function runSemainesTypesShift() {
             profEmail: u.email,
             effectiveYmd,
             weekDelta,
+            currentUser: u,
             onProgress: (detail) => {
                 if (shiftBtn && detail) shiftBtn.textContent = detail.slice(0, 40);
             },

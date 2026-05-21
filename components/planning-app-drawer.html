@@ -19,7 +19,7 @@
 
         <div class="planning-drawer__block planning-drawer__block--views">
             <p class="planning-drawer__section-title">Vues</p>
-            <div class="planning-drawer__view-row" role="group" aria-label="Changer de vue">
+            <div class="planning-drawer__view-row planning-drawer__view-row--inline" role="group" aria-label="Changer de vue">
                 <button type="button" class="planning-drawer__view-btn" data-calendar-view="timeGridDay" aria-pressed="false">
                     <span class="planning-drawer__link-icon planning-drawer__link-icon--neutral" aria-hidden="true">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5a2.25 2.25 0 002.25-2.25m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5a2.25 2.25 0 012.25 2.25v7.5" /></svg>
@@ -168,20 +168,22 @@
                 <span id="drawer-help-version" class="font-mono tabular-nums ml-1"></span>
             </p>
             <form id="drawer-help-contact-form" class="drawer-help-contact space-y-2" method="get" action="#">
-                <p class="planning-ui-menu planning-ui-menu--caption text-slate-700 m-0">Nous contacter</p>
+                <p class="planning-ui-menu planning-ui-menu--caption text-slate-700 m-0 mb-2">Nous contacter</p>
                 <label class="block">
-                    <span class="planning-ui-menu planning-ui-menu--caption text-slate-500">Objet</span>
-                    <input type="text" id="drawer-help-subject" name="subject" class="planning-field input input-bordered input-sm w-full mt-0.5 text-[11px]" maxlength="200" placeholder="Ex. titre du message" autocomplete="off" />
+                    <span class="planning-ui-menu planning-ui-menu--caption text-slate-600 dark:text-slate-400">Objet</span>
+                    <input type="text" id="drawer-help-subject" name="subject" class="planning-field input input-bordered input-sm w-full mt-0.5 text-[11px] text-slate-800 dark:text-slate-100" maxlength="200" placeholder="Ex. titre du message" autocomplete="off" />
                 </label>
                 <label class="block">
-                    <span class="planning-ui-menu planning-ui-menu--caption text-slate-500">Message</span>
-                    <div id="drawer-help-message" class="planning-field drawer-help-message-editable textarea textarea-bordered w-full mt-0.5 text-[11px] min-h-[8rem]" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Votre message (texte ou image collée)…"></div>
+                    <span class="planning-ui-menu planning-ui-menu--caption text-slate-600 dark:text-slate-400">Message</span>
+                    <div id="drawer-help-message" class="planning-field drawer-help-message-editable textarea textarea-bordered w-full mt-0.5 text-[11px] text-slate-800 dark:text-slate-100 min-h-[8rem]" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Votre message (texte ou image collée)…"></div>
                 </label>
                 <label class="block">
-                    <span class="planning-ui-menu planning-ui-menu--caption text-slate-500">Pièces jointes</span>
+                    <span class="planning-ui-menu planning-ui-menu--caption text-slate-600 dark:text-slate-400">Pièces jointes</span>
                     <input type="file" id="drawer-help-attachments" class="planning-field file-input file-input-bordered file-input-sm w-full mt-0.5 text-[11px]" multiple accept="image/*,.pdf,.doc,.docx,.txt" />
                 </label>
-                <button type="submit" class="btn btn-primary btn-sm w-full font-bold text-[11px]">Envoyer par e-mail</button>
+                <div class="drawer-help-submit-wrap pt-2">
+                    <button type="submit" class="btn btn-sm planning-btn-accent font-semibold text-[11px] w-full">Envoyer par e-mail</button>
+                </div>
             </form>
             <a id="drawer-help-mailto-anchor" class="hidden" href="#" aria-hidden="true"></a>
         </div>

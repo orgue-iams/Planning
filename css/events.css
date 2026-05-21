@@ -186,8 +186,10 @@ html[data-planning-fc-text='lg'] .event-title-fc {
     color: inherit !important;
     opacity: 1;
     flex: 0 0 auto;
-    min-height: 1.65rem;
-    padding: 0.26rem 0.14rem 0.2rem;
+    min-height: 1.15rem;
+    padding: 0.1rem 0.08rem 0.08rem;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
     margin: 0;
     background: var(--slot-bg-strong, #cbd5e1);
     font-variant-numeric: tabular-nums;
@@ -209,9 +211,10 @@ html[data-planning-fc-text='lg'] .event-time-fc {
 
 /* Échelle moyenne : bandeau horaire un peu plus haut ; titre un peu plus compact pour 2 lignes / 1 h */
 html[data-planning-fc-text='md'] .event-time-fc {
-    min-height: 1.62rem;
-    padding: 0.22rem 0.12rem 0.16rem;
-    line-height: 1.15;
+    min-height: 1.12rem;
+    padding: 0.08rem 0.06rem 0.06rem;
+    line-height: 1.08;
+    font-size: clamp(0.58rem, 1.8vw, 0.72rem);
 }
 
 html[data-planning-fc-text='md'] .event-title-fc {

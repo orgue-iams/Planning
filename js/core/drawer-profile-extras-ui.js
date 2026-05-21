@@ -18,7 +18,7 @@ import { sortEventsByStart } from './planning-courses.js';
 import { fetchPlanningEventsForFullCalendar } from './planning-events-db.js';
 
 const AGENDA_HELP =
-    'Ces liens permettent d’afficher le planning dans Google Agenda (lecture seule). Dans Google Agenda : Paramètres → Ajouter un agenda → À partir de l’URL. Collez le lien copié. Le planning complet affiche tous les créneaux ; le planning personnel n’affiche que vos réservations IAMS.';
+    'Ces liens permettent d’afficher le planning dans Google Agenda (lecture seule). Dans Google Agenda : Paramètres → Ajouter un agenda → À partir de l’URL. Collez le lien copié. Le planning principal affiche tous les créneaux. Le planning personnel affiche, selon votre rôle : vos cours inscrits ou à donner, et vos créneaux de travail perso (pas les autres types ni le travail des autres).';
 
 let nextCoursRefreshGen = 0;
 
@@ -108,7 +108,7 @@ export async function refreshDrawerAgendas(user) {
     const mainLabel =
         String(mainGoogleCalendarLabel || '').trim() ||
         (await loadPoolLabelByCalendarId(mainGoogleCalendarId));
-    setAgendaEntryName('drawer-agenda-main-name', mainLabel);
+    setAgendaEntryName('drawer-agenda-main-name', mainLabel ? `Planning principal (${mainLabel})` : 'Planning principal');
     bindAgendaCopyBtn('drawer-agenda-main-btn', mainUrl);
 
     const { id: persId, label: persLabel } = await loadPersonalPoolRow(user.id);
@@ -117,7 +117,11 @@ export async function refreshDrawerAgendas(user) {
     const persWrap = document.getElementById('drawer-agenda-personal-wrap');
     const persNone = document.getElementById('drawer-agenda-personal-none');
     if (persUrl) {
-        setAgendaEntryName('drawer-agenda-personal-name', persLabel || persId);
+        const persDisplay = persLabel || persId;
+        setAgendaEntryName(
+            'drawer-agenda-personal-name',
+            persDisplay ? `Planning perso. (${persDisplay})` : 'Planning perso.'
+        );
         bindAgendaCopyBtn('drawer-agenda-personal-btn', persUrl);
         persWrap?.classList.remove('hidden');
         persNone?.classList.add('hidden');
