@@ -243,9 +243,15 @@ export async function upsertPlanningEventRow(p) {
             slot_type: row.slot_type,
             updated_at: row.updated_at
         };
-        const { error } = await sb.from('planning_event').update(updateRow).eq('id', existingId);
+        const { data, error } = await sb
+            .from('planning_event')
+            .update(updateRow)
+            .eq('id', existingId)
+            .select('id')
+            .maybeSingle();
         if (error) return { ok: false, error: error.message, id: null };
-        return { ok: true, error: null, id: existingId };
+        if (data?.id) return { ok: true, error: null, id: String(data.id) };
+        /* UUID client (création rapide) ou id obsolète : aucune ligne → insertion. */
     }
     const { data, error } = await sb.from('planning_event').insert(row).select('id').single();
     if (error) return { ok: false, error: error.message, id: null };

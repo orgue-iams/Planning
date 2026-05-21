@@ -41,7 +41,8 @@ import {
     isReservationMutationInFlight,
     reservationModalMayCloseNow,
     isReservationModalDirty,
-    dismissReservationRouteDialog
+    dismissReservationRouteDialog,
+    setSlotWorkflowCalendar
 } from './calendar-logic.js';
 import {
     login,
@@ -216,10 +217,22 @@ function initPlanningFabCreate(getUser) {
     });
 }
 
+function syncCalendarDefaultSlotDataset(user) {
+    const cal = document.getElementById('calendar');
+    if (!cal) return;
+    const r = String(user?.role || '').trim().toLowerCase();
+    if (user?.email && (r === 'eleve' || r === 'prof')) {
+        cal.setAttribute('data-planning-default-slot', 'travail');
+    } else {
+        cal.removeAttribute('data-planning-default-slot');
+    }
+}
+
 function refreshHeaderUser(user) {
     const drawerName = document.getElementById('drawer-profile-name');
     const drawerRole = document.getElementById('drawer-profile-role');
     const shell = document.getElementById('app-shell');
+    syncCalendarDefaultSlotDataset(user);
     if (!user?.email) {
         if (drawerName) drawerName.textContent = 'Invité';
         if (drawerRole) drawerRole.textContent = '—';
@@ -425,6 +438,8 @@ function initCalendarAndRevealUi() {
             getCalendarConfig(handlers, currentUser)
         );
         calendar.render();
+        setSlotWorkflowCalendar(calendar);
+        syncCalendarDefaultSlotDataset(currentUser);
         const toolbarCtl = initCalendarToolbar(calendar);
         handlers.onDatesSet = () => {
             const b = getChapelSlotBounds();

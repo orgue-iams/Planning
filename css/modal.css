@@ -922,6 +922,16 @@
     line-height: 1.45;
 }
 
+#modal_reservation .reservation-modal-headline-divider {
+    border: 0;
+    border-top: 1px solid rgb(226 232 240);
+    margin: 0.5rem 0 0.75rem;
+}
+
+[data-theme='dark'] #modal_reservation .reservation-modal-headline-divider {
+    border-top-color: rgb(51 65 85);
+}
+
 #modal_fermetures.fermetures-modal--busy #fermetures-add,
 #modal_fermetures.fermetures-modal--busy #fermetures-apply-pending,
 #modal_fermetures.fermetures-modal--busy .fermeture-card {

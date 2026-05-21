@@ -125,6 +125,52 @@
     box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.2);
 }
 
+/* Créneau en cours d’enregistrement base (création rapide). */
+.fc-event--db-pending .event-box {
+    opacity: 0.72;
+    outline: 2px dashed rgba(97, 199, 27, 0.75);
+    outline-offset: -1px;
+}
+
+#calendar.planning-calendar--db-busy {
+    cursor: wait;
+}
+
+#calendar.planning-calendar--db-busy .fc-timegrid-col,
+#calendar.planning-calendar--db-busy .fc-daygrid-day {
+    cursor: wait;
+}
+
+.planning-slot-workflow-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0.35rem;
+    padding: 0.45rem 0.65rem;
+    border-radius: 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: rgb(30 64 175);
+    background: rgb(239 246 255 / 0.95);
+    border: 1px solid rgb(147 197 253 / 0.85);
+}
+
+[data-theme='dark'] .planning-slot-workflow-banner {
+    color: rgb(191 219 254);
+    background: rgb(30 58 138 / 0.45);
+    border-color: rgb(59 130 246 / 0.45);
+}
+
+/* Sélection clic / étirement (prof, élève) : aperçu travail perso = vert, pas bleu « autre ». */
+#calendar[data-planning-default-slot='travail'] .fc-highlight {
+    background: rgba(143, 218, 91, 0.55) !important;
+}
+
+[data-theme='dark'] #calendar[data-planning-default-slot='travail'] .fc-highlight {
+    background: rgba(97, 199, 27, 0.38) !important;
+}
+
 /* Créneau passé (règles élève : même jour avant l’heure actuelle, ou jour précédent) : même lecture que la modale. */
 .event-box--past-readonly {
     opacity: 0.72;

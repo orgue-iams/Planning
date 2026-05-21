@@ -14,7 +14,8 @@ import {
 import {
     fcDragResizePropsForEvent,
     applyDragResizePropsToFcEvent,
-    isEleveEnrolledInCoursEvent
+    isEleveEnrolledInCoursEvent,
+    isEventDbPersistPending
 } from '../core/calendar-logic.js';
 import { fetchPlanningEventsForFullCalendar } from '../core/planning-events-db.js';
 import { scheduleTimeGridColumnSync } from '../utils/timegrid-column-sync.js';
@@ -255,8 +256,14 @@ export const getCalendarConfig = (handlers, currentUser) => {
 
         eventContent: (arg) => handlers.renderEventContent(arg),
 
-        eventClassNames: (arg) =>
-            isEleveEnrolledInCoursEvent(arg.event, currentUser) ? ['fc-event--cours-enrolled'] : [],
+        eventClassNames: (arg) => {
+            const classes = [];
+            if (isEventDbPersistPending(arg.event)) classes.push('fc-event--db-pending');
+            if (isEleveEnrolledInCoursEvent(arg.event, currentUser)) {
+                classes.push('fc-event--cours-enrolled');
+            }
+            return classes;
+        },
 
         eventTimeFormat: {
             hour: '2-digit',
