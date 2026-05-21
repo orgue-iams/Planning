@@ -37,6 +37,9 @@ let directoryPasswordMasked = false;
 const DELETE_USER_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m2-3h6a1 1 0 011 1v1H8V5a1 1 0 011-1z"/></svg>';
 
+const DIRECTORY_USER_ICON_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>';
+
 function directoryRoleCardClass(role) {
     const key = normalizePlanningRole(role);
     if (key === 'admin') return 'directory-admin-user-card--role-admin';
@@ -182,17 +185,27 @@ function buildPrivilegedUserCard(r, opts) {
 
     const identity = document.createElement('div');
     identity.className =
-        'directory-user-card__identity min-w-0 self-stretch flex flex-col justify-center pr-2';
+        'directory-user-card__identity min-w-0 self-stretch flex flex-row items-center gap-2 pr-2';
+
+    const avatar = document.createElement('span');
+    avatar.className = `directory-user-card__avatar directory-user-card__avatar--${roleKey}`;
+    avatar.innerHTML = DIRECTORY_USER_ICON_SVG;
+
+    const identityText = document.createElement('div');
+    identityText.className = 'min-w-0 flex flex-col justify-center';
     const nameP = document.createElement('p');
     nameP.className =
         'font-semibold text-slate-900 leading-snug m-0 break-words text-[13px]';
     nameP.style.overflowWrap = 'anywhere';
     nameP.textContent = directoryDisplayName(r);
     const roleP = document.createElement('p');
-    roleP.className = 'directory-user-card__role text-[11px] sm:text-xs leading-snug m-0 mt-0.5';
+    roleP.className =
+        'directory-user-card__role font-bold text-[11px] sm:text-xs leading-snug m-0 mt-0.5';
     roleP.textContent = roleLabel(r.profile_role || r.role);
-    identity.appendChild(nameP);
-    identity.appendChild(roleP);
+    identityText.appendChild(nameP);
+    identityText.appendChild(roleP);
+    identity.appendChild(avatar);
+    identity.appendChild(identityText);
     card.appendChild(identity);
 
     const contact = buildDirectoryContactColumn(r);
@@ -489,6 +502,16 @@ async function applyDirectoryEditPassword() {
     }
 }
 
+function syncDirectoryAddUserFab() {
+    const u = getPlanningSessionUser();
+    const listVisible = !document.getElementById('directory-users-list-panel')?.classList.contains('hidden');
+    const editOpen = !document.getElementById('directory-user-edit-panel')?.classList.contains('hidden');
+    const createOpen = !document.getElementById('directory-user-create-panel')?.classList.contains('hidden');
+    document
+        .getElementById('directory-add-user-wrap')
+        ?.classList.toggle('hidden', !isAdmin(u) || !listVisible || editOpen || createOpen);
+}
+
 function showDirectoryListPanel() {
     document.getElementById('directory-users-list-panel')?.classList.remove('hidden');
     document.getElementById('directory-users-list-panel')?.setAttribute('aria-hidden', 'false');
@@ -502,6 +525,7 @@ function showDirectoryListPanel() {
     editingUser = null;
     editSnapshot = null;
     setPlanningRouteBackHandler('modal_directory_users', () => popPlanningRouteLevel('modal_directory_users'));
+    syncDirectoryAddUserFab();
 }
 
 function getDirectoryCreateMode() {
@@ -587,6 +611,7 @@ async function submitDirectoryCreateUser() {
 function openDirectoryUserCreate() {
     if (!isAdmin(getPlanningSessionUser())) return;
     document.getElementById('directory-users-list-panel')?.classList.add('hidden');
+    syncDirectoryAddUserFab();
     document.getElementById('directory-user-edit-panel')?.classList.add('hidden');
     const create = document.getElementById('directory-user-create-panel');
     create?.classList.remove('hidden');
@@ -672,6 +697,7 @@ function openDirectoryUserEdit(userRow) {
     const editPanel = document.getElementById('directory-user-edit-panel');
     editPanel?.classList.remove('hidden');
     editPanel?.setAttribute('aria-hidden', 'false');
+    syncDirectoryAddUserFab();
 
     const nom = document.getElementById('directory-edit-nom');
     const prenom = document.getElementById('directory-edit-prenom');
@@ -776,7 +802,7 @@ export function initDirectoryUsersUi() {
         showDirectoryListPanel();
         const u = getPlanningSessionUser();
         const privileged = isDirectoryPrivileged(u);
-        document.getElementById('directory-add-user-wrap')?.classList.toggle('hidden', !isAdmin(u));
+        syncDirectoryAddUserFab();
         const status = document.getElementById('directory-users-status');
         if (!openPlanningRouteFromDrawer('modal_directory_users', 'Utilisateurs', 'Menu')) {
             return;

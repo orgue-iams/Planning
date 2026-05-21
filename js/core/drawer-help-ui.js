@@ -70,6 +70,22 @@ async function readHelpAttachments() {
     return out;
 }
 
+function syncHelpAttachmentsHint() {
+    const input = document.getElementById('drawer-help-attachments');
+    const hint = document.getElementById('drawer-help-attachments-hint');
+    if (!(input instanceof HTMLInputElement) || !(hint instanceof HTMLElement)) return;
+    const n = input.files?.length ?? 0;
+    if (!n) {
+        hint.textContent = 'Aucun fichier';
+        return;
+    }
+    if (n === 1) {
+        hint.textContent = input.files[0]?.name || '1 fichier';
+        return;
+    }
+    hint.textContent = `${n} fichiers sélectionnés`;
+}
+
 function clearHelpForm() {
     const subj = document.getElementById('drawer-help-subject');
     const msg = document.getElementById('drawer-help-message');
@@ -77,6 +93,7 @@ function clearHelpForm() {
     if (subj instanceof HTMLInputElement) subj.value = '';
     if (msg instanceof HTMLElement) msg.innerHTML = '';
     if (files instanceof HTMLInputElement) files.value = '';
+    syncHelpAttachmentsHint();
 }
 
 export function initDrawerHelpUi() {
@@ -121,6 +138,14 @@ export function initDrawerHelpUi() {
         e.preventDefault();
         showMainDrawerPanel();
     });
+
+    document.getElementById('drawer-help-attachments-btn')?.addEventListener('click', () => {
+        document.getElementById('drawer-help-attachments')?.click();
+    });
+    document.getElementById('drawer-help-attachments')?.addEventListener('change', () => {
+        syncHelpAttachmentsHint();
+    });
+    syncHelpAttachmentsHint();
 
     document.getElementById('drawer-help-contact-form')?.addEventListener('submit', (ev) => {
         ev.preventDefault();

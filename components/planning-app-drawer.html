@@ -179,7 +179,11 @@
                 </label>
                 <label class="block">
                     <span class="planning-ui-menu planning-ui-menu--caption text-slate-600 dark:text-slate-400">Pièces jointes</span>
-                    <input type="file" id="drawer-help-attachments" class="planning-field file-input file-input-bordered file-input-sm w-full mt-0.5 text-[11px]" multiple accept="image/*,.pdf,.doc,.docx,.txt" />
+                    <div class="drawer-help-file-picker flex flex-wrap items-center gap-2 mt-0.5">
+                        <input type="file" id="drawer-help-attachments" class="sr-only" multiple accept="image/*,.pdf,.doc,.docx,.txt" tabindex="-1" aria-hidden="true" />
+                        <button type="button" id="drawer-help-attachments-btn" class="btn btn-sm planning-btn-accent font-semibold text-[11px] shrink-0">Choisir des fichiers</button>
+                        <span id="drawer-help-attachments-hint" class="planning-ui-menu planning-ui-menu--caption text-slate-500 dark:text-slate-400 min-w-0 break-words">Aucun fichier</span>
+                    </div>
                 </label>
                 <div class="drawer-help-submit-wrap pt-2">
                     <button type="submit" class="btn btn-sm planning-btn-accent font-semibold text-[11px] w-full">Envoyer par e-mail</button>
