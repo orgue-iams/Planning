@@ -31,6 +31,7 @@ import {
 } from './organ-settings.js';
 import { syncPlanningDrawerGroupedSections } from './planning-drawer-ui.js';
 import { createPlanningIconDeleteButton } from '../utils/planning-delete-btn.js';
+import { planningConfirm } from '../utils/planning-confirm.js';
 import {
     CLOSURE_PERIODIC_ICON_SVG,
     formatPeriodicClosureLabel
@@ -72,7 +73,7 @@ function ownsClosurePeriod(range, user) {
 export function canEditClosureRange(range, user) {
     if (!canManageOwnClosures(user)) return false;
     if (range?.legacy) return false;
-    if (range?.appliedAt) return false;
+    if (isAdmin(user)) return true;
     const ownerId = String(range?.createdByUserId || '').trim();
     if (!ownerId) return true;
     return ownsClosurePeriod(range, user);
@@ -206,9 +207,9 @@ function buildClosureCard(range, index) {
     const left = document.createElement('div');
     left.className = 'fermeture-card__col-left min-w-0';
     const periodLine = document.createElement('div');
-    periodLine.className = 'flex items-start gap-1 min-w-0';
+    periodLine.className = 'fermeture-card__period-line flex items-center gap-1 min-w-0';
     const iconWrap = document.createElement('span');
-    iconWrap.className = 'fermeture-card__cal-icon-wrap shrink-0 text-slate-600 mt-0.5';
+    iconWrap.className = 'fermeture-card__cal-icon-wrap shrink-0 text-slate-600';
     iconWrap.innerHTML = range.isPeriodic ? CLOSURE_PERIODIC_ICON_SVG : FERMETURE_CALENDAR_ICON_SVG;
     const dates = document.createElement('p');
     dates.className =
@@ -226,7 +227,7 @@ function buildClosureCard(range, index) {
     const titleText = String(range.title || '').trim();
     const title = document.createElement('p');
     title.className =
-        'text-[11px] font-bold text-slate-800 m-0 mt-0.5 leading-snug break-words';
+        'text-[11px] font-normal text-slate-800 m-0 mt-0.5 leading-snug break-words';
     title.textContent = titleText || 'Fermeture';
     left.appendChild(title);
     grid.appendChild(left);
@@ -235,7 +236,7 @@ function buildClosureCard(range, index) {
     center.className = 'fermeture-card__col-center min-w-0 flex flex-col justify-start gap-0.5';
     const creator = document.createElement('p');
     creator.className =
-        'fermeture-card__creator text-[11px] font-semibold text-slate-800 m-0 leading-snug break-words';
+        'fermeture-card__creator text-[11px] font-normal text-slate-800 m-0 leading-snug break-words';
     creator.textContent =
         range.creatorLabel || (range.creatorRole === 'admin' ? 'Administration' : 'Professeur');
     center.appendChild(creator);
@@ -254,8 +255,14 @@ function buildClosureCard(range, index) {
                 title: 'Supprimer',
                 onClick: (e) => {
                     e.stopPropagation();
-                    if (!window.confirm('Supprimer cette période ?')) return;
-                    void deleteClosureAt(index);
+                    void (async () => {
+                        const ok = await planningConfirm(
+                            'Supprimer cette période et tous les créneaux associés sur le planning ?',
+                            { title: 'Supprimer la fermeture', confirmLabel: 'Supprimer', danger: true }
+                        );
+                        if (!ok) return;
+                        void deleteClosureAt(index);
+                    })();
                 }
             })
         );
@@ -465,47 +472,94 @@ function returnToFermeturesList() {
     showFermeturesMainPanel();
 }
 
-async function deleteClosureAt(index) {
+/** @param {object} range @param {number} index */
+export async function deleteClosureAt(index) {
     const u = getPlanningSessionUser();
     const range = closureRanges[index];
     if (!range || !canDeleteClosureRange(range, u)) return;
+    if (closureApplyInFlight) return;
 
-    if (range.legacy) {
-        const r = await deleteClosureRangeEvents(range.eventIds);
-        if (!r.ok) {
-            showToast(r.error || 'Suppression impossible.', 'error');
-            return;
-        }
-    } else if (range.appliedAt) {
-        let eventIds = [...(range.eventIds || [])];
-        if (!eventIds.length) {
-            eventIds = await fetchEventIdsForAbsencePeriod(range.id);
-        }
-        if (eventIds.length) {
-            const dr = await deleteClosureRangeEvents(eventIds);
-            if (!dr.ok) {
-                showToast(dr.error || 'Suppression des fermetures impossible.', 'error');
+    const { setClosureDeletionBusy, deleteClosureRangeEvents } = await import('./fermetures-planning.js');
+
+    showToast('Suppression de la fermeture en cours…', 'info', 5000);
+    setFermeturesModalBusy(true);
+    setClosureDeletionBusy(true);
+    setApplyProgress(0, 'Préparation de la suppression…');
+    syncFermeturesActionsRow();
+    renderClosureCards();
+
+    const onProgress = (label, pct) => {
+        setApplyProgress(pct, label);
+        document.dispatchEvent(new CustomEvent('planning-calendar-chrome-refresh'));
+    };
+
+    try {
+        if (range.legacy) {
+            const r = await deleteClosureRangeEvents(range.eventIds, { onProgress });
+            if (!r.ok) {
+                showToast(r.error || 'Suppression impossible.', 'error');
+                return;
+            }
+        } else if (range.appliedAt) {
+            let eventIds = [...(range.eventIds || [])];
+            if (!eventIds.length) {
+                eventIds = await fetchEventIdsForAbsencePeriod(range.id);
+            }
+            if (eventIds.length) {
+                const dr = await deleteClosureRangeEvents(eventIds, { onProgress });
+                if (!dr.ok) {
+                    showToast(dr.error || 'Suppression des fermetures impossible.', 'error');
+                    return;
+                }
+            }
+            setApplyProgress(95, 'Retrait de la période…');
+            const r = await deleteAbsencePeriodOwned(range.id);
+            if (!r.ok) {
+                showToast(r.error || 'Suppression impossible.', 'error');
+                return;
+            }
+        } else {
+            const r = await deleteAbsencePeriodDraft(range.id);
+            if (!r.ok) {
+                showToast(r.error || 'Suppression impossible.', 'error');
                 return;
             }
         }
-        const r = await deleteAbsencePeriodOwned(range.id);
-        if (!r.ok) {
-            showToast(r.error || 'Suppression impossible.', 'error');
-            return;
-        }
-    } else {
-        const r = await deleteAbsencePeriodDraft(range.id);
-        if (!r.ok) {
-            showToast(r.error || 'Suppression impossible.', 'error');
-            return;
-        }
-    }
 
-    closureRanges.splice(index, 1);
-    renderClosureCards();
-    showToast('Période supprimée.', 'success');
-    invalidateCalendarListCache();
-    document.dispatchEvent(new CustomEvent('planning-events-changed'));
+        closureRanges.splice(index, 1);
+        renderClosureCards();
+        showToast('Période supprimée.', 'success');
+        invalidateCalendarListCache();
+        document.dispatchEvent(new CustomEvent('planning-events-changed'));
+    } finally {
+        setClosureDeletionBusy(false);
+        setFermeturesModalBusy(false);
+        setApplyProgress(100, 'Terminé');
+        syncFermeturesActionsRow();
+        renderClosureCards();
+    }
+}
+
+/** Publie une période brouillon sur le planning. */
+export async function applyOneClosurePeriod(period) {
+    if (!period?.id || period.appliedAt) return { ok: false, error: 'Période déjà publiée.' };
+    if (closureApplyInFlight) return { ok: false, error: 'Une application est déjà en cours.' };
+    closureApplyInFlight = true;
+    setFermeturesModalBusy(true);
+    setApplyProgress(0, 'Publication sur le planning…');
+    syncFermeturesActionsRow();
+    try {
+        const r = await applyPendingAbsencePeriods([period], {
+            onProgress: (pct, label) => setApplyProgress(pct ?? 0, label || 'Publication…')
+        });
+        if (r.ok) await loadClosureRangesFromServer();
+        return r;
+    } finally {
+        closureApplyInFlight = false;
+        setFermeturesModalBusy(false);
+        syncFermeturesActionsRow();
+        renderClosureCards();
+    }
 }
 
 export async function loadClosureRangesFromServer() {

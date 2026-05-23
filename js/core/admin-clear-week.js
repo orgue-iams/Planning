@@ -117,12 +117,14 @@ export async function runAdminClearWeek(getCalendar, getCurrentUser) {
     const { start, endExclusive } = getPlanningWipeWeekRange(calendar);
     const label = formatWeekRangeFr(start, endExclusive);
 
-    const ok = confirm(
+    const { planningConfirm } = await import('../utils/planning-confirm.js');
+    const ok = await planningConfirm(
         `Vider la période :\n${label}\n\n` +
             '• Tous les événements Google sur cette plage seront supprimés sur le calendrier principal (GOOGLE_CALENDAR_ID) et sur chaque calendrier secondaire assigné à un élève.\n' +
             '• Toutes les lignes planning correspondantes seront supprimées en base (même sans lien avec Google).\n\n' +
             'Attention : tout événement Google dans cette fenêtre horaire est concerné, pas seulement ceux issus du planning.\n\n' +
-            'Confirmer ?'
+            'Confirmer ?',
+        { title: 'Vider la semaine', confirmLabel: 'Vider', danger: true }
     );
     if (!ok) return;
 

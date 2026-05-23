@@ -1,8 +1,10 @@
 <dialog id="modal_fermeture_edit" class="modal">
     <div class="modal-box fermeture-edit-route-box p-4 w-[96%] max-w-md max-h-[90dvh] flex flex-col border-0 shadow-none">
-        <div id="fermeture-edit-tabs" class="hidden flex gap-1 mb-3 shrink-0" role="tablist" aria-label="Mode d’édition">
-            <button type="button" id="fermeture-edit-tab-period" class="btn btn-sm btn-primary flex-1 font-semibold text-[11px]" role="tab" aria-selected="true">Toute la période</button>
-            <button type="button" id="fermeture-edit-tab-day" class="btn btn-sm btn-outline flex-1 font-semibold text-[11px]" role="tab" aria-selected="false">Ce jour</button>
+        <p id="fermeture-edit-period-heading" class="hidden text-[13px] font-semibold text-slate-800 m-0 mb-1 leading-snug shrink-0"></p>
+
+        <div id="fermeture-edit-tabs" class="hidden fermeture-edit-tabs shrink-0 mb-3" role="tablist" aria-label="Mode d’édition">
+            <button type="button" id="fermeture-edit-tab-period" class="fermeture-edit-tabs__btn" role="tab" aria-selected="true">Toute la période</button>
+            <button type="button" id="fermeture-edit-tab-day" class="fermeture-edit-tabs__btn" role="tab" aria-selected="false">Ce jour</button>
         </div>
 
         <div id="fermeture-edit-body" class="space-y-4 overflow-y-auto flex-1 min-w-0 py-1">

@@ -270,7 +270,7 @@ export async function dismissReservationRouteDialog(options = {}) {
         if (saved) modal.close();
         return;
     }
-    if (!reservationModalMayCloseNow()) return;
+    if (!(await reservationModalMayCloseNow())) return;
     restoreReservationModalFormBaseline();
     modal.close();
 }
@@ -289,10 +289,15 @@ export function isReservationModalDirty() {
 }
 
 /** Fermeture modale (bouton Fermer, fond) : false si mutation en cours ou si l’utilisateur refuse d’abandonner. */
-export function reservationModalMayCloseNow() {
+export async function reservationModalMayCloseNow() {
     if (isReservationMutationInFlight()) return false;
     if (!isReservationModalDirty()) return true;
-    return window.confirm('Abandonner les modifications ?');
+    const { planningConfirm } = await import('../utils/planning-confirm.js');
+    return planningConfirm('Abandonner les modifications non enregistrées ?', {
+        title: 'Modifications en cours',
+        confirmLabel: 'Abandonner',
+        danger: true
+    });
 }
 
 function setReservationModalMutationLock(locked) {
@@ -3657,6 +3662,11 @@ export async function quickCreateFromDateClick(calendar, clickDate, currentUser,
  */
 export async function openModal(start, end, event, currentUser, calendarForClip = null) {
     document.dispatchEvent(new CustomEvent('planning-close-drawer-request'));
+    const { isClosureDeletionBusy } = await import('./fermetures-planning.js');
+    if (isClosureDeletionBusy()) {
+        showToast('Une suppression de fermeture est en cours. Patientez quelques instants.', 'info', 5000);
+        return;
+    }
     if (event) {
         const xpF = safeEventExtendedProps(event) || {};
         const isFermetureClick =
@@ -4001,9 +4011,9 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
 
     btnCancel?.addEventListener(
         'click',
-        (e) => {
+        async (e) => {
             e.preventDefault();
-            if (!reservationModalMayCloseNow()) return;
+            if (!(await reservationModalMayCloseNow())) return;
             restoreReservationModalFormBaseline();
             modal.close();
         },
@@ -4019,9 +4029,9 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     );
     btnCloseReadOnly?.addEventListener(
         'click',
-        (e) => {
+        async (e) => {
             e.preventDefault();
-            if (!reservationModalMayCloseNow()) return;
+            if (!(await reservationModalMayCloseNow())) return;
             modal.close();
         },
         { signal: modalSignal }

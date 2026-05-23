@@ -23,6 +23,7 @@ import {
 import { normalizePlanningRole, PLANNING_ROLE_OPTIONS } from './planning-roles.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
 import { createPlanningIconDeleteButton } from '../utils/planning-delete-btn.js';
+import { planningConfirm } from '../utils/planning-confirm.js';
 
 let bound = false;
 /** @type {object | null} */
@@ -93,32 +94,31 @@ function roleLabel(role) {
     return PLANNING_ROLE_OPTIONS.find((o) => o.value === key)?.label ?? key;
 }
 
-function confirmDirectoryAsync(message) {
-    return new Promise((resolve) => {
-        const dlg = document.getElementById('modal_admin_confirm');
-        const msg = document.getElementById('admin-confirm-message');
-        const btnOk = document.getElementById('admin-confirm-ok');
-        const btnCancel = document.getElementById('admin-confirm-cancel');
-        if (!dlg || !msg || !btnOk || !btnCancel) {
-            resolve(window.confirm(message));
-            return;
-        }
-        msg.textContent = message;
-        const cleanup = (v) => {
-            btnOk.removeEventListener('click', onOk);
-            btnCancel.removeEventListener('click', onCancel);
-            dlg.removeEventListener('cancel', onCancel);
-            dlg.close();
-            resolve(v);
-        };
-        const onOk = () => cleanup(true);
-        const onCancel = () => cleanup(false);
-        btnOk.addEventListener('click', onOk);
-        btnCancel.addEventListener('click', onCancel);
-        dlg.addEventListener('cancel', onCancel, { once: true });
-        dlg.showModal();
-        focusPlanningDialogRoot(dlg instanceof HTMLDialogElement ? dlg : null);
-    });
+function confirmDirectoryAsync(message, opts) {
+    return planningConfirm(message, opts);
+}
+
+/** @param {object[]} rows */
+function measureDirectoryNameColumnWidth(rows) {
+    const probe = document.createElement('span');
+    probe.className =
+        'directory-user-card__name font-semibold text-[13px] whitespace-nowrap inline-block';
+    probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;pointer-events:none;';
+    document.body.appendChild(probe);
+    let max = 0;
+    for (const r of rows) {
+        probe.replaceChildren();
+        fillDirectoryUserNameElement(probe, r);
+        max = Math.max(max, probe.offsetWidth);
+    }
+    probe.remove();
+    return Math.min(Math.max(max + 6, 72), 150);
+}
+
+/** @param {HTMLElement} host @param {object[]} rows */
+function applyDirectoryNameColumnWidth(host, rows) {
+    if (!host || !rows?.length) return;
+    host.style.setProperty('--directory-name-col-width', `${measureDirectoryNameColumnWidth(rows)}px`);
 }
 
 function formatFrPhone(raw) {
@@ -274,6 +274,8 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
 
     const root = document.createElement('div');
     root.className = 'directory-users-stack min-w-0 text-[12px] sm:text-[13px] space-y-2';
+    const allRows = [...admins, ...profs, ...eleves];
+    applyDirectoryNameColumnWidth(root, allRows);
 
     let firstSection = true;
     for (const { title, rows } of sections) {
@@ -348,6 +350,7 @@ function renderPrivilegedDirectoryCards(users) {
             'fr'
         )
     );
+    applyDirectoryNameColumnWidth(root, sorted);
 
     const sessionUser = getPlanningSessionUser();
     const adminUser = isAdmin(sessionUser);

@@ -633,13 +633,61 @@ export async function saveClosureRangeToPlanning(range, opts = {}) {
     return { ok: true, error: null };
 }
 
-/** @param {string[]} eventIds */
-export async function deleteClosureRangeEvents(eventIds) {
+/** @type {Set<string>} */
+const closureDeletionPendingIds = new Set();
+
+let closureDeletionBusy = false;
+
+export function isClosureDeletionBusy() {
+    return closureDeletionBusy;
+}
+
+export function setClosureDeletionBusy(busy) {
+    closureDeletionBusy = busy;
+}
+
+/** @param {object | string} eventLike */
+export function isClosureEventPendingDeletion(eventLike) {
+    const id =
+        typeof eventLike === 'string'
+            ? eventLike
+            : String(eventLike?.id || eventLike?.extendedProps?.planningEventId || '').trim();
+    return Boolean(id && closureDeletionPendingIds.has(id));
+}
+
+/** @param {string[]} ids */
+export function markClosureEventsPendingDeletion(ids) {
+    for (const id of ids || []) {
+        const s = String(id || '').trim();
+        if (s) closureDeletionPendingIds.add(s);
+    }
+}
+
+export function clearClosureEventsPendingDeletion() {
+    closureDeletionPendingIds.clear();
+}
+
+/** @param {string[]} eventIds @param {{ onProgress?: (label: string, pct: number) => void }} [opts] */
+export async function deleteClosureRangeEvents(eventIds, opts = {}) {
     const u = getPlanningSessionUser();
     if (!u?.email) return { ok: false, error: 'Session requise.' };
-    for (const id of eventIds || []) {
-        const dr = await deletePlanningEventWithMirrors(id);
-        if (!dr.ok) return dr;
+    const ids = (eventIds || []).map((x) => String(x).trim()).filter(Boolean);
+    const total = ids.length;
+    markClosureEventsPendingDeletion(ids);
+    try {
+        for (let i = 0; i < ids.length; i++) {
+            const id = ids[i];
+            const pct = total ? Math.round(((i + 1) / total) * 100) : 100;
+            opts.onProgress?.(
+                total > 1 ? `Suppression ${i + 1} / ${total}…` : 'Suppression du créneau…',
+                pct
+            );
+            const dr = await deletePlanningEventWithMirrors(id, { onProgress: opts.onProgress });
+            if (!dr.ok) return dr;
+            closureDeletionPendingIds.delete(id);
+        }
+        return { ok: true, error: null };
+    } finally {
+        clearClosureEventsPendingDeletion();
     }
-    return { ok: true, error: null };
 }

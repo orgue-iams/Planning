@@ -161,7 +161,11 @@ export function initMessagesUi(_ignored) {
             if (isEditing && rulesQuill) {
                 const dirty = String(rulesEditorHtml()) !== String(editInitialHtml);
                 if (dirty) {
-                    const ok = confirm('Fermer sans enregistrer les modifications ?');
+                    const { planningConfirm } = await import('../utils/planning-confirm.js');
+                    const ok = await planningConfirm(
+                        'Fermer sans enregistrer les modifications ?',
+                        { title: 'Règles d’utilisation', confirmLabel: 'Fermer', danger: true }
+                    );
                     if (!ok) return;
                 }
             }

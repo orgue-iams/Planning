@@ -383,32 +383,10 @@ function openPoolEdit(row) {
     );
 }
 
-function confirmPoolDelete(message) {
-    return new Promise((resolve) => {
-        const dlg = document.getElementById('modal_admin_confirm');
-        const msg = document.getElementById('admin-confirm-message');
-        const btnOk = document.getElementById('admin-confirm-ok');
-        const btnCancel = document.getElementById('admin-confirm-cancel');
-        if (!dlg || !msg || !btnOk || !btnCancel) {
-            resolve(window.confirm(message));
-            return;
-        }
-        msg.textContent = message;
-        const cleanup = (v) => {
-            btnOk.removeEventListener('click', onOk);
-            btnCancel.removeEventListener('click', onCancel);
-            dlg.removeEventListener('cancel', onCancel);
-            dlg.close();
-            resolve(v);
-        };
-        const onOk = () => cleanup(true);
-        const onCancel = () => cleanup(false);
-        btnOk.addEventListener('click', onOk);
-        btnCancel.addEventListener('click', onCancel);
-        dlg.addEventListener('cancel', onCancel, { once: true });
-        dlg.showModal();
-        focusPlanningDialogRoot(dlg instanceof HTMLDialogElement ? dlg : null);
-    });
+function confirmPoolDelete(message, opts) {
+    return import('../utils/planning-confirm.js').then(({ planningConfirm }) =>
+        planningConfirm(message, { title: 'Confirmation', danger: true, ...opts })
+    );
 }
 
 async function deletePoolRow(poolId, rowForNames) {

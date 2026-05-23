@@ -28,6 +28,7 @@ import {
 } from './fermetures-planning.js';
 import { createPlanningIconDeleteButton } from '../utils/planning-delete-btn.js';
 import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
+import { planningConfirm } from '../utils/planning-confirm.js';
 import { canEditClosureRange, canDeleteClosureRange, canManageOwnClosures, canViewClosures } from './fermetures-ui.js';
 
 let bound = false;
@@ -186,6 +187,15 @@ function setReadonly(readonly, period) {
     syncDayTabActions(readonly);
 }
 
+function syncPeriodHeading(range) {
+    const el = document.getElementById('fermeture-edit-period-heading');
+    if (!el) return;
+    const hide = editCtx?.activeTab === 'day';
+    const title = String(range?.title || '').trim() || 'Fermeture';
+    el.textContent = title;
+    el.classList.toggle('hidden', hide || !range);
+}
+
 function syncTabsUi() {
     const period = getPeriodRef();
     const showTabs = Boolean(
@@ -196,10 +206,13 @@ function syncTabsUi() {
     const isDay = showTabs && editCtx?.activeTab === 'day';
     document.getElementById('fermeture-edit-panel-period')?.classList.toggle('hidden', isDay);
     document.getElementById('fermeture-edit-panel-day')?.classList.toggle('hidden', !isDay);
-    document.getElementById('fermeture-edit-tab-period')?.classList.toggle('btn-primary', !isDay);
-    document.getElementById('fermeture-edit-tab-period')?.classList.toggle('btn-outline', isDay);
-    document.getElementById('fermeture-edit-tab-day')?.classList.toggle('btn-primary', isDay);
-    document.getElementById('fermeture-edit-tab-day')?.classList.toggle('btn-outline', !isDay);
+    const tabPeriod = document.getElementById('fermeture-edit-tab-period');
+    const tabDay = document.getElementById('fermeture-edit-tab-day');
+    tabPeriod?.classList.toggle('fermeture-edit-tabs__btn--active', !isDay);
+    tabDay?.classList.toggle('fermeture-edit-tabs__btn--active', isDay);
+    tabPeriod?.setAttribute('aria-selected', isDay ? 'false' : 'true');
+    tabDay?.setAttribute('aria-selected', isDay ? 'true' : 'false');
+    syncPeriodHeading(period);
     if (isDay && editCtx?.clickedYmd) {
         const ymd = editCtx.clickedYmd;
         const period = getPeriodRef();
@@ -257,51 +270,30 @@ async function deleteCurrentPeriod() {
     if (!period || !canDeleteClosureRange(period, u)) return;
 
     if (editCtx?.activeTab === 'day' && period.isPeriodic && editCtx.clickedYmd) {
-        if (!window.confirm('Supprimer uniquement ce jour de la fermeture périodique ?')) return;
+        const ok = await planningConfirm(
+            'Retirer uniquement ce jour de la fermeture périodique sur le planning ?',
+            { title: 'Supprimer ce jour', confirmLabel: 'Supprimer', danger: true }
+        );
+        if (!ok) return;
+        showToast('Mise à jour de la fermeture…', 'info', 4000);
         await excludeSinglePeriodicDay(editCtx.clickedYmd);
-        invalidateCalendarListCache();
-        document.dispatchEvent(new CustomEvent('planning-events-changed'));
-        closeFermetureEditModal();
         return;
     }
 
-    if (!window.confirm('Supprimer toute la période de fermeture et tous les créneaux associés ?')) return;
+    const ok = await planningConfirm(
+        'Supprimer toute la période et tous les créneaux associés sur le planning ?',
+        { title: 'Supprimer la fermeture', confirmLabel: 'Supprimer', danger: true }
+    );
+    if (!ok) return;
 
-    if (period.legacy) {
-        const r = await deleteClosureRangeEvents(period.eventIds);
-        if (!r.ok) {
-            showToast(r.error || 'Suppression impossible.', 'error');
-            return;
-        }
-    } else if (period.appliedAt) {
-        let eventIds = [...(period.eventIds || [])];
-        if (!eventIds.length) eventIds = await fetchEventIdsForAbsencePeriod(period.id);
-        if (eventIds.length) {
-            const dr = await deleteClosureRangeEvents(eventIds);
-            if (!dr.ok) {
-                showToast(dr.error || 'Suppression impossible.', 'error');
-                return;
-            }
-        }
-        const r = await deleteAbsencePeriodOwned(period.id);
-        if (!r.ok) {
-            showToast(r.error || 'Suppression impossible.', 'error');
-            return;
-        }
-    } else {
-        const r = await deleteAbsencePeriodDraft(period.id);
-        if (!r.ok) {
-            showToast(r.error || 'Suppression impossible.', 'error');
-            return;
-        }
-    }
-
-    invalidateCalendarListCache();
-    document.dispatchEvent(new CustomEvent('planning-events-changed'));
-    showToast('Période supprimée.', 'success');
+    const idx = editCtx?.periodIndex;
     const source = editCtx?.source;
     closeFermetureEditModal();
-    if (source === 'menu') await (await fermeturesUiModule()).loadClosureRangesFromServer();
+    const mod = await fermeturesUiModule();
+    if (typeof idx === 'number' && idx >= 0) {
+        await mod.deleteClosureAt(idx);
+    }
+    if (source === 'menu') await mod.loadClosureRangesFromServer();
 }
 
 async function excludeSinglePeriodicDay(ymd) {
@@ -468,12 +460,42 @@ async function persistEdit() {
         return;
     }
 
-  const mod = await fermeturesUiModule();
+    const mod = await fermeturesUiModule();
     await mod.loadClosureRangesFromServer();
-    showToast(
-        'Période enregistrée. Utilisez « Appliquer » dans le menu fermetures pour la publier.',
-        'success'
-    );
+
+    if (f.isPeriodic) {
+        const publish = await planningConfirm(
+            'Publier cette fermeture périodique sur le planning maintenant ?',
+            {
+                title: 'Publier sur le planning',
+                confirmLabel: 'Publier',
+                cancelLabel: 'Plus tard'
+            }
+        );
+        if (publish) {
+            const ar = await mod.applyOneClosurePeriod(draft.period);
+            if (!ar.ok) {
+                showToast(ar.error || 'Publication impossible.', 'error', 8000);
+            } else {
+                await mod.loadClosureRangesFromServer();
+                showToast('Fermeture périodique publiée sur le planning.', 'success');
+                invalidateCalendarListCache();
+                document.dispatchEvent(new CustomEvent('planning-events-changed'));
+            }
+        } else {
+            showToast(
+                'Période enregistrée. Utilisez « Appliquer les absences » dans le menu fermetures pour la publier.',
+                'info',
+                8000
+            );
+        }
+    } else {
+        showToast(
+            'Période enregistrée. Utilisez « Appliquer les absences » pour la publier sur le planning.',
+            'success'
+        );
+    }
+
     const source = editCtx?.source;
     closeFermetureEditModal();
     if (source === 'menu') mod.returnToFermeturesListOnly();

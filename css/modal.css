@@ -847,10 +847,16 @@
     margin-bottom: 0.1rem;
 }
 
-#modal_fermetures .fermeture-card__cal-icon {
+#modal_fermetures .fermeture-card__cal-icon,
+#modal_fermetures .fermeture-card__periodic-icon {
     width: 1rem;
     height: 1rem;
     display: block;
+    flex-shrink: 0;
+}
+
+#modal_fermetures .fermeture-card__period-line {
+    align-items: center;
 }
 
 #modal_fermetures .fermeture-card__header-right .fermeture-card__badge {
@@ -1214,15 +1220,31 @@
     height: 1.15rem;
 }
 
+#modal_directory_users .directory-users-stack {
+    --directory-name-col-width: 6.75rem;
+}
+
 #modal_directory_users .directory-admin-user-card--layout-v4 {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: auto var(--directory-name-col-width) minmax(0, 1fr);
     column-gap: 0.45rem;
     align-items: center;
 }
 
 #modal_directory_users .directory-admin-user-card--layout-v4.directory-admin-user-card--with-delete {
-    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) 2.25rem;
+    grid-template-columns: auto var(--directory-name-col-width) minmax(0, 1fr) 2.25rem;
+}
+
+#modal_directory_users .directory-user-card__name-col {
+    width: var(--directory-name-col-width);
+    max-width: var(--directory-name-col-width);
+    min-width: 0;
+}
+
+#modal_directory_users .directory-user-card__contact {
+    justify-self: end;
+    text-align: right;
+    padding-right: 0.35rem;
 }
 
 #modal_directory_users .directory-user-card__contact {
@@ -1265,6 +1287,51 @@
 
 #modal_fermetures .fermeture-card__col-center {
     text-align: left;
+}
+
+/* Modale édition fermeture : onglets */
+.fermeture-edit-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid rgb(226 232 240);
+}
+
+.fermeture-edit-tabs__btn {
+    flex: 1;
+    margin: 0;
+    padding: 0.45rem 0.5rem;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    background: transparent;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: rgb(100 116 139);
+    cursor: pointer;
+}
+
+.fermeture-edit-tabs__btn--active {
+    color: rgb(15 23 42);
+    border-bottom-color: rgb(249 115 22);
+}
+
+[data-theme='dark'] .fermeture-edit-tabs {
+    border-bottom-color: rgb(51 65 85);
+}
+
+[data-theme='dark'] .fermeture-edit-tabs__btn {
+    color: rgb(148 163 184);
+}
+
+[data-theme='dark'] .fermeture-edit-tabs__btn--active {
+    color: rgb(248 250 252);
+    border-bottom-color: rgb(251 146 60);
+}
+
+.fc-event--closure-deleting {
+    opacity: 0.45 !important;
+    filter: grayscale(0.85);
+    pointer-events: none !important;
 }
 
 @media (max-width: 30rem) {

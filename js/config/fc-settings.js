@@ -18,6 +18,10 @@ import {
     isEventDbPersistPending,
     isReservationNonEditablePast
 } from '../core/calendar-logic.js';
+import {
+    isClosureDeletionBusy,
+    isClosureEventPendingDeletion
+} from '../core/fermetures-planning.js';
 import { fetchPlanningEventsForFullCalendar } from '../core/planning-events-db.js';
 import { scheduleTimeGridColumnSync } from '../utils/timegrid-column-sync.js';
 import { getChapelSlotBounds } from '../core/organ-settings.js';
@@ -267,10 +271,17 @@ export const getCalendarConfig = (handlers, currentUser) => {
         eventClassNames: (arg) => {
             const classes = [];
             if (isEventDbPersistPending(arg.event)) classes.push('fc-event--db-pending');
+            if (isClosureEventPendingDeletion(arg.event)) classes.push('fc-event--closure-deleting');
             if (isEleveEnrolledInCoursEvent(arg.event, currentUser)) {
                 classes.push('fc-event--cours-enrolled');
             }
             return classes;
+        },
+
+        eventAllow: (_dropInfo, dragged) => {
+            if (isClosureDeletionBusy()) return false;
+            if (dragged && isClosureEventPendingDeletion(dragged)) return false;
+            return true;
         },
 
         eventTimeFormat: {

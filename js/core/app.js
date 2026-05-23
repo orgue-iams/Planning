@@ -474,6 +474,13 @@ function initCalendarAndRevealUi() {
                 /* */
             });
         });
+        document.addEventListener('planning-calendar-chrome-refresh', () => {
+            try {
+                calendar?.render();
+            } catch {
+                /* */
+            }
+        });
         const onOrganSettingsUpdated = async () => {
             if (!calendar) return;
             await fetchOrganSchoolSettings();
@@ -647,8 +654,11 @@ function wireDialogBackdropClose() {
             /* Fenêtre utilisateur admin : fermeture fond / abandon gérés dans admin-users-modal-ui.js */
             if (e.target.id === 'modal_users_admin') return;
             if (e.target.id === 'modal_reservation') {
-                if (!reservationModalMayCloseNow()) return;
-                e.target.close();
+                e.preventDefault();
+                void (async () => {
+                    if (!(await reservationModalMayCloseNow())) return;
+                    e.target.close();
+                })();
                 return;
             }
             e.target.close();
@@ -694,9 +704,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         if (isReservationModalDirty()) {
             e.preventDefault();
-            if (window.confirm('Abandonner les modifications ?')) {
-                e.target.close();
-            }
+            void (async () => {
+                const { planningConfirm } = await import('./utils/planning-confirm.js');
+                if (
+                    await planningConfirm('Abandonner les modifications non enregistrées ?', {
+                        title: 'Modifications en cours',
+                        confirmLabel: 'Abandonner',
+                        danger: true
+                    })
+                ) {
+                    e.target.close();
+                }
+            })();
         }
     });
     document.getElementById('modal_reservation')?.addEventListener('close', () => {
@@ -819,10 +838,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('btn-password-cancel')?.addEventListener('click', async () => {
         if (isBackendAuthConfigured() && isSupabasePasswordRecoveryPending()) {
+            const { planningConfirm } = await import('./utils/planning-confirm.js');
             if (
-                !confirm(
-                    'Annuler la réinitialisation ? Vous devrez demander un nouveau lien par e-mail. Le lien déjà reçu ne fonctionnera plus.'
-                )
+                !(await planningConfirm(
+                    'Annuler la réinitialisation ? Vous devrez demander un nouveau lien par e-mail. Le lien déjà reçu ne fonctionnera plus.',
+                    { title: 'Annuler la réinitialisation', confirmLabel: 'Annuler la réinitialisation', danger: true }
+                ))
             ) {
                 return;
             }

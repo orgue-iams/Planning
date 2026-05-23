@@ -12,6 +12,7 @@ import {
 import { getPlanningSessionUser } from './session-user.js';
 import { getSupabaseClient, isBackendAuthConfigured, getPlanningConfig } from './supabase-client.js';
 import { showToast } from '../utils/toast.js';
+import { planningConfirm } from '../utils/planning-confirm.js';
 import {
     fetchOrganSchoolSettings,
     getOrganSchoolSettingsCached,
@@ -715,10 +716,17 @@ function wireStLineEditModal() {
         ev.stopPropagation();
         const card = stLineEditTargetTr;
         if (!card) return;
-        if (!window.confirm('Supprimer ce créneau du gabarit ?')) return;
-        card.remove();
-        showStMainPanel();
-        scheduleStAutoSave();
+        void (async () => {
+            const ok = await planningConfirm('Supprimer ce créneau du gabarit ?', {
+                title: 'Supprimer le créneau',
+                confirmLabel: 'Supprimer',
+                danger: true
+            });
+            if (!ok) return;
+            card.remove();
+            showStMainPanel();
+            scheduleStAutoSave();
+        })();
     });
 
     dlg.addEventListener('close', () => {
@@ -1416,9 +1424,10 @@ async function runSemainesTypesAnalyze() {
         const emptyCours = linePayload.filter((l) => l.slot_type === 'cours').length === 0;
         if (emptyCours && linePayload.filter((l) => l.slot_type === 'reservation').length === 0) {
             if (
-                !confirm(
-                    'Votre gabarit ne contient aucune ligne. Tous vos cours seront retirés des agendas sur la période. Continuer la préparation ?'
-                )
+                !(await planningConfirm(
+                    'Votre gabarit ne contient aucune ligne. Tous vos cours seront retirés des agendas sur la période. Continuer la préparation ?',
+                    { title: 'Gabarit vide', confirmLabel: 'Continuer' }
+                ))
             ) {
                 resetStAnalyzeOutput();
                 return;
@@ -1488,7 +1497,7 @@ async function runSemainesTypesApply() {
     const conflicts = lastAnalysis?.otherProfConflicts || [];
     if (conflicts.length) {
         const lines = formatTemplateOtherProfConflictLines(conflicts);
-        const ok = confirm(
+        const ok = await planningConfirm(
             [
                 `${conflicts.length} créneau(x) d’un autre professeur chevauchent votre gabarit.`,
                 'En continuant, ces créneaux seront supprimés (comme une suppression normale), puis votre gabarit sera appliqué.',
@@ -1499,7 +1508,8 @@ async function runSemainesTypesApply() {
                 'Confirmer l’écrasement et l’application ?'
             ]
                 .filter(Boolean)
-                .join('\n')
+                .join('\n'),
+            { title: 'Conflits avec d’autres profs', confirmLabel: 'Écraser et appliquer', danger: true }
         );
         if (!ok) return;
         setStModalActionsBusy(true);
@@ -1527,9 +1537,10 @@ async function runSemainesTypesApply() {
         }
     }
     if (
-        !confirm(
-            'La base de données est mise à jour en premier, puis Google Agenda en arrière-plan (calendrier général, puis agendas concernés), avec des pauses pour limiter les quotas. Vous pourrez fermer cette fenêtre pendant la synchro Google ; les boutons Préparer / Appliquer resteront indisponibles jusqu’à la fin. Continuer ?'
-        )
+        !(await planningConfirm(
+            'La base de données est mise à jour en premier, puis Google Agenda en arrière-plan (calendrier général, puis agendas concernés), avec des pauses pour limiter les quotas. Vous pourrez fermer cette fenêtre pendant la synchro Google ; les boutons Préparer / Appliquer resteront indisponibles jusqu’à la fin. Continuer ?',
+            { title: 'Appliquer le gabarit', confirmLabel: 'Appliquer' }
+        ))
     ) {
         return;
     }
@@ -1833,7 +1844,12 @@ async function runSemainesTypesShift() {
         if (analysis.partialAlternance?.partial) {
             confirmMsg += `\n\nAlternance A/B : certains jours de la semaine ne basculent pas comme les autres (fermetures / ponts). Les élèves d’un jour peuvent voir un décalage d’une semaine sans les autres.\n${(analysis.partialAlternance.lines || []).join('\n')}`;
         }
-        if (!confirm(confirmMsg)) {
+        if (
+            !(await planningConfirm(confirmMsg, {
+                title: 'Décaler mes créneaux',
+                confirmLabel: 'Décaler'
+            }))
+        ) {
             return;
         }
 
