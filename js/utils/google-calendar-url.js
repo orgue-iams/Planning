@@ -4,11 +4,28 @@
  * @param {string} calendarId
  * @param {{ timeZone?: string }} [opts] — défaut Europe/Paris (aligné agenda IAMS)
  */
-/** URL d’abonnement Google Calendar (ajout au compte Google). */
-export function googleCalendarSubscribeUrl(calendarId) {
+/** @param {string} calendarId */
+function calendarIdToSubscribeCid(calendarId) {
     const id = String(calendarId || '').trim();
     if (!id) return '';
-    return `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(id)}`;
+    try {
+        const bytes = new TextEncoder().encode(id);
+        let binary = '';
+        for (const b of bytes) binary += String.fromCharCode(b);
+        return btoa(binary);
+    } catch {
+        return btoa(id);
+    }
+}
+
+/**
+ * URL d’abonnement Google Calendar (cid = id d’agenda encodé en base64, format attendu par Google).
+ * Le libellé affiché dans Google Agenda vient du calendrier partagé ; renommable après ajout.
+ */
+export function googleCalendarSubscribeUrl(calendarId) {
+    const cid = calendarIdToSubscribeCid(calendarId);
+    if (!cid) return '';
+    return `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(cid)}`;
 }
 
 export function googleCalendarEmbedUrl(calendarId, opts) {

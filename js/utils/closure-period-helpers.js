@@ -80,7 +80,7 @@ export function formatPeriodicClosureLabel(weekdays) {
     }
     const names = list.map((n) => WEEKDAY_BY_ISO.get(n)?.label?.toLowerCase() || '?');
     if (names.length === 2) return `Tous les ${names[0]}s et ${names[1]}s`;
-    return `Tous les ${names.slice(0, -1).join('s, ')}s et ${names[names.length - 1]}s`;
+    return `Tous les ${names.slice(0, -1).join('s,\n')}s et ${names[names.length - 1]}s`;
 }
 
 /** @param {string} t HH:MM ou HH:MM:SS */

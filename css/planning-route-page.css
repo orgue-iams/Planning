@@ -1,6 +1,7 @@
 /* Sous-pages (dialog route) : panneau à gauche (~75 %), planning visible à droite. */
 
 dialog.planning-route-page {
+    --planning-route-surface: rgb(255 255 255);
     --planning-route-panel-width: min(75vw, 22rem);
     width: 100vw;
     max-width: 100vw;
@@ -51,7 +52,7 @@ dialog.planning-route-page .planning-route-page__bar {
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
-    background: rgb(255 255 255) !important;
+    background: var(--planning-route-surface) !important;
     border-bottom: none !important;
     box-shadow: none;
     flex-wrap: wrap;
@@ -84,7 +85,11 @@ dialog.planning-route-page .modal-box {
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    background: rgb(255 255 255) !important;
+    background: var(--planning-route-surface) !important;
+}
+
+dialog.planning-route-page .modal-box > :not(input):not(select):not(textarea):not(.input):not(.select):not(.checkbox):not(.toggle):not(.btn):not(.progress):not(.badge) {
+    background-color: transparent;
 }
 
 dialog.planning-route-page#modal_directory_users {
@@ -108,9 +113,13 @@ dialog.planning-route-page#modal_reservation {
     --planning-route-panel-width: min(75vw, 26rem);
 }
 
+[data-theme='dark'] dialog.planning-route-page {
+    --planning-route-surface: rgb(15 23 42);
+}
+
 [data-theme='dark'] dialog.planning-route-page .planning-route-page__bar,
 [data-theme='dark'] dialog.planning-route-page .modal-box {
-    background: rgb(15 23 42) !important;
+    background: var(--planning-route-surface) !important;
 }
 
 [data-theme='dark'] dialog.planning-route-page .modal-box {

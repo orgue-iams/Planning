@@ -17,8 +17,11 @@ import { fetchPlanningListElevesActifs } from './planning-events-db.js';
 import { sortEventsByStart } from './planning-courses.js';
 import { fetchPlanningEventsForFullCalendar } from './planning-events-db.js';
 
+const AGENDA_LABEL_MAIN = 'Orgue IAMS - global';
+const AGENDA_LABEL_PERSONAL = 'Orgue IAMS - Mes créneaux';
+
 const AGENDA_HELP =
-    '« Ajouter à mon agenda » ouvre Google Agenda pour s’abonner aux calendriers IAMS (principal + personnel si disponible). « Copier l’URL » sert à une intégration lecture seule (Paramètres → Ajouter un agenda → À partir de l’URL). Le planning principal affiche tous les créneaux ; le personnel limite l’affichage à vos cours et créneaux selon votre rôle.';
+    'Ajoutez chaque calendrier avec le bouton dédié (un à la fois, pour éviter le blocage des fenêtres sur mobile). Dans Google Agenda, vous pouvez renommer l’agenda après ajout. « Copier l’URL » sert à une intégration lecture seule.';
 
 let nextCoursRefreshGen = 0;
 
@@ -75,6 +78,29 @@ async function copyText(text) {
     }
 }
 
+/** Un seul geste utilisateur = une navigation (évite le blocage popup sur mobile). */
+function openGoogleCalendarSubscribe(url, label) {
+    if (!url) return;
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.setAttribute('aria-label', `Ajouter ${label} dans Google Agenda`);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    showToast(`Si besoin, validez l’ajout de « ${label} » dans Google Agenda.`, 'info', 7000);
+}
+
+function bindAgendaSubscribeBtn(btnId, url, label) {
+    const btn = document.getElementById(btnId);
+    if (!(btn instanceof HTMLButtonElement)) return;
+    const hasUrl = Boolean(url);
+    btn.classList.toggle('hidden', !hasUrl);
+    btn.disabled = !hasUrl;
+    btn.onclick = () => openGoogleCalendarSubscribe(url, label);
+}
+
 function bindAgendaCopyBtn(btnId, url) {
     const btn = document.getElementById(btnId);
     if (!(btn instanceof HTMLButtonElement)) return;
@@ -103,25 +129,18 @@ export async function refreshDrawerAgendas(user) {
     block.classList.remove('hidden');
     showAgendaHelpAlways();
 
-    const { mainGoogleCalendarId, mainGoogleCalendarLabel } = getPlanningConfig();
+    const { mainGoogleCalendarId } = getPlanningConfig();
     const mainUrl = googleCalendarEmbedUrl(mainGoogleCalendarId);
-    const mainLabel =
-        String(mainGoogleCalendarLabel || '').trim() ||
-        (await loadPoolLabelByCalendarId(mainGoogleCalendarId));
-    setAgendaEntryName('drawer-agenda-main-name', 'Planning complet (Orgue IAMS)');
+    setAgendaEntryName('drawer-agenda-main-name', AGENDA_LABEL_MAIN);
     bindAgendaCopyBtn('drawer-agenda-main-btn', mainUrl);
 
-    const { id: persId, label: persLabel } = await loadPersonalPoolRow(user.id);
+    const { id: persId } = await loadPersonalPoolRow(user.id);
     const persUrl = googleCalendarEmbedUrl(persId);
 
     const persWrap = document.getElementById('drawer-agenda-personal-wrap');
     const persNone = document.getElementById('drawer-agenda-personal-none');
     if (persUrl) {
-        const persDisplay = persLabel || persId;
-        setAgendaEntryName(
-            'drawer-agenda-personal-name',
-            persDisplay ? `Planning perso. (${persDisplay})` : 'Planning perso.'
-        );
+        setAgendaEntryName('drawer-agenda-personal-name', AGENDA_LABEL_PERSONAL);
         bindAgendaCopyBtn('drawer-agenda-personal-btn', persUrl);
         persWrap?.classList.remove('hidden');
         persNone?.classList.add('hidden');
@@ -130,22 +149,12 @@ export async function refreshDrawerAgendas(user) {
         persNone?.classList.remove('hidden');
     }
 
-    const subBtn = document.getElementById('drawer-agenda-subscribe-btn');
     const mainSub = googleCalendarSubscribeUrl(mainGoogleCalendarId);
     const persSub = googleCalendarSubscribeUrl(persId);
-    if (subBtn instanceof HTMLButtonElement) {
-        const canSub = Boolean(mainSub || persSub);
-        subBtn.classList.toggle('hidden', !canSub);
-        subBtn.onclick = () => {
-            if (mainSub) window.open(mainSub, '_blank', 'noopener,noreferrer');
-            if (persSub) {
-                window.setTimeout(() => {
-                    window.open(persSub, '_blank', 'noopener,noreferrer');
-                }, 400);
-            }
-            showToast('Ouverture de Google Agenda pour ajouter les calendriers IAMS.');
-        };
-    }
+    const subWrap = document.getElementById('drawer-agenda-subscribe-wrap');
+    subWrap?.classList.toggle('hidden', !mainSub && !persSub);
+    bindAgendaSubscribeBtn('drawer-agenda-subscribe-main-btn', mainSub, AGENDA_LABEL_MAIN);
+    bindAgendaSubscribeBtn('drawer-agenda-subscribe-personal-btn', persSub, AGENDA_LABEL_PERSONAL);
 }
 
 /** @param {string[]} userIds @returns {Promise<Map<string, { prenom: string, nom: string, display_name?: string }>>} */

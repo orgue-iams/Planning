@@ -103,7 +103,7 @@ function formatFrRange(startYmd, endYmd) {
     if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) {
         return `${startYmd} → ${endYmd}`;
     }
-    const opts = { day: 'numeric', month: 'long', year: 'numeric' };
+    const opts = { day: 'numeric', month: 'short' };
     if (startYmd === endYmd) return s.toLocaleDateString('fr-FR', opts);
     return `${s.toLocaleDateString('fr-FR', opts)} → ${e.toLocaleDateString('fr-FR', opts)}`;
 }
@@ -181,8 +181,9 @@ function buildClosureCard(range, index) {
     const isDraft = !range.appliedAt && !range.legacy;
     const draftPast = isDraft && isPast;
     const mine = ownsClosureRange(range, u);
+    const deletable = canDeleteClosureRange(range, u) && !isPast && !pending && !closureApplyInFlight;
     const card = document.createElement('div');
-    card.className = `fermeture-card rounded-xl border px-3 py-2.5 min-w-0 ${closureCardToneClass(range)}${isPast ? ' fermeture-card--past' : ''}${mine ? ' fermeture-card--mine' : ''}`;
+    card.className = `fermeture-card fermeture-card--layout-grid rounded-xl border px-3 py-2.5 min-w-0 ${closureCardToneClass(range)}${isPast ? ' fermeture-card--past' : ''}${mine ? ' fermeture-card--mine' : ''}${deletable ? ' fermeture-card--with-delete' : ''}`;
     if (!pending && !closureApplyInFlight) {
         card.classList.add('cursor-pointer');
         card.tabIndex = 0;
@@ -200,17 +201,18 @@ function buildClosureCard(range, index) {
     }
 
     const grid = document.createElement('div');
-    grid.className = 'fermeture-card__grid flex-1 min-w-0';
+    grid.className = 'fermeture-card__grid min-w-0';
 
     const left = document.createElement('div');
     left.className = 'fermeture-card__col-left min-w-0';
     const periodLine = document.createElement('div');
-    periodLine.className = 'flex items-start gap-1.5 min-w-0';
+    periodLine.className = 'flex items-start gap-1 min-w-0';
     const iconWrap = document.createElement('span');
     iconWrap.className = 'fermeture-card__cal-icon-wrap shrink-0 text-slate-600 mt-0.5';
     iconWrap.innerHTML = range.isPeriodic ? CLOSURE_PERIODIC_ICON_SVG : FERMETURE_CALENDAR_ICON_SVG;
     const dates = document.createElement('p');
-    dates.className = 'text-[12px] font-semibold text-slate-800 m-0 leading-snug break-words';
+    dates.className =
+        'text-[11px] font-semibold text-slate-800 m-0 leading-snug break-words whitespace-normal';
     let periodLabel = pending
         ? `${formatFrRange(range.startYmd, range.endYmd)} — enregistrement…`
         : formatFrRange(range.startYmd, range.endYmd);
@@ -230,7 +232,7 @@ function buildClosureCard(range, index) {
     grid.appendChild(left);
 
     const center = document.createElement('div');
-    center.className = 'fermeture-card__col-center min-w-0 flex flex-col justify-center';
+    center.className = 'fermeture-card__col-center min-w-0 flex flex-col justify-start gap-0.5';
     const creator = document.createElement('p');
     creator.className =
         'fermeture-card__creator text-[11px] font-semibold text-slate-800 m-0 leading-snug break-words';
@@ -243,24 +245,24 @@ function buildClosureCard(range, index) {
     center.appendChild(badge);
     grid.appendChild(center);
 
+    if (deletable) {
+        const actions = document.createElement('div');
+        actions.className = 'fermeture-card__col-actions shrink-0 flex items-start justify-center pt-0.5';
+        actions.appendChild(
+            createPlanningIconDeleteButton({
+                ariaLabel: 'Supprimer cette période',
+                title: 'Supprimer',
+                onClick: (e) => {
+                    e.stopPropagation();
+                    if (!window.confirm('Supprimer cette période ?')) return;
+                    void deleteClosureAt(index);
+                }
+            })
+        );
+        grid.appendChild(actions);
+    }
+
     card.appendChild(grid);
-
-    const deletable = canDeleteClosureRange(range, u) && !isPast;
-    if (!deletable || pending || closureApplyInFlight) return card;
-
-    const actions = document.createElement('div');
-    actions.className = 'fermeture-card__col-actions shrink-0 flex items-center';
-    card.classList.add('fermeture-card--with-delete');
-    const delBtn = createPlanningIconDeleteButton({
-        ariaLabel: 'Supprimer cette période',
-        title: 'Supprimer',
-        onClick: () => {
-            if (!window.confirm('Supprimer cette période ?')) return;
-            void deleteClosureAt(index);
-        }
-    });
-    actions.appendChild(delBtn);
-    card.appendChild(actions);
     return card;
 }
 

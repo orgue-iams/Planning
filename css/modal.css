@@ -1216,13 +1216,13 @@
 
 #modal_directory_users .directory-admin-user-card--layout-v4 {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.2fr);
-    column-gap: 0.65rem;
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 0.45rem;
     align-items: center;
 }
 
 #modal_directory_users .directory-admin-user-card--layout-v4.directory-admin-user-card--with-delete {
-    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.2fr) 2.25rem;
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) 2.25rem;
 }
 
 #modal_directory_users .directory-user-card__contact {
@@ -1237,11 +1237,25 @@
     justify-content: center;
 }
 
-#modal_fermetures .fermeture-card__grid {
+#modal_fermetures .fermeture-card--layout-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto;
-    column-gap: 0.65rem;
-    align-items: center;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 0.5rem;
+    align-items: start;
+}
+
+#modal_fermetures .fermeture-card--layout-grid.fermeture-card--with-delete {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 2.25rem;
+}
+
+#modal_fermetures .fermeture-card__grid {
+    display: contents;
+}
+
+#modal_fermetures .fermeture-card__col-left,
+#modal_fermetures .fermeture-card__col-center,
+#modal_fermetures .fermeture-card__col-actions {
+    min-width: 0;
 }
 
 #modal_fermetures .fermeture-card--mine {
@@ -1254,29 +1268,13 @@
 }
 
 @media (max-width: 30rem) {
-    #modal_directory_users .directory-admin-user-card--layout-v4,
     #modal_directory_users .directory-admin-user-card--layout-v4.directory-admin-user-card--with-delete {
-        grid-template-columns: auto minmax(0, 1fr);
-        row-gap: 0.35rem;
+        column-gap: 0.35rem;
     }
 
+    #modal_directory_users .directory-admin-user-card--layout-v4 .directory-user-card__name,
     #modal_directory_users .directory-admin-user-card--layout-v4 .directory-user-card__contact {
-        grid-column: 1 / -1;
-        padding-left: 2.35rem;
-    }
-
-    #modal_directory_users .directory-admin-user-card--layout-v4 .directory-user-card__actions {
-        grid-column: 2;
-        grid-row: 1;
-    }
-
-    #modal_fermetures .fermeture-card__grid {
-        grid-template-columns: minmax(0, 1fr) auto;
-        row-gap: 0.35rem;
-    }
-
-    #modal_fermetures .fermeture-card__col-center {
-        grid-column: 1;
+        font-size: 0.68rem;
     }
 }
 
