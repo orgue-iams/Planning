@@ -434,7 +434,7 @@ dialog.planning-route-page .btn.btn-primary:not(.btn-outline):not(.btn-ghost):no
 dialog.modal .btn.btn-primary:not(.btn-outline):not(.btn-ghost):not(.btn-link):active,
 dialog.planning-route-page .btn.btn-primary:not(.btn-outline):not(.btn-ghost):not(.btn-link):active,
 #planning-drawer-help-panel .btn.btn-primary:not(.btn-outline):not(.btn-ghost):active,
-#modal_login .btn.btn-primary:active {
+#modal_login .btn.btn-primary:active:not(:disabled):not(.login-btn--busy) {
     filter: brightness(0.94);
 }
 
@@ -570,25 +570,52 @@ dialog.modal .btn.btn-warning:not(.btn-ghost) {
     word-break: break-word;
 }
 
-/* Noms de profil (tiroir, cartes annuaire, champ « Nom » du profil) */
-.planning-profile-name-text,
+/* Petites capitales : menu tiroir + cartes annuaire uniquement */
 .planning-drawer__profile-name,
-.planning-profile-name-input {
+.directory-user-card__name {
     font-variant-caps: small-caps;
     letter-spacing: 0.03em;
 }
 
-/* Annuaire : prénom + nom sur une seule ligne */
+/* Annuaire : prénom + nom visibles (retour à la ligne si besoin) */
 .directory-user-card__name {
     display: block;
     min-width: 0;
     max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow: visible;
+    text-overflow: unset;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.35;
 }
 
 .directory-user-card__name .directory-user-card__prenom,
 .directory-user-card__name .directory-user-card__nom {
     display: inline;
+}
+
+.planning-date-field {
+    position: relative;
+    display: block;
+    min-width: 0;
+}
+
+.planning-date-field .planning-date-input {
+    width: 100%;
+    padding-right: 2.25rem;
+}
+
+.planning-date-field__icon {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1.1rem;
+    height: 1.1rem;
+    color: rgb(100 116 139);
+    pointer-events: none;
+}
+
+[data-theme='dark'] .planning-date-field__icon {
+    color: rgb(148 163 184);
 }

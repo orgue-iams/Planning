@@ -189,23 +189,33 @@ function buildClosureCard(range, index) {
 
     const body = document.createElement('div');
     body.className = 'flex-1 min-w-0';
+
+    const header = document.createElement('div');
+    header.className = 'fermeture-card__header flex items-start justify-between gap-2 min-w-0';
+
+    const headerLeft = document.createElement('div');
+    headerLeft.className = 'min-w-0 flex-1';
     const dates = document.createElement('p');
     dates.className = 'text-[12px] font-mono font-semibold text-slate-800 dark:text-slate-50 m-0 leading-snug';
     dates.textContent = pending
         ? `${formatFrRange(range.startYmd, range.endYmd)} — enregistrement…`
         : formatFrRange(range.startYmd, range.endYmd);
-    body.appendChild(dates);
+    headerLeft.appendChild(dates);
+    header.appendChild(headerLeft);
 
-    const meta = document.createElement('p');
-    meta.className = 'text-[10px] text-slate-600 dark:text-slate-300 m-0 mt-0.5';
-    meta.textContent = range.creatorLabel || (range.creatorRole === 'admin' ? 'Administration' : 'Professeur');
-    body.appendChild(meta);
+    const creator = document.createElement('p');
+    creator.className =
+        'fermeture-card__creator text-[10px] text-slate-600 dark:text-slate-300 m-0 leading-snug text-right shrink-0 max-w-[48%] break-words';
+    creator.textContent =
+        range.creatorLabel || (range.creatorRole === 'admin' ? 'Administration' : 'Professeur');
+    header.appendChild(creator);
+    body.appendChild(header);
 
     const titleText = String(range.title || '').trim();
     if (titleText) {
         const title = document.createElement('p');
         title.className =
-            'text-[11px] text-slate-600 dark:text-orange-100/90 m-0 mt-0.5 leading-snug break-words';
+            'text-[11px] font-bold text-slate-800 dark:text-orange-50 m-0 mt-1 leading-snug break-words';
         title.textContent = titleText;
         body.appendChild(title);
     }

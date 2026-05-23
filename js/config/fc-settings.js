@@ -23,6 +23,7 @@ import { scheduleTimeGridColumnSync } from '../utils/timegrid-column-sync.js';
 import { getChapelSlotBounds } from '../core/organ-settings.js';
 import { applyPlanningPortraitSlotFit } from '../core/planning-viewport-fit.js';
 import { syncPlanningGridCornerHud } from '../core/calendar-toolbar.js';
+import { isCoarsePointerDevice } from '../utils/touch-handler.js';
 
 function escapeHtmlText(s) {
     return String(s)
@@ -111,8 +112,8 @@ export const getCalendarConfig = (handlers, currentUser) => {
          * et pouvait ne jamais atteindre le seuil si un autre gestionnaire captait le geste. */
         selectMinDistance: 0,
 
-        longPressDelay: 250,
-        selectLongPressDelay: 250,
+        longPressDelay: isCoarsePointerDevice() ? 80 : 250,
+        selectLongPressDelay: isCoarsePointerDevice() ? 80 : 250,
 
         selectAllow: (selectInfo) => {
             /* FC appelle parfois ce hook pendant handleHitUpdate avec seulement start/end (sans `view`) :

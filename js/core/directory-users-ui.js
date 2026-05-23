@@ -219,11 +219,11 @@ function buildPrivilegedUserCard(r, opts) {
     identityText.className = 'min-w-0 flex-1 flex flex-col justify-center';
     const nameP = document.createElement('p');
     nameP.className =
-        'directory-user-card__name planning-profile-name-text font-semibold text-slate-900 leading-snug m-0 text-[13px]';
+        'directory-user-card__name font-semibold text-slate-900 leading-snug m-0 text-[13px]';
     fillDirectoryUserNameElement(nameP, r);
     const roleP = document.createElement('p');
     roleP.className =
-        'directory-user-card__role planning-profile-name-text font-bold text-[11px] sm:text-xs leading-snug m-0 mt-0.5';
+        'directory-user-card__role font-bold text-[11px] sm:text-xs leading-snug m-0 mt-0.5 text-slate-700 dark:text-slate-200';
     roleP.textContent = roleLabel(r.profile_role || r.role);
     identityText.appendChild(nameP);
     identityText.appendChild(roleP);
@@ -326,7 +326,7 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
             identity.className = 'directory-user-card__identity min-w-0 self-stretch flex flex-col justify-center pr-2';
             const nameEl = document.createElement('p');
             nameEl.className =
-                'directory-user-card__name planning-profile-name-text font-semibold text-slate-900 leading-snug m-0 text-[13px]';
+                'directory-user-card__name font-semibold text-slate-900 leading-snug m-0 text-[13px]';
             fillDirectoryUserNameElement(nameEl, r);
             identity.appendChild(nameEl);
             item.appendChild(identity);

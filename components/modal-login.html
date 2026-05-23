@@ -15,7 +15,7 @@
             <div class="form-control login-pass-form-control overflow-visible">
                 <label class="sr-only" for="login-pass">Mot de passe</label>
                 <div class="login-pass-field relative z-[1] w-full">
-                    <input type="password" id="login-pass" name="password" autocomplete="current-password" placeholder="Mot de passe" class="input input-bordered login-field w-full h-12 text-base pr-[3.25rem]" required />
+                    <input type="password" id="login-pass" name="password" autocomplete="current-password" placeholder="Mot de passe" class="input input-bordered login-field w-full h-12 text-base login-pass-input" required />
                     <button type="button" id="login-pass-toggle" class="login-pass-toggle" aria-label="Afficher le mot de passe" aria-pressed="false">
                         <span id="login-pass-icon-show" class="login-pass-toggle__icon" aria-hidden="true">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="22" height="22">
@@ -38,6 +38,7 @@
                 <input type="checkbox" id="login-remember-me" name="remember" class="checkbox checkbox-primary checkbox-sm login-remember__checkbox" checked />
                 <span class="login-remember__label text-sm leading-snug">Se souvenir de moi sur cet appareil</span>
             </label>
+            <p id="login-error-msg" class="login-card__error hidden m-0 rounded-lg border px-3 py-2 text-xs font-semibold leading-snug" role="alert" aria-live="assertive"></p>
             <button type="button" id="btn-do-login" class="btn btn-primary w-full text-white font-bold h-12 text-sm tracking-wide shadow-lg">SE CONNECTER</button>
             <button type="button" id="btn-pwa-install" class="btn btn-outline btn-sm w-full font-semibold text-xs tracking-wide hidden" aria-hidden="true">Installer l'application</button>
         </div>

@@ -12,6 +12,15 @@ export function isTouchSwipeWeekNavigationEnabled() {
     return coarse || hoverNone;
 }
 
+/** Téléphone / tablette (création au tap, pas seulement appui long). */
+export function isCoarsePointerDevice() {
+    if (typeof window === 'undefined') return false;
+    if (navigator.maxTouchPoints === 0) return false;
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
+    const hoverNone = window.matchMedia('(hover: none)').matches;
+    return coarse || hoverNone;
+}
+
 /**
  * Swipe horizontal pour naviguer entre périodes (tactile natif, sans Hammer sur le calendrier).
  */

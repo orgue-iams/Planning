@@ -6,6 +6,8 @@
  * @param {number} [durationMs] temps d’affichage avant fondu (défaut 3200 ms)
  */
 function getToastMountParent() {
+    const loginDlg = document.getElementById('modal_login');
+    if (loginDlg?.open) return loginDlg;
     for (const id of ['modal_semaines_shift', 'modal_semaines_apply', 'modal_semaines_types']) {
         const d = document.getElementById(id);
         if (d?.open) return d;
@@ -22,7 +24,7 @@ const TOAST_MOUNT_CLASS =
 
 export function showToast(message, variant = 'success', durationMs) {
     const isError = variant === 'error';
-    const parent = isError ? document.body : getToastMountParent();
+    const parent = getToastMountParent();
 
     let root = parent.querySelector(':scope > .planning-toast-mount');
     if (!root && parent === document.body) {

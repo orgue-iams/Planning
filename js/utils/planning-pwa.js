@@ -2,6 +2,7 @@ import {
     clearPlanningServiceWorkerCaches,
     isPlanningServiceWorkerEnabled
 } from './planning-sw-env.js';
+import { showToast } from './toast.js';
 
 /** @type {BeforeInstallPromptEvent | null} */
 let deferredInstallPrompt = null;
@@ -25,13 +26,22 @@ export function isPlanningPwaInstalled() {
     }
 }
 
+function isIosSafariNoInstallApi() {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    const iOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    return iOS && !('BeforeInstallPromptEvent' in window);
+}
+
 /**
- * @returns {boolean} Peut proposer l’installation native (Chrome/Edge/Android).
+ * @returns {boolean} Afficher le bouton d’installation sur la modale login.
  */
 export function canOfferPlanningPwaInstall() {
     if (!isPlanningServiceWorkerEnabled()) return false;
     if (isPlanningPwaInstalled()) return false;
-    return Boolean(deferredInstallPrompt);
+    if (deferredInstallPrompt) return true;
+    if (isIosSafariNoInstallApi()) return false;
+    return true;
 }
 
 /**
@@ -127,17 +137,30 @@ function bindInstallPromptEvents() {
     });
 }
 
+function installFallbackHint() {
+    const isMac =
+        typeof navigator !== 'undefined' &&
+        /Mac/i.test(navigator.platform || navigator.userAgent || '');
+    const msg = isMac
+        ? 'Installation : dans Chrome, menu ⋮ → « Transmettre, enregistrer et partager » → « Installer la page en tant qu’application… », ou l’icône ⊕ dans la barre d’adresse.'
+        : 'Installation : menu du navigateur (⋮) → « Installer l’application » ou « Ajouter à l’écran d’accueil ».';
+    showToast(msg, 'info', 14000);
+}
+
 async function onInstallButtonClick() {
     const prompt = deferredInstallPrompt;
-    if (!prompt) return;
-    try {
-        await prompt.prompt();
-        await prompt.userChoice;
-    } catch {
-        /* invite annulée ou indisponible */
+    if (prompt) {
+        try {
+            await prompt.prompt();
+            await prompt.userChoice;
+        } catch {
+            /* invite annulée */
+        }
+        deferredInstallPrompt = null;
+        syncLoginPwaInstallButton();
+        return;
     }
-    deferredInstallPrompt = null;
-    syncLoginPwaInstallButton();
+    installFallbackHint();
 }
 
 /**
@@ -155,4 +178,5 @@ export function initPlanningPwaLoginInstallUi() {
     });
 
     syncLoginPwaInstallButton();
+    window.setTimeout(() => syncLoginPwaInstallButton(), 800);
 }

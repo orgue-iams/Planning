@@ -46,6 +46,7 @@ import {
     setSlotWorkflowCalendar
 } from './calendar-logic.js';
 import {
+    clearLoginFormError,
     login,
     logout,
     sendResetLink,
@@ -109,6 +110,7 @@ import {
     registerPlanningServiceWorker,
     syncLoginPwaInstallButton
 } from '../utils/planning-pwa.js';
+import { isCoarsePointerDevice } from '../utils/touch-handler.js';
 
 void registerPlanningServiceWorker(new URL('../../sw.js', import.meta.url));
 
@@ -291,10 +293,15 @@ function initCalendarAndRevealUi() {
                 console.error(err)
             );
         },
-        /** Clic simple : création rapide (mois / année). Semaine/jour → select uniquement. */
+        /** Clic simple : création rapide (mois / année). Semaine/jour : tap tactile uniquement (souris → glisser). */
         onDateClick: (info) => {
             const vtClick = info.view?.type ?? '';
-            if (vtClick === 'timeGridWeek' || vtClick === 'timeGridDay') return;
+            if (
+                (vtClick === 'timeGridWeek' || vtClick === 'timeGridDay') &&
+                !isCoarsePointerDevice()
+            ) {
+                return;
+            }
             queueMicrotask(() => {
                 if (Date.now() < suppressDateClickUntil) return;
                 const slotMs = info?.date instanceof Date ? info.date.getTime() : Number.NaN;
@@ -735,6 +742,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const vis = loginPass?.getAttribute('type') === 'text';
         setLoginPassVisible(!vis);
     });
+    document.getElementById('login-email')?.addEventListener('input', clearLoginFormError);
+    document.getElementById('login-pass')?.addEventListener('input', clearLoginFormError);
 
     populateTimeSelects('event-start', 'event-end');
     populateTimeSelects('event-recur-start', 'event-recur-end');
@@ -820,19 +829,41 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('modal_password')?.close();
     });
 
-    document.getElementById('btn-do-login').onclick = async () => {
-        const rememberMe = document.getElementById('login-remember-me')?.checked !== false;
-        const result = await login(
-            document.getElementById('login-email').value,
-            document.getElementById('login-pass').value,
-            rememberMe
-        );
-        if (result.success) {
-            currentUser = result.user;
-            setPlanningSessionUser(currentUser);
-            refreshHeaderUser(currentUser);
-            initCalendarAndRevealUi();
+    let loginSubmitInFlight = false;
+    const runLoginSubmit = async () => {
+        if (loginSubmitInFlight) return;
+        const btn = document.getElementById('btn-do-login');
+        loginSubmitInFlight = true;
+        clearLoginFormError();
+        if (btn instanceof HTMLButtonElement) {
+            btn.disabled = true;
+            btn.setAttribute('aria-busy', 'true');
+            btn.classList.add('login-btn--busy');
         }
+        try {
+            const rememberMe = document.getElementById('login-remember-me')?.checked !== false;
+            const result = await login(
+                document.getElementById('login-email').value,
+                document.getElementById('login-pass').value,
+                rememberMe
+            );
+            if (result.success) {
+                currentUser = result.user;
+                setPlanningSessionUser(currentUser);
+                refreshHeaderUser(currentUser);
+                initCalendarAndRevealUi();
+            }
+        } finally {
+            loginSubmitInFlight = false;
+            if (btn instanceof HTMLButtonElement) {
+                btn.disabled = false;
+                btn.removeAttribute('aria-busy');
+                btn.classList.remove('login-btn--busy');
+            }
+        }
+    };
+    document.getElementById('btn-do-login').onclick = () => {
+        void runLoginSubmit();
     };
     document.getElementById('modal_login')?.addEventListener('keydown', (e) => {
         if (e.key !== 'Enter') return;
@@ -840,7 +871,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!(target instanceof HTMLElement)) return;
         if (!target.closest('#login-email, #login-pass, #login-remember-me')) return;
         e.preventDefault();
-        document.getElementById('btn-do-login')?.click();
+        void runLoginSubmit();
     });
 
     document.getElementById('btn-save-pass').onclick = async () => {

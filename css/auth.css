@@ -48,6 +48,44 @@
     color: rgb(37 99 235);
 }
 
+#modal_login .login-card__error {
+    color: rgb(153 27 27);
+    background: rgb(254 226 226 / 0.95);
+    border-color: rgb(252 165 165);
+}
+
+[data-theme='dark'] #modal_login .login-card__error {
+    color: rgb(254 202 202);
+    background: rgb(127 29 29 / 0.45);
+    border-color: rgb(248 113 113 / 0.55);
+}
+
+#modal_login #btn-do-login.login-btn--busy,
+#modal_login #btn-do-login:disabled {
+    opacity: 0.72;
+    cursor: wait;
+    filter: none;
+}
+
+#modal_login #btn-do-login.login-btn--busy::after {
+    content: '';
+    display: inline-block;
+    width: 0.9rem;
+    height: 0.9rem;
+    margin-left: 0.45rem;
+    vertical-align: -0.12rem;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: login-btn-spin 0.65s linear infinite;
+}
+
+@keyframes login-btn-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 #modal_login #btn-pwa-install {
     margin-top: 0.25rem;
     border-color: rgb(148 163 184);
@@ -188,24 +226,28 @@
 }
 
 #modal_login .login-pass-field {
+    position: relative;
+    display: block;
     overflow: visible;
+}
+
+#modal_login .login-pass-input {
+    padding-right: 2.65rem !important;
 }
 
 #modal_login .login-pass-toggle {
     position: absolute;
-    right: 4px;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 20;
-    box-sizing: border-box;
-    width: 2.75rem;
-    height: 2.75rem;
-    min-width: 2.75rem;
-    min-height: 2.75rem;
+    right: 0.3rem;
+    top: 0.3rem;
+    bottom: 0.3rem;
+    height: auto;
+    width: 2.4rem;
+    min-width: 2.4rem;
+    min-height: unset;
     padding: 0;
     margin: 0;
     border: 0;
-    border-radius: 0.375rem;
+    border-radius: 0.35rem;
     background: rgba(248, 250, 252, 0.98);
     color: #334155;
     cursor: pointer;
@@ -214,6 +256,8 @@
     justify-content: center;
     -webkit-tap-highlight-color: transparent;
     box-shadow: inset 0 0 0 1px rgb(203 213 225 / 0.6);
+    z-index: 2;
+    transform: none;
 }
 
 #modal_login .login-pass-toggle:hover {

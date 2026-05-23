@@ -838,6 +838,10 @@
     background: rgb(30 58 138 / 0.35);
 }
 
+#modal_fermetures .fermeture-card__header {
+    margin-bottom: 0.1rem;
+}
+
 #modal_fermetures .fermeture-card {
     transition: background-color 0.12s ease;
 }
@@ -1172,13 +1176,44 @@
 
 #modal_directory_users .directory-admin-user-card--layout {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(7.5rem, 11.5rem);
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
     column-gap: 0.5rem;
     align-items: stretch;
 }
 
 #modal_directory_users .directory-admin-user-card--layout.directory-admin-user-card--with-delete {
-    grid-template-columns: minmax(0, 1fr) minmax(7.5rem, 11.5rem) 2.75rem;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) 2.75rem;
+}
+
+@media (max-width: 30rem) {
+    #modal_directory_users .directory-admin-user-card--layout,
+    #modal_directory_users .directory-admin-user-card--layout.directory-admin-user-card--with-delete {
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: 0.35rem;
+    }
+
+    #modal_directory_users .directory-admin-user-card--layout .directory-user-card__identity,
+    #modal_directory_users .directory-admin-user-card--layout .directory-user-card__contact {
+        border-right: none;
+        border-bottom: 1px solid var(--directory-card-divider, rgb(226 232 240 / 0.9));
+        padding-bottom: 0.35rem;
+    }
+
+    #modal_directory_users .directory-admin-user-card--layout .directory-user-card__contact {
+        padding-left: 0;
+        padding-right: 0;
+        text-align: left;
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    #modal_directory_users .directory-admin-user-card--layout.directory-admin-user-card--with-delete
+        .directory-user-delete-btn {
+        justify-self: end;
+        width: auto;
+        min-height: 2.25rem;
+        padding: 0 0.5rem;
+    }
 }
 
 #modal_directory_users .directory-admin-user-card--layout .directory-user-card__identity,

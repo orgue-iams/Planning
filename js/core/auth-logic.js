@@ -86,6 +86,28 @@ export function roleLabelFr(role) {
     return m[role] || role || '';
 }
 
+export function clearLoginFormError() {
+    const box = document.getElementById('login-error-msg');
+    if (!box) return;
+    box.textContent = '';
+    box.classList.add('hidden');
+}
+
+/** Message visible dans la modale login (top layer) + toast. */
+export function showLoginFormError(message) {
+    const text = String(message || '').trim();
+    if (!text) {
+        clearLoginFormError();
+        return;
+    }
+    const box = document.getElementById('login-error-msg');
+    if (box) {
+        box.textContent = text;
+        box.classList.remove('hidden');
+    }
+    showToast(text, 'error');
+}
+
 export function setPasswordModalMode(isTokenReset) {
     const group = document.getElementById('group-old-pass');
     if (group) {
@@ -172,22 +194,25 @@ function rawIncludesInvalidLogin(msg) {
  * @returns {Promise<{ success: boolean, user?: { name: string, email: string, role: string, id?: string } }>}
  */
 export async function login(email, pass, rememberMe = true) {
+    clearLoginFormError();
     if (!isBackendAuthConfigured()) {
-        showToast('Configuration Supabase absente : renseignez supabaseUrl et supabaseAnonKey dans planning.config.js.', 'error');
+        showLoginFormError(
+            'Configuration Supabase absente : renseignez supabaseUrl et supabaseAnonKey dans planning.config.js.'
+        );
         return { success: false };
     }
     const id = String(email ?? '').trim().toLowerCase();
     if (!id) {
-        showToast('Veuillez renseigner votre email.', 'error');
+        showLoginFormError('Veuillez renseigner votre email.');
         return { success: false };
     }
     const password = String(pass ?? '');
     if (!password) {
-        showToast('Veuillez renseigner votre mot de passe.', 'error');
+        showLoginFormError('Veuillez renseigner votre mot de passe.');
         return { success: false };
     }
     if (password.length < PASSWORD_MIN_LENGTH) {
-        showToast(`Le mot de passe doit contenir au moins ${PASSWORD_MIN_LENGTH} caractères.`, 'error');
+        showLoginFormError(`Le mot de passe doit contenir au moins ${PASSWORD_MIN_LENGTH} caractères.`);
         return { success: false };
     }
     const remember = rememberMe !== false;
@@ -196,7 +221,7 @@ export async function login(email, pass, rememberMe = true) {
     purgeSupabaseKeysFromStorage(remember ? sessionStorage : localStorage);
     const supabase = getSupabaseClient();
     if (!supabase) {
-        showToast('Configuration Supabase invalide.', 'error');
+        showLoginFormError('Configuration Supabase invalide.');
         return { success: false };
     }
     // Réduit les 400 "session stale" après longue inactivité (tokens croisés/revoked en storage).
@@ -215,12 +240,12 @@ export async function login(email, pass, rememberMe = true) {
     }
     if (error) {
         console.warn('[auth] signInWithPassword', error.code || '', error.message || error);
-        showToast(humanMessageFromSupabaseLoginError(error), 'error');
+        showLoginFormError(humanMessageFromSupabaseLoginError(error));
         return { success: false };
     }
     const user = await fetchAppUserFromSession(data.session);
     if (!user) {
-        showToast('Session invalide.', 'error');
+        showLoginFormError('Session invalide.');
         return { success: false };
     }
     document.getElementById('modal_login')?.close();

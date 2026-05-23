@@ -4,6 +4,7 @@
  */
 
 import { showPersistentToast, showToast } from '../utils/toast.js';
+import { isCoarsePointerDevice } from '../utils/touch-handler.js';
 import { setStudentsLineWithUsersIcon } from '../utils/template-cours-card-ui.js';
 import { formatTimeFr24, formatWeekdayDayTimeFr24 } from '../utils/time-helpers.js';
 import { getAccessToken, isBackendAuthConfigured, isPrivilegedUser } from './auth-logic.js';
@@ -2716,8 +2717,29 @@ async function loadGooglePoolDirectory() {
 
 const GOOGLE_SYNC_MAIN_LABEL = 'Calendrier principal orgue IAMS';
 
-function googleSyncInProgressMessage(calendarLabel) {
-    return `Synchro. du calendrier Google : ${calendarLabel}`;
+/** @param {string} calendarLabel */
+function formatGoogleSyncBannerLine(calendarLabel) {
+    const raw = String(calendarLabel || '').trim();
+    if (!raw || raw === GOOGLE_SYNC_MAIN_LABEL) {
+        return `Synchro agendas Google : '${GOOGLE_SYNC_MAIN_LABEL}'`;
+    }
+    const paren = raw.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+    if (paren) {
+        return `Synchro agendas Google : '${paren[1].trim()}' - ${paren[2].trim()}`;
+    }
+    return `Synchro agendas Google : '${raw}'`;
+}
+
+/**
+ * @param {number} stepIndex index 0-based
+ * @param {number} total
+ * @param {string} calendarLabel
+ */
+function googleSyncInProgressMessage(stepIndex, total, calendarLabel) {
+    const line = formatGoogleSyncBannerLine(calendarLabel);
+    if (total <= 1) return line;
+    const pct = Math.min(100, Math.max(0, Math.round(((stepIndex + 1) / total) * 100)));
+    return `${line} — ${pct}%`;
 }
 
 function formatPoolCalendarLabel(meta) {
@@ -2802,6 +2824,7 @@ function setGoogleSyncBannerMessage(message) {
     const spinner = document.getElementById('planning-slot-workflow-banner-spinner');
     if (!banner || !text) return;
     banner.classList.remove('hidden');
+    banner.classList.add('planning-slot-workflow-float--sync');
     spinner?.classList.remove('hidden');
     text.textContent = message;
 }
@@ -2825,14 +2848,16 @@ function syncSlotWorkflowBanner() {
     if (!banner || !text) return;
     if (isCalendarDbPersistBusy()) {
         banner.classList.remove('hidden');
+        banner.classList.remove('planning-slot-workflow-float--sync');
         spinner?.classList.remove('hidden');
-        text.textContent = 'Enregistrement en base de données… Merci de patienter.';
+        text.textContent = 'Enregistrement…';
         return;
     }
     if (googleCalendarSyncInFlight > 0) {
         return;
     }
     banner.classList.add('hidden');
+    banner.classList.remove('planning-slot-workflow-float--sync');
     spinner?.classList.add('hidden');
     text.textContent = '';
 }
@@ -2876,9 +2901,10 @@ async function runGoogleMirrorSyncWithBanner(mirrorTargets) {
     const steps = await buildGoogleSyncStepsFromMirrorTargets(mirrorTargets);
     googleCalendarSyncInFlight += 1;
     let stepIdx = 0;
+    const total = steps.length;
     const showStep = (i) => {
         const step = steps[i];
-        if (step) setGoogleSyncBannerMessage(googleSyncInProgressMessage(step.label));
+        if (step) setGoogleSyncBannerMessage(googleSyncInProgressMessage(i, total, step.label));
     };
     showStep(0);
 
@@ -2930,9 +2956,10 @@ async function runGoogleCalendarSyncInBackground(eventsPayload, calendar = null)
     googleCalendarSyncInFlight += 1;
 
     let stepIdx = 0;
+    const total = steps.length;
     const showStep = (i) => {
         const step = steps[Math.min(i, steps.length - 1)];
-        if (step) setGoogleSyncBannerMessage(googleSyncInProgressMessage(step.label));
+        if (step) setGoogleSyncBannerMessage(googleSyncInProgressMessage(i, total, step.label));
     };
     showStep(0);
 
@@ -3571,8 +3598,8 @@ export async function quickCreateFromDateClick(calendar, clickDate, currentUser,
         showToast('Enregistrement en cours : attendez la fin du créneau précédent.', 'info');
         return;
     }
-    /* Vue semaine/jour : la sélection (select) gère déjà le clic ; dateClick doublonne sinon. */
-    if (viewType === 'timeGridWeek' || viewType === 'timeGridDay') {
+    /* Vue semaine/jour : souris = glisser (select) ; tactile = tap rapide (dateClick). */
+    if ((viewType === 'timeGridWeek' || viewType === 'timeGridDay') && !isCoarsePointerDevice()) {
         return;
     }
     if (viewType.startsWith('list')) {
