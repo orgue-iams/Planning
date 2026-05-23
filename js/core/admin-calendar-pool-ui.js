@@ -15,6 +15,7 @@ import {
 } from '../utils/planning-route-dialog.js';
 import { syncPlanningDrawerGroupedSections } from './planning-drawer-ui.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
+import { createPlanningIconDeleteButton } from '../utils/planning-delete-btn.js';
 
 /** @type {{ key: 'label' | 'assignee_nom', dir: 'asc' | 'desc' }} */
 let poolSort = { key: 'label', dir: 'asc' };
@@ -30,9 +31,6 @@ let poolEditSnapshot = null;
 
 /** @type {string | null} */
 let poolResyncInFlight = null;
-
-const DELETE_POOL_SVG =
-    '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m2-3h6a1 1 0 011 1v1H8V5a1 1 0 011-1z"/></svg>';
 
 const CALENDAR_POOL_ROUTE_LABEL = 'Agendas Google pour les utilisateurs';
 
@@ -53,7 +51,7 @@ function appendPoolUpdateButton(actions, opts) {
     const upd = document.createElement('button');
     upd.type = 'button';
     upd.className =
-        'calendar-pool-update-btn btn btn-primary btn-sm font-semibold text-[10px] min-h-8 px-2 w-full max-w-[9rem]';
+        'calendar-pool-update-btn btn btn-primary btn-sm font-semibold text-[10px] min-h-8 px-2.5 shrink-0';
     if (mainResync) {
         upd.dataset.mainResync = '1';
     } else {
@@ -85,30 +83,19 @@ function buildMainPlanningCalendarCard() {
 
     const left = document.createElement('div');
     left.className = 'calendar-pool-card__left min-w-0';
-    const labelP = document.createElement('p');
-    labelP.className = 'text-[13px] font-semibold text-slate-900 m-0 leading-snug break-words';
-    labelP.textContent = label;
+    appendPoolLabelWithAssignee(left, label, 'Agenda principal');
     const idP = document.createElement('p');
     idP.className =
         'text-[10px] sm:text-[11px] font-mono text-slate-900 m-0 mt-0.5 break-all leading-snug';
     idP.textContent = gid;
-    left.appendChild(labelP);
     left.appendChild(idP);
 
-    const right = document.createElement('div');
-    right.className = 'calendar-pool-card__right flex flex-col items-stretch gap-1.5 min-w-0';
-    const userP = document.createElement('p');
-    userP.className =
-        'calendar-pool-card__assignee-name font-bold text-[12px] text-slate-900 m-0 leading-snug text-right break-words';
-    userP.textContent = 'Agenda principal';
-    right.appendChild(userP);
     const actions = document.createElement('div');
-    actions.className = 'calendar-pool-card__actions flex flex-col items-stretch';
+    actions.className = 'calendar-pool-card__actions';
     appendPoolUpdateButton(actions, { mainResync: true, label });
-    right.appendChild(actions);
 
     grid.appendChild(left);
-    grid.appendChild(right);
+    grid.appendChild(actions);
     card.appendChild(grid);
     return card;
 }
@@ -135,6 +122,32 @@ function cmpPoolRows(a, b) {
     const cp = ap.localeCompare(bp, 'fr', { sensitivity: 'base' });
     if (cp !== 0) return m * cp;
     return String(a.label || '').localeCompare(String(b.label || ''), 'fr', { sensitivity: 'base' });
+}
+
+/** Attribués par libellé planning, puis non attribués par libellé. */
+function sortPoolRowsForDisplay(rows) {
+    const assigned = [];
+    const unassigned = [];
+    for (const r of rows) {
+        if (String(r?.assigned_user_id ?? '').trim()) assigned.push(r);
+        else unassigned.push(r);
+    }
+    const byLabel = (a, b) =>
+        String(a.label || '').localeCompare(String(b.label || ''), 'fr', { sensitivity: 'base' });
+    assigned.sort(byLabel);
+    unassigned.sort(byLabel);
+    return [...assigned, ...unassigned];
+}
+
+function appendPoolLabelWithAssignee(parent, planningLabel, assigneeText) {
+    const labelP = document.createElement('p');
+    labelP.className = 'text-[13px] font-semibold text-slate-900 m-0 leading-snug break-words';
+    labelP.appendChild(document.createTextNode(planningLabel));
+    const assigneeSpan = document.createElement('span');
+    assigneeSpan.className = 'calendar-pool-card__assignee-inline font-semibold';
+    assigneeSpan.textContent = ` (${assigneeText})`;
+    labelP.appendChild(assigneeSpan);
+    parent.appendChild(labelP);
 }
 
 function updatePoolSortButtonsUi() {
@@ -164,42 +177,28 @@ function buildPoolCard(row) {
     main.setAttribute('role', 'button');
     main.tabIndex = 0;
 
-    const labelP = document.createElement('p');
-    labelP.className = 'text-[13px] font-semibold text-slate-900 m-0 leading-snug break-words';
-    labelP.textContent = String(row.label || '').trim() || '—';
+    const planningLabel = String(row.label || '').trim() || '—';
+    appendPoolLabelWithAssignee(main, planningLabel, assigneeDisplayName(row));
     const idP = document.createElement('p');
     idP.className =
         'text-[10px] sm:text-[11px] font-mono text-slate-900 m-0 mt-0.5 break-all leading-snug';
     idP.textContent = String(row.google_calendar_id ?? '').trim() || '—';
-    main.appendChild(labelP);
     main.appendChild(idP);
 
-    const right = document.createElement('div');
-    right.className = 'calendar-pool-card__right flex flex-col items-stretch gap-1.5 min-w-0';
-    const userP = document.createElement('p');
-    userP.className =
-        'calendar-pool-card__assignee-name font-bold text-[12px] text-slate-900 m-0 leading-snug text-right break-words';
-    userP.textContent = assigneeDisplayName(row);
-    right.appendChild(userP);
-
     const actions = document.createElement('div');
-    actions.className = 'calendar-pool-card__actions flex flex-col items-stretch gap-1';
-    const rowLabel = String(row.label || '').trim() || 'Agenda';
+    actions.className = 'calendar-pool-card__actions';
+    const rowLabel = planningLabel === '—' ? 'Agenda' : planningLabel;
     appendPoolUpdateButton(actions, { poolId: row.id, label: rowLabel });
-
-    const del = document.createElement('button');
-    del.type = 'button';
-    del.className =
-        'calendar-pool-delete-btn btn btn-ghost btn-xs shrink-0 self-end border border-transparent text-slate-500 hover:text-error';
+    const del = createPlanningIconDeleteButton({
+        ariaLabel: 'Supprimer cet agenda',
+        title: 'Supprimer',
+        extraClass: 'calendar-pool-delete-btn'
+    });
     del.dataset.poolId = String(row.id ?? '');
-    del.setAttribute('aria-label', 'Supprimer cet agenda');
-    del.title = 'Supprimer';
-    del.innerHTML = DELETE_POOL_SVG;
     actions.appendChild(del);
-    right.appendChild(actions);
 
     grid.appendChild(main);
-    grid.appendChild(right);
+    grid.appendChild(actions);
     card.appendChild(grid);
     return card;
 }
@@ -290,7 +289,7 @@ function renderPoolCards(rows) {
         updatePoolSortButtonsUi();
         return;
     }
-    for (const r of [...list].sort(cmpPoolRows)) {
+    for (const r of sortPoolRowsForDisplay(list)) {
         host.appendChild(buildPoolCard(r));
     }
     updatePoolSortButtonsUi();

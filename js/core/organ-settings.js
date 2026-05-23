@@ -143,9 +143,16 @@ export async function saveOrganSchoolSettingsAdmin(row) {
             eleve_weekly_travail_cap_enabled: Boolean(row.eleve_weekly_travail_cap_enabled),
             eleve_weekly_travail_cap_hours: row.eleve_weekly_travail_cap_enabled ? capHours : null,
             eleve_booking_horizon_enabled: Boolean(row.eleve_booking_horizon_enabled),
-            eleve_booking_horizon_amount: row.eleve_booking_horizon_enabled
-                ? Math.max(0, parseInt(String(row.eleve_booking_horizon_amount || '0'), 10) || 0)
-                : null,
+            eleve_booking_horizon_amount: (() => {
+                const raw = row.eleve_booking_horizon_amount;
+                if (raw === '' || raw === null || raw === undefined) {
+                    const cached = getOrganSchoolSettingsCached()?.eleve_booking_horizon_amount;
+                    return cached != null
+                        ? Math.max(0, parseInt(String(cached), 10) || 0)
+                        : null;
+                }
+                return Math.max(0, parseInt(String(raw), 10) || 0);
+            })(),
             eleve_booking_horizon_unit:
                 String(row.eleve_booking_horizon_unit || 'days') === 'weeks' ? 'weeks' : 'days',
             eleve_count_voided_travail_toward_cap: Boolean(

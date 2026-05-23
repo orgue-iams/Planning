@@ -57,6 +57,7 @@
     padding-right: 0.35rem;
 }
 
+.planning-icon-delete-btn,
 #modal_fermetures .fermeture-card__delete-btn {
     flex-shrink: 0;
     align-self: stretch;
@@ -74,19 +75,23 @@
     cursor: pointer;
 }
 
+.planning-icon-delete-btn:hover,
 #modal_fermetures .fermeture-card__delete-btn:hover {
     background: rgb(254 226 226 / 0.85);
 }
 
+.planning-icon-delete-btn svg,
 #modal_fermetures .fermeture-card__delete-btn svg {
     width: 1.1rem;
     height: 1.1rem;
 }
 
+[data-theme='dark'] .planning-icon-delete-btn,
 [data-theme='dark'] #modal_fermetures .fermeture-card__delete-btn {
     color: rgb(248 113 113);
 }
 
+[data-theme='dark'] .planning-icon-delete-btn:hover,
 [data-theme='dark'] #modal_fermetures .fermeture-card__delete-btn:hover {
     background: rgb(127 29 29 / 0.45);
 }
@@ -1074,6 +1079,7 @@
     align-items: center;
     gap: 0.35rem;
     flex-shrink: 0;
+    min-height: 2.25rem;
 }
 
 #modal_config .config-rule-value-wrap.hidden {
@@ -1208,10 +1214,63 @@
     height: 1.15rem;
 }
 
-#modal_directory_users .directory-admin-user-card--layout-v2 {
+#modal_directory_users .directory-admin-user-card--layout-v3 {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.15fr) 2.25rem;
+    column-gap: 0.5rem;
+    align-items: stretch;
+}
+
+#modal_directory_users .directory-admin-user-card--layout-v3:not(.directory-admin-user-card--with-delete) {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.15fr);
+}
+
+#modal_directory_users .directory-admin-user-card--layout-v3 .directory-user-card__identity {
+    border-right: 1px solid var(--directory-card-divider, rgb(226 232 240 / 0.9));
+    padding-right: 0.5rem;
+}
+
+#modal_directory_users .directory-admin-user-card--layout-v3 .directory-user-card__contact {
+    border-right: none;
+    padding-left: 0.5rem;
+    padding-right: 0.35rem;
+    text-align: left;
+}
+
+#modal_directory_users .directory-admin-user-card--layout-v3.directory-admin-user-card--with-delete .directory-user-card__contact {
+    border-right: 1px solid var(--directory-card-divider, rgb(226 232 240 / 0.9));
+}
+
+#modal_directory_users .directory-user-card__actions {
     display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+}
+
+@media (max-width: 30rem) {
+    #modal_directory_users .directory-admin-user-card--layout-v3,
+    #modal_directory_users .directory-admin-user-card--layout-v3.directory-admin-user-card--with-delete {
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: 0.35rem;
+    }
+
+    #modal_directory_users .directory-admin-user-card--layout-v3 .directory-user-card__identity,
+    #modal_directory_users .directory-admin-user-card--layout-v3 .directory-user-card__contact {
+        border-right: none;
+        border-bottom: 1px solid var(--directory-card-divider, rgb(226 232 240 / 0.9));
+        padding-bottom: 0.35rem;
+        padding-right: 0;
+    }
+
+    #modal_directory_users .directory-admin-user-card--layout-v3 .directory-user-card__contact {
+        border-bottom: none;
+        padding-left: 0;
+    }
+
+    #modal_directory_users .directory-user-card__actions {
+        justify-content: flex-end;
+    }
 }
 
 #modal_directory_users .directory-user-card__agenda-icon {
@@ -1281,20 +1340,6 @@
     border-right: none;
 }
 
-#modal_directory_users .directory-user-delete-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    align-self: stretch;
-    width: 2.75rem;
-    min-height: 2.5rem;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    border-radius: 0.5rem;
-    background: transparent;
-    cursor: pointer;
-}
 
 /* Thème sombre : mêmes pastels que le clair (opacité pleine pour ne pas paraître transparent sur fond sombre). */
 [data-theme='dark'] #modal_directory_users .directory-admin-user-card--role-admin,
@@ -1615,18 +1660,28 @@ dialog#modal_st_slot_edit::backdrop {
 
 #modal_calendar_pool .calendar-pool-card__grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(7.5rem, 9.5rem);
+    grid-template-columns: minmax(0, 1fr) auto;
     column-gap: 0.65rem;
-    align-items: start;
+    align-items: center;
 }
 
-#modal_calendar_pool .calendar-pool-card__right {
+#modal_calendar_pool .calendar-pool-card__actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
     border-left: 1px solid var(--calendar-pool-divider);
     padding-left: 0.65rem;
+    align-self: stretch;
+}
+
+#modal_calendar_pool .calendar-pool-card__assignee-inline {
+    color: rgb(15 23 42);
 }
 
 #modal_calendar_pool .calendar-pool-card__actions .calendar-pool-update-btn {
-    width: 100%;
+    width: auto;
     max-width: none;
 }
 
@@ -1648,7 +1703,7 @@ dialog#modal_st_slot_edit::backdrop {
 [data-theme='dark'] #modal_calendar_pool .calendar-pool-card--main .calendar-pool-card__left,
 [data-theme='dark'] #modal_calendar_pool .calendar-pool-card--main .calendar-pool-card__left p,
 [data-theme='dark'] #modal_calendar_pool .calendar-pool-card--main .calendar-pool-card__left span,
-[data-theme='dark'] #modal_calendar_pool .calendar-pool-card--main .calendar-pool-card__assignee {
+[data-theme='dark'] #modal_calendar_pool .calendar-pool-card--main .calendar-pool-card__assignee-inline {
     color: rgb(15 23 42) !important;
 }
 
@@ -1660,14 +1715,6 @@ dialog#modal_st_slot_edit::backdrop {
 [data-theme='dark'] #modal_calendar_pool .calendar-pool-card .calendar-pool-card__left,
 [data-theme='dark'] #modal_calendar_pool .calendar-pool-card .calendar-pool-card__left p,
 [data-theme='dark'] #modal_calendar_pool .calendar-pool-card .calendar-pool-card__left span,
-[data-theme='dark'] #modal_calendar_pool .calendar-pool-card .calendar-pool-card__assignee {
+[data-theme='dark'] #modal_calendar_pool .calendar-pool-card .calendar-pool-card__assignee-inline {
     color: rgb(15 23 42) !important;
-}
-
-[data-theme='dark'] #modal_calendar_pool .calendar-pool-delete-btn {
-    color: rgb(51 65 85) !important;
-}
-
-[data-theme='dark'] #modal_calendar_pool .calendar-pool-delete-btn:hover {
-    color: rgb(220 38 38) !important;
 }

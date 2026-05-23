@@ -100,10 +100,12 @@ async function fillConfigModal() {
     const hzA = document.getElementById('config-eleve-horizon-amount');
     if (hzA) {
         const unit = data?.eleve_booking_horizon_unit === 'weeks' ? 'weeks' : 'days';
-        const rawAmt = parseInt(String(data?.eleve_booking_horizon_amount ?? '0'), 10) || 0;
-        const days =
-            unit === 'weeks' ? rawAmt * 7 : rawAmt;
-        hzA.value = String(days);
+        const rawAmt = data?.eleve_booking_horizon_amount;
+        if (rawAmt != null && rawAmt !== '') {
+            const n = parseInt(String(rawAmt), 10) || 0;
+            const days = unit === 'weeks' ? n * 7 : n;
+            hzA.value = String(days);
+        }
     }
     const noDel = document.getElementById('config-eleve-no-delete-after-start');
     if (noDel) noDel.checked = data?.eleve_forbid_delete_after_slot_start !== false;
@@ -202,13 +204,20 @@ async function persistConfigIfAdmin() {
         }
         capHours = String(parsed);
     }
-    if (hzOn) {
+    if (horizonDays !== '' && horizonDays != null) {
         const parsed = parseHalfStepNumber(horizonDays);
         if (parsed == null || parsed < 0) {
-            showToast('Réservabilité : saisir un nombre entier ou un demi de jour.', 'error');
-            return;
+            if (hzOn) {
+                showToast('Réservabilité : saisir un nombre entier ou un demi de jour.', 'error');
+                return;
+            }
+        } else {
+            horizonDays = String(parsed);
         }
-        horizonDays = String(parsed);
+    }
+    if (hzOn && (horizonDays === '' || horizonDays == null)) {
+        showToast('Réservabilité : indiquer le nombre de jours.', 'error');
+        return;
     }
     const r = await saveOrganSchoolSettingsAdmin({
         school_year_start: document.getElementById('config-school-start')?.value || null,

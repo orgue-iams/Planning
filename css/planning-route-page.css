@@ -22,14 +22,26 @@ dialog.planning-route-page::backdrop {
     background: rgb(15 23 42 / 0.22);
 }
 
-dialog.planning-route-page .planning-route-page__nav {
+dialog.planning-route-page .planning-route-page__nav.planning-drawer__route-nav {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: rgb(30 41 59);
     text-decoration: underline;
     text-underline-offset: 3px;
     text-decoration-color: rgb(148 163 184);
 }
 
-[data-theme='dark'] dialog.planning-route-page .planning-route-page__nav {
+dialog.planning-route-page .planning-route-page__nav.planning-drawer__route-nav:hover {
+    color: rgb(15 23 42);
+}
+
+[data-theme='dark'] dialog.planning-route-page .planning-route-page__nav.planning-drawer__route-nav {
+    color: rgb(226 232 240);
     text-decoration-color: rgb(100 116 139);
+}
+
+[data-theme='dark'] dialog.planning-route-page .planning-route-page__nav.planning-drawer__route-nav:hover {
+    color: rgb(255 255 255);
 }
 
 dialog.planning-route-page .planning-route-page__bar {
@@ -146,6 +158,20 @@ dialog.planning-route-page .planning-route-section--first {
     margin-top: 0;
     padding-top: 0;
     border-top: none;
+}
+
+/* Titres de section : même style que le menu tiroir (.planning-drawer__section-title) */
+dialog.planning-route-page .planning-route-section > p.text-\[10px\].font-bold {
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgb(100 116 139);
+    margin: 0 0 0.4rem;
+}
+
+[data-theme='dark'] dialog.planning-route-page .planning-route-section > p.text-\[10px\].font-bold {
+    color: rgb(148 163 184);
 }
 
 [data-theme='dark'] dialog.planning-route-page .planning-route-section {
