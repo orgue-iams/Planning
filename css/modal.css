@@ -842,6 +842,16 @@
     margin-bottom: 0.1rem;
 }
 
+#modal_fermetures .fermeture-card__cal-icon {
+    width: 1rem;
+    height: 1rem;
+    display: block;
+}
+
+#modal_fermetures .fermeture-card__header-right .fermeture-card__badge {
+    margin-top: 0;
+}
+
 #modal_fermetures .fermeture-card {
     transition: background-color 0.12s ease;
 }
@@ -1059,6 +1069,30 @@
     color: rgb(203 213 225);
 }
 
+#modal_config .config-rule-value-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}
+
+#modal_config .config-rule-value-wrap.hidden {
+    display: none !important;
+}
+
+#modal_config .config-rule-unit {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: rgb(71 85 105);
+    white-space: nowrap;
+}
+
+#modal_config .config-chapel-hour-select {
+    width: 5.75rem !important;
+    min-width: 5.75rem !important;
+    max-width: 5.75rem !important;
+}
+
 #modal_config .config-rule-field:not(.hidden) {
     flex: 0 0 auto;
 }
@@ -1172,6 +1206,23 @@
 #modal_directory_users .directory-user-card__avatar svg {
     width: 1.15rem;
     height: 1.15rem;
+}
+
+#modal_directory_users .directory-admin-user-card--layout-v2 {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+#modal_directory_users .directory-user-card__agenda-icon {
+    width: 1.15rem;
+    height: 1.15rem;
+    padding: 0.1rem;
+}
+
+#modal_directory_users .directory-user-card__agenda-icon svg {
+    width: 0.85rem;
+    height: 0.85rem;
 }
 
 #modal_directory_users .directory-admin-user-card--layout {
@@ -1562,30 +1613,21 @@ dialog#modal_st_slot_edit::backdrop {
     border-color: rgb(125 211 252 / 0.75);
 }
 
-#modal_calendar_pool .calendar-pool-card__assignee {
-    border-left: 1px solid var(--calendar-pool-divider);
-    padding-left: 0.5rem;
-    margin-left: 0.25rem;
+#modal_calendar_pool .calendar-pool-card__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(7.5rem, 9.5rem);
+    column-gap: 0.65rem;
+    align-items: start;
 }
 
-#modal_calendar_pool .calendar-pool-card__actions {
-    gap: 0;
-    align-self: stretch;
-    padding-left: 0.75rem;
-    margin-left: 0.35rem;
+#modal_calendar_pool .calendar-pool-card__right {
     border-left: 1px solid var(--calendar-pool-divider);
+    padding-left: 0.65rem;
 }
 
 #modal_calendar_pool .calendar-pool-card__actions .calendar-pool-update-btn {
-    align-self: center;
-    margin-right: 0;
-    padding-right: 0.75rem;
-    border-right: 1px solid var(--calendar-pool-divider);
-}
-
-#modal_calendar_pool .calendar-pool-card__actions .calendar-pool-delete-btn {
-    align-self: center;
-    margin-left: 0.75rem;
+    width: 100%;
+    max-width: none;
 }
 
 #modal_calendar_pool .calendar-pool-card--main {

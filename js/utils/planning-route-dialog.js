@@ -202,7 +202,7 @@ function ensureRouteBar(el) {
     if (bar) return bar;
     bar = document.createElement('div');
     bar.className =
-        'planning-route-page__bar shrink-0 bg-slate-50 px-3 py-2 max-sm:pt-[max(0.35rem,env(safe-area-inset-top,0px))] dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700';
+        'planning-route-page__bar shrink-0 px-3 py-2 max-sm:pt-[max(0.35rem,env(safe-area-inset-top,0px))]';
     const nav = document.createElement('button');
     nav.type = 'button';
     nav.className =

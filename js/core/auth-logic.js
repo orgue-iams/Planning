@@ -93,7 +93,7 @@ export function clearLoginFormError() {
     box.classList.add('hidden');
 }
 
-/** Message visible dans la modale login (top layer) + toast. */
+/** Message visible sous le bouton de connexion (pas de toast : modale en top layer). */
 export function showLoginFormError(message) {
     const text = String(message || '').trim();
     if (!text) {
@@ -105,7 +105,6 @@ export function showLoginFormError(message) {
         box.textContent = text;
         box.classList.remove('hidden');
     }
-    showToast(text, 'error');
 }
 
 export function setPasswordModalMode(isTokenReset) {

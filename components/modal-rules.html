@@ -2,15 +2,15 @@
     <div class="modal-box rules-modal-box max-w-2xl w-[94%] max-h-[90dvh] flex flex-col border border-slate-200 rounded-2xl shadow-xl bg-white dark:bg-slate-800 dark:border-slate-600">
         <h3 class="rules-modal-title font-bold text-sm text-slate-800 dark:text-slate-100 border-b border-slate-200 dark:border-slate-600 pb-2 shrink-0 m-0">Consignes</h3>
         <div id="rules-view" class="rules-modal-body text-sm text-slate-700 dark:text-slate-200 leading-relaxed py-4 overflow-y-auto flex-1 min-h-0 organ-rich"></div>
-        <div id="rules-edit-wrap" class="hidden flex-1 min-h-0 py-2 flex flex-col gap-2">
-            <div id="rules-quill-mount" class="planning-quill-mount rules-quill-mount"></div>
+        <div id="rules-edit-wrap" class="rules-edit-wrap hidden flex-1 min-h-0 py-2 flex flex-col">
+            <div id="rules-quill-mount" class="planning-quill-mount rules-quill-mount flex-1 min-h-0 min-h-[12rem]"></div>
         </div>
 
 
         <div class="modal-action flex-wrap gap-2 shrink-0 border-t border-slate-200 dark:border-slate-600 mt-2 pt-3">
             <button type="button" id="rules-btn-edit" class="btn btn-outline btn-sm font-bold text-[11px] hidden">Modifier les consignes</button>
             <button type="button" id="rules-btn-save" class="btn btn-primary btn-sm font-bold text-[11px] hidden">Enregistrer les consignes</button>
-            <button type="button" id="rules-btn-close" class="btn btn-ghost btn-sm font-bold text-[11px] ml-auto">Fermer</button>
+            <button type="button" id="rules-btn-close" class="btn planning-btn-dismiss btn-sm font-bold text-[11px] ml-auto">Fermer</button>
         </div>
     </div>
 </dialog>

@@ -30,11 +30,11 @@
             <div class="flex flex-wrap gap-3 items-end">
                 <div>
                     <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="config-chapel-min">Première heure</label>
-                    <select id="config-chapel-min" class="select select-sm h-9 text-sm font-mono bg-white border border-slate-200 rounded-lg min-w-[6.5rem]"></select>
+                    <select id="config-chapel-min" class="select select-sm h-9 text-sm font-mono bg-white border border-slate-200 rounded-lg config-chapel-hour-select w-[5.75rem]"></select>
                 </div>
                 <div>
                     <label class="text-[9px] font-bold text-slate-500 block mb-0.5" for="config-chapel-max">Dernière heure affichée</label>
-                    <select id="config-chapel-max" class="select select-sm h-9 text-sm font-mono bg-white border border-slate-200 rounded-lg min-w-[6.5rem]"></select>
+                    <select id="config-chapel-max" class="select select-sm h-9 text-sm font-mono bg-white border border-slate-200 rounded-lg config-chapel-hour-select w-[5.75rem]"></select>
                 </div>
             </div>
         </div>
@@ -46,14 +46,20 @@
                 <input type="checkbox" id="config-eleve-cap-enabled" class="config-rule-toggle-input sr-only" role="switch" />
                 <label for="config-eleve-cap-enabled" class="config-rule-toggle"></label>
                 <span class="config-rule-title">Limite d’heures par sem.</span>
-                <input type="number" id="config-eleve-cap-hours" class="config-rule-field input input-sm h-9 w-20 text-sm font-mono bg-white border border-slate-200 rounded-lg hidden" min="1" step="0.5" />
+                <span class="config-rule-value-wrap hidden">
+                    <input type="text" inputmode="decimal" id="config-eleve-cap-hours" class="config-rule-field input input-sm h-9 w-14 text-sm font-mono bg-white border border-slate-200 rounded-lg" autocomplete="off" />
+                    <span class="config-rule-unit">h / sem.</span>
+                </span>
             </div>
 
             <div class="config-rule-row" data-config-rule="horizon">
                 <input type="checkbox" id="config-eleve-horizon-enabled" class="config-rule-toggle-input sr-only" role="switch" />
                 <label for="config-eleve-horizon-enabled" class="config-rule-toggle"></label>
                 <span class="config-rule-title">Réservabilité dans le futur</span>
-                <input type="number" id="config-eleve-horizon-amount" class="config-rule-field input input-sm h-9 w-24 text-sm font-mono bg-white border border-slate-200 rounded-lg hidden" min="0" max="366" step="1" />
+                <span class="config-rule-value-wrap hidden">
+                    <input type="text" inputmode="numeric" id="config-eleve-horizon-amount" class="config-rule-field input input-sm h-9 w-14 text-sm font-mono bg-white border border-slate-200 rounded-lg" autocomplete="off" />
+                    <span class="config-rule-unit">jours</span>
+                </span>
             </div>
 
             <div class="config-rule-row config-rule-row--multiline" data-config-rule="nodelete">

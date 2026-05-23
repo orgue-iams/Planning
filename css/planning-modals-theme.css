@@ -34,6 +34,57 @@
     border-color: rgb(51 65 85) !important;
 }
 
+/* Consignes : zone d’édition puis barre d’outils en dessous */
+.rules-edit-wrap .rules-quill-mount {
+    display: flex;
+    flex-direction: column;
+    min-height: 12rem;
+}
+
+.rules-edit-wrap .rules-quill-mount .ql-container.ql-snow {
+    order: 1;
+    flex: 1 1 auto;
+    min-height: 10rem;
+    border-radius: 0.5rem 0.5rem 0 0;
+    border-bottom: none;
+}
+
+.rules-edit-wrap .rules-quill-mount .ql-toolbar.ql-snow {
+    order: 2;
+    flex-shrink: 0;
+    border-radius: 0 0 0.5rem 0.5rem;
+    border-top: 1px solid rgb(203 213 225);
+    background: rgb(248 250 252);
+}
+
+.rules-edit-wrap .rules-quill-mount .ql-toolbar .ql-formats button,
+.rules-edit-wrap .rules-quill-mount .ql-toolbar .planning-fs-btn {
+    border: 1px solid rgb(148 163 184);
+    border-radius: 0.375rem;
+    background: transparent;
+    color: rgb(51 65 85);
+    min-height: 1.75rem;
+    min-width: 1.75rem;
+    padding: 0.15rem 0.35rem;
+}
+
+.rules-edit-wrap .rules-quill-mount .ql-toolbar .ql-formats button:hover,
+.rules-edit-wrap .rules-quill-mount .ql-toolbar .planning-fs-btn:hover {
+    background: rgb(241 245 249);
+    border-color: rgb(100 116 139);
+}
+
+[data-theme='dark'] .rules-edit-wrap .rules-quill-mount .ql-toolbar.ql-snow {
+    background: rgb(30 41 59);
+    border-top-color: rgb(71 85 105);
+}
+
+[data-theme='dark'] .rules-edit-wrap .rules-quill-mount .ql-toolbar .ql-formats button,
+[data-theme='dark'] .rules-edit-wrap .rules-quill-mount .ql-toolbar .planning-fs-btn {
+    border-color: rgb(100 116 139);
+    color: rgb(226 232 240);
+}
+
 /* Champs modales : voir planning-theme-tokens.css (variables --planning-input-*) */
 
 [data-theme='dark'] dialog.modal .input-bordered:focus,

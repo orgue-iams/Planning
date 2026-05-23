@@ -40,6 +40,9 @@ const DELETE_USER_SVG =
 const DIRECTORY_USER_ICON_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>';
 
+const DIRECTORY_CALENDAR_ICON_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>';
+
 function directoryRoleCardClass(role) {
     const key = normalizePlanningRole(role);
     if (key === 'admin') return 'directory-admin-user-card--role-admin';
@@ -47,42 +50,26 @@ function directoryRoleCardClass(role) {
     return 'directory-admin-user-card--role-eleve';
 }
 
-/** @returns {string[]} lignes contact droite (email, tél., planning si admin) */
+/** @returns {string[]} lignes contact (email, tél. — pas l’agenda, affiché à part). */
 function directoryUserContactLines(r) {
     const email = String(r?.email || '').trim();
     const phone = formatFrPhone(String(r?.telephone || '').trim());
-    const showPlanning = isAdmin(getPlanningSessionUser());
-    const planning = showPlanning
-        ? String(r?.personal_calendar_label || r?.calendar_label || '').trim()
-        : '';
-    const shown = new Set();
     const lines = [];
-    if (email) {
-        lines.push(email);
-        shown.add('email');
-    } else if (phone) {
-        lines.push(phone);
-        shown.add('phone');
-    } else if (planning) {
-        lines.push(planning);
-        shown.add('planning');
-    }
-    if (!shown.has('phone') && phone) {
-        lines.push(phone);
-        shown.add('phone');
-    } else if (!shown.has('planning') && planning) {
-        lines.push(planning);
-        shown.add('planning');
-    }
-    if (!shown.has('planning') && planning) lines.push(planning);
+    if (email) lines.push(email);
+    if (phone) lines.push(phone);
     return lines;
 }
 
-/** @param {object} r @returns {HTMLElement} */
-function buildDirectoryContactColumn(r) {
+function directoryUserAgendaLabel(r) {
+    if (!isAdmin(getPlanningSessionUser())) return '';
+    return String(r?.personal_calendar_label || r?.calendar_label || '').trim();
+}
+
+/** @param {object} r @param {string} roleKey @returns {HTMLElement} */
+function buildDirectoryContactColumn(r, roleKey) {
     const col = document.createElement('div');
     col.className =
-        'directory-user-card__contact text-right min-w-0 flex flex-col gap-0.5 self-stretch justify-center py-0.5';
+        'directory-user-card__contact text-right min-w-0 flex flex-col gap-0.5 self-stretch justify-end py-0.5';
     for (const line of directoryUserContactLines(r)) {
         if (line.includes('@')) {
             const a = document.createElement('a');
@@ -99,6 +86,22 @@ function buildDirectoryContactColumn(r) {
             p.textContent = line;
             col.appendChild(p);
         }
+    }
+    const agenda = directoryUserAgendaLabel(r);
+    if (agenda) {
+        const row = document.createElement('div');
+        row.className =
+            'directory-user-card__agenda-row flex items-center justify-end gap-1.5 min-w-0';
+        const icon = document.createElement('span');
+        icon.className = `directory-user-card__avatar directory-user-card__avatar--${roleKey} directory-user-card__agenda-icon shrink-0`;
+        icon.innerHTML = DIRECTORY_CALENDAR_ICON_SVG;
+        const lab = document.createElement('p');
+        lab.className =
+            'directory-user-card__agenda text-[11px] sm:text-xs font-semibold text-slate-800 m-0 break-words leading-snug';
+        lab.textContent = agenda;
+        row.appendChild(icon);
+        row.appendChild(lab);
+        col.appendChild(row);
     }
     return col;
 }
@@ -204,19 +207,22 @@ function buildPrivilegedUserCard(r, opts) {
     const roleKey = normalizePlanningRole(r.profile_role || r.role);
     const withDelete = Boolean(opts.canDelete);
     card.className =
-        `directory-admin-user-card directory-admin-user-card--layout ${directoryRoleCardClass(roleKey)} ${withDelete ? 'directory-admin-user-card--with-delete' : ''} py-2.5 px-3 min-w-0 rounded-xl border`;
+        `directory-admin-user-card directory-admin-user-card--layout-v2 ${directoryRoleCardClass(roleKey)} py-2.5 px-3 min-w-0 rounded-xl border`;
     card.dataset.userJson = JSON.stringify(r);
+
+    const topRow = document.createElement('div');
+    topRow.className = 'directory-user-card__top flex items-start gap-2 min-w-0';
 
     const identity = document.createElement('div');
     identity.className =
-        'directory-user-card__identity min-w-0 self-stretch flex flex-row items-center gap-2 pr-2';
+        'directory-user-card__identity min-w-0 flex-1 flex flex-row items-start gap-2';
 
     const avatar = document.createElement('span');
-    avatar.className = `directory-user-card__avatar directory-user-card__avatar--${roleKey}`;
+    avatar.className = `directory-user-card__avatar directory-user-card__avatar--${roleKey} shrink-0`;
     avatar.innerHTML = DIRECTORY_USER_ICON_SVG;
 
     const identityText = document.createElement('div');
-    identityText.className = 'min-w-0 flex-1 flex flex-col justify-center';
+    identityText.className = 'min-w-0 flex-1 flex flex-col justify-center pt-0.5';
     const nameP = document.createElement('p');
     nameP.className =
         'directory-user-card__name font-semibold text-slate-900 leading-snug m-0 text-[13px]';
@@ -229,9 +235,25 @@ function buildPrivilegedUserCard(r, opts) {
     identityText.appendChild(roleP);
     identity.appendChild(avatar);
     identity.appendChild(identityText);
-    card.appendChild(identity);
+    topRow.appendChild(identity);
 
-    const contact = buildDirectoryContactColumn(r);
+    if (withDelete) {
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'directory-user-delete-btn shrink-0';
+        del.setAttribute('aria-label', `Supprimer ${directoryDisplayName(r)}`);
+        del.title = 'Supprimer';
+        del.innerHTML = DELETE_USER_SVG;
+        del.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            void deleteDirectoryUser(String(r.id || ''));
+        });
+        topRow.appendChild(del);
+    }
+    card.appendChild(topRow);
+
+    const contact = buildDirectoryContactColumn(r, roleKey);
     if (contact.childElementCount) card.appendChild(contact);
 
     const openEdit = () => {
@@ -242,28 +264,13 @@ function buildPrivilegedUserCard(r, opts) {
         }
     };
 
-    if (opts.canDelete) {
-        const del = document.createElement('button');
-        del.type = 'button';
-        del.className = 'directory-user-delete-btn';
-        del.setAttribute('aria-label', `Supprimer ${directoryDisplayName(r)}`);
-        del.title = 'Supprimer';
-        del.innerHTML = DELETE_USER_SVG;
-        del.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            void deleteDirectoryUser(String(r.id || ''));
-        });
-        card.appendChild(del);
-    }
-
     if (opts.canOpen) {
         const bindOpen = (el) => {
             el.classList.add('cursor-pointer');
             el.setAttribute('role', 'button');
             el.tabIndex = 0;
             el.addEventListener('click', (e) => {
-                if (e.target instanceof Element && e.target.closest('a')) return;
+                if (e.target instanceof Element && e.target.closest('button, a')) return;
                 openEdit();
             });
             el.addEventListener('keydown', (e) => {
@@ -273,7 +280,7 @@ function buildPrivilegedUserCard(r, opts) {
                 }
             });
         };
-        bindOpen(identity);
+        bindOpen(topRow);
         if (contact.childElementCount) bindOpen(contact);
     }
 

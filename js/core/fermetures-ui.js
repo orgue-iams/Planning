@@ -34,6 +34,9 @@ import { syncPlanningDrawerGroupedSections } from './planning-drawer-ui.js';
 
 let bound = false;
 
+const FERMETURE_CALENDAR_ICON_SVG =
+    '<svg class="fermeture-card__cal-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>';
+
 /** @type {import('./absence-period-db.js').AbsencePeriodRow[]} */
 let closureRanges = [];
 
@@ -193,22 +196,36 @@ function buildClosureCard(range, index) {
     const header = document.createElement('div');
     header.className = 'fermeture-card__header flex items-start justify-between gap-2 min-w-0';
 
+    const headerRight = document.createElement('div');
+    headerRight.className =
+        'fermeture-card__header-right flex flex-col items-end gap-0.5 shrink-0 max-w-[46%] min-w-0';
+
+    const creator = document.createElement('p');
+    creator.className =
+        'fermeture-card__creator text-[10px] text-slate-600 dark:text-slate-300 m-0 leading-snug text-right break-words w-full';
+    creator.textContent =
+        range.creatorLabel || (range.creatorRole === 'admin' ? 'Administration' : 'Professeur');
+    headerRight.appendChild(creator);
+
+    const badge = document.createElement('span');
+    badge.className = `fermeture-card__badge ${isDraft ? 'fermeture-card__badge--draft' : 'fermeture-card__badge--applied'}`;
+    badge.textContent = isDraft ? (draftPast ? 'Archivée (non applicable)' : 'À appliquer') : 'Appliquée';
+    headerRight.appendChild(badge);
+
     const headerLeft = document.createElement('div');
-    headerLeft.className = 'min-w-0 flex-1';
+    headerLeft.className = 'min-w-0 flex-1 flex items-start gap-1.5';
+    const calIcon = document.createElement('span');
+    calIcon.className = 'fermeture-card__cal-icon-wrap shrink-0 text-slate-600 dark:text-slate-300 mt-0.5';
+    calIcon.innerHTML = FERMETURE_CALENDAR_ICON_SVG;
     const dates = document.createElement('p');
     dates.className = 'text-[12px] font-mono font-semibold text-slate-800 dark:text-slate-50 m-0 leading-snug';
     dates.textContent = pending
         ? `${formatFrRange(range.startYmd, range.endYmd)} — enregistrement…`
         : formatFrRange(range.startYmd, range.endYmd);
+    headerLeft.appendChild(calIcon);
     headerLeft.appendChild(dates);
     header.appendChild(headerLeft);
-
-    const creator = document.createElement('p');
-    creator.className =
-        'fermeture-card__creator text-[10px] text-slate-600 dark:text-slate-300 m-0 leading-snug text-right shrink-0 max-w-[48%] break-words';
-    creator.textContent =
-        range.creatorLabel || (range.creatorRole === 'admin' ? 'Administration' : 'Professeur');
-    header.appendChild(creator);
+    header.appendChild(headerRight);
     body.appendChild(header);
 
     const titleText = String(range.title || '').trim();
@@ -219,11 +236,6 @@ function buildClosureCard(range, index) {
         title.textContent = titleText;
         body.appendChild(title);
     }
-
-    const badge = document.createElement('span');
-    badge.className = `fermeture-card__badge ${isDraft ? 'fermeture-card__badge--draft' : 'fermeture-card__badge--applied'}`;
-    badge.textContent = isDraft ? (draftPast ? 'Archivée (non applicable)' : 'À appliquer') : 'Appliquée';
-    body.appendChild(badge);
 
     card.appendChild(body);
 

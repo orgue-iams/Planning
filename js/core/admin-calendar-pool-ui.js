@@ -37,11 +37,15 @@ const DELETE_POOL_SVG =
 const CALENDAR_POOL_ROUTE_LABEL = 'Agendas Google pour les utilisateurs';
 
 function assigneeDisplayName(row) {
+    const uid = String(row?.assigned_user_id ?? '').trim();
     const nom = String(row.assignee_nom ?? '').trim();
     const prenom = String(row.assignee_prenom ?? '').trim();
     const fromParts = formatProfileFullName(nom, prenom);
     if (fromParts) return fromParts;
-    return String(row.assignee_display_name ?? '').trim() || '—';
+    const disp = String(row.assignee_display_name ?? '').trim();
+    if (disp) return disp;
+    if (!uid) return '(Non attribué)';
+    return '—';
 }
 
 function appendPoolUpdateButton(actions, opts) {
@@ -49,7 +53,7 @@ function appendPoolUpdateButton(actions, opts) {
     const upd = document.createElement('button');
     upd.type = 'button';
     upd.className =
-        'calendar-pool-update-btn btn btn-sm planning-btn-accent font-semibold text-[10px] min-h-8 px-2';
+        'calendar-pool-update-btn btn btn-primary btn-sm font-semibold text-[10px] min-h-8 px-2 w-full max-w-[9rem]';
     if (mainResync) {
         upd.dataset.mainResync = '1';
     } else {
@@ -74,39 +78,38 @@ function buildMainPlanningCalendarCard() {
         String(mainGoogleCalendarLabel || '').trim() || 'Planning complet (Orgue IAMS)';
     const card = document.createElement('div');
     card.className =
-        'calendar-pool-card calendar-pool-card--main flex items-stretch gap-2 py-2.5 px-3 min-w-0 rounded-xl border';
+        'calendar-pool-card calendar-pool-card--main py-2.5 px-3 min-w-0 rounded-xl border';
 
-    const main = document.createElement('div');
-    main.className = 'calendar-pool-card__main flex flex-1 min-w-0 gap-2';
+    const grid = document.createElement('div');
+    grid.className = 'calendar-pool-card__grid min-w-0';
 
     const left = document.createElement('div');
-    left.className = 'calendar-pool-card__left flex-1 min-w-0 max-w-full';
-    const line1 = document.createElement('div');
-    line1.className =
-        'flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-[13px] leading-snug';
-    const labelP = document.createElement('span');
-    labelP.className = 'font-semibold text-slate-900 break-words text-left';
+    left.className = 'calendar-pool-card__left min-w-0';
+    const labelP = document.createElement('p');
+    labelP.className = 'text-[13px] font-semibold text-slate-900 m-0 leading-snug break-words';
     labelP.textContent = label;
-    const userP = document.createElement('span');
-    userP.className =
-        'calendar-pool-card__assignee text-[11px] sm:text-xs text-slate-700 shrink-0 text-right italic';
-    userP.textContent = 'Agenda principal';
-    line1.appendChild(labelP);
-    line1.appendChild(userP);
     const idP = document.createElement('p');
     idP.className =
         'text-[10px] sm:text-[11px] font-mono text-slate-900 m-0 mt-0.5 break-all leading-snug';
     idP.textContent = gid;
-    left.appendChild(line1);
+    left.appendChild(labelP);
     left.appendChild(idP);
-    main.appendChild(left);
 
+    const right = document.createElement('div');
+    right.className = 'calendar-pool-card__right flex flex-col items-stretch gap-1.5 min-w-0';
+    const userP = document.createElement('p');
+    userP.className =
+        'calendar-pool-card__assignee-name font-bold text-[12px] text-slate-900 m-0 leading-snug text-right break-words';
+    userP.textContent = 'Agenda principal';
+    right.appendChild(userP);
     const actions = document.createElement('div');
-    actions.className = 'calendar-pool-card__actions flex shrink-0 items-center self-center';
+    actions.className = 'calendar-pool-card__actions flex flex-col items-stretch';
     appendPoolUpdateButton(actions, { mainResync: true, label });
+    right.appendChild(actions);
 
-    card.appendChild(main);
-    card.appendChild(actions);
+    grid.appendChild(left);
+    grid.appendChild(right);
+    card.appendChild(grid);
     return card;
 }
 
@@ -150,55 +153,54 @@ function updatePoolSortButtonsUi() {
 
 function buildPoolCard(row) {
     const card = document.createElement('div');
-    card.className =
-        'calendar-pool-card flex items-stretch gap-2 py-2.5 px-3 min-w-0 rounded-xl border';
+    card.className = 'calendar-pool-card py-2.5 px-3 min-w-0 rounded-xl border';
     card.dataset.poolJson = JSON.stringify(row);
 
+    const grid = document.createElement('div');
+    grid.className = 'calendar-pool-card__grid min-w-0';
+
     const main = document.createElement('div');
-    main.className = 'calendar-pool-card__main flex flex-1 min-w-0 gap-2 cursor-pointer';
+    main.className = 'calendar-pool-card__main calendar-pool-card__left min-w-0 cursor-pointer';
     main.setAttribute('role', 'button');
     main.tabIndex = 0;
 
-    const left = document.createElement('div');
-    left.className = 'calendar-pool-card__left flex-1 min-w-0 max-w-full';
-    const line1 = document.createElement('div');
-    line1.className =
-        'flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-[13px] leading-snug';
-    const labelP = document.createElement('span');
-    labelP.className = 'font-semibold text-slate-900 break-words text-left';
+    const labelP = document.createElement('p');
+    labelP.className = 'text-[13px] font-semibold text-slate-900 m-0 leading-snug break-words';
     labelP.textContent = String(row.label || '').trim() || '—';
-    const userP = document.createElement('span');
-    userP.className =
-        'calendar-pool-card__assignee text-[11px] sm:text-xs text-slate-900 shrink-0 text-right';
-    userP.textContent = assigneeDisplayName(row);
-    line1.appendChild(labelP);
-    line1.appendChild(userP);
     const idP = document.createElement('p');
     idP.className =
         'text-[10px] sm:text-[11px] font-mono text-slate-900 m-0 mt-0.5 break-all leading-snug';
     idP.textContent = String(row.google_calendar_id ?? '').trim() || '—';
-    left.appendChild(line1);
-    left.appendChild(idP);
+    main.appendChild(labelP);
+    main.appendChild(idP);
+
+    const right = document.createElement('div');
+    right.className = 'calendar-pool-card__right flex flex-col items-stretch gap-1.5 min-w-0';
+    const userP = document.createElement('p');
+    userP.className =
+        'calendar-pool-card__assignee-name font-bold text-[12px] text-slate-900 m-0 leading-snug text-right break-words';
+    userP.textContent = assigneeDisplayName(row);
+    right.appendChild(userP);
 
     const actions = document.createElement('div');
-    actions.className = 'calendar-pool-card__actions flex shrink-0 items-center self-center';
-
+    actions.className = 'calendar-pool-card__actions flex flex-col items-stretch gap-1';
     const rowLabel = String(row.label || '').trim() || 'Agenda';
     appendPoolUpdateButton(actions, { poolId: row.id, label: rowLabel });
 
     const del = document.createElement('button');
     del.type = 'button';
     del.className =
-        'calendar-pool-delete-btn btn btn-ghost btn-xs btn-square shrink-0 border border-transparent text-slate-500 hover:text-error';
+        'calendar-pool-delete-btn btn btn-ghost btn-xs shrink-0 self-end border border-transparent text-slate-500 hover:text-error';
     del.dataset.poolId = String(row.id ?? '');
     del.setAttribute('aria-label', 'Supprimer cet agenda');
     del.title = 'Supprimer';
     del.innerHTML = DELETE_POOL_SVG;
-
     actions.appendChild(del);
-    main.appendChild(left);
-    card.appendChild(main);
-    card.appendChild(actions);
+    right.appendChild(actions);
+
+    grid.appendChild(main);
+    grid.appendChild(right);
+    card.appendChild(grid);
     return card;
 }
 

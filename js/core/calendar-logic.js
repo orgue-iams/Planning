@@ -4102,12 +4102,14 @@ async function enrichReservationModalAfterOpen(ctx) {
         }
         await prepareReservationInscritsSelect(currentUser, liveEvent || null, canEditEvent);
         if (calendarForClip?.getEvents) {
+            const startEl = document.getElementById('event-start');
+            const endEl = document.getElementById('event-end');
+            setSelectTime(startEl, startInstant);
+            setSelectTime(endEl, endInstant);
             syncReservationModalTimeOptions(
                 calendarForClip,
                 reservationModalEventRef || liveEvent || null
             );
-            const startEl = document.getElementById('event-start');
-            const endEl = document.getElementById('event-end');
             setSelectTime(startEl, startInstant);
             setSelectTime(endEl, endInstant);
         }

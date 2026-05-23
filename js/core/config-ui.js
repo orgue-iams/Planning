@@ -117,7 +117,9 @@ function syncConfigRuleRows() {
         const toggle = document.getElementById(rule.toggleId);
         const field = rule.fieldId ? document.getElementById(rule.fieldId) : null;
         const on = toggle instanceof HTMLInputElement && toggle.checked;
-        if (field) field.classList.toggle('hidden', !on);
+        const wrap = field?.closest('.config-rule-value-wrap');
+        if (wrap instanceof HTMLElement) wrap.classList.toggle('hidden', !on);
+        else if (field) field.classList.toggle('hidden', !on);
         if (toggle) {
             toggle.setAttribute('aria-checked', on ? 'true' : 'false');
             const lab = document.querySelector(`label.config-rule-toggle[for="${rule.toggleId}"]`);
@@ -140,6 +142,17 @@ function currentConfigSnapshot() {
         else if (el) base[id] = el.value || '';
     }
     return JSON.stringify(base);
+}
+
+/** Entier ou demi (ex. 1, 1.5, 2). */
+function parseHalfStepNumber(raw) {
+    const s = String(raw ?? '').trim().replace(',', '.');
+    if (!s) return null;
+    const n = parseFloat(s);
+    if (!Number.isFinite(n)) return null;
+    const halfSteps = Math.round(n * 2);
+    if (Math.abs(n * 2 - halfSteps) > 0.001) return null;
+    return halfSteps / 2;
 }
 
 function minutesFromHHmm(hhmm) {
@@ -179,6 +192,24 @@ async function persistConfigIfAdmin() {
 
     const capOn = document.getElementById('config-eleve-cap-enabled')?.checked;
     const hzOn = document.getElementById('config-eleve-horizon-enabled')?.checked;
+    let capHours = document.getElementById('config-eleve-cap-hours')?.value;
+    let horizonDays = document.getElementById('config-eleve-horizon-amount')?.value;
+    if (capOn) {
+        const parsed = parseHalfStepNumber(capHours);
+        if (parsed == null || parsed <= 0) {
+            showToast('Limite d’heures : saisir un nombre entier ou un demi (ex. 2 ou 2,5).', 'error');
+            return;
+        }
+        capHours = String(parsed);
+    }
+    if (hzOn) {
+        const parsed = parseHalfStepNumber(horizonDays);
+        if (parsed == null || parsed < 0) {
+            showToast('Réservabilité : saisir un nombre entier ou un demi de jour.', 'error');
+            return;
+        }
+        horizonDays = String(parsed);
+    }
     const r = await saveOrganSchoolSettingsAdmin({
         school_year_start: document.getElementById('config-school-start')?.value || null,
         school_year_end: document.getElementById('config-school-end')?.value || null,
@@ -186,9 +217,9 @@ async function persistConfigIfAdmin() {
         chapel_slot_max: `${mx}:00`,
         planning_error_notify_email: notifyRaw,
         eleve_weekly_travail_cap_enabled: capOn,
-        eleve_weekly_travail_cap_hours: document.getElementById('config-eleve-cap-hours')?.value,
+        eleve_weekly_travail_cap_hours: capHours,
         eleve_booking_horizon_enabled: hzOn,
-        eleve_booking_horizon_amount: document.getElementById('config-eleve-horizon-amount')?.value,
+        eleve_booking_horizon_amount: horizonDays,
         eleve_booking_horizon_unit: 'days',
         eleve_forbid_delete_after_slot_start: document.getElementById('config-eleve-no-delete-after-start')?.checked,
         eleve_booking_tolerance_days: 0

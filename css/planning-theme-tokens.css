@@ -157,6 +157,26 @@ textarea.planning-field,
     background-color: var(--planning-action-btn-bg-active);
 }
 
+/* Saisie modales / tiroirs : texte noir sur fond blanc (lisibilité thème sombre). */
+[data-theme='dark'] dialog.modal .input,
+[data-theme='dark'] dialog.modal .select,
+[data-theme='dark'] dialog.modal .textarea,
+[data-theme='dark'] dialog.planning-route-page .input,
+[data-theme='dark'] dialog.planning-route-page .select,
+[data-theme='dark'] dialog.planning-route-page .textarea,
+[data-theme='dark'] dialog.modal .config-rule-field,
+[data-theme='dark'] dialog.modal .planning-date-input {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border-color: rgb(203 213 225) !important;
+    color-scheme: light;
+}
+
+[data-theme='dark'] dialog.modal .input::placeholder,
+[data-theme='dark'] dialog.modal .textarea::placeholder {
+    color: rgb(100 116 139) !important;
+}
+
 /* ——— Boutons primaires (modales / pages) : texte accent en sombre ——— */
 [data-theme='dark'] dialog.modal .btn.btn-primary:not(.btn-ghost):not(.btn-outline):not(.btn-link),
 [data-theme='dark'] dialog.planning-route-page .btn.btn-primary:not(.btn-ghost):not(.btn-outline):not(.btn-link),
@@ -442,6 +462,35 @@ dialog.planning-route-page .btn.btn-primary:not(.btn-outline):not(.btn-ghost):no
 [data-theme='dark'] dialog.planning-route-page .btn.btn-primary:not(.btn-outline):not(.btn-ghost):not(.btn-link):hover,
 [data-theme='dark'] #planning-drawer-help-panel .btn.btn-primary:not(.btn-outline):not(.btn-ghost):hover {
     filter: brightness(1.16);
+}
+
+/* Fermer / annuler : contour gris, fond vide */
+dialog.modal .btn.planning-btn-dismiss,
+dialog.modal .modal-action .btn.planning-btn-dismiss {
+    background: transparent !important;
+    border: 1px solid rgb(148 163 184) !important;
+    color: rgb(51 65 85) !important;
+    box-shadow: none;
+    font-weight: 600;
+}
+
+dialog.modal .btn.planning-btn-dismiss:hover,
+dialog.modal .modal-action .btn.planning-btn-dismiss:hover {
+    background: rgb(248 250 252) !important;
+    border-color: rgb(100 116 139) !important;
+    color: rgb(15 23 42) !important;
+}
+
+[data-theme='dark'] dialog.modal .btn.planning-btn-dismiss,
+[data-theme='dark'] dialog.modal .modal-action .btn.planning-btn-dismiss {
+    border-color: rgb(100 116 139) !important;
+    color: rgb(226 232 240) !important;
+}
+
+[data-theme='dark'] dialog.modal .btn.planning-btn-dismiss:hover,
+[data-theme='dark'] dialog.modal .modal-action .btn.planning-btn-dismiss:hover {
+    background: rgb(30 41 59) !important;
+    color: rgb(255 255 255) !important;
 }
 
 dialog.modal .btn.btn-outline:not(.btn-error):not(.btn-warning),

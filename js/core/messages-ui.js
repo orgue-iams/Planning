@@ -45,7 +45,7 @@ function ensureFallbackRulesModal() {
                 <h3 class="font-black text-sm uppercase tracking-wide text-slate-600 border-b pb-2 shrink-0">Consignes</h3>
                 <div id="rules-fallback-view" class="text-sm text-slate-700 leading-relaxed py-4 overflow-y-auto flex-1 min-h-0"></div>
                 <div class="modal-action shrink-0 border-t border-slate-100 mt-2 pt-3">
-                    <button type="button" id="rules-fallback-close" class="btn btn-ghost btn-sm font-black text-[11px] ml-auto">Fermer</button>
+                    <button type="button" id="rules-fallback-close" class="btn planning-btn-dismiss btn-sm font-black text-[11px] ml-auto">Fermer</button>
                 </div>
             </div>
         `;
