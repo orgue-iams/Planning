@@ -18,6 +18,7 @@ export async function loadUIComponents() {
         { id: 'app-modals', file: 'components/modal-semaines-apply.html', append: true },
         { id: 'app-modals', file: 'components/modal-semaines-shift.html', append: true },
         { id: 'app-modals', file: 'components/modal-fermetures.html', append: true },
+        { id: 'app-modals', file: 'components/modal-fermeture-edit.html', append: true },
         { id: 'app-modals', file: 'components/modal-course-students.html', append: true },
         { id: 'app-modals', file: 'components/modal-statistics.html', append: true },
         { id: 'app-modals', file: 'components/modal-directory-users.html', append: true },

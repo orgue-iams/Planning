@@ -8,13 +8,12 @@ import { showToast } from '../utils/toast.js';
 import {
     openPlanningRouteFromDrawer,
     planningRouteTitle,
-    popPlanningRouteLevel,
     pushPlanningRouteLevel
 } from '../utils/planning-route-dialog.js';
 import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
 import {
     deleteClosureRangeEvents,
-    findConflictsForClosureRange,
+    findConflictsForClosurePeriod,
     formatConflictLineFr
 } from './fermetures-planning.js';
 import {
@@ -32,6 +31,11 @@ import {
 } from './organ-settings.js';
 import { syncPlanningDrawerGroupedSections } from './planning-drawer-ui.js';
 import { createPlanningIconDeleteButton } from '../utils/planning-delete-btn.js';
+import {
+    CLOSURE_PERIODIC_ICON_SVG,
+    formatPeriodicClosureLabel
+} from '../utils/closure-period-helpers.js';
+import { openFermetureEdit } from './fermeture-edit-ui.js';
 
 let bound = false;
 
@@ -42,13 +46,12 @@ const FERMETURE_CALENDAR_ICON_SVG =
 let closureRanges = [];
 
 /** @type {number | null} */
-let editingClosureIndex = null;
 
 /** @type {object[]} */
 let pendingConflicts = [];
 
-let closureSaveInFlight = false;
 let closureApplyInFlight = false;
+let fermeturesOwnOnlyFilter = false;
 
 /** @type {import('./absence-period-db.js').AbsencePeriodRow[] | null} */
 let closureRangesBeforeOptimistic = null;
@@ -66,7 +69,7 @@ function ownsClosurePeriod(range, user) {
     return String(range?.createdByUserId || '') === String(user?.id || '');
 }
 
-function canEditClosureRange(range, user) {
+export function canEditClosureRange(range, user) {
     if (!canManageOwnClosures(user)) return false;
     if (range?.legacy) return false;
     if (range?.appliedAt) return false;
@@ -79,7 +82,7 @@ function isClosureDraftPast(range) {
     return isClosurePeriodFullyPast(range) && !range?.appliedAt && !range?.legacy;
 }
 
-function canDeleteClosureRange(range, user) {
+export function canDeleteClosureRange(range, user) {
     if (!canViewClosures(user)) return false;
     if (range?.legacy) {
         return isAdmin(user) || ownsClosurePeriod(range, user);
@@ -148,7 +151,7 @@ function syncFermeturesActionsRow() {
     const canManage = canManageOwnClosures(u);
     const hasPendingDrafts = closureRanges.some((r) => !r.legacy && !r.appliedAt);
     row?.classList.toggle('hidden', !canManage || !hasPendingDrafts);
-    const editOpen = !document.getElementById('fermetures-edit-panel')?.classList.contains('hidden');
+    const editOpen = Boolean(document.getElementById('modal_fermeture_edit')?.open);
     fabWrap?.classList.toggle('hidden', !canManage || editOpen);
     const pending = pendingAbsencePeriodsForUser(closureRanges, u);
     const today = todayYmdLocal();
@@ -162,8 +165,12 @@ function syncFermeturesActionsRow() {
         applyBtn.disabled = closureApplyInFlight;
     }
     if (addBtn instanceof HTMLButtonElement) {
-        addBtn.disabled = closureApplyInFlight || closureSaveInFlight;
+        addBtn.disabled = closureApplyInFlight;
     }
+}
+
+function ownsClosureRange(range, user) {
+    return String(range?.createdByUserId || '') === String(user?.id || '');
 }
 
 function buildClosureCard(range, index) {
@@ -173,8 +180,9 @@ function buildClosureCard(range, index) {
     const pending = Boolean(range._optimistic);
     const isDraft = !range.appliedAt && !range.legacy;
     const draftPast = isDraft && isPast;
+    const mine = ownsClosureRange(range, u);
     const card = document.createElement('div');
-    card.className = `fermeture-card rounded-xl border px-3 py-2.5 min-w-0 ${closureCardToneClass(range)}${isPast ? ' fermeture-card--past' : ''}`;
+    card.className = `fermeture-card rounded-xl border px-3 py-2.5 min-w-0 ${closureCardToneClass(range)}${isPast ? ' fermeture-card--past' : ''}${mine ? ' fermeture-card--mine' : ''}`;
     if (!pending && !closureApplyInFlight) {
         card.classList.add('cursor-pointer');
         card.tabIndex = 0;
@@ -191,58 +199,57 @@ function buildClosureCard(range, index) {
         card.setAttribute('aria-busy', 'true');
     }
 
-    const body = document.createElement('div');
-    body.className = 'flex-1 min-w-0';
+    const grid = document.createElement('div');
+    grid.className = 'fermeture-card__grid flex-1 min-w-0';
 
-    const header = document.createElement('div');
-    header.className = 'fermeture-card__header flex items-start justify-between gap-2 min-w-0';
+    const left = document.createElement('div');
+    left.className = 'fermeture-card__col-left min-w-0';
+    const periodLine = document.createElement('div');
+    periodLine.className = 'flex items-start gap-1.5 min-w-0';
+    const iconWrap = document.createElement('span');
+    iconWrap.className = 'fermeture-card__cal-icon-wrap shrink-0 text-slate-600 mt-0.5';
+    iconWrap.innerHTML = range.isPeriodic ? CLOSURE_PERIODIC_ICON_SVG : FERMETURE_CALENDAR_ICON_SVG;
+    const dates = document.createElement('p');
+    dates.className = 'text-[12px] font-semibold text-slate-800 m-0 leading-snug break-words';
+    let periodLabel = pending
+        ? `${formatFrRange(range.startYmd, range.endYmd)} — enregistrement…`
+        : formatFrRange(range.startYmd, range.endYmd);
+    if (range.isPeriodic && !pending) {
+        periodLabel = formatPeriodicClosureLabel(range.weekdays);
+    }
+    dates.textContent = periodLabel;
+    periodLine.appendChild(iconWrap);
+    periodLine.appendChild(dates);
+    left.appendChild(periodLine);
+    const titleText = String(range.title || '').trim();
+    const title = document.createElement('p');
+    title.className =
+        'text-[11px] font-bold text-slate-800 m-0 mt-0.5 leading-snug break-words';
+    title.textContent = titleText || 'Fermeture';
+    left.appendChild(title);
+    grid.appendChild(left);
 
-    const headerRight = document.createElement('div');
-    headerRight.className =
-        'fermeture-card__header-right flex flex-col items-end gap-0.5 shrink-0 max-w-[46%] min-w-0';
-
+    const center = document.createElement('div');
+    center.className = 'fermeture-card__col-center min-w-0 flex flex-col justify-center';
     const creator = document.createElement('p');
     creator.className =
-        'fermeture-card__creator text-[10px] text-slate-600 dark:text-slate-300 m-0 leading-snug text-right break-words w-full';
+        'fermeture-card__creator text-[11px] font-semibold text-slate-800 m-0 leading-snug break-words';
     creator.textContent =
         range.creatorLabel || (range.creatorRole === 'admin' ? 'Administration' : 'Professeur');
-    headerRight.appendChild(creator);
-
+    center.appendChild(creator);
     const badge = document.createElement('span');
     badge.className = `fermeture-card__badge ${isDraft ? 'fermeture-card__badge--draft' : 'fermeture-card__badge--applied'}`;
     badge.textContent = isDraft ? (draftPast ? 'Archivée (non applicable)' : 'À appliquer') : 'Appliquée';
-    headerRight.appendChild(badge);
+    center.appendChild(badge);
+    grid.appendChild(center);
 
-    const headerLeft = document.createElement('div');
-    headerLeft.className = 'min-w-0 flex-1 flex items-start gap-1.5';
-    const calIcon = document.createElement('span');
-    calIcon.className = 'fermeture-card__cal-icon-wrap shrink-0 text-slate-600 dark:text-slate-300 mt-0.5';
-    calIcon.innerHTML = FERMETURE_CALENDAR_ICON_SVG;
-    const dates = document.createElement('p');
-    dates.className = 'text-[12px] font-mono font-semibold text-slate-800 dark:text-slate-50 m-0 leading-snug';
-    dates.textContent = pending
-        ? `${formatFrRange(range.startYmd, range.endYmd)} — enregistrement…`
-        : formatFrRange(range.startYmd, range.endYmd);
-    headerLeft.appendChild(calIcon);
-    headerLeft.appendChild(dates);
-    header.appendChild(headerLeft);
-    header.appendChild(headerRight);
-    body.appendChild(header);
-
-    const titleText = String(range.title || '').trim();
-    if (titleText) {
-        const title = document.createElement('p');
-        title.className =
-            'text-[11px] font-bold text-slate-800 dark:text-orange-50 m-0 leading-snug break-words';
-        title.textContent = titleText;
-        body.appendChild(title);
-    }
-
-    card.appendChild(body);
+    card.appendChild(grid);
 
     const deletable = canDeleteClosureRange(range, u) && !isPast;
     if (!deletable || pending || closureApplyInFlight) return card;
 
+    const actions = document.createElement('div');
+    actions.className = 'fermeture-card__col-actions shrink-0 flex items-center';
     card.classList.add('fermeture-card--with-delete');
     const delBtn = createPlanningIconDeleteButton({
         ariaLabel: 'Supprimer cette période',
@@ -252,7 +259,8 @@ function buildClosureCard(range, index) {
             void deleteClosureAt(index);
         }
     });
-    card.appendChild(delBtn);
+    actions.appendChild(delBtn);
+    card.appendChild(actions);
     return card;
 }
 
@@ -269,6 +277,7 @@ function renderClosureCards() {
     const applied = [];
     const pending = [];
     closureRanges.forEach((r, index) => {
+        if (fermeturesOwnOnlyFilter && !ownsClosureRange(r, u)) return;
         if (r.legacy || r.appliedAt) applied.push({ r, index });
         else pending.push({ r, index });
     });
@@ -305,9 +314,6 @@ function hideConflictPanel() {
 function showConflictPanel(conflicts) {
     pendingConflicts = conflicts;
     document.getElementById('fermetures-main-panel')?.classList.remove('hidden');
-    const edit = document.getElementById('fermetures-edit-panel');
-    edit?.classList.add('hidden');
-    edit?.setAttribute('aria-hidden', 'true');
     document.getElementById('fermetures-fab-wrap')?.classList.remove('hidden');
 
     const panel = document.getElementById('fermetures-conflict-panel');
@@ -332,131 +338,18 @@ function showConflictPanel(conflicts) {
 
 function showFermeturesMainPanel() {
     document.getElementById('fermetures-main-panel')?.classList.remove('hidden');
-    const edit = document.getElementById('fermetures-edit-panel');
-    edit?.classList.add('hidden');
-    edit?.setAttribute('aria-hidden', 'true');
     document.getElementById('fermetures-fab-wrap')?.classList.remove('hidden');
     hideConflictPanel();
-    editingClosureIndex = null;
     renderClosureCards();
 }
 
-function readEditForm() {
-    return {
-        startYmd: String(document.getElementById('fermeture-edit-start')?.value || '').trim(),
-        endYmd: String(document.getElementById('fermeture-edit-end')?.value || '').trim(),
-        title: String(document.getElementById('fermeture-edit-title')?.value || '').trim()
-    };
-}
-
-function applyEditForm(range) {
-    const s = document.getElementById('fermeture-edit-start');
-    const e = document.getElementById('fermeture-edit-end');
-    const t = document.getElementById('fermeture-edit-title');
-    if (s instanceof HTMLInputElement) s.value = range?.startYmd || '';
-    if (e instanceof HTMLInputElement) e.value = range?.endYmd || '';
-    if (t instanceof HTMLInputElement) t.value = range?.title || '';
-}
-
-function setEditFieldsReadonly(readonly) {
-    for (const id of ['fermeture-edit-start', 'fermeture-edit-end', 'fermeture-edit-title']) {
-        const el = document.getElementById(id);
-        if (el instanceof HTMLInputElement) {
-            el.readOnly = readonly;
-            el.disabled = readonly;
-            el.classList.toggle('opacity-70', readonly);
-        }
-    }
-    const saveBtn = document.getElementById('fermeture-edit-save');
-    if (saveBtn instanceof HTMLButtonElement) saveBtn.classList.toggle('hidden', readonly);
-}
-
-function setClosureSaveBusy(busy) {
-    closureSaveInFlight = busy;
-    const saveBtn = document.getElementById('fermeture-edit-save');
-    if (saveBtn instanceof HTMLButtonElement) {
-        saveBtn.disabled = busy || closureApplyInFlight;
-        saveBtn.setAttribute('aria-busy', busy ? 'true' : 'false');
-    }
-    syncFermeturesActionsRow();
-}
-
 function openClosureEdit(index) {
-    const u = getPlanningSessionUser();
-    if (!canViewClosures(u)) return;
     if (closureRanges[index]?._optimistic || closureApplyInFlight) return;
-    const rangeRef = index >= 0 ? closureRanges[index] : null;
-    const isPast = rangeRef ? isClosurePeriodFullyPast(rangeRef) : false;
-    const editable = rangeRef
-        ? canEditClosureRange(rangeRef, u) && (!isPast || isClosureDraftPast(rangeRef))
-        : true;
-    editingClosureIndex = index;
-    document.getElementById('fermetures-fab-wrap')?.classList.add('hidden');
-    const range =
-        index >= 0
-            ? closureRanges[index]
-            : { startYmd: todayYmdLocal(), endYmd: todayYmdLocal(), title: '', eventIds: [] };
-
-    document.getElementById('fermetures-main-panel')?.classList.add('hidden');
-    const panel = document.getElementById('fermetures-edit-panel');
-    panel?.classList.remove('hidden');
-    panel?.setAttribute('aria-hidden', 'false');
-    hideConflictPanel();
-
-    applyEditForm(range);
-    setEditFieldsReadonly(!editable);
-
-    const title =
-        index < 0
-            ? planningRouteTitle('Nouvelle période')
-            : editable
-              ? planningRouteTitle('Édition')
-              : planningRouteTitle('Détail');
-    pushPlanningRouteLevel('modal_fermetures', title, 'Fermetures / Indisponibilités', showFermeturesMainPanel);
-}
-
-async function persistClosureEdit() {
-    if (closureSaveInFlight || closureApplyInFlight) return;
-    const u = getPlanningSessionUser();
-    if (!canManageOwnClosures(u)) return;
-    const f = readEditForm();
-    if (!f.startYmd || !f.endYmd) {
-        showToast('Indiquez les dates de début et de fin.', 'error');
-        return;
-    }
-    if (f.endYmd < f.startYmd) {
-        showToast('La date de fin doit être après le début.', 'error');
-        return;
-    }
-
-    const prev =
-        editingClosureIndex != null && editingClosureIndex >= 0
-            ? closureRanges[editingClosureIndex]
-            : null;
-
-    setClosureSaveBusy(true);
-    const r = await saveAbsencePeriodDraft({
-        id: prev?.legacy ? undefined : prev?.id,
-        startYmd: f.startYmd,
-        endYmd: f.endYmd,
-        title: f.title
+    void openFermetureEdit({
+        index,
+        source: 'menu',
+        periodId: index >= 0 ? closureRanges[index]?.id : undefined
     });
-    setClosureSaveBusy(false);
-    if (!r.ok || !r.period) {
-        showToast(r.error || 'Enregistrement impossible.', 'error');
-        return;
-    }
-
-    await loadClosureRangesFromServer();
-    returnToFermeturesList();
-    const isPast = f.endYmd < todayYmdLocal();
-    showToast(
-        isPast
-            ? 'Période enregistrée (historique). Elle ne sera pas publiée sur le planning.'
-            : 'Période enregistrée. Utilisez « Appliquer » pour la publier sur le planning.',
-        'success',
-        isPast ? 8000 : 6000
-    );
 }
 
 async function collectConflictsForPendingApply() {
@@ -470,7 +363,7 @@ async function collectConflictsForPendingApply() {
     /** @type {Map<string, object[]>} */
     const byPeriod = new Map();
     for (const p of pending) {
-        const conflicts = await findConflictsForClosureRange(p.startYmd, p.endYmd, []);
+        const conflicts = await findConflictsForClosurePeriod(p, []);
         if (conflicts.length) byPeriod.set(p.id, conflicts);
         for (const c of conflicts) {
             if (!all.some((x) => x.id === c.id)) all.push(c);
@@ -552,6 +445,10 @@ async function runApplyPendingClosures(deleteConflicts) {
             : `${r.applied} absences appliquées.`,
         'success'
     );
+    if (window.__fermeturesApplyFromCalendar) {
+        window.__fermeturesApplyFromCalendar = false;
+        document.getElementById('modal_fermetures')?.close();
+    }
 }
 
 function setConflictProceedBusy(busy) {
@@ -563,9 +460,7 @@ function setConflictProceedBusy(busy) {
 
 function returnToFermeturesList() {
     hideConflictPanel();
-    editingClosureIndex = null;
     showFermeturesMainPanel();
-    popPlanningRouteLevel('modal_fermetures');
 }
 
 async function deleteClosureAt(index) {
@@ -616,6 +511,35 @@ export async function loadClosureRangesFromServer() {
 }
 
 /** Ouvre la modale fermetures sur une période (ex. depuis un créneau fermeture du planning). */
+export function getClosureRangesRef() {
+    return closureRanges;
+}
+
+export function returnToFermeturesListOnly() {
+    returnToFermeturesList();
+}
+
+/** @param {object[]} conflicts @param {string} periodId @param {boolean} [fromCalendar] */
+export async function showFermeturesConflictFromApply(conflicts, periodId, fromCalendar = false) {
+    const u = getPlanningSessionUser();
+    if (!canViewClosures(u)) return;
+    const dlg = document.getElementById('modal_fermetures');
+    if (dlg && !dlg.open) {
+        if (fromCalendar) {
+            await dlg.showModal();
+        } else if (!openPlanningRouteFromDrawer('modal_fermetures', 'Fermetures / Indisponibilités', 'Menu')) {
+            await dlg.showModal();
+        }
+    }
+    await loadClosureRangesFromServer();
+    showFermeturesMainPanel();
+    const byPeriod = new Map();
+    byPeriod.set(periodId, conflicts);
+    window.__fermeturesApplyConflictMap = byPeriod;
+    showConflictPanel(conflicts);
+    window.__fermeturesApplyFromCalendar = fromCalendar;
+}
+
 export async function openClosureEditByPeriodId(periodId) {
     const id = String(periodId || '').trim();
     if (!id || id.startsWith('legacy:')) {
@@ -634,14 +558,7 @@ export async function openClosureEditByPeriodId(periodId) {
         showToast('Période introuvable (rechargez la liste).', 'error');
         return;
     }
-    const dlg = document.getElementById('modal_fermetures');
-    if (dlg && !dlg.open) {
-        if (!openPlanningRouteFromDrawer('modal_fermetures', 'Fermetures / Indisponibilités', 'Menu')) {
-            await dlg.showModal();
-        }
-    }
-    showFermeturesMainPanel();
-    openClosureEdit(idx);
+    void openFermetureEdit({ index: idx, periodId: id, source: 'menu' });
 }
 
 export async function openFermeturesModal() {
@@ -664,9 +581,7 @@ export function syncFermeturesMenuVisibility(user) {
 export function resetFermeturesUiBindings() {
     bound = false;
     closureRanges = [];
-    editingClosureIndex = null;
     pendingConflicts = [];
-    closureSaveInFlight = false;
     closureApplyInFlight = false;
     closureRangesBeforeOptimistic = null;
 }
@@ -695,8 +610,9 @@ export function initFermeturesUi() {
         void runApplyPendingClosures(false);
     });
 
-    document.getElementById('fermeture-edit-save')?.addEventListener('click', () => {
-        void persistClosureEdit();
+    document.getElementById('fermetures-filter-own')?.addEventListener('change', (ev) => {
+        fermeturesOwnOnlyFilter = ev.target instanceof HTMLInputElement && ev.target.checked;
+        renderClosureCards();
     });
 
     document.getElementById('fermetures-conflict-cancel')?.addEventListener('click', () => {

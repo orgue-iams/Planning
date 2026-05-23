@@ -33,7 +33,7 @@ import {
     replacePlanningEventEnrollment
 } from './planning-events-db.js';
 import { fetchOrganSchoolSettings, getOrganSchoolSettingsCached } from './organ-settings.js';
-import { openClosureEditByPeriodId } from './fermetures-ui.js';
+import { openFermetureEditFromCalendarEvent } from './fermeture-edit-ui.js';
 import {
     eleveBookingTooFarInFuture,
     eleveTravailWouldExceedWeeklyCap,
@@ -3657,6 +3657,16 @@ export async function quickCreateFromDateClick(calendar, clickDate, currentUser,
  */
 export async function openModal(start, end, event, currentUser, calendarForClip = null) {
     document.dispatchEvent(new CustomEvent('planning-close-drawer-request'));
+    if (event) {
+        const xpF = safeEventExtendedProps(event) || {};
+        const isFermetureClick =
+            String(xpF.planningDbSlotType || '').toLowerCase() === 'fermeture' ||
+            String(xpF.type || '').toLowerCase() === 'fermeture';
+        if (isFermetureClick) {
+            await openFermetureEditFromCalendarEvent(event);
+            return;
+        }
+    }
     const modal = document.getElementById('modal_reservation');
     if (!modal) return;
     if (event) {

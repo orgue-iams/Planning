@@ -11,7 +11,7 @@ import {
     markAbsencePeriodApplied,
     pendingAbsencePeriodsForUser
 } from './absence-period-db.js';
-import { enumerateYmdInRange, saveClosureRangeToPlanning } from './fermetures-planning.js';
+import { resolveClosureOccurrenceDays, saveClosureRangeToPlanning } from './fermetures-planning.js';
 import { formatApplyProgressLabel } from '../utils/apply-progress-label.js';
 import { executeProfSlotsShift } from './prof-slots-shift-engine.js';
 import { getProfWeekCycleForToolbar } from './week-cycle.js';
@@ -93,9 +93,8 @@ export async function applyPendingAbsencePeriods(periods, opts = {}) {
     /** Jours de fermeture publiés lors de cette application (décalage prof limité à ces jours). */
     const appliedClosureYmdSet = new Set();
     for (const period of valid) {
-        for (const ymd of enumerateYmdInRange(period.startYmd, period.endYmd)) {
-            appliedClosureYmdSet.add(ymd);
-        }
+        const days = await resolveClosureOccurrenceDays(period);
+        for (const ymd of days) appliedClosureYmdSet.add(ymd);
     }
 
     let applied = 0;
@@ -107,7 +106,14 @@ export async function applyPendingAbsencePeriods(periods, opts = {}) {
                 startYmd: period.startYmd,
                 endYmd: period.endYmd,
                 title: period.title,
-                absencePeriodId: period.id
+                absencePeriodId: period.id,
+                isPeriodic: period.isPeriodic,
+                weekdays: period.weekdays,
+                slotStartTime: period.slotStartTime,
+                slotEndTime: period.slotEndTime,
+                excludedYmds: period.excludedYmds,
+                dayOverrides: period.dayOverrides,
+                eventIds: period.eventIds
             },
             {
                 deleteConflicts: Boolean(opts.deleteConflicts && conflicts.length),

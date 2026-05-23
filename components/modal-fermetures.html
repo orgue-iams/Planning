@@ -1,6 +1,10 @@
 <dialog id="modal_fermetures" class="modal">
     <div class="modal-box p-4 pb-0 w-[96%] max-w-lg max-h-[90dvh] overflow-hidden rounded-2xl border border-slate-200 shadow-2xl flex flex-col dark:border-slate-600">
         <div id="fermetures-main-panel" class="min-w-0 flex-1 min-h-0 flex flex-col">
+            <label id="fermetures-filter-own-wrap" class="flex items-center gap-2 shrink-0 mb-2 cursor-pointer">
+                <input type="checkbox" id="fermetures-filter-own" class="toggle toggle-sm" role="switch" />
+                <span class="text-[11px] font-semibold text-slate-700">Mes fermetures uniquement</span>
+            </label>
             <div class="fermetures-card-list min-w-0 flex-1 min-h-0 overflow-y-auto pb-2 space-y-4">
                 <section id="fermetures-section-applied" class="min-w-0 space-y-2">
                     <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 m-0 shrink-0">Déjà appliquées</p>
@@ -34,26 +38,6 @@
             <div id="fermetures-apply-progress-wrap" class="hidden shrink-0 pt-2 mt-1 border-t border-slate-200 dark:border-slate-600" aria-hidden="true">
                 <p id="fermetures-apply-progress-label" class="text-[10px] font-semibold text-slate-600 dark:text-slate-300 m-0 mb-1">Application…</p>
                 <progress id="fermetures-apply-progress" class="progress progress-primary w-full h-2" value="0" max="100"></progress>
-            </div>
-        </div>
-
-        <div id="fermetures-edit-panel" class="hidden min-w-0 flex-1 min-h-0 overflow-y-auto space-y-3 pb-4" aria-hidden="true">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label class="flex flex-col gap-1 min-w-0">
-                    <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Début (inclus)</span>
-                    <input type="date" id="fermeture-edit-start" class="input input-bordered input-sm w-full font-mono planning-date-input bg-white dark:bg-slate-900 dark:text-slate-100" />
-                </label>
-                <label class="flex flex-col gap-1 min-w-0">
-                    <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Fin (inclus)</span>
-                    <input type="date" id="fermeture-edit-end" class="input input-bordered input-sm w-full font-mono planning-date-input bg-white dark:bg-slate-900 dark:text-slate-100" />
-                </label>
-            </div>
-            <label class="flex flex-col gap-1 min-w-0">
-                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Titre (optionnel)</span>
-                <input type="text" id="fermeture-edit-title" class="input input-bordered input-sm w-full bg-white dark:bg-slate-900 dark:text-slate-100" maxlength="120" placeholder="Ex. Vacances, absence personnelle" />
-            </label>
-            <div class="flex flex-wrap gap-2 justify-end pt-1">
-                <button type="button" id="fermeture-edit-save" class="btn btn-sm planning-btn-accent font-semibold text-[11px]">Enregistrer</button>
             </div>
         </div>
     </div>

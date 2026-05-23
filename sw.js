@@ -77,6 +77,7 @@ const ASSETS = [
   './components/modal-semaines-apply.html',
   './components/modal-semaines-shift.html',
   './components/modal-fermetures.html',
+  './components/modal-fermeture-edit.html',
   './js/core/fermetures-ui.js',
   './js/core/fermetures-planning.js',
   './js/utils/planning-card-swipe.js',

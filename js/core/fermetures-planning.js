@@ -21,6 +21,13 @@ import {
 import { formatTimeFr24 } from '../utils/time-helpers.js';
 import { formatApplyProgressLabel, formatUniqueTitlesPreview } from '../utils/apply-progress-label.js';
 import { invokeSlotNotify } from './slot-notify-api.js';
+import {
+    enumerateWeekdayYmdInRange,
+    normalizeClosureTime,
+    normalizeDayOverrides,
+    normalizeExcludedYmds,
+    slotBoundsIsoFromYmdAndTimes
+} from '../utils/closure-period-helpers.js';
 
 /** @param {string[]} userIds */
 async function fetchProfileLabelsMap(userIds) {
@@ -441,9 +448,106 @@ export async function loadClosureRangesFromPlanning(opts = {}) {
 }
 
 /**
- * @param {{ startYmd: string, endYmd: string, title?: string, eventIds?: string[] }} range
+ * @param {{
+ *   startYmd: string,
+ *   endYmd: string,
+ *   title?: string,
+ *   eventIds?: string[],
+ *   absencePeriodId?: string,
+ *   isPeriodic?: boolean,
+ *   weekdays?: number[],
+ *   slotStartTime?: string,
+ *   slotEndTime?: string,
+ *   excludedYmds?: string[],
+ *   dayOverrides?: object[]
+ * }} range
  * @param {{ deleteConflicts?: boolean, conflicts?: object[], onProgress?: (label: string) => void }} opts
  */
+export async function resolveClosureOccurrenceDays(range) {
+    const startYmd = String(range.startYmd || '').slice(0, 10);
+    const endYmd = String(range.endYmd || '').slice(0, 10);
+    const excluded = new Set(normalizeExcludedYmds(range.excludedYmds));
+    if (range.isPeriodic && normalizeWeekdaysFromRange(range).length) {
+        return enumerateWeekdayYmdInRange(
+            normalizeWeekdaysFromRange(range),
+            startYmd,
+            endYmd,
+            excluded
+        );
+    }
+    return enumerateYmdInRange(startYmd, endYmd).filter((ymd) => !excluded.has(ymd));
+}
+
+function normalizeWeekdaysFromRange(range) {
+    return Array.isArray(range.weekdays) ? range.weekdays : [];
+}
+
+function boundsForClosureDay(ymd, range, overrides) {
+    const ov = overrides.find((o) => o.ymd === ymd);
+    const title = normClosureTitle(ov?.title || range.title);
+    if (range.isPeriodic || range.slotStartTime || range.slotEndTime) {
+        const st = normalizeClosureTime(ov?.slot_start_time || range.slotStartTime);
+        const en = normalizeClosureTime(ov?.slot_end_time || range.slotEndTime);
+        const { startIso, endIso } = slotBoundsIsoFromYmdAndTimes(ymd, st, en);
+        return { startIso, endIso, title };
+    }
+    const full = daySlotBoundsIsoFromYmd(ymd);
+    return { startIso: full.startIso, endIso: full.endIso, title };
+}
+
+/**
+ * Créneaux non-fermeture en conflit avec les jours / horaires de la période.
+ * @param {object} range
+ * @param {string[]} [excludeEventIds]
+ */
+export async function findConflictsForClosurePeriod(range, excludeEventIds = []) {
+    const days = await resolveClosureOccurrenceDays(range);
+    if (!days.length) return [];
+    const overrides = normalizeDayOverrides(range.dayOverrides);
+    /** @type {object[]} */
+    const all = [];
+    const seen = new Set();
+    for (const ymd of days) {
+        const b = boundsForClosureDay(ymd, range, overrides);
+        const st = new Date(b.startIso).getTime();
+        const en = new Date(b.endIso).getTime();
+        const rows = await fetchPlanningEventRowsInRange(new Date(b.startIso), new Date(b.endIso));
+        for (const row of rows) {
+            const id = String(row?.id || '').trim();
+            if (!id || excludeEventIds.includes(id)) continue;
+            if (String(row?.slot_type || '').toLowerCase() === 'fermeture') continue;
+            const rs = new Date(row.start_at).getTime();
+            const re = new Date(row.end_at).getTime();
+            if (Number.isNaN(rs) || Number.isNaN(re)) continue;
+            if (rs < en && re > st && !seen.has(id)) {
+                seen.add(id);
+                all.push({
+                    id,
+                    title: String(row.title || '').trim() || 'Créneau',
+                    slotType: String(row.slot_type || '').trim(),
+                    startIso: row.start_at,
+                    endIso: row.end_at,
+                    ownerEmail: String(row.owner_email || '').trim().toLowerCase(),
+                    ownerUserId: String(row.owner_user_id || '').trim(),
+                    ownerLabel: '',
+                    ownerDisplayName: ''
+                });
+            }
+        }
+    }
+    const ownerIds = all.map((c) => c.ownerUserId).filter(Boolean);
+    const labelMap = await fetchProfileLabelsMap(ownerIds);
+    for (const c of all) {
+        const lab = labelMap.get(c.ownerUserId);
+        if (lab) {
+            c.ownerDisplayName = lab;
+            c.ownerLabel = lab;
+        }
+    }
+    all.sort((a, b) => String(a.startIso).localeCompare(String(b.startIso)));
+    return all;
+}
+
 export async function saveClosureRangeToPlanning(range, opts = {}) {
     const u = getPlanningSessionUser();
     if (!u?.email || !u?.id) return { ok: false, error: 'Session requise.' };
@@ -452,7 +556,8 @@ export async function saveClosureRangeToPlanning(range, opts = {}) {
     const startYmd = String(range.startYmd || '').slice(0, 10);
     const endYmd = String(range.endYmd || '').slice(0, 10);
     const title = normClosureTitle(range.title);
-    const days = enumerateYmdInRange(startYmd, endYmd);
+    const overrides = normalizeDayOverrides(range.dayOverrides);
+    const days = await resolveClosureOccurrenceDays(range);
     if (!days.length) return { ok: false, error: 'Plage de dates invalide.' };
 
     const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : null;
@@ -495,11 +600,11 @@ export async function saveClosureRangeToPlanning(range, opts = {}) {
                 detail: `création fermeture ${formatYmdShortFr(ymd)} — « ${title} »`
             })
         );
-        const { startIso, endIso } = daySlotBoundsIsoFromYmd(ymd);
+        const bounds = boundsForClosureDay(ymd, range, overrides);
         const ur = await upsertPlanningEventRow({
-            startIso,
-            endIso,
-            title,
+            startIso: bounds.startIso,
+            endIso: bounds.endIso,
+            title: bounds.title,
             dbSlotType: 'fermeture',
             ownerEmail,
             ownerUserId,
@@ -510,9 +615,9 @@ export async function saveClosureRangeToPlanning(range, opts = {}) {
         }
         googlePayloads.push({
             planningEventId: ur.id,
-            title,
-            start: startIso,
-            end: endIso,
+            title: bounds.title,
+            start: bounds.startIso,
+            end: bounds.endIso,
             type: 'fermeture',
             owner: ownerEmail
         });

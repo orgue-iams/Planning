@@ -94,6 +94,7 @@ import {
     resetFermeturesUiBindings,
     syncFermeturesMenuVisibility
 } from './fermetures-ui.js';
+import { initFermetureEditUi, resetFermetureEditUiBindings } from './fermeture-edit-ui.js';
 import { initStatisticsUi, resetStatisticsUiBindings } from './statistics-ui.js';
 import { initDirectoryUsersUi, resetDirectoryUsersUiBindings } from './directory-users-ui.js';
 import { initCoursSeriesScopeUi, resetCoursSeriesScopeUiBindings } from './cours-series-scope-ui.js';
@@ -179,6 +180,7 @@ function performLogout() {
         'modal_profile',
         'modal_semaines_types',
         'modal_fermetures',
+        'modal_fermeture_edit',
         'modal_config',
         'modal_course_students',
         'modal_statistics',
@@ -592,6 +594,7 @@ function initCalendarAndRevealUi() {
         });
         initSemainesTypesUi();
         initFermeturesUi();
+        initFermetureEditUi();
         initStatisticsUi();
         initDirectoryUsersUi();
         initCoursSeriesScopeUi();

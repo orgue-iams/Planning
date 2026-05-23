@@ -3,7 +3,7 @@
  */
 import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
 import { getPlanningSessionUser } from './session-user.js';
-import { googleCalendarEmbedUrl } from '../utils/google-calendar-url.js';
+import { googleCalendarEmbedUrl, googleCalendarSubscribeUrl } from '../utils/google-calendar-url.js';
 import { showToast } from '../utils/toast.js';
 import {
     appendEleveGabaritCoursCard,
@@ -18,7 +18,7 @@ import { sortEventsByStart } from './planning-courses.js';
 import { fetchPlanningEventsForFullCalendar } from './planning-events-db.js';
 
 const AGENDA_HELP =
-    'Ces liens permettent d’afficher le planning dans Google Agenda (lecture seule). Dans Google Agenda : Paramètres → Ajouter un agenda → À partir de l’URL. Collez le lien copié. Le planning principal affiche tous les créneaux. Le planning personnel affiche, selon votre rôle : vos cours inscrits ou à donner, et vos créneaux de travail perso (pas les autres types ni le travail des autres).';
+    '« Ajouter à mon agenda » ouvre Google Agenda pour s’abonner aux calendriers IAMS (principal + personnel si disponible). « Copier l’URL » sert à une intégration lecture seule (Paramètres → Ajouter un agenda → À partir de l’URL). Le planning principal affiche tous les créneaux ; le personnel limite l’affichage à vos cours et créneaux selon votre rôle.';
 
 let nextCoursRefreshGen = 0;
 
@@ -128,6 +128,23 @@ export async function refreshDrawerAgendas(user) {
     } else {
         persWrap?.classList.add('hidden');
         persNone?.classList.remove('hidden');
+    }
+
+    const subBtn = document.getElementById('drawer-agenda-subscribe-btn');
+    const mainSub = googleCalendarSubscribeUrl(mainGoogleCalendarId);
+    const persSub = googleCalendarSubscribeUrl(persId);
+    if (subBtn instanceof HTMLButtonElement) {
+        const canSub = Boolean(mainSub || persSub);
+        subBtn.classList.toggle('hidden', !canSub);
+        subBtn.onclick = () => {
+            if (mainSub) window.open(mainSub, '_blank', 'noopener,noreferrer');
+            if (persSub) {
+                window.setTimeout(() => {
+                    window.open(persSub, '_blank', 'noopener,noreferrer');
+                }, 400);
+            }
+            showToast('Ouverture de Google Agenda pour ajouter les calendriers IAMS.');
+        };
     }
 }
 

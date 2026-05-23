@@ -80,7 +80,7 @@ dialog.planning-route-page .modal-box {
     margin: 0;
     border-radius: 0;
     border: none;
-    box-shadow: 4px 0 24px rgb(15 23 42 / 0.1);
+    box-shadow: none;
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
@@ -93,6 +93,7 @@ dialog.planning-route-page#modal_directory_users {
 
 dialog.planning-route-page#modal_config,
 dialog.planning-route-page#modal_fermetures,
+dialog.planning-route-page#modal_fermeture_edit,
 dialog.planning-route-page#modal_profile,
 dialog.planning-route-page#modal_calendar_pool,
 dialog.planning-route-page#modal_statistics {
@@ -196,6 +197,7 @@ dialog.planning-route-page .planning-route-section > p.text-\[10px\].font-bold {
 
     dialog.planning-route-page#modal_config,
     dialog.planning-route-page#modal_fermetures,
+    dialog.planning-route-page#modal_fermeture_edit,
     dialog.planning-route-page#modal_profile,
     dialog.planning-route-page#modal_calendar_pool,
     dialog.planning-route-page#modal_statistics {

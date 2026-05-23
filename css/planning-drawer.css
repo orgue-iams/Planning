@@ -632,6 +632,52 @@
     color: rgb(194 65 12);
 }
 
+.planning-drawer__link-icon--stroke-blue {
+    background: rgb(241 245 249);
+    color: rgb(29 78 216);
+}
+
+.planning-drawer__link-icon--stroke-yellow {
+    background: rgb(241 245 249);
+    color: rgb(202 138 4);
+}
+
+.planning-drawer__link-icon--stroke-orange {
+    background: rgb(241 245 249);
+    color: rgb(194 65 12);
+}
+
+.planning-drawer__link-icon--stroke-green {
+    background: rgb(241 245 249);
+    color: rgb(21 128 61);
+}
+
+.planning-drawer__link-icon--stroke-logout {
+    background: rgb(241 245 249);
+    color: rgb(234 88 12);
+}
+
+[data-theme='dark'] .planning-drawer__link-icon--stroke-blue {
+    background: rgb(51 65 85);
+    color: rgb(147 197 253);
+}
+
+[data-theme='dark'] .planning-drawer__link-icon--stroke-yellow {
+    background: rgb(51 65 85);
+    color: rgb(253 224 71);
+}
+
+[data-theme='dark'] .planning-drawer__link-icon--stroke-orange,
+[data-theme='dark'] .planning-drawer__link-icon--stroke-logout {
+    background: rgb(51 65 85);
+    color: rgb(253 186 116);
+}
+
+[data-theme='dark'] .planning-drawer__link-icon--stroke-green {
+    background: rgb(51 65 85);
+    color: rgb(134 239 172);
+}
+
 [data-theme='dark'] .planning-drawer__link-icon--neutral {
     background: rgb(51 65 85);
 }

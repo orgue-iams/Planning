@@ -4,6 +4,13 @@
  * @param {string} calendarId
  * @param {{ timeZone?: string }} [opts] — défaut Europe/Paris (aligné agenda IAMS)
  */
+/** URL d’abonnement Google Calendar (ajout au compte Google). */
+export function googleCalendarSubscribeUrl(calendarId) {
+    const id = String(calendarId || '').trim();
+    if (!id) return '';
+    return `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(id)}`;
+}
+
 export function googleCalendarEmbedUrl(calendarId, opts) {
     const id = String(calendarId || '').trim();
     if (!id) return '';

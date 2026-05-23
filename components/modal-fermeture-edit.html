@@ -1,0 +1,77 @@
+<dialog id="modal_fermeture_edit" class="modal">
+    <div class="modal-box fermeture-edit-route-box p-4 w-[96%] max-w-md max-h-[90dvh] flex flex-col border-0 shadow-none">
+        <div id="fermeture-edit-tabs" class="hidden flex gap-1 mb-3 shrink-0" role="tablist" aria-label="Mode d’édition">
+            <button type="button" id="fermeture-edit-tab-period" class="btn btn-sm btn-primary flex-1 font-semibold text-[11px]" role="tab" aria-selected="true">Toute la période</button>
+            <button type="button" id="fermeture-edit-tab-day" class="btn btn-sm btn-outline flex-1 font-semibold text-[11px]" role="tab" aria-selected="false">Ce jour</button>
+        </div>
+
+        <div id="fermeture-edit-body" class="space-y-4 overflow-y-auto flex-1 min-w-0 py-1">
+            <div id="fermeture-edit-panel-period" class="space-y-4">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="fermeture-edit-periodic" class="checkbox checkbox-sm" />
+                    <span class="text-sm font-semibold text-slate-800">Fermeture périodique</span>
+                </label>
+
+                <div id="fermeture-edit-dates-wrap" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label class="flex flex-col gap-1 min-w-0">
+                        <span class="label-text font-bold text-[11px] uppercase text-slate-500">Début (inclus)</span>
+                        <input type="date" id="fermeture-edit-start" class="input input-bordered input-sm w-full font-mono planning-date-input bg-white" />
+                    </label>
+                    <label class="flex flex-col gap-1 min-w-0">
+                        <span class="label-text font-bold text-[11px] uppercase text-slate-500">Fin (inclus)</span>
+                        <input type="date" id="fermeture-edit-end" class="input input-bordered input-sm w-full font-mono planning-date-input bg-white" />
+                    </label>
+                </div>
+
+                <div id="fermeture-edit-weekdays-wrap" class="hidden space-y-2">
+                    <span class="label-text font-bold text-[11px] uppercase text-slate-500 block">Jours de la semaine</span>
+                    <div id="fermeture-edit-weekdays" class="flex flex-wrap gap-2"></div>
+                    <p class="text-[10px] text-slate-500 m-0 leading-snug">Sur l’année scolaire en cours (à partir d’aujourd’hui si elle a déjà commencé).</p>
+                </div>
+
+                <div class="form-control">
+                    <span class="label-text font-bold text-[11px] uppercase text-slate-500 block mb-1">Horaires</span>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <select id="fermeture-edit-time-start" class="select select-sm w-[6.5rem] font-mono bg-white" aria-label="Heure de début"></select>
+                        <span class="text-slate-500 text-sm">à</span>
+                        <select id="fermeture-edit-time-end" class="select select-sm w-[6.5rem] font-mono bg-white" aria-label="Heure de fin"></select>
+                    </div>
+                </div>
+
+                <label class="flex flex-col gap-1 min-w-0">
+                    <span class="label-text font-bold text-[11px] uppercase text-slate-500">Titre (optionnel)</span>
+                    <input type="text" id="fermeture-edit-title" class="input input-bordered input-sm w-full bg-white" maxlength="120" placeholder="Ex. Vacances, absence personnelle" />
+                </label>
+            </div>
+
+            <div id="fermeture-edit-panel-day" class="hidden space-y-4">
+                <p class="text-[11px] text-slate-600 m-0 leading-snug">Modifier ou supprimer uniquement le jour sélectionné sur le planning (la période périodique sera ajustée).</p>
+                <label class="flex flex-col gap-1 min-w-0">
+                    <span class="label-text font-bold text-[11px] uppercase text-slate-500">Jour</span>
+                    <input type="date" id="fermeture-edit-single-ymd" class="input input-bordered input-sm w-full font-mono bg-white" />
+                </label>
+                <div class="form-control">
+                    <span class="label-text font-bold text-[11px] uppercase text-slate-500 block mb-1">Horaires</span>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <select id="fermeture-edit-single-time-start" class="select select-sm w-[6.5rem] font-mono bg-white"></select>
+                        <span class="text-slate-500 text-sm">à</span>
+                        <select id="fermeture-edit-single-time-end" class="select select-sm w-[6.5rem] font-mono bg-white"></select>
+                    </div>
+                </div>
+                <label class="flex flex-col gap-1 min-w-0">
+                    <span class="label-text font-bold text-[11px] uppercase text-slate-500">Titre (optionnel)</span>
+                    <input type="text" id="fermeture-edit-single-title" class="input input-bordered input-sm w-full bg-white" maxlength="120" />
+                </label>
+            </div>
+        </div>
+
+        <div id="fermeture-edit-footer" class="shrink-0 pt-3 mt-1 border-t border-slate-200 flex flex-wrap items-center gap-2">
+            <button type="button" id="fermeture-edit-delete" class="btn btn-error btn-outline btn-sm font-bold text-[11px] hidden">Supprimer</button>
+            <div class="flex flex-wrap gap-2 ml-auto">
+                <button type="button" id="fermeture-edit-cancel" class="btn planning-btn-dismiss btn-sm font-bold text-[11px]">Annuler</button>
+                <button type="button" id="fermeture-edit-save" class="btn btn-primary btn-sm font-bold text-[11px]">Enregistrer</button>
+                <button type="button" id="fermeture-edit-apply" class="btn btn-primary btn-sm font-bold text-[11px] hidden">Appliquer</button>
+            </div>
+        </div>
+    </div>
+</dialog>

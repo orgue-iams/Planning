@@ -12,6 +12,12 @@ import {
 } from './organ-settings.js';
 import { fetchPlanningEventRowsInRange } from './planning-events-db.js';
 import { groupFermetureRowsIntoRanges } from './fermetures-planning.js';
+import {
+    normalizeDayOverrides,
+    normalizeExcludedYmds,
+    normalizeWeekdays,
+    normalizeClosureTime
+} from '../utils/closure-period-helpers.js';
 
 /**
  * @typedef {object} AbsencePeriodRow
@@ -25,6 +31,12 @@ import { groupFermetureRowsIntoRanges } from './fermetures-planning.js';
  * @property {string | null} appliedAt — ISO ou null
  * @property {string[]} eventIds
  * @property {boolean} legacy — true si dérivé d’anciens créneaux sans période
+ * @property {boolean} isPeriodic
+ * @property {number[]} weekdays — ISO 1=lundi … 7=dimanche
+ * @property {string} slotStartTime — HH:MM
+ * @property {string} slotEndTime — HH:MM
+ * @property {string[]} excludedYmds
+ * @property {object[]} dayOverrides
  */
 
 function todayYmdLocal() {
@@ -51,7 +63,13 @@ function mapDbPeriod(row, profileById) {
         title: String(row.title || '').trim() || 'Fermeture',
         appliedAt: row.applied_at ? String(row.applied_at) : null,
         eventIds: [],
-        legacy: false
+        legacy: false,
+        isPeriodic: Boolean(row.is_periodic),
+        weekdays: normalizeWeekdays(row.weekdays),
+        slotStartTime: normalizeClosureTime(row.slot_start_time) || '',
+        slotEndTime: normalizeClosureTime(row.slot_end_time) || '',
+        excludedYmds: normalizeExcludedYmds(row.excluded_ymds),
+        dayOverrides: normalizeDayOverrides(row.day_overrides)
     };
 }
 
@@ -79,7 +97,9 @@ export async function fetchAbsencePeriodsForCurrentSchoolYear() {
 
     let q = sb
         .from('planning_absence_period')
-        .select('id,created_by_user_id,start_ymd,end_ymd,title,applied_at,created_at')
+        .select(
+            'id,created_by_user_id,start_ymd,end_ymd,title,applied_at,created_at,is_periodic,weekdays,slot_start_time,slot_end_time,excluded_ymds,day_overrides'
+        )
         .order('start_ymd', { ascending: true })
         .order('end_ymd', { ascending: true });
     if (sy) q = q.gte('end_ymd', sy);
@@ -200,25 +220,54 @@ export async function saveAbsencePeriodDraft(p) {
     const sb = getSupabaseClient();
     if (!sb) return { ok: false, error: 'Session indisponible.', period: null };
 
+    const isPeriodic = Boolean(p.isPeriodic);
+    const weekdays = normalizeWeekdays(p.weekdays);
+    const slotStart = normalizeClosureTime(p.slotStartTime);
+    const slotEnd = normalizeClosureTime(p.slotEndTime);
+    if (isPeriodic && !weekdays.length) {
+        return { ok: false, error: 'Cochez au moins un jour de la semaine.', period: null };
+    }
+    if (isPeriodic && (!slotStart || !slotEnd || slotEnd <= slotStart)) {
+        return { ok: false, error: 'Indiquez une plage horaire valide.', period: null };
+    }
+
     const row = {
         start_ymd: startYmd,
         end_ymd: endYmd,
         title: String(p.title || '').trim() || 'Fermeture',
+        is_periodic: isPeriodic,
+        weekdays: isPeriodic ? weekdays : [],
+        slot_start_time: slotStart ? `${slotStart}:00` : null,
+        slot_end_time: slotEnd ? `${slotEnd}:00` : null,
+        excluded_ymds: normalizeExcludedYmds(p.excludedYmds),
+        day_overrides: normalizeDayOverrides(p.dayOverrides),
         updated_at: new Date().toISOString()
     };
 
     const existingId = String(p.id || '').trim();
     if (existingId && !existingId.startsWith('legacy:')) {
-        const { data, error } = await sb
-            .from('planning_absence_period')
-            .update(row)
-            .eq('id', existingId)
-            .eq('created_by_user_id', u.id)
-            .is('applied_at', null)
-            .select('id,created_by_user_id,start_ymd,end_ymd,title,applied_at')
+        const allowApplied = Boolean(p.allowAppliedUpdate);
+        let q = sb.from('planning_absence_period').update(row).eq('id', existingId);
+        if (!isAdmin(u)) {
+            q = q.eq('created_by_user_id', u.id);
+            if (!allowApplied) q = q.is('applied_at', null);
+        } else if (!allowApplied) {
+            q = q.is('applied_at', null);
+        }
+        const { data, error } = await q.select(
+                'id,created_by_user_id,start_ymd,end_ymd,title,applied_at,is_periodic,weekdays,slot_start_time,slot_end_time,excluded_ymds,day_overrides'
+            )
             .maybeSingle();
         if (error) return { ok: false, error: error.message, period: null };
-        if (!data) return { ok: false, error: 'Période introuvable ou déjà appliquée.', period: null };
+        if (!data) {
+            return {
+                ok: false,
+                error: allowApplied
+                    ? 'Période introuvable ou non modifiable.'
+                    : 'Période introuvable ou déjà appliquée.',
+                period: null
+            };
+        }
         const profileById = await loadProfileMap([u.id]);
         return { ok: true, error: null, period: mapDbPeriod(data, profileById) };
     }
@@ -229,7 +278,9 @@ export async function saveAbsencePeriodDraft(p) {
             ...row,
             created_by_user_id: u.id
         })
-        .select('id,created_by_user_id,start_ymd,end_ymd,title,applied_at')
+        .select(
+            'id,created_by_user_id,start_ymd,end_ymd,title,applied_at,is_periodic,weekdays,slot_start_time,slot_end_time,excluded_ymds,day_overrides'
+        )
         .single();
     if (error) return { ok: false, error: error.message, period: null };
     const profileById = await loadProfileMap([u.id]);

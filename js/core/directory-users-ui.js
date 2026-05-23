@@ -85,22 +85,6 @@ function buildDirectoryContactColumn(r, roleKey) {
             col.appendChild(p);
         }
     }
-    const agenda = directoryUserAgendaLabel(r);
-    if (agenda) {
-        const row = document.createElement('div');
-        row.className =
-            'directory-user-card__agenda-row flex items-center justify-start gap-1.5 min-w-0';
-        const icon = document.createElement('span');
-        icon.className = `directory-user-card__avatar directory-user-card__avatar--${roleKey} directory-user-card__agenda-icon shrink-0`;
-        icon.innerHTML = DIRECTORY_CALENDAR_ICON_SVG;
-        const lab = document.createElement('p');
-        lab.className =
-            'directory-user-card__agenda text-[11px] sm:text-xs font-semibold text-slate-800 m-0 break-words leading-snug';
-        lab.textContent = agenda;
-        row.appendChild(icon);
-        row.appendChild(lab);
-        col.appendChild(row);
-    }
     return col;
 }
 
@@ -205,19 +189,19 @@ function buildPrivilegedUserCard(r, opts) {
     const roleKey = normalizePlanningRole(r.profile_role || r.role);
     const withDelete = Boolean(opts.canDelete);
     card.className =
-        `directory-admin-user-card directory-admin-user-card--layout-v3${withDelete ? ' directory-admin-user-card--with-delete' : ''} ${directoryRoleCardClass(roleKey)} py-2.5 px-3 min-w-0 rounded-xl border`;
+        `directory-admin-user-card directory-admin-user-card--layout-v4${withDelete ? ' directory-admin-user-card--with-delete' : ''} ${directoryRoleCardClass(roleKey)} py-2.5 px-3 min-w-0 rounded-xl border`;
     card.dataset.userJson = JSON.stringify(r);
 
-    const identity = document.createElement('div');
-    identity.className =
-        'directory-user-card__identity min-w-0 flex flex-row items-start gap-2';
-
+    const avatarCol = document.createElement('div');
+    avatarCol.className = 'directory-user-card__avatar-col shrink-0 flex items-center';
     const avatar = document.createElement('span');
-    avatar.className = `directory-user-card__avatar directory-user-card__avatar--${roleKey} shrink-0`;
+    avatar.className = `directory-user-card__avatar directory-user-card__avatar--${roleKey}`;
     avatar.innerHTML = DIRECTORY_USER_ICON_SVG;
+    avatarCol.appendChild(avatar);
+    card.appendChild(avatarCol);
 
-    const identityText = document.createElement('div');
-    identityText.className = 'min-w-0 flex-1 flex flex-col justify-center pt-0.5';
+    const nameCol = document.createElement('div');
+    nameCol.className = 'directory-user-card__name-col min-w-0 flex flex-col justify-center';
     const nameP = document.createElement('p');
     nameP.className =
         'directory-user-card__name font-semibold text-slate-900 leading-snug m-0 text-[13px]';
@@ -226,18 +210,15 @@ function buildPrivilegedUserCard(r, opts) {
     roleP.className =
         'directory-user-card__role font-bold text-[11px] sm:text-xs leading-snug m-0 mt-0.5 text-slate-700';
     roleP.textContent = roleLabel(r.profile_role || r.role);
-    identityText.appendChild(nameP);
-    identityText.appendChild(roleP);
-    identity.appendChild(avatar);
-    identity.appendChild(identityText);
-    card.appendChild(identity);
+    nameCol.appendChild(nameP);
+    nameCol.appendChild(roleP);
+    card.appendChild(nameCol);
 
-    const contact = buildDirectoryContactColumn(r, roleKey);
-    card.appendChild(contact);
+    card.appendChild(buildDirectoryContactColumn(r, roleKey));
 
     if (withDelete) {
         const actions = document.createElement('div');
-        actions.className = 'directory-user-card__actions';
+        actions.className = 'directory-user-card__actions shrink-0 flex items-center';
         actions.appendChild(
             createPlanningIconDeleteButton({
                 ariaLabel: `Supprimer ${directoryDisplayName(r)}`,
@@ -272,8 +253,9 @@ function buildPrivilegedUserCard(r, opts) {
                 }
             });
         };
-        bindOpen(identity);
-        if (contact.childElementCount) bindOpen(contact);
+        bindOpen(nameCol);
+        const contactCol = card.querySelector('.directory-user-card__contact');
+        if (contactCol) bindOpen(contactCol);
     }
 
     return card;
@@ -319,16 +301,18 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
         for (const r of rows) {
             const item = document.createElement('div');
             const roleKey = normalizePlanningRole(r.profile_role || r.role);
-            item.className = `directory-readonly-user-item directory-admin-user-card directory-admin-user-card--layout-v3 ${directoryRoleCardClass(roleKey)} py-2.5 px-3 min-w-0 rounded-xl border`;
+            item.className = `directory-readonly-user-item directory-admin-user-card directory-admin-user-card--layout-v4 ${directoryRoleCardClass(roleKey)} py-2.5 px-3 min-w-0 rounded-xl border`;
 
-            const identity = document.createElement('div');
-            identity.className =
-                'directory-user-card__identity min-w-0 flex flex-row items-start gap-2';
+            const avatarCol = document.createElement('div');
+            avatarCol.className = 'directory-user-card__avatar-col shrink-0 flex items-center';
             const avatar = document.createElement('span');
-            avatar.className = `directory-user-card__avatar directory-user-card__avatar--${roleKey} shrink-0`;
+            avatar.className = `directory-user-card__avatar directory-user-card__avatar--${roleKey}`;
             avatar.innerHTML = DIRECTORY_USER_ICON_SVG;
-            const identityText = document.createElement('div');
-            identityText.className = 'min-w-0 flex-1 flex flex-col justify-center pt-0.5';
+            avatarCol.appendChild(avatar);
+            item.appendChild(avatarCol);
+
+            const nameCol = document.createElement('div');
+            nameCol.className = 'directory-user-card__name-col min-w-0 flex flex-col justify-center';
             const nameEl = document.createElement('p');
             nameEl.className =
                 'directory-user-card__name font-semibold text-slate-900 leading-snug m-0 text-[13px]';
@@ -337,11 +321,9 @@ function renderDirectoryUnified(container, admins, profs, eleves) {
             roleP.className =
                 'directory-user-card__role font-bold text-[11px] sm:text-xs leading-snug m-0 mt-0.5 text-slate-700';
             roleP.textContent = roleLabel(r.profile_role || r.role);
-            identityText.appendChild(nameEl);
-            identityText.appendChild(roleP);
-            identity.appendChild(avatar);
-            identity.appendChild(identityText);
-            item.appendChild(identity);
+            nameCol.appendChild(nameEl);
+            nameCol.appendChild(roleP);
+            item.appendChild(nameCol);
             item.appendChild(buildDirectoryContactColumn(r, roleKey));
             list.appendChild(item);
         }
