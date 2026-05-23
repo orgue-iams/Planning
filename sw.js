@@ -34,6 +34,8 @@ const ASSETS = [
   './components/modal-semaines-slot-edit.html',
   './js/config/fc-settings.js',
   './js/utils/loader.js',
+  './js/utils/planning-sw-env.js',
+  './js/utils/planning-pwa.js',
   './js/utils/planning-theme.js',
   './js/utils/time-helpers.js',
   './js/utils/touch-handler.js',
@@ -98,6 +100,12 @@ const ASSETS = [
   './js/core/planning-courses.js',
   './js/utils/google-calendar-url.js'
 ];
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

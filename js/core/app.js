@@ -105,19 +105,12 @@ import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
 import { applyPlanningPortraitSlotFit, bindPlanningPortraitSlotFit } from './planning-viewport-fit.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
 import {
-    clearPlanningServiceWorkerCaches,
-    isPlanningServiceWorkerEnabled
-} from '../utils/planning-sw-env.js';
+    initPlanningPwaLoginInstallUi,
+    registerPlanningServiceWorker,
+    syncLoginPwaInstallButton
+} from '../utils/planning-pwa.js';
 
-if ('serviceWorker' in navigator) {
-    if (isPlanningServiceWorkerEnabled()) {
-        navigator.serviceWorker
-            .register(new URL('../../sw.js', import.meta.url), { type: 'module' })
-            .catch(() => {});
-    } else {
-        void clearPlanningServiceWorkerCaches();
-    }
-}
+void registerPlanningServiceWorker(new URL('../../sw.js', import.meta.url));
 
 let calendar;
 let currentEvent = null;
@@ -195,6 +188,7 @@ function performLogout() {
     const rememberCb = document.getElementById('login-remember-me');
     if (rememberCb) rememberCb.checked = getRememberMePreference();
     loginDlg?.showModal();
+    syncLoginPwaInstallButton();
     requestAnimationFrame(() => document.getElementById('login-email')?.focus());
 }
 
@@ -682,6 +676,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initSessionLostListeners();
     wireDialogBackdropClose();
     wireHeaderHoverMenus();
+    initPlanningPwaLoginInstallUi();
     document.getElementById('modal_reservation')?.addEventListener('cancel', (e) => {
         if (isReservationMutationInFlight()) {
             e.preventDefault();
@@ -948,6 +943,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const cb = document.getElementById('login-remember-me');
             if (cb) cb.checked = getRememberMePreference();
             void applyLoginBanner();
+            syncLoginPwaInstallButton();
         }
     });
 
@@ -959,6 +955,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (rememberCb) rememberCb.checked = getRememberMePreference();
         await applyLoginBanner();
         dlg?.showModal();
+        syncLoginPwaInstallButton();
         requestAnimationFrame(() => document.getElementById('login-email')?.focus());
     }
 

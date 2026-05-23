@@ -48,6 +48,26 @@
     color: rgb(37 99 235);
 }
 
+#modal_login #btn-pwa-install {
+    margin-top: 0.25rem;
+    border-color: rgb(148 163 184);
+    color: rgb(51 65 85);
+}
+
+#modal_login #btn-pwa-install:hover {
+    border-color: rgb(100 116 139);
+    background: rgb(241 245 249);
+}
+
+[data-theme='dark'] #modal_login #btn-pwa-install {
+    border-color: rgb(71 85 105);
+    color: rgb(226 232 240);
+}
+
+[data-theme='dark'] #modal_login #btn-pwa-install:hover {
+    background: rgb(51 65 85 / 0.5);
+}
+
 [data-theme='dark'] #modal_login .modal-login-box {
     background: linear-gradient(165deg, rgb(30 41 59) 0%, rgb(15 23 42) 100%) !important;
     border-color: rgb(71 85 105) !important;
