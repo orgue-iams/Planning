@@ -19,6 +19,8 @@ import {
 } from './fermetures-planning.js';
 import {
     deleteAbsencePeriodDraft,
+    deleteAbsencePeriodOwned,
+    fetchEventIdsForAbsencePeriod,
     loadAllAbsencePeriodsForUi,
     pendingAbsencePeriodsForUser,
     saveAbsencePeriodDraft
@@ -69,11 +71,17 @@ function canEditClosureRange(range, user) {
     return ownsClosurePeriod(range, user);
 }
 
+function isClosureDraftPast(range) {
+    return isClosurePeriodFullyPast(range) && !range?.appliedAt && !range?.legacy;
+}
+
 function canDeleteClosureRange(range, user) {
     if (!canViewClosures(user)) return false;
     if (range?.legacy) {
         return isAdmin(user) || ownsClosurePeriod(range, user);
     }
+    if (isAdmin(user)) return true;
+    if (ownsClosurePeriod(range, user)) return true;
     return canEditClosureRange(range, user);
 }
 
@@ -115,7 +123,9 @@ function setFermeturesModalBusy(busy) {
 function setApplyProgress(pct, label) {
     const bar = document.getElementById('fermetures-apply-progress');
     const lab = document.getElementById('fermetures-apply-progress-label');
-    if (bar instanceof HTMLProgressElement) bar.value = Math.max(0, Math.min(100, pct));
+    if (bar instanceof HTMLProgressElement && typeof pct === 'number' && Number.isFinite(pct)) {
+        bar.value = Math.max(0, Math.min(100, pct));
+    }
     if (lab) lab.textContent = label || 'Application…';
 }
 
@@ -132,16 +142,19 @@ function syncFermeturesActionsRow() {
     const fabWrap = document.getElementById('fermetures-fab-wrap');
     if (!row) return;
     const canManage = canManageOwnClosures(u);
-    row.classList.toggle('hidden', !canManage);
+    const hasPendingDrafts = closureRanges.some((r) => !r.legacy && !r.appliedAt);
+    row?.classList.toggle('hidden', !canManage || !hasPendingDrafts);
     const editOpen = !document.getElementById('fermetures-edit-panel')?.classList.contains('hidden');
     fabWrap?.classList.toggle('hidden', !canManage || editOpen);
     const pending = pendingAbsencePeriodsForUser(closureRanges, u);
+    const today = todayYmdLocal();
+    const applicablePending = pending.filter((p) => String(p.endYmd || '').slice(0, 10) >= today);
     if (applyBtn instanceof HTMLButtonElement) {
-        applyBtn.classList.toggle('hidden', !pending.length);
+        applyBtn.classList.toggle('hidden', !applicablePending.length);
         applyBtn.textContent =
-            pending.length === 1
+            applicablePending.length === 1
                 ? 'Appliquer 1 absence'
-                : `Appliquer ${pending.length} absences`;
+                : `Appliquer ${applicablePending.length} absences`;
         applyBtn.disabled = closureApplyInFlight;
     }
     if (addBtn instanceof HTMLButtonElement) {
@@ -155,6 +168,7 @@ function buildClosureCard(range, index) {
     const editable = canEditClosureRange(range, u) && !isPast;
     const pending = Boolean(range._optimistic);
     const isDraft = !range.appliedAt && !range.legacy;
+    const draftPast = isDraft && isPast;
     const card = document.createElement('div');
     card.className = `fermeture-card rounded-xl border px-3 py-2.5 min-w-0 ${closureCardToneClass(range)}${isPast ? ' fermeture-card--past' : ''}`;
     if (!pending && !closureApplyInFlight) {
@@ -198,7 +212,7 @@ function buildClosureCard(range, index) {
 
     const badge = document.createElement('span');
     badge.className = `fermeture-card__badge ${isDraft ? 'fermeture-card__badge--draft' : 'fermeture-card__badge--applied'}`;
-    badge.textContent = isDraft ? 'À appliquer' : 'Appliquée';
+    badge.textContent = isDraft ? (draftPast ? 'Archivée (non applicable)' : 'À appliquer') : 'Appliquée';
     body.appendChild(badge);
 
     card.appendChild(body);
@@ -224,25 +238,41 @@ function buildClosureCard(range, index) {
 }
 
 function renderClosureCards() {
-    const host = document.getElementById('fermetures-list');
-    if (!host) return;
-    host.replaceChildren();
+    const appliedHost = document.getElementById('fermetures-applied-cards');
+    const pendingHost = document.getElementById('fermetures-pending-cards');
+    const pendingSection = document.getElementById('fermetures-list-pending-section');
+    if (!appliedHost || !pendingHost) return;
+
+    appliedHost.replaceChildren();
+    pendingHost.replaceChildren();
     const u = getPlanningSessionUser();
 
-    if (!closureRanges.length) {
+    const applied = [];
+    const pending = [];
+    closureRanges.forEach((r, index) => {
+        if (r.legacy || r.appliedAt) applied.push({ r, index });
+        else pending.push({ r, index });
+    });
+
+    pendingSection?.classList.toggle('hidden', !pending.length);
+
+    if (!applied.length && !pending.length) {
         const empty = document.createElement('p');
         empty.className = 'text-sm text-slate-500 dark:text-slate-400 italic m-0 py-2';
         empty.textContent = canManageOwnClosures(u)
             ? 'Aucune période enregistrée pour l’année scolaire en cours.'
             : 'Aucune période sur l’année en cours.';
-        host.appendChild(empty);
+        appliedHost.appendChild(empty);
         syncFermeturesActionsRow();
         return;
     }
 
-    closureRanges.forEach((r, index) => {
-        host.appendChild(buildClosureCard(r, index));
-    });
+    for (const { r, index } of applied) {
+        appliedHost.appendChild(buildClosureCard(r, index));
+    }
+    for (const { r, index } of pending) {
+        pendingHost.appendChild(buildClosureCard(r, index));
+    }
     syncFermeturesActionsRow();
 }
 
@@ -255,6 +285,12 @@ function hideConflictPanel() {
 
 function showConflictPanel(conflicts) {
     pendingConflicts = conflicts;
+    document.getElementById('fermetures-main-panel')?.classList.remove('hidden');
+    const edit = document.getElementById('fermetures-edit-panel');
+    edit?.classList.add('hidden');
+    edit?.setAttribute('aria-hidden', 'true');
+    document.getElementById('fermetures-fab-wrap')?.classList.remove('hidden');
+
     const panel = document.getElementById('fermetures-conflict-panel');
     const list = document.getElementById('fermetures-conflict-list');
     if (!panel || !list) return;
@@ -267,6 +303,12 @@ function showConflictPanel(conflicts) {
     }
     panel.classList.remove('hidden');
     panel.setAttribute('aria-hidden', 'false');
+    panel.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    showToast(
+        `${conflicts.length} créneau${conflicts.length > 1 ? 'x' : ''} en conflit : validez ou annulez ci-dessous.`,
+        'warning',
+        9000
+    );
 }
 
 function showFermeturesMainPanel() {
@@ -326,7 +368,9 @@ function openClosureEdit(index) {
     if (closureRanges[index]?._optimistic || closureApplyInFlight) return;
     const rangeRef = index >= 0 ? closureRanges[index] : null;
     const isPast = rangeRef ? isClosurePeriodFullyPast(rangeRef) : false;
-    const editable = rangeRef ? canEditClosureRange(rangeRef, u) && !isPast : true;
+    const editable = rangeRef
+        ? canEditClosureRange(rangeRef, u) && (!isPast || isClosureDraftPast(rangeRef))
+        : true;
     editingClosureIndex = index;
     document.getElementById('fermetures-fab-wrap')?.classList.add('hidden');
     const range =
@@ -365,10 +409,6 @@ async function persistClosureEdit() {
         showToast('La date de fin doit être après le début.', 'error');
         return;
     }
-    if (f.endYmd < todayYmdLocal()) {
-        showToast('La période ne peut pas être entièrement dans le passé.', 'error');
-        return;
-    }
 
     const prev =
         editingClosureIndex != null && editingClosureIndex >= 0
@@ -388,14 +428,24 @@ async function persistClosureEdit() {
         return;
     }
 
-    returnToFermeturesList();
     await loadClosureRangesFromServer();
-    showToast('Période enregistrée. Utilisez « Appliquer » pour la publier.', 'success');
+    returnToFermeturesList();
+    const isPast = f.endYmd < todayYmdLocal();
+    showToast(
+        isPast
+            ? 'Période enregistrée (historique). Elle ne sera pas publiée sur le planning.'
+            : 'Période enregistrée. Utilisez « Appliquer » pour la publier sur le planning.',
+        'success',
+        isPast ? 8000 : 6000
+    );
 }
 
 async function collectConflictsForPendingApply() {
     const u = getPlanningSessionUser();
-    const pending = pendingAbsencePeriodsForUser(closureRanges, u);
+    const today = todayYmdLocal();
+    const pending = pendingAbsencePeriodsForUser(closureRanges, u).filter(
+        (p) => String(p.endYmd || '').slice(0, 10) >= today
+    );
     /** @type {object[]} */
     const all = [];
     /** @type {Map<string, object[]>} */
@@ -418,6 +468,16 @@ async function runApplyPendingClosures(deleteConflicts) {
         showToast('Aucune nouvelle période à appliquer.', 'info');
         return;
     }
+    const today = todayYmdLocal();
+    const applicable = pending.filter((p) => String(p.endYmd || '').slice(0, 10) >= today);
+    if (!applicable.length) {
+        showToast(
+            'Aucune période à publier : les brouillons entièrement passés restent en archive (sans impact sur le planning).',
+            'info',
+            9000
+        );
+        return;
+    }
 
     closureApplyInFlight = true;
     setFermeturesModalBusy(true);
@@ -433,10 +493,12 @@ async function runApplyPendingClosures(deleteConflicts) {
             setFermeturesModalBusy(false);
             syncFermeturesActionsRow();
             renderClosureCards();
+            hideConflictPanel();
             showConflictPanel(all);
             window.__fermeturesApplyConflictMap = byPeriod;
             return;
         }
+        hideConflictPanel();
         conflictsByPeriod = byPeriod;
     } else {
         conflictsByPeriod = window.__fermeturesApplyConflictMap || new Map();
@@ -446,7 +508,7 @@ async function runApplyPendingClosures(deleteConflicts) {
     const r = await applyPendingAbsencePeriods(closureRanges, {
         deleteConflicts,
         conflictsByPeriodId: conflictsByPeriod,
-        onProgress: (pct, label) => setApplyProgress(pct, label)
+        onProgress: (pct, label) => setApplyProgress(pct, label || 'Application…')
     });
 
     closureApplyInFlight = false;
@@ -498,6 +560,23 @@ async function deleteClosureAt(index) {
             showToast(r.error || 'Suppression impossible.', 'error');
             return;
         }
+    } else if (range.appliedAt) {
+        let eventIds = [...(range.eventIds || [])];
+        if (!eventIds.length) {
+            eventIds = await fetchEventIdsForAbsencePeriod(range.id);
+        }
+        if (eventIds.length) {
+            const dr = await deleteClosureRangeEvents(eventIds);
+            if (!dr.ok) {
+                showToast(dr.error || 'Suppression des fermetures impossible.', 'error');
+                return;
+            }
+        }
+        const r = await deleteAbsencePeriodOwned(range.id);
+        if (!r.ok) {
+            showToast(r.error || 'Suppression impossible.', 'error');
+            return;
+        }
     } else {
         const r = await deleteAbsencePeriodDraft(range.id);
         if (!r.ok) {
@@ -515,6 +594,35 @@ async function deleteClosureAt(index) {
 
 export async function loadClosureRangesFromServer() {
     closureRanges = await loadAllAbsencePeriodsForUi();
+}
+
+/** Ouvre la modale fermetures sur une période (ex. depuis un créneau fermeture du planning). */
+export async function openClosureEditByPeriodId(periodId) {
+    const id = String(periodId || '').trim();
+    if (!id || id.startsWith('legacy:')) {
+        showToast('Cette fermeture historique ne peut pas être modifiée ici.', 'info');
+        return;
+    }
+    const u = getPlanningSessionUser();
+    if (!canViewClosures(u)) {
+        showToast('Indisponibilités : réservé aux professeurs et administrateurs.', 'info');
+        return;
+    }
+    await fetchOrganSchoolSettings();
+    await loadClosureRangesFromServer();
+    const idx = closureRanges.findIndex((r) => r.id === id);
+    if (idx < 0) {
+        showToast('Période introuvable (rechargez la liste).', 'error');
+        return;
+    }
+    const dlg = document.getElementById('modal_fermetures');
+    if (dlg && !dlg.open) {
+        if (!openPlanningRouteFromDrawer('modal_fermetures', 'Fermetures / Indisponibilités', 'Menu')) {
+            await dlg.showModal();
+        }
+    }
+    showFermeturesMainPanel();
+    openClosureEdit(idx);
 }
 
 export async function openFermeturesModal() {

@@ -213,7 +213,9 @@ export function appendEleveGabaritCoursCard(host, p) {
         typ === 'cours' ? String(p.studentsLine || '').trim() || "pas d'élèves" : '—';
 
     const inDrawerStyleHost = Boolean(
-        host.closest?.('#drawer-next-cours-card, #profile-cours-list')
+        host.closest?.(
+            '#drawer-next-cours-gabarit, #drawer-next-cours-exceptional, #profile-cours-list'
+        )
     );
     card.className = [
         'event-box st-slot-card st-slot-card--eleve-view profile-gabarit-cours-card gabarit-cours-card--slot-text',

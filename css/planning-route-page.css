@@ -39,8 +39,8 @@ dialog.planning-route-page .planning-route-page__bar {
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
-    background: rgb(248 250 252);
-    border-bottom: 1px solid rgb(226 232 240);
+    background: rgb(255 255 255) !important;
+    border-bottom: none !important;
     box-shadow: none;
     flex-wrap: wrap;
     gap: 0.25rem 0.5rem;
@@ -72,7 +72,7 @@ dialog.planning-route-page .modal-box {
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    background: rgb(248 250 252);
+    background: rgb(255 255 255) !important;
 }
 
 dialog.planning-route-page#modal_directory_users {
@@ -97,11 +97,7 @@ dialog.planning-route-page#modal_reservation {
 
 [data-theme='dark'] dialog.planning-route-page .planning-route-page__bar,
 [data-theme='dark'] dialog.planning-route-page .modal-box {
-    background: rgb(15 23 42);
-}
-
-[data-theme='dark'] dialog.planning-route-page .planning-route-page__bar {
-    border-bottom-color: rgb(51 65 85);
+    background: rgb(15 23 42) !important;
 }
 
 [data-theme='dark'] dialog.planning-route-page .modal-box {
@@ -131,6 +127,9 @@ dialog.planning-route-page .planning-route-page__title {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-color: rgb(148 163 184);
 }
 
 [data-theme='dark'] dialog.planning-route-page .planning-route-page__title {

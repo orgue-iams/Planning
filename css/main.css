@@ -273,6 +273,17 @@ textarea:disabled,
     opacity: 1 !important;
 }
 
+/* Lecture seule : pas de chevron de liste sur les champs désactivés */
+select:disabled,
+.select:disabled,
+select[disabled],
+.select[disabled] {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    background-image: none !important;
+    cursor: default !important;
+}
+
 [data-theme='dark'] input:disabled,
 [data-theme='dark'] select:disabled,
 [data-theme='dark'] textarea:disabled,

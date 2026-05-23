@@ -253,7 +253,13 @@ function onStApplyProgress(ev) {
     const total = ev.total > 0 ? ev.total : 1;
     const pct = Math.min(100, Math.round((100 * ev.done) / total));
     bar.value = pct;
-    txt.textContent = `Progression : ${ev.done} / ${ev.total} — ${ev.detail || ''}`.trim();
+    const detail = String(ev.detail || '').trim();
+    const prefix =
+        ev.phase === 'google-sync' ? 'Agendas Google' : 'Traitement gabarit A/B';
+    const counter = `${ev.done} / ${ev.total}`;
+    txt.textContent = detail.includes('—')
+        ? `Progression : ${counter} — ${detail}`
+        : `Progression : ${counter} — ${prefix} — ${detail}`.trim();
 }
 
 function resetStAnalyzeOutput() {
@@ -1719,9 +1725,15 @@ function onStTemplateDragStart(e) {
     card.classList.add('opacity-40');
 }
 
+function clearStTemplateListDnDHighlight() {
+    document.getElementById('st-list-a')?.classList.remove('st-dnd-drop-active');
+    document.getElementById('st-list-b')?.classList.remove('st-dnd-drop-active');
+}
+
 function onStTemplateDragEnd() {
     if (stDnDRow) stDnDRow.classList.remove('opacity-40');
     stDnDRow = null;
+    clearStTemplateListDnDHighlight();
 }
 
 function onStTemplateDragOver(e) {
@@ -1732,6 +1744,8 @@ function onStTemplateDragOver(e) {
     if (!dlg?.open || !dlg.contains(tb)) return;
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    clearStTemplateListDnDHighlight();
+    tb.classList.add('st-dnd-drop-active');
 }
 
 function onStTemplateDrop(e) {
@@ -1740,6 +1754,7 @@ function onStTemplateDrop(e) {
     const dlg = document.getElementById('modal_semaines_types');
     if (!dlg?.open || !dlg.contains(tb)) return;
     e.preventDefault();
+    clearStTemplateListDnDHighlight();
     const src = stDnDRow.parentElement;
     if (src === tb) return;
     const u = getPlanningSessionUser();

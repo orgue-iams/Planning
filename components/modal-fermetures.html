@@ -1,22 +1,40 @@
 <dialog id="modal_fermetures" class="modal">
     <div class="modal-box p-4 pb-0 w-[96%] max-w-lg max-h-[90dvh] overflow-hidden rounded-2xl border border-slate-200 shadow-2xl flex flex-col dark:border-slate-600">
         <div id="fermetures-main-panel" class="min-w-0 flex-1 min-h-0 flex flex-col">
-            <div id="fermetures-apply-progress-wrap" class="hidden mb-3 shrink-0" aria-hidden="true">
+            <div class="fermetures-card-list min-w-0 flex-1 min-h-0 overflow-y-auto pb-2 space-y-4">
+                <section id="fermetures-section-applied" class="min-w-0 space-y-2">
+                    <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 m-0 shrink-0">Déjà appliquées</p>
+                    <div id="fermetures-applied-cards" class="space-y-2 min-w-0"></div>
+                    <div id="fermetures-fab-wrap" class="fermetures-route-fab hidden shrink-0">
+                        <button type="button" id="fermetures-add" class="btn btn-sm planning-btn-accent font-semibold text-[11px] w-full">
+                            Ajouter un créneau de Fermeture/Indispo.
+                        </button>
+                    </div>
+                </section>
+                <section id="fermetures-list-pending-section" class="hidden min-w-0 space-y-2 pt-2 border-t border-slate-200 dark:border-slate-600">
+                    <p class="text-[10px] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-200 m-0">À appliquer sur le planning</p>
+                    <div id="fermetures-pending-cards" class="space-y-2 min-w-0"></div>
+                    <div id="fermetures-conflict-panel" class="hidden rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40 p-3 space-y-2" aria-hidden="true">
+                        <p class="text-[11px] font-bold text-amber-900 dark:text-amber-100 m-0">Créneaux déjà présents sur ces périodes</p>
+                        <p class="text-[10px] text-amber-900/90 dark:text-amber-100/90 m-0">Tant que vous n’avez pas confirmé, ces créneaux restent sur le planning.</p>
+                        <ul id="fermetures-conflict-list" class="list-disc pl-4 m-0 space-y-1 max-h-[10rem] overflow-y-auto"></ul>
+                        <p class="text-[10px] text-slate-600 dark:text-slate-300 m-0">« Poursuivre » les supprime (agendas + e-mails), publie la fermeture, puis décale vos créneaux si vous êtes professeur.</p>
+                        <div class="flex flex-wrap gap-2 justify-end">
+                            <button type="button" id="fermetures-conflict-cancel" class="btn btn-ghost btn-sm text-[11px] font-bold">Annuler</button>
+                            <button type="button" id="fermetures-conflict-proceed" class="btn btn-warning btn-sm text-[11px] font-bold">Poursuivre quand même</button>
+                        </div>
+                    </div>
+                    <div id="fermetures-actions-row" class="hidden shrink-0 pt-1 flex flex-wrap gap-2 items-center">
+                        <button type="button" id="fermetures-apply-pending" class="btn btn-sm planning-btn-accent font-semibold text-[11px] flex-1 min-w-[8rem]">
+                            Appliquer les absences
+                        </button>
+                    </div>
+                </section>
+            </div>
+            <div id="fermetures-apply-progress-wrap" class="hidden shrink-0 pt-2 mt-1 border-t border-slate-200 dark:border-slate-600" aria-hidden="true">
                 <p id="fermetures-apply-progress-label" class="text-[10px] font-semibold text-slate-600 dark:text-slate-300 m-0 mb-1">Application…</p>
                 <progress id="fermetures-apply-progress" class="progress progress-primary w-full h-2" value="0" max="100"></progress>
             </div>
-            <div id="fermetures-list" class="fermetures-card-list space-y-2 min-w-0 flex-1 min-h-0 overflow-y-auto pb-24"></div>
-            <div id="fermetures-actions-row" class="hidden shrink-0 mt-3 pt-3 border-t border-slate-200 dark:border-slate-600 flex flex-wrap gap-2 items-center">
-                <button type="button" id="fermetures-apply-pending" class="btn btn-primary btn-sm font-bold text-[11px] flex-1 min-w-[8rem]">
-                    Appliquer les absences
-                </button>
-            </div>
-        </div>
-
-        <div id="fermetures-fab-wrap" class="fermetures-route-fab hidden shrink-0">
-            <button type="button" id="fermetures-add" class="btn btn-primary btn-sm font-bold text-[11px] w-full">
-                Ajouter un créneau de Fermeture/Indispo.
-            </button>
         </div>
 
         <div id="fermetures-edit-panel" class="hidden min-w-0 flex-1 min-h-0 overflow-y-auto space-y-3 pb-4" aria-hidden="true">
@@ -34,17 +52,8 @@
                 <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Titre (optionnel)</span>
                 <input type="text" id="fermeture-edit-title" class="input input-bordered input-sm w-full bg-white dark:bg-slate-900 dark:text-slate-100" maxlength="120" placeholder="Ex. Vacances, absence personnelle" />
             </label>
-            <div id="fermetures-conflict-panel" class="hidden rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40 p-3 space-y-2" aria-hidden="true">
-                <p class="text-[11px] font-bold text-amber-900 dark:text-amber-100 m-0">Créneaux déjà présents sur ces périodes</p>
-                <ul id="fermetures-conflict-list" class="list-disc pl-4 m-0 space-y-1 max-h-[10rem] overflow-y-auto"></ul>
-                <p class="text-[10px] text-slate-600 dark:text-slate-300 m-0">Poursuivre supprimera ces créneaux (agendas + e-mails habituels), puis appliquera les absences et décalera vos créneaux si besoin.</p>
-                <div class="flex flex-wrap gap-2 justify-end">
-                    <button type="button" id="fermetures-conflict-cancel" class="btn btn-ghost btn-sm text-[11px] font-bold">Annuler</button>
-                    <button type="button" id="fermetures-conflict-proceed" class="btn btn-warning btn-sm text-[11px] font-bold">Poursuivre quand même</button>
-                </div>
-            </div>
             <div class="flex flex-wrap gap-2 justify-end pt-1">
-                <button type="button" id="fermeture-edit-save" class="btn btn-primary btn-sm text-[11px] font-bold">Enregistrer</button>
+                <button type="button" id="fermeture-edit-save" class="btn btn-sm planning-btn-accent font-semibold text-[11px]">Enregistrer</button>
             </div>
         </div>
     </div>

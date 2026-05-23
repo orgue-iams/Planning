@@ -20,8 +20,9 @@ function getToastMountParent() {
 const TOAST_MOUNT_CLASS =
     'planning-toast-mount toast toast-bottom toast-end fixed flex flex-col gap-2 p-0 bottom-4 end-4 z-[2147483647] pointer-events-auto';
 
-export function showToast(message, variant = 'success', durationMs = 3200) {
-    const parent = getToastMountParent();
+export function showToast(message, variant = 'success', durationMs) {
+    const isError = variant === 'error';
+    const parent = isError ? document.body : getToastMountParent();
 
     let root = parent.querySelector(':scope > .planning-toast-mount');
     if (!root && parent === document.body) {
@@ -51,7 +52,12 @@ export function showToast(message, variant = 'success', durationMs = 3200) {
     el.textContent = message;
     root.appendChild(el);
 
-    const fadeMs = typeof durationMs === 'number' && durationMs > 0 ? durationMs : 3200;
+    const fadeMs =
+        typeof durationMs === 'number' && durationMs > 0
+            ? durationMs
+            : isError
+              ? 6000
+              : 3200;
     window.setTimeout(() => {
         el.style.opacity = '0';
         el.style.transition = 'opacity 0.25s ease';

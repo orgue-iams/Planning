@@ -18,8 +18,67 @@ import {
     toLocalDateFromIsoDate,
     formatLocalYmd
 } from './week-cycle.js';
-import { formatWeekdayDayTimeFr24 } from '../utils/time-helpers.js';
+import { formatTimeFr24 } from '../utils/time-helpers.js';
+import { formatApplyProgressLabel, formatUniqueTitlesPreview } from '../utils/apply-progress-label.js';
 import { invokeSlotNotify } from './slot-notify-api.js';
+
+/** @param {string[]} userIds */
+async function fetchProfileLabelsMap(userIds) {
+    const ids = [...new Set(userIds.map((x) => String(x || '').trim()).filter(Boolean))];
+    if (!ids.length || !isBackendAuthConfigured()) return new Map();
+    const sb = getSupabaseClient();
+    if (!sb) return new Map();
+    try {
+        const { data, error } = await sb.rpc('planning_profiles_label_for_ids', { p_ids: ids });
+        if (error) {
+            console.warn('[fermetures] planning_profiles_label_for_ids', error.message);
+            return new Map();
+        }
+        const rows = Array.isArray(data) ? data : [];
+        return new Map(rows.map((r) => [String(r.user_id), String(r.label || '').trim()]));
+    } catch (e) {
+        console.warn('[fermetures] planning_profiles_label_for_ids', e);
+        return new Map();
+    }
+}
+
+/** @param {string} startIso @param {string} endIso */
+function formatConflictSlotRangeFr(startIso, endIso) {
+    const st = new Date(startIso);
+    const en = new Date(endIso);
+    if (Number.isNaN(st.getTime()) || Number.isNaN(en.getTime())) return '';
+    const day = st.toLocaleDateString('fr-FR', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'long'
+    });
+    return `${day}, ${formatTimeFr24(st)} – ${formatTimeFr24(en)}`;
+}
+
+/**
+ * @param {string} target
+ * @param {string} targetUserId
+ * @param {Map<string, string>} labelByUserId
+ * @param {string} ownerDisplayName
+ */
+function mirrorAgendaLabelFr(target, targetUserId, labelByUserId, ownerDisplayName) {
+    const t = String(target || '').trim();
+    if (t === 'main') return 'Planning principal';
+    if (t === 'pool_owner') {
+        return ownerDisplayName ? `Agenda de ${ownerDisplayName}` : 'Agenda personnel';
+    }
+    if (t === 'pool_student') {
+        const lab = labelByUserId.get(String(targetUserId || '').trim());
+        return lab ? `Agenda de ${lab}` : 'Agenda élève inscrit';
+    }
+    return 'Agenda Google';
+}
+
+function formatYmdShortFr(ymd) {
+    const d = new Date(`${ymd}T12:00:00`);
+    if (Number.isNaN(d.getTime())) return ymd;
+    return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+}
 
 const DEFAULT_CLOSURE_TITLE = 'Fermeture';
 
@@ -225,6 +284,7 @@ export async function findConflictsForClosureRange(startYmd, endYmd, excludeEven
         if (!hits || seen.has(id)) continue;
         seen.add(id);
         const ownerEmail = String(row.owner_email || '').trim().toLowerCase();
+        const ownerUserId = String(row.owner_user_id || '').trim();
         conflicts.push({
             id,
             title: String(row.title || '').trim() || 'Créneau',
@@ -232,35 +292,50 @@ export async function findConflictsForClosureRange(startYmd, endYmd, excludeEven
             startIso: row.start_at,
             endIso: row.end_at,
             ownerEmail,
-            owner_user_id: String(row.owner_user_id || '').trim(),
-            ownerLabel: ownerEmail ? ownerEmail.split('@')[0] : '—'
+            ownerUserId,
+            ownerLabel: ownerEmail ? ownerEmail.split('@')[0] : '—',
+            ownerDisplayName: ''
         });
+    }
+    const ownerIds = conflicts.map((c) => c.ownerUserId).filter(Boolean);
+    const labelMap = await fetchProfileLabelsMap(ownerIds);
+    for (const c of conflicts) {
+        const lab = labelMap.get(c.ownerUserId);
+        if (lab) {
+            c.ownerDisplayName = lab;
+            c.ownerLabel = lab;
+        }
     }
     conflicts.sort((a, b) => String(a.startIso).localeCompare(String(b.startIso)));
     return conflicts;
 }
 
 export function formatConflictLineFr(c) {
-    const st = new Date(c.startIso);
-    const en = new Date(c.endIso);
-    if (Number.isNaN(st.getTime())) return `« ${c.title} »`;
-    const tf = (d) => formatWeekdayDayTimeFr24(d);
-    return `« ${c.title} » — ${tf(st)} – ${tf(en)}`;
+    const who = String(c.ownerDisplayName || c.ownerLabel || c.title || 'Créneau').trim();
+    const range = formatConflictSlotRangeFr(c.startIso, c.endIso);
+    if (!range) return `« ${who} »`;
+    return `« ${who} » — ${range}`;
 }
 
-async function deletePlanningEventWithMirrors(eventId) {
+async function deletePlanningEventWithMirrors(eventId, progressCtx = null) {
     const canonicalId = String(eventId || '').trim();
     if (!canonicalId) return { ok: false, error: 'Identifiant manquant.' };
     const token = await getAccessToken();
     const targets = await fetchPlanningMirrorTargetsForDelete(canonicalId);
+    const labelMap = progressCtx?.labelByUserId || new Map();
+    const slotTitle = String(progressCtx?.slotTitle || 'Créneau').trim();
+    const ownerName = String(progressCtx?.ownerDisplayName || progressCtx?.ownerLabel || 'Propriétaire').trim();
     if (token && targets.length) {
         for (const t of targets) {
+            const agenda = mirrorAgendaLabelFr(t.target, t.targetUserId, labelMap, ownerName);
+            progressCtx?.onProgress?.(`Suppression : ${ownerName} — « ${slotTitle} » (${agenda})`);
             const rDel = await bridgeDeleteEvent(token, t.googleEventId, t.calendarId);
             if (!rDel.ok && !rDel.skipped) {
                 return { ok: false, error: rDel.error || 'Suppression Google impossible.' };
             }
         }
     }
+    progressCtx?.onProgress?.(`Suppression : ${ownerName} — « ${slotTitle} » (base)`);
     const delRow = await deletePlanningEventRow(canonicalId);
     if (!delRow.ok) return { ok: false, error: delRow.error || 'Suppression base impossible.' };
     return { ok: true, error: null };
@@ -271,22 +346,27 @@ async function deletePlanningEventWithMirrors(eventId) {
  * @param {object} row — conflit ou ligne RPC
  * @param {object} currentUser
  */
-export async function deletePlanningSlotForClosureConflict(row, currentUser) {
+export async function deletePlanningSlotForClosureConflict(row, currentUser, opts = {}) {
     const canonicalId = String(row?.id || '').trim();
     if (!canonicalId) return { ok: false, error: 'Identifiant manquant.' };
 
-    const token = await getAccessToken();
-    const targets = await fetchPlanningMirrorTargetsForDelete(canonicalId);
-    if (token && targets.length) {
-        for (const t of targets) {
-            const rDel = await bridgeDeleteEvent(token, t.googleEventId, t.calendarId);
-            if (!rDel.ok && !rDel.skipped) {
-                return { ok: false, error: rDel.error || 'Suppression Google impossible.' };
-            }
-        }
-    }
-    const delRow = await deletePlanningEventRow(canonicalId);
-    if (!delRow.ok) return { ok: false, error: delRow.error || 'Suppression base impossible.' };
+    const ownerUserId = String(row.ownerUserId || row.owner_user_id || '').trim();
+    const labelMap = await fetchProfileLabelsMap(ownerUserId ? [ownerUserId] : []);
+    const ownerName =
+        String(row.ownerDisplayName || '').trim() ||
+        labelMap.get(ownerUserId) ||
+        String(row.ownerLabel || row.owner_email || 'Propriétaire').trim();
+    const slotTitle = String(row.title || '').trim() || 'Créneau';
+    const progressCtx = {
+        onProgress: opts.onProgress,
+        labelByUserId: labelMap,
+        slotTitle,
+        ownerDisplayName: ownerName,
+        ownerLabel: ownerName
+    };
+
+    const dr = await deletePlanningEventWithMirrors(canonicalId, progressCtx);
+    if (!dr.ok) return dr;
 
     const ownerEmail = String(row.ownerEmail || row.owner_email || '')
         .trim()
@@ -312,15 +392,28 @@ export async function deletePlanningSlotForClosureConflict(row, currentUser) {
     return { ok: true, error: null };
 }
 
-async function syncClosureEventsToGoogle(payloads) {
+async function syncClosureEventsToGoogle(payloads, onProgress = null) {
     if (!payloads.length) return { ok: true, error: null };
     const { calendarBridgeUrl } = getPlanningConfig();
     if (!calendarBridgeUrl) return { ok: true, error: null };
     const token = await getAccessToken();
     if (!token) return { ok: false, error: 'Session expirée (reconnectez-vous).' };
     const batchSize = 15;
+    const batchTotal = Math.ceil(payloads.length / batchSize) || 1;
     for (let i = 0; i < payloads.length; i += batchSize) {
         const batch = payloads.slice(i, i + batchSize);
+        const b = Math.floor(i / batchSize) + 1;
+        const preview = formatUniqueTitlesPreview(
+            batch.map((p) => String(p.title || 'Fermeture').trim())
+        );
+        onProgress?.(
+            formatApplyProgressLabel({
+                domain: 'Agendas Google',
+                step: b,
+                total: batchTotal,
+                detail: `${preview.text || 'fermetures'} — Planning principal (${batch.length} jour(s))`
+            })
+        );
         const r = await invokeCalendarBridge(token, { action: 'upsert', events: batch });
         if (!r.ok && !r.skipped) {
             return { ok: false, error: r.error || 'Synchronisation Google impossible.' };
@@ -349,7 +442,7 @@ export async function loadClosureRangesFromPlanning(opts = {}) {
 
 /**
  * @param {{ startYmd: string, endYmd: string, title?: string, eventIds?: string[] }} range
- * @param {{ deleteConflicts?: boolean, conflicts?: object[] }} opts
+ * @param {{ deleteConflicts?: boolean, conflicts?: object[], onProgress?: (label: string) => void }} opts
  */
 export async function saveClosureRangeToPlanning(range, opts = {}) {
     const u = getPlanningSessionUser();
@@ -362,9 +455,12 @@ export async function saveClosureRangeToPlanning(range, opts = {}) {
     const days = enumerateYmdInRange(startYmd, endYmd);
     if (!days.length) return { ok: false, error: 'Plage de dates invalide.' };
 
-    if (opts.deleteConflicts && Array.isArray(opts.conflicts)) {
+    const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : null;
+
+    if (opts.deleteConflicts && Array.isArray(opts.conflicts) && opts.conflicts.length) {
+        onProgress?.(`Suppression de ${opts.conflicts.length} créneau(x) en conflit…`);
         for (const c of opts.conflicts) {
-            const dr = await deletePlanningSlotForClosureConflict(c, u);
+            const dr = await deletePlanningSlotForClosureConflict(c, u, { onProgress });
             if (!dr.ok) return dr;
         }
     }
@@ -373,7 +469,13 @@ export async function saveClosureRangeToPlanning(range, opts = {}) {
     const inRange = await fermetureEventIdsInRange(startYmd, endYmd);
     const toDelete = new Set([...explicitOld, ...inRange]);
     for (const id of toDelete) {
-        const dr = await deletePlanningEventWithMirrors(id);
+        onProgress?.('Nettoyage d’anciennes fermetures sur la période…');
+        const dr = await deletePlanningEventWithMirrors(id, {
+            onProgress,
+            slotTitle: title,
+            ownerDisplayName: String(u.name || u.email || '').trim(),
+            ownerLabel: String(u.name || u.email || '').trim()
+        });
         if (!dr.ok) return dr;
     }
 
@@ -382,7 +484,17 @@ export async function saveClosureRangeToPlanning(range, opts = {}) {
     /** @type {{ planningEventId: string, title: string, start: string, end: string, type: string, owner: string }[]} */
     const googlePayloads = [];
 
-    for (const ymd of days) {
+    const dayTotal = days.length;
+    for (let di = 0; di < days.length; di++) {
+        const ymd = days[di];
+        onProgress?.(
+            formatApplyProgressLabel({
+                domain: 'Planning',
+                step: di + 1,
+                total: dayTotal,
+                detail: `création fermeture ${formatYmdShortFr(ymd)} — « ${title} »`
+            })
+        );
         const { startIso, endIso } = daySlotBoundsIsoFromYmd(ymd);
         const ur = await upsertPlanningEventRow({
             startIso,
@@ -406,7 +518,7 @@ export async function saveClosureRangeToPlanning(range, opts = {}) {
         });
     }
 
-    const sync = await syncClosureEventsToGoogle(googlePayloads);
+    const sync = await syncClosureEventsToGoogle(googlePayloads, onProgress);
     if (!sync.ok) {
         return {
             ok: false,

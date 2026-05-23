@@ -36,6 +36,7 @@ import {
     seriesPrevSnapshotFromEvent,
     captureResizeStart,
     maybeNotifySlotOwnerAfterThirdPartyEdit,
+    notifyEnrolledStudentsAfterCoursChangeNonBlocking,
     ownerInfoFromEvent,
     refetchPlanningGrid,
     isReservationMutationInFlight,
@@ -397,6 +398,19 @@ function initCalendarAndRevealUi() {
                     previousEndIso: info.oldEvent.end.toISOString()
                 }).catch((err) => console.warn('[slot-notify] drop non bloquant', err));
             }
+            const prevTitle = String(info.oldEvent?.title || '').trim();
+            const rangeChangedDrop =
+                Boolean(info.oldEvent?.start && info.oldEvent?.end && info.event.start && info.event.end) &&
+                (info.oldEvent.start.toISOString() !== info.event.start.toISOString() ||
+                    info.oldEvent.end.toISOString() !== info.event.end.toISOString() ||
+                    prevTitle !== String(info.event.title || '').trim());
+            if (rangeChangedDrop) {
+                notifyEnrolledStudentsAfterCoursChangeNonBlocking(currentUser, info.event, {
+                    title: prevTitle,
+                    startStr: info.oldEvent.start.toISOString(),
+                    endStr: info.oldEvent.end.toISOString()
+                });
+            }
             await refetchPlanningGrid(info.view.calendar);
         },
         onEventResize: (info) => {
@@ -500,6 +514,33 @@ function initCalendarAndRevealUi() {
             void saveReservation(calendar, currentUser, currentEvent).catch((err) =>
                 console.error(err)
             );
+
+        document.getElementById('modal_reservation')?.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            const t = e.target;
+            if (!(t instanceof HTMLElement)) return;
+            if (t.closest('textarea')) return;
+            if (t.closest('#btn-delete')) return;
+            const saveFooter = document.getElementById('btn-reservation-save');
+            if (
+                saveFooter instanceof HTMLButtonElement &&
+                !saveFooter.disabled &&
+                !saveFooter.classList.contains('hidden')
+            ) {
+                e.preventDefault();
+                saveFooter.click();
+                return;
+            }
+            const saveLegacy = document.getElementById('btn-save');
+            if (
+                saveLegacy instanceof HTMLButtonElement &&
+                !saveLegacy.disabled &&
+                !saveLegacy.classList.contains('hidden')
+            ) {
+                e.preventDefault();
+                saveLegacy.click();
+            }
+        });
         document.getElementById('btn-delete').onclick = () =>
             void deleteReservation(calendar, currentEvent, currentUser).catch((err) =>
                 console.error(err)

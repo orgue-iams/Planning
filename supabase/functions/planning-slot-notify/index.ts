@@ -18,7 +18,7 @@ const cors: Record<string, string> = {
         'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-version'
 };
 
-type SlotAction = 'deleted' | 'moved' | 'modified';
+type SlotAction = 'deleted' | 'moved' | 'modified' | 'enrolled_modified';
 
 function json(data: unknown, status = 200) {
     return new Response(JSON.stringify(data), {
@@ -35,24 +35,67 @@ function escapeHtml(s: string) {
         .replace(/"/g, '&quot;');
 }
 
-function formatFrWhen(startIso: string, endIso: string) {
+/** Aligné sur l’app (réservations sur une journée) ; heures en Europe/Paris (Edge = UTC par défaut). */
+const NOTIFY_TZ = 'Europe/Paris';
+
+function formatFrSlotRange(startIso: string, endIso: string) {
     try {
         const a = new Date(startIso);
         const b = new Date(endIso);
         if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return `${startIso} → ${endIso}`;
-        const opts: Intl.DateTimeFormatOptions = {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false
-        };
-        return `${a.toLocaleString('fr-FR', opts)} — ${b.toLocaleString('fr-FR', opts)}`;
+
+        const dateKey = (d: Date) =>
+            d.toLocaleDateString('fr-FR', {
+                timeZone: NOTIFY_TZ,
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+        const dayLabel = (d: Date) =>
+            d.toLocaleDateString('fr-FR', {
+                timeZone: NOTIFY_TZ,
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+            });
+        const timeLabel = (d: Date) =>
+            d.toLocaleTimeString('fr-FR', {
+                timeZone: NOTIFY_TZ,
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            });
+
+        if (dateKey(a) === dateKey(b)) {
+            return `${dayLabel(a)}, ${timeLabel(a)} — ${timeLabel(b)}`;
+        }
+        return `${dayLabel(a)}, ${timeLabel(a)} — ${dayLabel(b)}, ${timeLabel(b)}`;
     } catch {
         return `${startIso} → ${endIso}`;
     }
+}
+
+function buildSlotChangeDetailHtml(
+    titleLabel: string,
+    slotTitle: string,
+    previousStartIso: string,
+    previousEndIso: string,
+    slotStartIso: string,
+    slotEndIso: string
+) {
+    const titleLine = `<p>${titleLabel} : <strong>${escapeHtml(slotTitle)}</strong></p>`;
+    if (previousStartIso && previousEndIso) {
+        return (
+            titleLine +
+            `<p>Ancienne plage : ${escapeHtml(formatFrSlotRange(previousStartIso, previousEndIso))}</p>` +
+            `<p>Nouvelle plage : <strong>${escapeHtml(formatFrSlotRange(slotStartIso, slotEndIso))}</strong></p>`
+        );
+    }
+    return (
+        titleLine +
+        `<p>Plage : <strong>${escapeHtml(formatFrSlotRange(slotStartIso, slotEndIso))}</strong></p>`
+    );
 }
 
 function actionLabelFr(action: SlotAction): string {
@@ -257,7 +300,11 @@ ${messageBody}
             return json({ ok: true, emailSent: true });
         }
 
-        if (!targetEmail || !actorEmail || !['deleted', 'moved', 'modified'].includes(action)) {
+        if (
+            !targetEmail ||
+            !actorEmail ||
+            !['deleted', 'moved', 'modified', 'enrolled_modified'].includes(action)
+        ) {
             return json({ ok: false, emailSent: false, error: 'Requête invalide' }, 400);
         }
 
@@ -276,28 +323,53 @@ ${messageBody}
         const previousStartIso = String(body.previousStartIso ?? '');
         const previousEndIso = String(body.previousEndIso ?? '');
 
-        const verbe = actionLabelFr(action);
-        const subject = `Planning orgue — votre créneau a été ${verbe}`;
+        const verbe = action === 'enrolled_modified' ? 'modifié' : actionLabelFr(action);
+        const subject =
+            action === 'enrolled_modified'
+                ? `Planning orgue — un cours auquel vous êtes inscrit a été ${verbe}`
+                : `Planning orgue — votre créneau a été ${verbe}`;
 
         let detailHtml = '';
         if (action === 'deleted') {
             detailHtml = `<p>Créneau concerné : <strong>${escapeHtml(slotTitle)}</strong></p>
-<p>Période : ${escapeHtml(formatFrWhen(slotStartIso, slotEndIso))}</p>`;
-        } else if (action === 'moved' && previousStartIso && previousEndIso) {
-            detailHtml = `<p>Créneau : <strong>${escapeHtml(slotTitle)}</strong></p>
-<p>Ancienne plage : ${escapeHtml(formatFrWhen(previousStartIso, previousEndIso))}</p>
-<p>Nouvelle plage : ${escapeHtml(formatFrWhen(slotStartIso, slotEndIso))}</p>`;
+<p>Période : ${escapeHtml(formatFrSlotRange(slotStartIso, slotEndIso))}</p>`;
+        } else if (action === 'enrolled_modified') {
+            detailHtml = buildSlotChangeDetailHtml(
+                'Cours',
+                slotTitle,
+                previousStartIso,
+                previousEndIso,
+                slotStartIso,
+                slotEndIso
+            );
+        } else if (action === 'moved') {
+            detailHtml = buildSlotChangeDetailHtml(
+                'Créneau',
+                slotTitle,
+                previousStartIso,
+                previousEndIso,
+                slotStartIso,
+                slotEndIso
+            );
         } else {
-            detailHtml = `<p>Créneau : <strong>${escapeHtml(slotTitle)}</strong></p>
-<p>Plage actuelle : ${escapeHtml(formatFrWhen(slotStartIso, slotEndIso))}</p>`;
-            if (previousStartIso && previousEndIso) {
-                detailHtml += `<p>Ancienne plage : ${escapeHtml(formatFrWhen(previousStartIso, previousEndIso))}</p>`;
-            }
+            detailHtml = buildSlotChangeDetailHtml(
+                'Créneau',
+                slotTitle,
+                previousStartIso,
+                previousEndIso,
+                slotStartIso,
+                slotEndIso
+            );
         }
+
+        const intro =
+            action === 'enrolled_modified'
+                ? `<p><strong>${escapeHtml(actorDisplayName)}</strong> (${escapeHtml(actorEmail)}) a <strong>${escapeHtml(verbe)}</strong> un cours auquel vous êtes inscrit sur le planning orgue IAMS.</p>`
+                : `<p><strong>${escapeHtml(actorDisplayName)}</strong> (${escapeHtml(actorEmail)}) a <strong>${escapeHtml(verbe)}</strong> un de vos créneaux sur le planning orgue IAMS.</p>`;
 
         const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"/></head><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#222;">
 <p>Bonjour,</p>
-<p><strong>${escapeHtml(actorDisplayName)}</strong> (${escapeHtml(actorEmail)}) a <strong>${escapeHtml(verbe)}</strong> un de vos créneaux sur le planning orgue IAMS.</p>
+${intro}
 ${detailHtml}
 <p>Ce message est automatique ; en cas de question, vous pouvez répondre directement à cette personne.</p>
 </body></html>`;

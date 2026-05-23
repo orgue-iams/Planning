@@ -124,7 +124,7 @@ export function initPlanningDrawer(calendar) {
         if (routeDlg instanceof HTMLDialogElement && t.closest(`#${routeDlg.id}`)) return;
         if (t.closest('dialog#modal_reservation[open]')) {
             if (t.closest('#modal_reservation')) return;
-            void dismissReservationRouteDialog({ save: true });
+            void dismissReservationRouteDialog({ save: false });
             return;
         }
         if (!t.closest('#calendar, #planning-legend, #app-shell, .fc')) return;

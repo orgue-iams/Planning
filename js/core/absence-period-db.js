@@ -1,6 +1,7 @@
 /**
  * Périodes d'absence / fermeture (brouillon → application).
  */
+import { isAdmin } from './auth-logic.js';
 import { getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
 import { getPlanningSessionUser } from './session-user.js';
 import {
@@ -92,7 +93,56 @@ export async function fetchAbsencePeriodsForCurrentSchoolYear() {
     const rows = data || [];
     const ids = [...new Set(rows.map((r) => String(r.created_by_user_id || '').trim()).filter(Boolean))];
     const profileById = await loadProfileMap(ids);
-    return rows.map((r) => mapDbPeriod(r, profileById));
+    const periods = rows.map((r) => mapDbPeriod(r, profileById));
+    return attachAbsencePeriodEventIds(periods);
+}
+
+/** @param {AbsencePeriodRow[]} periods */
+async function attachAbsencePeriodEventIds(periods) {
+    const sb = getSupabaseClient();
+    const ids = (periods || [])
+        .filter((p) => !p.legacy && p.appliedAt && p.id)
+        .map((p) => String(p.id).trim())
+        .filter(Boolean);
+    if (!sb || !ids.length) return periods;
+    const { data, error } = await sb
+        .from('planning_event')
+        .select('id, absence_period_id')
+        .in('absence_period_id', ids);
+    if (error) {
+        console.warn('[absence-period] event ids', error.message);
+        return periods;
+    }
+    const byPeriod = new Map();
+    for (const row of data || []) {
+        const pid = String(row.absence_period_id || '').trim();
+        const eid = String(row.id || '').trim();
+        if (!pid || !eid) continue;
+        if (!byPeriod.has(pid)) byPeriod.set(pid, []);
+        byPeriod.get(pid).push(eid);
+    }
+    return periods.map((p) => {
+        if (p.legacy || !p.appliedAt) return p;
+        const linked = byPeriod.get(p.id);
+        return linked?.length ? { ...p, eventIds: linked } : p;
+    });
+}
+
+/** @param {string} periodId */
+export async function fetchEventIdsForAbsencePeriod(periodId) {
+    const id = String(periodId || '').trim();
+    if (!id || id.startsWith('legacy:')) return [];
+    const sb = getSupabaseClient();
+    if (!sb) return [];
+    const { data, error } = await sb
+        .from('planning_event')
+        .select('id')
+        .eq('absence_period_id', id);
+    if (error) {
+        console.warn('[absence-period] fetchEventIds', error.message);
+        return [];
+    }
+    return (data || []).map((r) => String(r.id || '').trim()).filter(Boolean);
 }
 
 /** Anciens créneaux fermeture sans période (affichés comme déjà appliqués). */
@@ -147,11 +197,6 @@ export async function saveAbsencePeriodDraft(p) {
     if (!rangeOverlapsSchoolYear(startYmd, endYmd)) {
         return { ok: false, error: 'La période doit être dans l’année scolaire en cours.', period: null };
     }
-    const today = todayYmdLocal();
-    if (endYmd < today) {
-        return { ok: false, error: 'Impossible d’ajouter une période entièrement passée.', period: null };
-    }
-
     const sb = getSupabaseClient();
     if (!sb) return { ok: false, error: 'Session indisponible.', period: null };
 
@@ -204,6 +249,22 @@ export async function deleteAbsencePeriodDraft(periodId) {
         .eq('id', id)
         .eq('created_by_user_id', u?.id || '')
         .is('applied_at', null);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, error: null };
+}
+
+/** Supprime une période enregistrée (y compris déjà appliquée) si l’utilisateur en est l’auteur. */
+export async function deleteAbsencePeriodOwned(periodId) {
+    const u = getPlanningSessionUser();
+    const id = String(periodId || '').trim();
+    if (!id || id.startsWith('legacy:')) return { ok: false, error: 'Suppression impossible.' };
+    const sb = getSupabaseClient();
+    if (!sb) return { ok: false, error: 'Session indisponible.' };
+    let q = sb.from('planning_absence_period').delete().eq('id', id);
+    if (!isAdmin(u)) {
+        q = q.eq('created_by_user_id', u?.id || '');
+    }
+    const { error } = await q;
     if (error) return { ok: false, error: error.message };
     return { ok: true, error: null };
 }

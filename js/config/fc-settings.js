@@ -15,7 +15,8 @@ import {
     fcDragResizePropsForEvent,
     applyDragResizePropsToFcEvent,
     isEleveEnrolledInCoursEvent,
-    isEventDbPersistPending
+    isEventDbPersistPending,
+    isReservationNonEditablePast
 } from '../core/calendar-logic.js';
 import { fetchPlanningEventsForFullCalendar } from '../core/planning-events-db.js';
 import { scheduleTimeGridColumnSync } from '../utils/timegrid-column-sync.js';
@@ -120,6 +121,12 @@ export const getCalendarConfig = (handlers, currentUser) => {
             const viewType = selectInfo.view?.type ?? '';
             if (viewType === 'dayGridMonth') {
                 showToast('Utilisez la vue Semaine ou Jour pour sélectionner une plage sur la grille.', 'info');
+                return false;
+            }
+            if (
+                currentUser &&
+                isReservationNonEditablePast(currentUser, { start: selectInfo.start })
+            ) {
                 return false;
             }
             if (selectAllowSingleCalendarDay(selectInfo)) return true;

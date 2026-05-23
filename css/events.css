@@ -35,15 +35,36 @@
 }
 
 .event-concert {
-    --slot-bg-strong: #a855f7;
-    --slot-bg-soft: #ddd6fe;
-    color: #2e1065 !important;
+    --slot-bg-strong: #8b5cf6;
+    --slot-bg-soft: #ede9fe;
+    color: #0f172a !important;
 }
 
 .event-autre {
-    --slot-bg-strong: #0d9488;
-    --slot-bg-soft: #99f6e4;
-    color: #062d2a !important;
+    --slot-bg-strong: #14b8a6;
+    --slot-bg-soft: #ccfbf1;
+    color: #0f172a !important;
+}
+
+/* Bandeau horaire : teinte plus marquée pour le distinguer du corps (thème clair). */
+.event-concert .event-time-fc {
+    background: var(--slot-bg-strong, #8b5cf6);
+    color: #0f172a !important;
+}
+
+.event-autre .event-time-fc {
+    background: var(--slot-bg-strong, #14b8a6);
+    color: #0f172a !important;
+}
+
+/* Thème clair : texte des créneaux en noir (bandeau + corps). */
+html:not([data-theme='dark']) #calendar .fc-timegrid-event .event-box,
+html:not([data-theme='dark']) #calendar .fc-timegrid-event .event-time-fc,
+html:not([data-theme='dark']) #calendar .fc-timegrid-event .event-title-fc,
+html:not([data-theme='dark']) #calendar .fc-list-event .event-box,
+html:not([data-theme='dark']) #calendar .fc-list-event .event-time-fc,
+html:not([data-theme='dark']) #calendar .fc-list-event .event-title-fc {
+    color: #0f172a !important;
 }
 
 .event-travail-mine {
@@ -141,10 +162,11 @@
     cursor: wait;
 }
 
-/* Bandeau workflow (BD / Google) : flottant bas-droite, à la place de l’ancien FAB « + ». */
+/* Bandeau workflow (BD / Google) : flottant bas-gauche (évite le chevauchement des toasts). */
 .planning-slot-workflow-float {
     position: fixed;
-    right: max(0.85rem, env(safe-area-inset-right, 0px));
+    left: max(0.85rem, env(safe-area-inset-left, 0px));
+    right: auto;
     bottom: max(0.85rem, env(safe-area-inset-bottom, 0px));
     z-index: 240;
     max-width: min(20rem, calc(100vw - 1.75rem));
@@ -360,11 +382,11 @@ html[data-planning-fc-text='md'] .event-title-fc {
 }
 
 .legend-swatch--concert {
-    background: #a855f7;
+    background: #c4b5fd;
 }
 
 .legend-swatch--autre {
-    background: #0d9488;
+    background: #5eead4;
 }
 
 .legend-swatch--travail-mine {

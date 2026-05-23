@@ -132,3 +132,23 @@
 [data-theme='dark'] #modal_reservation #event-info-description {
     color: rgb(248 250 252) !important;
 }
+
+/* Modale réservation : champs désactivés (lecture seule) lisibles en thème sombre */
+[data-theme='dark'] #modal_reservation .input:disabled,
+[data-theme='dark'] #modal_reservation .select:disabled,
+[data-theme='dark'] #modal_reservation .textarea:disabled,
+[data-theme='dark'] #modal_reservation .planning-date-input:disabled {
+    color: #0f172a !important;
+    -webkit-text-fill-color: #0f172a;
+    opacity: 1;
+}
+
+/* Statistiques : en-tête tableau occupation orgue */
+[data-theme='dark'] #modal_statistics table thead {
+    background: transparent !important;
+}
+
+[data-theme='dark'] #modal_statistics table thead th {
+    background: transparent !important;
+    color: rgb(248 250 252) !important;
+}

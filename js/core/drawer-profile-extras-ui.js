@@ -12,7 +12,7 @@ import {
     padTimeHhmm
 } from '../utils/template-cours-card-ui.js';
 import { formatProfileFullName } from '../utils/profile-full-name.js';
-import { getPlanningEventColorClass } from './calendar-logic.js';
+import { getPlanningEventColorClass, isEleveEnrolledInCoursEvent } from './calendar-logic.js';
 import { fetchPlanningListElevesActifs } from './planning-events-db.js';
 import { sortEventsByStart } from './planning-courses.js';
 import { fetchPlanningEventsForFullCalendar } from './planning-events-db.js';
@@ -232,6 +232,28 @@ function eventMatchesTemplateLine(ev, line, ctx = {}) {
  * @param {object} line
  * @param {{ studentEmail?: string, usedEventIds?: Set<string> }} ctx
  */
+/** Créneau « cours » planifié sans lien gabarit (semaines types). */
+function isExceptionalCoursPlanningEvent(ev) {
+    const db = String(ev?.extendedProps?.planningDbSlotType || '').toLowerCase();
+    const typ = String(ev?.extendedProps?.type || '').toLowerCase();
+    if (db !== 'cours' && typ !== 'cours') return false;
+    return !String(ev?.extendedProps?.planningSourceTemplateLineId || '').trim();
+}
+
+/**
+ * @param {object[]} upcoming
+ * @param {object} user
+ * @param {Set<string>} usedEventIds
+ */
+function findExceptionalUpcomingCours(upcoming, user, usedEventIds) {
+    return upcoming.filter((ev) => {
+        const id = String(ev?.id || '').trim();
+        if (id && usedEventIds.has(id)) return false;
+        if (!isExceptionalCoursPlanningEvent(ev)) return false;
+        return isEleveEnrolledInCoursEvent(ev, user);
+    });
+}
+
 function findNextEventForTemplateLine(upcoming, line, ctx = {}) {
     const used = ctx.usedEventIds;
     return (
@@ -373,14 +395,18 @@ export async function refreshProfileCoursInscrits(user) {
 /** @param {object | null} user */
 export async function refreshDrawerNextCours(user) {
     const block = document.getElementById('drawer-section-next-cours');
-    const cardHost = document.getElementById('drawer-next-cours-card');
+    const gabaritHost = document.getElementById('drawer-next-cours-gabarit');
+    const exceptionalWrap = document.getElementById('drawer-next-cours-exceptional-wrap');
+    const exceptionalHost = document.getElementById('drawer-next-cours-exceptional');
     const empty = document.getElementById('drawer-next-cours-empty');
-    if (!block || !cardHost) return;
+    if (!block || !gabaritHost) return;
 
     const gen = ++nextCoursRefreshGen;
     const isEleve = String(user?.role || '').toLowerCase() === 'eleve';
     block.classList.toggle('hidden', !isEleve || !user?.email);
-    cardHost.replaceChildren();
+    gabaritHost.replaceChildren();
+    exceptionalHost?.replaceChildren();
+    exceptionalWrap?.classList.add('hidden');
     if (!isEleve || !user?.email) return;
 
     let enrollments = [];
@@ -388,11 +414,6 @@ export async function refreshDrawerNextCours(user) {
         enrollments = await loadEleveGabaritEnrollments(user.id);
     } catch {
         /* */
-    }
-    if (!enrollments.length) {
-        if (gen !== nextCoursRefreshGen) return;
-        empty?.classList.remove('hidden');
-        return;
     }
 
     const start = new Date();
@@ -402,9 +423,12 @@ export async function refreshDrawerNextCours(user) {
     try {
         const evs = await fetchPlanningEventsForFullCalendar(start, end, user);
         const now = Date.now();
-        // Gabarit + lien source_template_line_id ; pas le cache grille (évite dates manquantes).
         upcoming = sortEventsByStart(
-            evs.filter((ev) => String(ev?.extendedProps?.type ?? '').toLowerCase() === 'cours')
+            evs.filter((ev) => {
+                const typ = String(ev?.extendedProps?.type ?? '').toLowerCase();
+                const db = String(ev?.extendedProps?.planningDbSlotType ?? '').toLowerCase();
+                return typ === 'cours' || db === 'cours';
+            })
         ).filter((ev) => {
             const t = new Date(String(ev?.start ?? '')).getTime();
             return !Number.isNaN(t) && t >= now;
@@ -414,7 +438,6 @@ export async function refreshDrawerNextCours(user) {
     }
 
     if (gen !== nextCoursRefreshGen) return;
-    empty?.classList.add('hidden');
 
     const usedEventIds = new Set();
     const matchCtx = {
@@ -449,7 +472,7 @@ export async function refreshDrawerNextCours(user) {
             colorClass = getPlanningEventColorClass(nextEv, user);
         }
 
-        appendEleveGabaritCoursCard(cardHost, {
+        appendEleveGabaritCoursCard(gabaritHost, {
             dayOfWeek: line.day_of_week,
             startTime,
             endTime,
@@ -463,6 +486,72 @@ export async function refreshDrawerNextCours(user) {
             ownerUserId,
             planningColorClass: colorClass
         });
+    }
+
+    const exceptional = findExceptionalUpcomingCours(upcoming, user, usedEventIds);
+    if (exceptional.length && exceptionalHost) {
+        exceptionalWrap?.classList.remove('hidden');
+        const ownerIds = [
+            ...new Set(
+                exceptional
+                    .map((ev) => String(ev?.extendedProps?.ownerUserId || '').trim())
+                    .filter(Boolean)
+            )
+        ];
+        const ownerProfiles = await loadProfilesPrenomNom(ownerIds);
+        const ownerLabelsRpc = ownerIds.length ? await loadProfileLabelsForIds(ownerIds) : new Map();
+        const elevesActifs = await fetchPlanningListElevesActifs();
+        const elevesByEmail = new Map(
+            elevesActifs
+                .map((e) => [String(e.email || '').trim().toLowerCase(), e])
+                .filter(([em]) => em)
+        );
+        for (const ev of exceptional) {
+            const startDt = new Date(String(ev.start ?? ''));
+            const ownerUserId = String(ev?.extendedProps?.ownerUserId || '').trim();
+            const ownerProf = ownerProfiles.get(ownerUserId);
+            const ownerPrenom = ownerProf?.prenom || '';
+            const ownerNom = ownerProf?.nom || '';
+            const ownerLabel =
+                [ownerPrenom, ownerNom].filter(Boolean).join(' ') ||
+                ownerProf?.display_name ||
+                String(ownerLabelsRpc.get(ownerUserId) || '').trim() ||
+                '';
+            appendEleveGabaritCoursCard(exceptionalHost, {
+                dayOfWeek: jsDateToPlanningDow(startDt),
+                startTime: startDt.toISOString(),
+                endTime: String(ev.end ?? ''),
+                dateSubline: startDt.toLocaleDateString('fr-FR', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long'
+                }),
+                title: String(ev.title || '').trim() || 'Cours',
+                slotType: 'cours',
+                studentsLine: formatEnrolledStudentsLineFromEmails(
+                    inscritEmailsFromEvent(ev),
+                    elevesByEmail
+                ),
+                ownerLabel,
+                ownerPrenom,
+                ownerNom,
+                ownerUserId,
+                planningColorClass: getPlanningEventColorClass(ev, user)
+            });
+        }
+    }
+
+    if (gen !== nextCoursRefreshGen) return;
+
+    const hasGabaritCards = gabaritHost.childElementCount > 0;
+    const hasExceptional = Boolean(exceptional.length);
+    if (!hasGabaritCards && !hasExceptional) {
+        empty?.classList.remove('hidden');
+        empty.textContent = enrollments.length
+            ? 'Aucune date de cours planifiée pour le moment.'
+            : 'Aucun cours inscrit dans les semaines types.';
+    } else {
+        empty?.classList.add('hidden');
     }
 }
 

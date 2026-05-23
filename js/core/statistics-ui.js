@@ -45,6 +45,17 @@ function parseYmd(s) {
     return Number.isNaN(d.getTime()) ? null : d;
 }
 
+/** Axe graphique : « 5 mai » (sans année). */
+function formatChartDayLabelFr(ymdStr) {
+    const d = parseYmd(ymdStr);
+    if (!d) return String(ymdStr || '').slice(5);
+    return d
+        .toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+        .replace(/\.$/u, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
 function defaultRangeFromSettings() {
     const s = getOrganSchoolSettingsCached();
     const fromStr = s?.school_year_start ? String(s.school_year_start).slice(0, 10) : '';
@@ -305,7 +316,7 @@ function drawStatisticsChart(p) {
     const groupWTick = n > 0 ? innerW / n : innerW;
     for (let i = 0; i < n; i += tickEvery) {
         const x = padL + i * groupWTick + groupWTick / 2;
-        const label = days[i].slice(5);
+        const label = formatChartDayLabelFr(days[i]);
         ctx.fillText(label, x, cssH - 12);
     }
 }

@@ -33,6 +33,37 @@ const corsHeaders: Record<string, string> = {
         'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-version'
 };
 
+/** JWT service_role (script admin / CLI) : compare aux clés Edge ou au claim `role`. */
+function bearerMatchesEdgeServiceRole(token: string): boolean {
+    const jwt = token.trim();
+    if (!jwt) return false;
+    const candidates = [
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+        Deno.env.get('SERVICE_ROLE_KEY')
+    ]
+        .map((s) => (s ?? '').trim())
+        .filter(Boolean);
+    if (candidates.some((k) => k === jwt)) return true;
+    try {
+        const parts = jwt.split('.');
+        if (parts.length < 2) return false;
+        let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        while (b64.length % 4) b64 += '=';
+        const payload = JSON.parse(atob(b64)) as { role?: string };
+        return payload.role === 'service_role';
+    } catch {
+        return false;
+    }
+}
+
+function edgeServiceRoleKeyForDb(): string {
+    return (
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
+        Deno.env.get('SERVICE_ROLE_KEY') ??
+        ''
+    ).trim();
+}
+
 /** E-mail issu du JWT (claim `email`) si absent de la réponse GoTrue /auth/v1/user. */
 function emailFromSupabaseJwt(accessToken: string): string {
     try {
@@ -1121,6 +1152,75 @@ function sleepMs(ms: number): Promise<void> {
     return new Promise((r) => setTimeout(r, ms));
 }
 
+/** Cron : pousse un créneau base → agenda principal Google + ligne miroir (la base reste la vérité). */
+async function repairMainMirrorFromDbEvent(
+    accessToken: string,
+    supabaseUrl: string,
+    serviceKey: string,
+    ev: {
+        id: string;
+        title?: string;
+        start_at?: string;
+        end_at?: string;
+        slot_type?: string;
+        owner_email?: string;
+    },
+    mainCal: string,
+    existingGid?: string
+): Promise<string | null> {
+    const eventId = String(ev.id || '').trim();
+    if (!eventId) return null;
+
+    const bridgeType = planningSlotTypeToBridgeType(String(ev.slot_type || ''));
+    const ownerEmail = String(ev.owner_email || '').trim().toLowerCase();
+    let inscritsCsv = '';
+    if (bridgeType === 'cours') {
+        inscritsCsv = await fetchEnrollmentEmailsCsv(supabaseUrl, serviceKey, eventId);
+    }
+    const baseFields: EventPayloadInput = {
+        title: String(ev.title || '').trim() || 'Créneau',
+        start: String(ev.start_at || ''),
+        end: String(ev.end_at || ''),
+        type: bridgeType,
+        owner: ownerEmail,
+        planningEventId: eventId,
+        ...(inscritsCsv ? { inscrits: inscritsCsv } : {})
+    };
+    const payload = googleEventResource(baseFields, { actorEmail: ownerEmail });
+    const calEnc = encodeURIComponent(mainCal);
+    let mainOutId = String(existingGid || '').trim();
+
+    if (mainOutId) {
+        const patch = await gcalFetch(
+            accessToken,
+            `/calendars/${calEnc}/events/${encodeURIComponent(mainOutId)}?colorRgbFormat=true`,
+            { method: 'PATCH', body: JSON.stringify(payload) }
+        );
+        if (patch.ok) {
+            await patchMirrorRowAfterResync(supabaseUrl, serviceKey, eventId, 'main', null, mainCal, mainOutId);
+            return mainOutId;
+        }
+        if (patch.status !== 404) return null;
+        mainOutId = '';
+    }
+
+    const ins = await gcalFetch(accessToken, `/calendars/${calEnc}/events?colorRgbFormat=true`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+    const raw = await ins.text();
+    if (!ins.ok) return null;
+    try {
+        const created = JSON.parse(raw) as { id?: string };
+        const gid = String(created.id || '').trim();
+        if (!gid) return null;
+        await patchMirrorRowAfterResync(supabaseUrl, serviceKey, eventId, 'main', null, mainCal, gid);
+        return gid;
+    } catch {
+        return null;
+    }
+}
+
 function planningSlotTypeToBridgeType(slotType: string): string {
     const s = String(slotType || '').trim().toLowerCase();
     if (s === 'cours') return 'cours';
@@ -1172,6 +1272,7 @@ async function fetchEnrollmentEmailsCsv(
     return emails.join(',');
 }
 
+/** PATCH puis INSERT si aucune ligne miroir (réparation cron / resync). */
 async function patchMirrorRowAfterResync(
     supabaseUrl: string,
     serviceKey: string,
@@ -1181,29 +1282,74 @@ async function patchMirrorRowAfterResync(
     googleCalendarId: string,
     googleEventId: string
 ): Promise<void> {
+    const gen = await fetchPlanningEventSyncGeneration(supabaseUrl, serviceKey, eventId);
+    if (gen == null) return;
+
     const base = supabaseUrl.replace(/\/$/, '');
     const now = new Date().toISOString();
-    const body = {
-        google_event_id: googleEventId,
+    const row: Record<string, unknown> = {
+        event_id: eventId,
+        target,
         google_calendar_id: googleCalendarId,
+        google_event_id: googleEventId,
         sync_status: 'ok',
         last_error: null,
+        sync_generation: gen,
         updated_at: now
     };
-    let q = `event_id=eq.${encodeURIComponent(eventId)}&target=eq.${encodeURIComponent(target)}&google_calendar_id=eq.${encodeURIComponent(googleCalendarId)}`;
     if (target === 'pool_student' && targetUserId) {
-        q += `&target_user_id=eq.${encodeURIComponent(targetUserId)}`;
+        row.target_user_id = targetUserId;
     }
-    await fetch(`${base}/rest/v1/planning_event_google_mirror?${q}`, {
+
+    let filter = `event_id=eq.${encodeURIComponent(eventId)}&target=eq.${encodeURIComponent(target)}`;
+    if (target === 'pool_student' && targetUserId) {
+        filter += `&target_user_id=eq.${encodeURIComponent(targetUserId)}`;
+    }
+
+    const patchRes = await fetch(`${base}/rest/v1/planning_event_google_mirror?${filter}`, {
         method: 'PATCH',
+        headers: {
+            apikey: serviceKey,
+            Authorization: `Bearer ${serviceKey}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=representation'
+        },
+        body: JSON.stringify({
+            google_event_id: googleEventId,
+            google_calendar_id: googleCalendarId,
+            sync_status: 'ok',
+            last_error: null,
+            sync_generation: gen,
+            updated_at: now
+        })
+    });
+    if (!patchRes.ok) {
+        console.error('[calendar-bridge] mirror PATCH (resync):', patchRes.status, await patchRes.text());
+        return;
+    }
+    const patchText = await patchRes.text();
+    let updatedCount = 0;
+    try {
+        const parsed = JSON.parse(patchText) as unknown;
+        if (Array.isArray(parsed)) updatedCount = parsed.length;
+    } catch {
+        /* */
+    }
+    if (updatedCount > 0) return;
+
+    const insRes = await fetch(`${base}/rest/v1/planning_event_google_mirror`, {
+        method: 'POST',
         headers: {
             apikey: serviceKey,
             Authorization: `Bearer ${serviceKey}`,
             'Content-Type': 'application/json',
             Prefer: 'return=minimal'
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify(row)
     });
+    if (!insRes.ok) {
+        console.error('[calendar-bridge] mirror INSERT (resync):', insRes.status, await insRes.text());
+    }
 }
 
 /**
@@ -1222,6 +1368,102 @@ async function resyncGoogleCalendarFutureFromDb(
     const base = supabaseUrl.replace(/\/$/, '');
     const hdrs = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
     const nowIso = new Date().toISOString();
+
+    let mainCalNorm = '';
+    try {
+        mainCalNorm = normalizeGoogleCalendarId(calendarId());
+    } catch {
+        /* principal non configuré */
+    }
+    if (mainCalNorm && sameGoogleCalendarId(calNorm, mainCalNorm)) {
+        const horizon = new Date();
+        horizon.setDate(horizon.getDate() + 30);
+        const evRes = await fetch(
+            `${base}/rest/v1/planning_event?start_at=gte.${encodeURIComponent(nowIso)}&start_at=lte.${encodeURIComponent(horizon.toISOString())}&select=id,title,start_at,end_at,slot_type,owner_email&order=start_at.asc&limit=600`,
+            { headers: hdrs }
+        );
+        if (!evRes.ok) {
+            return {
+                upserted: 0,
+                removed: 0,
+                errors: [`Événements (principal) : HTTP ${evRes.status}`]
+            };
+        }
+        const dbEvents = (await evRes.json()) as Array<{
+            id?: string;
+            title?: string;
+            start_at?: string;
+            end_at?: string;
+            slot_type?: string;
+            owner_email?: string;
+        }>;
+
+        const mainGidByEvent = new Map<string, string>();
+        const eventIds = (dbEvents || []).map((e) => String(e.id || '').trim()).filter(Boolean);
+        for (let i = 0; i < eventIds.length; i += 80) {
+            const chunk = eventIds.slice(i, i + 80);
+            const mirRes = await fetch(
+                `${base}/rest/v1/planning_event_google_mirror?event_id=in.(${chunk.map((id) => encodeURIComponent(id)).join(',')})&target=eq.main&select=event_id,google_event_id`,
+                { headers: hdrs }
+            );
+            if (!mirRes.ok) continue;
+            const mirs = (await mirRes.json()) as Array<{ event_id?: string; google_event_id?: string }>;
+            for (const m of mirs || []) {
+                const eid = String(m.event_id || '').trim();
+                const gid = String(m.google_event_id || '').trim();
+                if (eid && gid) mainGidByEvent.set(eid, gid);
+            }
+        }
+
+        let upserted = 0;
+        let removed = 0;
+        const errors: string[] = [];
+        const validPlanningIds = new Set<string>();
+
+        for (const ev of dbEvents || []) {
+            const eventId = String(ev.id || '').trim();
+            if (!eventId) continue;
+            validPlanningIds.add(eventId);
+            const gid = await repairMainMirrorFromDbEvent(
+                accessToken,
+                supabaseUrl,
+                serviceKey,
+                ev,
+                calNorm,
+                mainGidByEvent.get(eventId)
+            );
+            if (gid) {
+                upserted += 1;
+                mainGidByEvent.set(eventId, gid);
+            } else {
+                errors.push(`Échec sync principal « ${String(ev.title || '').slice(0, 40)} » (${eventId.slice(0, 8)}…)`);
+            }
+            await sleepMs(45);
+        }
+
+        const timeMax = new Date();
+        timeMax.setFullYear(timeMax.getFullYear() + 1);
+        try {
+            const gItems = await listAllEventsInRangePaged(accessToken, calNorm, nowIso, timeMax.toISOString());
+            for (const g of gItems) {
+                const priv = g.extendedProperties?.private ?? {};
+                const pev = String(priv.planningEventId ?? '').trim();
+                if (!pev) continue;
+                if (!validPlanningIds.has(pev)) {
+                    const eid = String(g.id || '').trim();
+                    if (eid && (await deleteGoogleEventIdInCalendar(accessToken, calNorm, eid))) {
+                        removed += 1;
+                    }
+                    await sleepMs(25);
+                }
+            }
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            errors.push(`Nettoyage Google (principal) : ${msg}`);
+        }
+
+        return { upserted, removed, errors };
+    }
 
     const mirRes = await fetch(
         `${base}/rest/v1/planning_event_google_mirror?google_calendar_id=eq.${encodeURIComponent(calNorm)}&select=event_id,target,target_user_id,google_event_id`,
@@ -1794,8 +2036,10 @@ async function handleCronRepairGoogleSync(
     accessToken: string
 ): Promise<{
     ok: boolean;
+    repairedMain: number;
     repairedPool: number;
     resyncedCalendars: number;
+    resyncedCalendarsDetail: Array<{ label: string; userLabel: string; kind: 'main' | 'pool' }>;
     errors: string[];
 }> {
     const base = supabaseUrl.replace(/\/$/, '');
@@ -1807,15 +2051,50 @@ async function handleCronRepairGoogleSync(
     const mainCal = calendarId();
 
     const poolRes = await fetch(
-        `${base}/rest/v1/google_calendar_pool?assigned_user_id=not.is.null&select=assigned_user_id,google_calendar_id`,
+        `${base}/rest/v1/google_calendar_pool?assigned_user_id=not.is.null&select=assigned_user_id,google_calendar_id,label`,
         { headers: hdrs }
     );
     const poolRows = poolRes.ok ? ((await poolRes.json()) as Array<{ assigned_user_id?: string; google_calendar_id?: string }>) : [];
     const poolByUser = new Map<string, string>();
+    const poolMetaByCal = new Map<string, { label: string; userLabel: string }>();
+    const userIds = [
+        ...new Set(
+            (poolRows || [])
+                .map((pr) => String(pr.assigned_user_id || '').trim())
+                .filter(Boolean)
+        )
+    ];
+    const profileLabelById = new Map<string, string>();
+    if (userIds.length) {
+        const profRes = await fetch(
+            `${base}/rest/v1/profiles?id=in.(${userIds.map((id) => encodeURIComponent(id)).join(',')})&select=id,prenom,nom,display_name`,
+            { headers: hdrs }
+        );
+        if (profRes.ok) {
+            const profiles = (await profRes.json()) as Array<{
+                id?: string;
+                prenom?: string;
+                nom?: string;
+                display_name?: string;
+            }>;
+            for (const p of profiles || []) {
+                const id = String(p.id || '').trim();
+                const name =
+                    [p.prenom, p.nom].filter(Boolean).join(' ').trim() ||
+                    String(p.display_name || '').trim();
+                if (id && name) profileLabelById.set(id, name);
+            }
+        }
+    }
     for (const pr of poolRows || []) {
         const uid = String(pr.assigned_user_id || '').trim();
         const cal = normalizeGoogleCalendarId(String(pr.google_calendar_id || ''));
-        if (uid && cal) poolByUser.set(uid, cal);
+        const lab = String((pr as { label?: string }).label || '').trim() || 'Agenda pool';
+        const userLabel = profileLabelById.get(uid) || `Utilisateur ${uid.slice(0, 8)}…`;
+        if (uid && cal) {
+            poolByUser.set(uid, cal);
+            poolMetaByCal.set(cal, { label: lab, userLabel });
+        }
     }
 
     const evRes = await fetch(
@@ -1823,7 +2102,14 @@ async function handleCronRepairGoogleSync(
         { headers: hdrs }
     );
     if (!evRes.ok) {
-        return { ok: false, repairedPool: 0, resyncedCalendars: 0, errors: [`Événements : HTTP ${evRes.status}`] };
+        return {
+            ok: false,
+            repairedMain: 0,
+            repairedPool: 0,
+            resyncedCalendars: 0,
+            resyncedCalendarsDetail: [],
+            errors: [`Événements : HTTP ${evRes.status}`]
+        };
     }
     const events = (await evRes.json()) as Array<{
         id?: string;
@@ -1866,11 +2152,45 @@ async function handleCronRepairGoogleSync(
     }
 
     const calendarsToResync = new Set<string>();
+    const resyncedCalendarsDetail: Array<{ label: string; userLabel: string; kind: 'main' | 'pool' }> =
+        [];
+    const poolLabelByCal = new Map<string, string>();
+    for (const pr of poolRows || []) {
+        const cal = normalizeGoogleCalendarId(String(pr.google_calendar_id || ''));
+        const lab = String((pr as { label?: string }).label || '').trim();
+        if (cal && lab) poolLabelByCal.set(cal, lab);
+    }
+
+    let repairedMain = 0;
     let repairedPool = 0;
-    const maxRepair = 40;
+    const maxMainRepair = 40;
+    const maxPoolRepair = 40;
 
     for (const ev of events || []) {
-        if (repairedPool >= maxRepair) break;
+        if (repairedMain >= maxMainRepair) break;
+        const eventId = String(ev.id || '').trim();
+        if (!eventId) continue;
+        if (mainGidByEvent.has(eventId)) continue;
+        const gid = await repairMainMirrorFromDbEvent(
+            accessToken,
+            supabaseUrl,
+            serviceKey,
+            ev,
+            mainCal,
+            mainGidByEvent.get(eventId)
+        );
+        if (!gid) {
+            errors.push(`Échec miroir principal pour ${eventId.slice(0, 8)}…`);
+            continue;
+        }
+        mainGidByEvent.set(eventId, gid);
+        repairedMain += 1;
+        calendarsToResync.add(mainCal);
+        await sleepMs(50);
+    }
+
+    for (const ev of events || []) {
+        if (repairedPool >= maxPoolRepair) break;
         const eventId = String(ev.id || '').trim();
         const ownerId = String(ev.owner_user_id || '').trim();
         const slotType = String(ev.slot_type || '');
@@ -1914,20 +2234,90 @@ async function handleCronRepairGoogleSync(
     }
 
     let resyncedCalendars = 0;
+    const mainCalNorm = normalizeGoogleCalendarId(mainCal);
     for (const cal of calendarsToResync) {
         const r = await resyncGoogleCalendarFutureFromDb(accessToken, supabaseUrl, serviceKey, cal);
         if (r.errors.length) errors.push(...r.errors.slice(0, 3));
         resyncedCalendars += 1;
+        const calNorm = normalizeGoogleCalendarId(cal);
+        if (calNorm && sameGoogleCalendarId(calNorm, mainCalNorm)) {
+            resyncedCalendarsDetail.push({
+                label: 'Calendrier principal orgue IAMS',
+                userLabel: '(tous les créneaux en base)',
+                kind: 'main'
+            });
+        } else {
+            const meta = poolMetaByCal.get(calNorm);
+            const lab = meta?.label || poolLabelByCal.get(calNorm) || calNorm.slice(0, 24);
+            resyncedCalendarsDetail.push({
+                label: lab,
+                userLabel: meta?.userLabel || '(utilisateur non résolu)',
+                kind: 'pool'
+            });
+        }
         await sleepMs(120);
     }
 
-    if (repairedPool > 0 || calendarsToResync.size === 0) {
+    if (!calendarsToResync.has(mainCal)) {
         const mainSync = await resyncGoogleCalendarFutureFromDb(accessToken, supabaseUrl, serviceKey, mainCal);
         if (mainSync.errors.length) errors.push(...mainSync.errors.slice(0, 2));
         resyncedCalendars += 1;
+        resyncedCalendarsDetail.push({
+            label: 'Calendrier principal orgue IAMS',
+            userLabel: '(contrôle orphelins)',
+            kind: 'main'
+        });
     }
 
-    return { ok: errors.length === 0, repairedPool, resyncedCalendars, errors };
+    return {
+        ok: errors.length === 0,
+        repairedMain,
+        repairedPool,
+        resyncedCalendars,
+        resyncedCalendarsDetail,
+        errors
+    };
+}
+
+/** Admin ou script service_role : vide les agendas Google (principal + pools assignés) sur une plage. */
+async function executeAdminWipeCalendarsInRange(
+    accessToken: string,
+    supabaseUrl: string,
+    serviceKey: string,
+    timeMin: string,
+    timeMax: string
+): Promise<{ deletedByCalendar: Record<string, number>; errors: string[] }> {
+    let mainCal: string;
+    try {
+        mainCal = calendarId();
+    } catch (e) {
+        throw new Error(e instanceof Error ? e.message : 'GOOGLE_CALENDAR_ID manquant');
+    }
+    const poolIds = await fetchAssignedPoolCalendarIdsForWipe(supabaseUrl, serviceKey);
+    const allCalendars = uniqueNormCalendarIds([mainCal, ...poolIds]);
+
+    const deletedByCalendar: Record<string, number> = {};
+    const calendarErrors: string[] = [];
+
+    for (const cal of allCalendars) {
+        try {
+            const items = await listAllEventsInRangePaged(accessToken, cal, timeMin, timeMax);
+            let n = 0;
+            for (const ev of items) {
+                const eid = ev.id?.trim();
+                if (!eid) continue;
+                const okDel = await deleteGoogleEventIdInCalendar(accessToken, cal, eid);
+                if (okDel) n++;
+                await sleepMs(35);
+            }
+            deletedByCalendar[cal] = n;
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            calendarErrors.push(`${cal}: ${msg}`);
+        }
+    }
+
+    return { deletedByCalendar, errors: calendarErrors };
 }
 
 Deno.serve(async (req) => {
@@ -1974,6 +2364,34 @@ Deno.serve(async (req) => {
             const accessToken = await getGoogleAccessToken();
             const result = await handleCronRepairGoogleSync(supabaseUrl, serviceKey, accessToken);
             return jsonResponse({ ok: result.ok, mode: 'cron_repair_google_sync', ...result });
+        }
+
+        if (
+            bearerMatchesEdgeServiceRole(jwt) &&
+            body.action === 'adminWipeCalendarsInRange'
+        ) {
+            const serviceKey = edgeServiceRoleKeyForDb();
+            if (!serviceKey) {
+                return jsonResponse({ ok: false, error: 'SERVICE_ROLE_KEY manquante' }, 500);
+            }
+            const timeMin = String(body.timeMin ?? '').trim();
+            const timeMax = String(body.timeMax ?? '').trim();
+            if (!timeMin || !timeMax) {
+                return jsonResponse({ ok: false, error: 'timeMin et timeMax requis (ISO 8601)' }, 400);
+            }
+            const accessToken = await getGoogleAccessToken();
+            const wiped = await executeAdminWipeCalendarsInRange(
+                accessToken,
+                supabaseUrl,
+                serviceKey,
+                timeMin,
+                timeMax
+            );
+            return jsonResponse({
+                ok: wiped.errors.length === 0,
+                deletedByCalendar: wiped.deletedByCalendar,
+                ...(wiped.errors.length > 0 ? { errors: wiped.errors } : {})
+            });
         }
 
         const { user, error: authErr } = await fetchAuthUser(supabaseUrl, supabaseAnonKey, jwt);
@@ -2114,9 +2532,19 @@ Deno.serve(async (req) => {
                 Deno.env.get('SERVICE_ROLE_KEY') ??
                 ''
             ).trim();
-            let mainCal: string;
             try {
-                mainCal = calendarId();
+                const wiped = await executeAdminWipeCalendarsInRange(
+                    accessToken,
+                    supabaseUrl,
+                    serviceKey,
+                    timeMin,
+                    timeMax
+                );
+                return jsonResponse({
+                    ok: wiped.errors.length === 0,
+                    deletedByCalendar: wiped.deletedByCalendar,
+                    ...(wiped.errors.length > 0 ? { errors: wiped.errors } : {})
+                });
             } catch (e) {
                 return jsonResponse(
                     {
@@ -2126,35 +2554,6 @@ Deno.serve(async (req) => {
                     500
                 );
             }
-            const poolIds = await fetchAssignedPoolCalendarIdsForWipe(supabaseUrl, serviceKey);
-            const allCalendars = uniqueNormCalendarIds([mainCal, ...poolIds]);
-
-            const deletedByCalendar: Record<string, number> = {};
-            const calendarErrors: string[] = [];
-
-            for (const cal of allCalendars) {
-                try {
-                    const items = await listAllEventsInRangePaged(accessToken, cal, timeMin, timeMax);
-                    let n = 0;
-                    for (const ev of items) {
-                        const eid = ev.id?.trim();
-                        if (!eid) continue;
-                        const okDel = await deleteGoogleEventIdInCalendar(accessToken, cal, eid);
-                        if (okDel) n++;
-                        await sleepMs(35);
-                    }
-                    deletedByCalendar[cal] = n;
-                } catch (e) {
-                    const msg = e instanceof Error ? e.message : String(e);
-                    calendarErrors.push(`${cal}: ${msg}`);
-                }
-            }
-
-            return jsonResponse({
-                ok: true,
-                deletedByCalendar,
-                ...(calendarErrors.length > 0 ? { errors: calendarErrors } : {})
-            });
         }
 
         if (action === 'upsert' && body.events && body.events.length > 0) {

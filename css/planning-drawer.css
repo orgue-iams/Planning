@@ -312,6 +312,19 @@
     margin: -0.15rem 0 0.45rem;
 }
 
+.planning-drawer__section-subtitle {
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgb(100 116 139);
+    margin: 0.65rem 0 0.35rem;
+}
+
+[data-theme='dark'] .planning-drawer__section-subtitle {
+    color: rgb(148 163 184);
+}
+
 /* Mes prochains cours (tiroir) : cartes alignées à gauche, largeur max commune. */
 .planning-drawer__next-cours {
     display: flex;

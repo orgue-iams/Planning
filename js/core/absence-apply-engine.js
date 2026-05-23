@@ -3,7 +3,6 @@
  */
 import { isAdmin, isProf } from './auth-logic.js';
 import { getPlanningSessionUser } from './session-user.js';
-import { showToast } from '../utils/toast.js';
 import {
     fetchOrganSchoolSettings,
     getSchoolYearBoundsFromSettings
@@ -12,7 +11,8 @@ import {
     markAbsencePeriodApplied,
     pendingAbsencePeriodsForUser
 } from './absence-period-db.js';
-import { saveClosureRangeToPlanning } from './fermetures-planning.js';
+import { enumerateYmdInRange, saveClosureRangeToPlanning } from './fermetures-planning.js';
+import { formatApplyProgressLabel } from '../utils/apply-progress-label.js';
 import { executeProfSlotsShift } from './prof-slots-shift-engine.js';
 import { getProfWeekCycleForToolbar } from './week-cycle.js';
 
@@ -36,7 +36,7 @@ function effectiveYmdForPeriods(periods) {
 /**
  * @param {import('./absence-period-db.js').AbsencePeriodRow[]} periods
  * @param {{
- *   onProgress?: (pct: number, label: string) => void,
+ *   onProgress?: (pct: number | null, label: string) => void,
  *   deleteConflicts?: boolean,
  *   conflictsByPeriodId?: Map<string, object[]>
  * }} [opts]
@@ -70,16 +70,37 @@ export async function applyPendingAbsencePeriods(periods, opts = {}) {
         };
     }
 
-    const totalSteps = valid.length + (isProf(u) ? 1 : 0);
-    let step = 0;
-    const report = (label) => {
-        step += 1;
-        const pct = Math.min(100, Math.round((step / totalSteps) * 100));
-        opts.onProgress?.(pct, label);
+    const runProfShift = isProf(u) && !isAdmin(u);
+    const phaseCount = valid.length + (runProfShift ? 1 : 0);
+    let phase = 0;
+    const reportPhase = (label) => {
+        phase += 1;
+        const pct = Math.min(95, Math.round((phase / Math.max(phaseCount, 1)) * 90));
+        opts.onProgress?.(
+            pct,
+            formatApplyProgressLabel({
+                domain: 'Traitement principal',
+                step: phase,
+                total: phaseCount,
+                detail: label
+            })
+        );
+    };
+    const reportDetail = (label) => {
+        opts.onProgress?.(null, label);
     };
 
+    /** Jours de fermeture publiés lors de cette application (décalage prof limité à ces jours). */
+    const appliedClosureYmdSet = new Set();
     for (const period of valid) {
-        report(`Fermetures : ${period.startYmd} → ${period.endYmd}…`);
+        for (const ymd of enumerateYmdInRange(period.startYmd, period.endYmd)) {
+            appliedClosureYmdSet.add(ymd);
+        }
+    }
+
+    let applied = 0;
+    for (const period of valid) {
+        reportPhase(`Période ${period.startYmd} → ${period.endYmd}…`);
         const conflicts = opts.conflictsByPeriodId?.get(period.id) || [];
         const r = await saveClosureRangeToPlanning(
             {
@@ -90,24 +111,26 @@ export async function applyPendingAbsencePeriods(periods, opts = {}) {
             },
             {
                 deleteConflicts: Boolean(opts.deleteConflicts && conflicts.length),
-                conflicts
+                conflicts,
+                onProgress: reportDetail
             }
         );
         if (!r.ok) {
-            return { ok: false, error: r.error || 'Enregistrement impossible.', applied: step - 1 };
+            return { ok: false, error: r.error || 'Enregistrement impossible.', applied };
         }
         const mr = await markAbsencePeriodApplied(period.id);
         if (!mr.ok) {
             return {
                 ok: false,
                 error: mr.error || 'Marquage « appliqué » impossible.',
-                applied: step - 1
+                applied
             };
         }
+        applied += 1;
     }
 
-    if (isProf(u) && !isAdmin(u)) {
-        report('Décalage des créneaux…');
+    if (runProfShift && appliedClosureYmdSet.size > 0) {
+        reportPhase('Décalage des créneaux sur les jours fermés (+1 semaine)…');
         const cycle = getProfWeekCycleForToolbar();
         const effectiveYmd = effectiveYmdForPeriods(valid);
         const shift = await executeProfSlotsShift({
@@ -117,17 +140,33 @@ export async function applyPendingAbsencePeriods(periods, opts = {}) {
             weekDelta: 1,
             currentUser: u,
             profWeekCycle: cycle,
-            onProgress: (detail) => opts.onProgress?.(95, detail)
+            restrictToClosureYmdSet: appliedClosureYmdSet,
+            onProgress: reportDetail
         });
         if (!shift.ok) {
             return {
                 ok: false,
                 error: shift.error || 'Décalage des créneaux impossible.',
-                applied: valid.length
+                applied
             };
+        }
+        if (typeof shift.count === 'number' && shift.count > 0) {
+            reportDetail(
+                formatApplyProgressLabel({
+                    domain: 'Décalage professeur',
+                    detail: `${shift.count} créneau(x) décalé(s) (uniquement sur les jours de fermeture)`
+                })
+            );
+        } else {
+            reportDetail(
+                formatApplyProgressLabel({
+                    domain: 'Décalage professeur',
+                    detail: 'aucun de vos créneaux ne tombe sur ces jours — rien à décaler'
+                })
+            );
         }
     }
 
-    opts.onProgress?.(100, 'Terminé');
-    return { ok: true, error: null, applied: valid.length };
+    opts.onProgress?.(100, formatApplyProgressLabel({ domain: 'Traitement principal', detail: 'terminé' }));
+    return { ok: true, error: null, applied };
 }

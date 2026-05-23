@@ -23,6 +23,7 @@ import {
     weekTypeLetterForAlternance
 } from './week-cycle.js';
 import { formatWeekdayDayTimeFr24 } from '../utils/time-helpers.js';
+import { formatApplyProgressLabel, formatUniqueTitlesPreview } from '../utils/apply-progress-label.js';
 
 const MS_DAY = 24 * 60 * 60 * 1000;
 const DB_SHIFT_CHUNK = 14;
@@ -47,6 +48,28 @@ async function runInChunks(items, size, fn) {
 
 function normEmail(em) {
     return String(em || '').trim().toLowerCase();
+}
+
+/** Créneaux à exclure du décalage auto (fermetures institut, pas des cours à déplacer). */
+function profSlotEligibleForShift(it) {
+    const slot = String(it?.slotType || '').trim().toLowerCase();
+    const ext = String(it?.extType || '').trim().toLowerCase();
+    if (slot === 'fermeture' || ext === 'fermeture') return false;
+    return true;
+}
+
+/** Créneau qui tombe (au moins un jour) sur un des jours de fermeture appliqués. */
+export function slotOverlapsYmdSet(start, end, ymdSet) {
+    if (!ymdSet?.size) return true;
+    const dayStart = new Date(start);
+    dayStart.setHours(0, 0, 0, 0);
+    const endMs = end.getTime();
+    const cur = new Date(dayStart);
+    while (cur.getTime() < endMs) {
+        if (ymdSet.has(formatLocalYmd(cur))) return true;
+        cur.setDate(cur.getDate() + 1);
+    }
+    return false;
 }
 
 function rangesOverlap(aStart, aEnd, bStart, bEnd) {
@@ -168,7 +191,8 @@ function conflictRowFromOther(other, newStart, newEnd) {
  *   profEmail: string,
  *   effectiveYmd: string,
  *   weekDelta: 1 | 2,
- *   profWeekCycle?: { anchorMondayIso: string, letterAtAnchor: 'A'|'B' } | null
+ *   profWeekCycle?: { anchorMondayIso: string, letterAtAnchor: 'A'|'B' } | null,
+ *   restrictToClosureYmdSet?: Set<string>
  * }} p
  */
 export async function analyzeProfSlotsShift(p) {
@@ -207,14 +231,35 @@ export async function analyzeProfSlotsShift(p) {
         allItems.push(it);
     }
 
-    const shiftItems = allItems.filter((it) => {
+    let shiftItems = allItems.filter((it) => {
+        if (!profSlotEligibleForShift(it)) return false;
         if (it.ownerUserId !== profUserId) return false;
         if (it.start.getTime() < effectiveMs) return false;
         if (it.start.getTime() < nowMs) return false;
         return true;
     });
 
+    const restrict = p.restrictToClosureYmdSet;
+    if (restrict instanceof Set && restrict.size > 0) {
+        shiftItems = shiftItems.filter((it) => slotOverlapsYmdSet(it.start, it.end, restrict));
+    }
+
     if (!shiftItems.length) {
+        const restricted = restrict instanceof Set && restrict.size > 0;
+        if (restricted) {
+            return {
+                ok: true,
+                error: null,
+                count: 0,
+                weekDelta,
+                effectiveYmd,
+                deltaMs: weekDelta * 7 * MS_DAY,
+                closureYmdSet,
+                conflictsToDelete: [],
+                partialAlternance: { partial: false, lines: [] },
+                closureDaysInRange: 0
+            };
+        }
         return {
             ok: false,
             error: 'Aucun créneau futur à décaler à partir de cette date.',
@@ -319,7 +364,8 @@ export function formatProfShiftPrepareSummary(analysis) {
  *   weekDelta: 1 | 2,
  *   currentUser: object,
  *   onProgress?: (detail: string) => void,
- *   onDbComplete?: () => void
+ *   onDbComplete?: () => void,
+ *   restrictToClosureYmdSet?: Set<string>
  * }} p
  */
 export async function executeProfSlotsShift(p) {
@@ -339,14 +385,22 @@ export async function executeProfSlotsShift(p) {
     rangeEnd.setFullYear(rangeEnd.getFullYear() + 2);
 
     const rows = await fetchPlanningEventRowsInRange(rangeStart, rangeEnd);
-    const shiftItems = [];
+    let shiftItems = [];
     for (const row of rows) {
         const it = rowToShiftItem(row);
         if (!it) continue;
+        if (!profSlotEligibleForShift(it)) continue;
         if (String(row.owner_user_id || '').trim() !== profUserId) continue;
         if (it.start.getTime() < effectiveMs) continue;
         if (it.start.getTime() < nowMs) continue;
         shiftItems.push(it);
+    }
+    const restrict = p.restrictToClosureYmdSet;
+    if (restrict instanceof Set && restrict.size > 0) {
+        shiftItems = shiftItems.filter((it) => slotOverlapsYmdSet(it.start, it.end, restrict));
+    }
+    if (!shiftItems.length) {
+        return { ok: true, error: null, count: 0, googleSkipped: true };
     }
 
     const currentUser = p.currentUser || { email: profEmail };
@@ -371,7 +425,15 @@ export async function executeProfSlotsShift(p) {
     }
 
     const total = shiftItems.length;
-    p.onProgress?.(`Mise à jour base (0 / ${total})…`);
+    p.onProgress?.(
+        formatApplyProgressLabel({
+            domain: 'Planning',
+            detail:
+                total > 0
+                    ? `décalage en base de ${total} créneau(x) sur les jours fermés`
+                    : 'aucun créneau à décaler'
+        })
+    );
 
     const mirrorByEvent = await fetchPlanningMainPoolGoogleIdsForEvents(shiftItems.map((it) => it.id));
 
@@ -410,7 +472,14 @@ export async function executeProfSlotsShift(p) {
                 shifted.push({ item: it, startIso, endIso });
                 done += 1;
             }
-            p.onProgress?.(`Base ${done} / ${total}`);
+            p.onProgress?.(
+                formatApplyProgressLabel({
+                    domain: 'Planning',
+                    step: done,
+                    total,
+                    detail: 'décalage en base'
+                })
+            );
         });
     } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -455,7 +524,6 @@ export async function executeProfSlotsShift(p) {
     }
 
     const batchTotal = Math.ceil(bridgePayloads.length / GOOGLE_SHIFT_BATCH_SIZE) || 1;
-    p.onProgress?.('Google : agenda général, puis élèves inscrits…');
 
     for (let b = 0; b < batchTotal; b++) {
         if (b > 0) await sleepMs(GOOGLE_SHIFT_BATCH_GAP_MS);
@@ -463,7 +531,17 @@ export async function executeProfSlotsShift(p) {
             b * GOOGLE_SHIFT_BATCH_SIZE,
             (b + 1) * GOOGLE_SHIFT_BATCH_SIZE
         );
-        p.onProgress?.(`Google lot ${b + 1} / ${batchTotal} (${slice.length} créneau(x))`);
+        const preview = formatUniqueTitlesPreview(
+            slice.map((ev) => String(ev.title || 'Créneau').trim())
+        );
+        p.onProgress?.(
+            formatApplyProgressLabel({
+                domain: 'Agendas Google',
+                step: b + 1,
+                total: batchTotal,
+                detail: `${preview.text || 'créneaux'} — propriétaire et inscrits (${slice.length} opération(s))`
+            })
+        );
         const r = await bridgeUpsertEvents(token, slice);
         if (!r.ok && !r.skipped) {
             return {

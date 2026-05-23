@@ -80,7 +80,10 @@ export function mapPlanningDbRowToFcEvent(row, _currentUser) {
             planningGabaritWeekType: (() => {
                 const w = String(row.gabarit_week_type || '').trim().toUpperCase();
                 return w === 'A' || w === 'B' ? w : '';
-            })()
+            })(),
+            planningAbsencePeriodId: row.absence_period_id
+                ? String(row.absence_period_id).trim()
+                : ''
         }
     };
 }
@@ -247,11 +250,24 @@ export async function upsertPlanningEventRow(p) {
             .from('planning_event')
             .update(updateRow)
             .eq('id', existingId)
-            .select('id')
-            .maybeSingle();
-        if (error) return { ok: false, error: error.message, id: null };
-        if (data?.id) return { ok: true, error: null, id: String(data.id) };
-        /* UUID client (création rapide) ou id obsolète : aucune ligne → insertion. */
+            .select('id');
+        if (error) {
+            const msg = String(error.message || '');
+            const denied =
+                error.code === 'PGRST116' ||
+                error.code === '42501' ||
+                /0 rows|permission|policy/i.test(msg);
+            return {
+                ok: false,
+                error: denied
+                    ? 'Modification refusée (droits ou créneau introuvable). Rechargez la page puis réessayez.'
+                    : msg,
+                id: null
+            };
+        }
+        const updatedId = Array.isArray(data) && data[0]?.id ? String(data[0].id) : '';
+        if (updatedId) return { ok: true, error: null, id: updatedId };
+        /* UUID client (création rapide) ou id obsolète : aucune ligne mise à jour → insertion. */
     }
     const { data, error } = await sb.from('planning_event').insert(row).select('id').single();
     if (error) return { ok: false, error: error.message, id: null };
@@ -337,7 +353,7 @@ export async function fetchPlanningMirrorTargetsForDelete(eventId, options = {})
     const anySyncStatus = Boolean(options.anySyncStatus);
     const { data, error } = await sb
         .from('planning_event_google_mirror')
-        .select('google_calendar_id,google_event_id,sync_status')
+        .select('google_calendar_id,google_event_id,sync_status,target,target_user_id')
         .eq('event_id', id);
     if (error) {
         console.warn('[planning-events-db] mirror list', error.message);
@@ -354,7 +370,9 @@ export async function fetchPlanningMirrorTargetsForDelete(eventId, options = {})
         })
         .map((r) => ({
             calendarId: String(r.google_calendar_id).trim(),
-            googleEventId: String(r.google_event_id).trim()
+            googleEventId: String(r.google_event_id).trim(),
+            target: String(r.target || '').trim(),
+            targetUserId: String(r.target_user_id || '').trim()
         }));
 }
 

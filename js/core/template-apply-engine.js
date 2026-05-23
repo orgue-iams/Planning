@@ -771,15 +771,22 @@ export async function runTemplateGoogleBackgroundSync(p) {
                 const totalSteps = cleanup.length + ups.length;
                 activeGt = totalSteps > 0 ? totalSteps : 1;
 
-                report('Connexion Google…', 0, activeGt);
-
                 for (let i = 0; i < cleanup.length; i++) {
                     const t = cleanup[i];
+                    report(
+                        `Suppression Google ${i + 1}/${cleanup.length} (général → prof → élèves)…`,
+                        i,
+                        activeGt
+                    );
                     const rDel = await bridgeDeleteEvent(token, t.googleEventId, t.calendarId);
                     if (!rDel.ok && !rDel.skipped) throw new Error(rDel.error || 'Suppression Google');
                     grandDone += 1;
                     deletesDone += 1;
-                    report(`Suppression Google ${i + 1}/${cleanup.length} (général → prof → élèves)`, grandDone, activeGt);
+                    report(
+                        `Suppression Google ${i + 1}/${cleanup.length} (général → prof → élèves)`,
+                        grandDone,
+                        activeGt
+                    );
                     if (i < cleanup.length - 1 || ups.length > 0) await sleepMsLocal(GOOGLE_BG_DELETE_GAP_MS);
                 }
 
@@ -788,6 +795,11 @@ export async function runTemplateGoogleBackgroundSync(p) {
                     const batch = ups.slice(
                         bi * GOOGLE_BG_UPSERT_BATCH_SIZE,
                         (bi + 1) * GOOGLE_BG_UPSERT_BATCH_SIZE
+                    );
+                    report(
+                        `Écriture Google lot ${bi + 1}/${upsertBatches} (${batch.length} créneau(x))…`,
+                        cleanup.length + bi * GOOGLE_BG_UPSERT_BATCH_SIZE,
+                        activeGt
                     );
                     const rUp = await bridgeUpsertEvents(token, batch, undefined);
                     if (rUp.skipped) {
@@ -826,10 +838,13 @@ export async function runTemplateGoogleBackgroundSync(p) {
             activeTotalDel = totalDel;
             activeUpsertTotal = upsertTotal;
 
-            report('Google uniquement : suppressions (général → élèves → prof)…', 0, activeGt);
-
             for (let i = 0; i < orderedDel.length; i++) {
                 const d = orderedDel[i];
+                report(
+                    `Suppression Google ${i + 1}/${orderedDel.length} (général → élèves → prof)…`,
+                    i,
+                    activeGt
+                );
                 const rDel = await bridgeDeleteEvent(token, d.googleEventId, d.calendarId);
                 if (rDel.skipped) throw new Error('Pont agenda non configuré.');
                 if (!rDel.ok) throw new Error(rDel.error || 'Suppression Google');
@@ -844,6 +859,11 @@ export async function runTemplateGoogleBackgroundSync(p) {
                 const batch = upserts.slice(
                     bi * GOOGLE_BG_UPSERT_BATCH_SIZE,
                     (bi + 1) * GOOGLE_BG_UPSERT_BATCH_SIZE
+                );
+                report(
+                    `Écriture Google lot ${bi + 1}/${upsertBatches} (${batch.length} créneau(x))…`,
+                    orderedDel.length + bi * GOOGLE_BG_UPSERT_BATCH_SIZE,
+                    activeGt
                 );
                 const rUp = await bridgeUpsertEvents(token, batch, undefined);
                 if (rUp.skipped) throw new Error('Pont agenda non configuré.');
