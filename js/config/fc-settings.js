@@ -9,7 +9,8 @@ import {
     calendarListCacheKey,
     cloneCachedCalendarRows,
     getCalendarListCache,
-    setCalendarListCache
+    setCalendarListCache,
+    warmAdjacentCalendarListCaches
 } from '../core/calendar-events-list-cache.js';
 import {
     fcDragResizePropsForEvent,
@@ -213,6 +214,12 @@ export const getCalendarConfig = (handlers, currentUser) => {
                             try {
                                 rows = await fetchPlanningEventsForFullCalendar(start, end, currentUser);
                                 setCalendarListCache(cacheKey, cloneCachedCalendarRows(rows));
+                                void warmAdjacentCalendarListCaches(
+                                    start,
+                                    end,
+                                    currentUser,
+                                    `db:${currentUser?.id || ''}`
+                                );
                             } catch (err) {
                                 const msg = err instanceof Error ? err.message : String(err);
                                 showToast(`Planning (base) : ${msg}`, 'error');

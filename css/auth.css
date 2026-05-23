@@ -300,8 +300,24 @@
 }
 
 /* Champs mot de passe + œil (même principe que la modale login) — utilisateur admin, reset MDP */
-.planning-pass-field {
+.planning-pass-field,
+.profile-pass-field {
+    position: relative;
     overflow: visible;
+}
+
+#modal_profile .profile-pass-field .planning-pass-toggle {
+    width: 2rem;
+    height: 2rem;
+    min-width: 2rem;
+    min-height: 2rem;
+    background: transparent;
+    box-shadow: none;
+    border: 0;
+}
+
+#modal_profile .profile-pass-field .planning-pass-toggle:hover {
+    background: rgb(241 245 249);
 }
 
 .planning-pass-toggle {

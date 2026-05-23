@@ -233,12 +233,23 @@ async function applyProfilePassword() {
     }
     if (a) a.value = '';
     if (b) b.value = '';
-    const passToggle = document.getElementById('profile-pass-show-plain');
-    if (passToggle instanceof HTMLInputElement) passToggle.checked = false;
-    document.getElementById('profile-pass-new')?.setAttribute('type', 'password');
-    document.getElementById('profile-pass-confirm')?.setAttribute('type', 'password');
+    resetProfilePasswordToggles();
     syncProfilePassApplyState();
     setPassHint('Mot de passe changé.', 'success');
+}
+
+function resetProfilePasswordToggles() {
+    for (const id of ['profile-pass-new', 'profile-pass-confirm']) {
+        const el = document.getElementById(id);
+        if (el instanceof HTMLInputElement) el.type = 'password';
+    }
+    document.querySelectorAll('#modal_profile [data-profile-pw-toggle]').forEach((node) => {
+        const btn = /** @type {HTMLButtonElement} */ (node);
+        btn.setAttribute('aria-pressed', 'false');
+        btn.setAttribute('aria-label', 'Afficher le mot de passe');
+        btn.querySelector('.planning-pass-toggle__show')?.classList.remove('hidden');
+        btn.querySelector('.planning-pass-toggle__hide')?.classList.add('hidden');
+    });
 }
 
 export function resetProfileUiBindings() {
@@ -274,19 +285,22 @@ export function initProfileUi(currentUser) {
         void persistProfileFields();
     });
 
-    const passToggle = document.getElementById('profile-pass-show-plain');
-    const applyPassVisibility = (visible) => {
-        const type = visible ? 'text' : 'password';
-        document.getElementById('profile-pass-new')?.setAttribute('type', type);
-        document.getElementById('profile-pass-confirm')?.setAttribute('type', type);
-        if (passToggle instanceof HTMLInputElement) passToggle.checked = visible;
-    };
-    passToggle?.addEventListener('change', (e) =>
-        applyPassVisibility(Boolean(e.target instanceof HTMLInputElement && e.target.checked))
-    );
+    document.getElementById('modal_profile')?.addEventListener('click', (e) => {
+        const btn = e.target instanceof Element ? e.target.closest('[data-profile-pw-toggle]') : null;
+        if (!(btn instanceof HTMLButtonElement)) return;
+        const id = btn.getAttribute('data-profile-pw-toggle');
+        const input = id ? document.getElementById(id) : null;
+        if (!(input instanceof HTMLInputElement)) return;
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        btn.setAttribute('aria-pressed', String(show));
+        btn.setAttribute('aria-label', show ? 'Masquer le mot de passe' : 'Afficher le mot de passe');
+        btn.querySelector('.planning-pass-toggle__show')?.classList.toggle('hidden', show);
+        btn.querySelector('.planning-pass-toggle__hide')?.classList.toggle('hidden', !show);
+    });
     const profileDlg = document.getElementById('modal_profile');
     profileDlg?.addEventListener('close', () => {
-        applyPassVisibility(false);
+        resetProfilePasswordToggles();
         void persistProfileFields();
     });
 

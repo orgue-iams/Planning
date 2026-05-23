@@ -27,22 +27,22 @@
             <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-start min-h-[2.75rem] py-2.5">
                 <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none pt-1">Affichage</dt>
                 <dd class="m-0 min-w-0">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="profile-show-sunday" class="checkbox checkbox-primary checkbox-sm" />
+                    <label class="flex items-center justify-between gap-3 cursor-pointer">
                         <span class="text-[10px] text-slate-700">Afficher le dimanche (vue semaine)</span>
+                        <input type="checkbox" id="profile-show-sunday" class="toggle toggle-primary toggle-sm" role="switch" />
                     </label>
                 </dd>
             </div>
             <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-start min-h-[2.75rem] py-2.5">
                 <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none pt-1">Partage d'informations</dt>
                 <dd class="m-0 min-w-0 space-y-2">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="profile-share-email" class="checkbox checkbox-primary checkbox-sm" />
+                    <label class="flex items-center justify-between gap-3 cursor-pointer">
                         <span class="text-[10px] text-slate-700">email</span>
+                        <input type="checkbox" id="profile-share-email" class="toggle toggle-primary toggle-sm" role="switch" />
                     </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="profile-share-phone" class="checkbox checkbox-primary checkbox-sm" />
+                    <label class="flex items-center justify-between gap-3 cursor-pointer">
                         <span class="text-[10px] text-slate-700">n° de tel.</span>
+                        <input type="checkbox" id="profile-share-phone" class="toggle toggle-primary toggle-sm" role="switch" />
                     </label>
                 </dd>
             </div>
@@ -50,15 +50,41 @@
                 <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none pt-1">Mot de passe</dt>
                 <dd class="m-0 min-w-0">
                     <div class="flex flex-col gap-1.5">
-                        <input type="password" id="profile-pass-new" class="input input-xs input-bordered w-full text-[11px] h-8" placeholder="Nouveau mot de passe" autocomplete="new-password" />
-                        <input type="password" id="profile-pass-confirm" class="input input-xs input-bordered w-full text-[11px] h-8" placeholder="Confirmer le mot de passe" autocomplete="new-password" />
+                        <div class="profile-pass-field relative w-full">
+                            <input type="password" id="profile-pass-new" class="input input-xs input-bordered w-full text-[11px] h-8 pr-9" placeholder="Nouveau mot de passe" autocomplete="new-password" />
+                            <button type="button" class="planning-pass-toggle" data-profile-pw-toggle="profile-pass-new" aria-label="Afficher le mot de passe" aria-pressed="false">
+                                <span class="planning-pass-toggle__icon planning-pass-toggle__show" aria-hidden="true">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="20" height="20">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                </span>
+                                <span class="planning-pass-toggle__icon planning-pass-toggle__hide hidden" aria-hidden="true">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="20" height="20">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.274M6.228 6.228L3 3m3.228 3.228L12 12m-5.772-5.772L9.88 9.88M18.228 18.228L21 21m-2.772-2.772L12 12" />
+                                    </svg>
+                                </span>
+                            </button>
+                        </div>
+                        <div class="profile-pass-field relative w-full">
+                            <input type="password" id="profile-pass-confirm" class="input input-xs input-bordered w-full text-[11px] h-8 pr-9" placeholder="Confirmer le mot de passe" autocomplete="new-password" />
+                            <button type="button" class="planning-pass-toggle" data-profile-pw-toggle="profile-pass-confirm" aria-label="Afficher le mot de passe" aria-pressed="false">
+                                <span class="planning-pass-toggle__icon planning-pass-toggle__show" aria-hidden="true">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="20" height="20">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                </span>
+                                <span class="planning-pass-toggle__icon planning-pass-toggle__hide hidden" aria-hidden="true">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="20" height="20">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.274M6.228 6.228L3 3m3.228 3.228L12 12m-5.772-5.772L9.88 9.88M18.228 18.228L21 21m-2.772-2.772L12 12" />
+                                    </svg>
+                                </span>
+                            </button>
+                        </div>
                         <p id="profile-pass-hint" class="hidden text-[10px] leading-snug min-h-[1rem]" aria-live="polite"></p>
                         <div class="flex flex-wrap items-center gap-2">
                             <button type="button" id="profile-pass-apply" class="btn btn-primary btn-xs" disabled>Appliquer</button>
-                            <label class="label cursor-pointer justify-start gap-2 py-0 min-h-0">
-                                <input type="checkbox" id="profile-pass-show-plain" class="checkbox checkbox-primary checkbox-sm" />
-                                <span class="label-text text-[10px] text-slate-600">Montrer les mots de passe</span>
-                            </label>
                         </div>
                     </div>
                 </dd>

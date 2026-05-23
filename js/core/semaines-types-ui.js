@@ -41,8 +41,6 @@ import { setStudentsLineWithUsersIcon } from '../utils/template-cours-card-ui.js
 
 const ST_DELETE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m2-3h6a1 1 0 011 1v1H8V5a1 1 0 011-1z"/></svg>';
 
-const ST_DRAG_GRIP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>`;
-
 /** @param {string} ownerId */
 function profTintIndex(ownerId) {
     const s = String(ownerId || '0');
@@ -513,10 +511,10 @@ function syncRowReadonlyDisplay(card, elevesById) {
     if (periodEl) {
         periodEl.replaceChildren();
         const l1 = document.createElement('div');
-        l1.className = 'gabarit-cours-card__day leading-snug';
+        l1.className = 'gabarit-cours-card__day st-slot-card__day-label leading-snug';
         l1.textContent = dowLongLabel(dow);
         const l2 = document.createElement('div');
-        l2.className = 'font-mono text-[10px] opacity-90 mt-0.5';
+        l2.className = 'st-slot-card__hours font-mono text-[9px] tracking-tight opacity-90 mt-0.5';
         l2.textContent = `${padTime(card.dataset.stStart)} – ${padTime(card.dataset.stEnd)}`;
         periodEl.appendChild(l1);
         periodEl.appendChild(l2);
@@ -937,8 +935,8 @@ function appendTemplateCard(listEl, line, _optHtml, ctx) {
     const weekLetter = line?.week_type === 'B' ? 'B' : 'A';
     const card = document.createElement('div');
     card.className = isEleve
-        ? 'st-slot-card st-slot-card--eleve-view grid grid-cols-[minmax(5rem,0.95fr)_minmax(0,1.1fr)_minmax(0,0.95fr)] gap-2 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px] text-slate-800'
-        : 'st-slot-card grid grid-cols-[auto_minmax(5.5rem,1.15fr)_minmax(0,1fr)_minmax(0,0.95fr)] gap-2 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px] text-slate-800';
+        ? 'st-slot-card st-slot-card--eleve-view grid grid-cols-[minmax(3.75rem,auto)_minmax(0,1fr)_minmax(3.25rem,auto)] gap-1.5 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px] text-slate-800'
+        : 'st-slot-card grid grid-cols-[minmax(3.75rem,auto)_minmax(0,1fr)_minmax(3.25rem,auto)] gap-1.5 items-stretch rounded-lg border border-slate-200/90 px-2 py-2 min-w-0 text-[10px] text-slate-800';
     card.classList.add(`st-slot-card--prof-tint-${profTintIndex(lineOwnerId)}`);
     if (isOffTeachingDay) card.classList.add('st-slot-card--off-teaching-day');
     if (!isReadonly) card.classList.add('st-slot-card--editable');
@@ -957,17 +955,13 @@ function appendTemplateCard(listEl, line, _optHtml, ctx) {
     card.dataset.stOwnerPrenom = ownerPrenom || '';
     card.dataset.stOwnerNom = ownerNom || '';
 
-    const dragHtml = isReadonly
-        ? '<span class="w-0" aria-hidden="true"></span>'
-        : `<span class="st-drag-handle inline-flex cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 p-0.5 rounded hover:bg-slate-100 shrink-0 self-center" draggable="true" title="Glisser vers l’autre semaine type" aria-label="Glisser vers l’autre semaine type">${ST_DRAG_GRIP_SVG}</span>`;
-
     if (isEleve) {
         card.innerHTML = `
         <div class="st-slot-card__left min-w-0 self-stretch flex flex-col justify-center py-0.5">
             <div class="st-ro-period leading-snug"></div>
         </div>
         <div class="st-slot-card__right min-w-0 flex flex-col justify-center py-0.5">
-            <p class="gabarit-cours-card__title st-ro-headline m-0 leading-snug"></p>
+            <p class="gabarit-cours-card__title st-ro-headline st-slot-card__headline m-0 leading-snug"></p>
             <p class="st-ro-students text-[10px] font-normal text-slate-700 dark:text-slate-300 m-0 leading-snug break-words"></p>
         </div>
         <div class="st-slot-card__prof min-w-0 self-stretch flex items-center justify-end py-0.5">
@@ -975,16 +969,15 @@ function appendTemplateCard(listEl, line, _optHtml, ctx) {
         </div>`;
     } else {
         card.innerHTML = `
-        ${dragHtml}
-        <div class="st-slot-card__left min-w-0 border-r border-slate-200/80 dark:border-slate-500/50 pr-2 self-stretch flex flex-col justify-center py-0.5">
+        <div class="st-slot-card__left min-w-0 border-r border-slate-200/80 dark:border-slate-500/50 px-1 self-stretch flex flex-col justify-center py-0.5">
             <div class="st-ro-period leading-snug"></div>
         </div>
         <div class="st-slot-card__right min-w-0 pl-1 flex flex-col gap-0.5 self-stretch justify-center py-0.5">
-            <p class="gabarit-cours-card__title st-ro-headline m-0 leading-snug"></p>
+            <p class="gabarit-cours-card__title st-ro-headline st-slot-card__headline m-0 leading-snug"></p>
             <p class="st-ro-students text-[10px] font-normal text-slate-700 dark:text-slate-300 m-0 leading-snug break-words"></p>
         </div>
-        <div class="st-slot-card__prof min-w-0 border-l border-slate-200/80 dark:border-slate-500/50 pl-2 self-stretch flex items-center py-0.5">
-            <span class="st-ro-prof text-[10px] font-medium text-slate-600 dark:text-slate-300 leading-snug block"></span>
+        <div class="st-slot-card__prof min-w-0 border-l border-slate-200/80 dark:border-slate-500/50 px-1 self-stretch flex items-center justify-end py-0.5">
+            <span class="st-ro-prof text-[10px] font-medium text-slate-600 dark:text-slate-300 leading-snug block text-right"></span>
         </div>`;
     }
 
@@ -994,8 +987,7 @@ function appendTemplateCard(listEl, line, _optHtml, ctx) {
         card.addEventListener('click', (ev) => {
             const t = ev.target;
             if (!(t instanceof Element)) return;
-            if (t.closest('.st-drag-handle')) return;
-            openStSlotEditPanel(card);
+                openStSlotEditPanel(card);
         });
     }
     listEl.appendChild(card);

@@ -4,7 +4,11 @@
 import { isAdmin, isProf } from './auth-logic.js';
 import { getPlanningSessionUser } from './session-user.js';
 import { showToast } from '../utils/toast.js';
-import { resetPlanningRouteStack, planningRouteTitle } from '../utils/planning-route-dialog.js';
+import {
+    resetPlanningRouteStack,
+    planningRouteTitle,
+    setPlanningRouteBarHidden
+} from '../utils/planning-route-dialog.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
 import { getChapelSlotBounds, fetchOrganSchoolSettings, getSchoolYearBoundsFromSettings } from './organ-settings.js';
 import {
@@ -238,20 +242,35 @@ function syncTabsUi() {
 }
 
 function syncDayTabActions(readonly = false) {
-    const period = getPeriodRef();
     const isDay = editCtx?.activeTab === 'day';
     const del = document.getElementById('fermeture-edit-delete');
     const save = document.getElementById('fermeture-edit-save');
-    const apply = document.getElementById('fermeture-edit-apply');
     if (save instanceof HTMLButtonElement) {
         save.textContent = isDay ? 'Enregistrer ce jour' : 'Enregistrer';
     }
     if (del instanceof HTMLButtonElement) {
         del.textContent = isDay ? 'Supprimer ce jour' : 'Supprimer';
     }
-    if (apply instanceof HTMLButtonElement) {
-        apply.textContent = isDay ? 'Appliquer ce jour' : 'Appliquer';
-        apply.classList.toggle('hidden', readonly || !period?.appliedAt);
+    void readonly;
+}
+
+function resolveFermetureEditDialogTitle(index, range, editable, fromCalendar) {
+    if (index < 0) return 'Nouvelle fermeture';
+    if (range?.isPeriodic && !fromCalendar) return 'Fermeture périodique';
+    if (!editable) return 'Fermeture';
+    return 'Modifier la fermeture';
+}
+
+function syncFermetureEditDialogTitle(index, range, editable, fromCalendar) {
+    const title = resolveFermetureEditDialogTitle(index, range, editable, fromCalendar);
+    const heading = document.getElementById('fermeture-edit-dialog-title');
+    if (heading) {
+        heading.textContent = title;
+        heading.classList.toggle('hidden', fromCalendar);
+    }
+    const dlg = document.getElementById('modal_fermeture_edit');
+    if (dlg instanceof HTMLDialogElement && !fromCalendar) {
+        dlg.setAttribute('aria-label', title);
     }
 }
 
@@ -312,14 +331,23 @@ async function excludeSinglePeriodicDay(ymd) {
         slotStartTime: period.slotStartTime,
         slotEndTime: period.slotEndTime,
         excludedYmds: excluded,
-        dayOverrides: period.dayOverrides
+        dayOverrides: period.dayOverrides,
+        allowAppliedUpdate: true
     });
-    if (!r.ok) {
+    if (!r.ok || !r.period) {
         showToast(r.error || 'Mise à jour impossible.', 'error');
         return;
     }
+    const updated = r.period;
+    let eventIds = [...(period.eventIds || [])];
+    if (!eventIds.length) eventIds = await fetchEventIdsForAbsencePeriod(updated.id);
     const del = await saveClosureRangeToPlanning(
-        { ...period, excludedYmds: excluded, absencePeriodId: period.id, eventIds: period.eventIds },
+        {
+            ...updated,
+            excludedYmds: excluded,
+            absencePeriodId: updated.id,
+            eventIds
+        },
         {}
     );
     if (!del.ok) {
@@ -329,6 +357,8 @@ async function excludeSinglePeriodicDay(ymd) {
     showToast('Jour retiré de la fermeture périodique.', 'success');
     invalidateCalendarListCache();
     document.dispatchEvent(new CustomEvent('planning-events-changed'));
+    const mod = await fermeturesUiModule();
+    await mod.loadClosureRangesFromServer();
     closeFermetureEditModal();
 }
 
@@ -375,9 +405,11 @@ async function persistSingleDayOverride() {
         return;
     }
 
+    let eventIds = [...(period.eventIds || [])];
+    if (!eventIds.length) eventIds = await fetchEventIdsForAbsencePeriod(draft.period.id);
     const payload = {
         ...draft.period,
-        eventIds: period.eventIds,
+        eventIds,
         absencePeriodId: draft.period.id
     };
     const conflicts = await findConflictsForClosurePeriod(payload, period.eventIds || []);
@@ -463,38 +495,13 @@ async function persistEdit() {
     const mod = await fermeturesUiModule();
     await mod.loadClosureRangesFromServer();
 
-    if (f.isPeriodic) {
-        const publish = await planningConfirm(
-            'Publier cette fermeture périodique sur le planning maintenant ?',
-            {
-                title: 'Publier sur le planning',
-                confirmLabel: 'Publier',
-                cancelLabel: 'Plus tard'
-            }
-        );
-        if (publish) {
-            const ar = await mod.applyOneClosurePeriod(draft.period);
-            if (!ar.ok) {
-                showToast(ar.error || 'Publication impossible.', 'error', 8000);
-            } else {
-                await mod.loadClosureRangesFromServer();
-                showToast('Fermeture périodique publiée sur le planning.', 'success');
-                invalidateCalendarListCache();
-                document.dispatchEvent(new CustomEvent('planning-events-changed'));
-            }
-        } else {
-            showToast(
-                'Période enregistrée. Utilisez « Appliquer les absences » dans le menu fermetures pour la publier.',
-                'info',
-                8000
-            );
-        }
-    } else {
-        showToast(
-            'Période enregistrée. Utilisez « Appliquer les absences » pour la publier sur le planning.',
-            'success'
-        );
-    }
+    showToast(
+        f.isPeriodic
+            ? 'Fermeture périodique enregistrée. Utilisez « Appliquer les absences » pour la publier sur le planning.'
+            : 'Période enregistrée. Utilisez « Appliquer les absences » pour la publier sur le planning.',
+        'success',
+        f.isPeriodic ? 8000 : 6000
+    );
 
     const source = editCtx?.source;
     closeFermetureEditModal();
@@ -553,20 +560,22 @@ export async function openFermetureEdit(opts = {}) {
     applyPeriodToForm(range);
     setReadonly(!editable, periodSnapshot);
     syncTabsUi();
+    syncFermetureEditDialogTitle(index, range, editable, fromCalendar);
 
     const backLabel = fromCalendar ? 'Planning' : 'Fermetures / Indisponibilités';
-    const title =
-        index < 0
-            ? planningRouteTitle('Nouvelle fermeture')
-            : editable
-              ? planningRouteTitle('Modifier la fermeture')
-              : planningRouteTitle('Fermeture');
+    const routeTitle = planningRouteTitle(
+        resolveFermetureEditDialogTitle(index, range, editable, fromCalendar)
+    );
 
     if (fromCalendar) {
         dlg.classList.add('planning-route-page');
-        resetPlanningRouteStack('modal_fermeture_edit', title, backLabel);
+        resetPlanningRouteStack('modal_fermeture_edit', routeTitle, backLabel);
+        setPlanningRouteBarHidden('modal_fermetures', false);
     } else {
         dlg.classList.remove('planning-route-page');
+        if (document.getElementById('modal_fermetures')?.open) {
+            setPlanningRouteBarHidden('modal_fermetures', true);
+        }
     }
     if (!dlg.open) dlg.showModal();
     focusPlanningDialogRoot(dlg);
@@ -613,12 +622,13 @@ export function initFermetureEditUi() {
     });
 
     document.getElementById('fermeture-edit-save')?.addEventListener('click', () => void persistEdit());
-    document.getElementById('fermeture-edit-apply')?.addEventListener('click', () => void persistEdit());
     document.getElementById('fermeture-edit-delete')?.addEventListener('click', () => void deleteCurrentPeriod());
 
     document.getElementById('modal_fermeture_edit')?.addEventListener('close', () => {
         editCtx = null;
         document.getElementById('modal_fermeture_edit')?.classList.remove('planning-route-page');
+        const ferm = document.getElementById('modal_fermetures');
+        if (ferm?.open) setPlanningRouteBarHidden('modal_fermetures', false);
     });
 }
 

@@ -464,32 +464,33 @@ dialog.planning-route-page .btn.btn-primary:not(.btn-outline):not(.btn-ghost):no
     filter: brightness(1.16);
 }
 
-/* Fermer / annuler : contour gris, fond vide */
+/* Annuler : contour noir, fond vide ; survol gris clair (inversé en sombre) */
 dialog.modal .btn.planning-btn-dismiss,
 dialog.modal .modal-action .btn.planning-btn-dismiss {
     background: transparent !important;
-    border: 1px solid rgb(148 163 184) !important;
-    color: rgb(51 65 85) !important;
+    border: 1px solid rgb(0 0 0) !important;
+    color: rgb(15 23 42) !important;
     box-shadow: none;
     font-weight: 600;
 }
 
 dialog.modal .btn.planning-btn-dismiss:hover,
 dialog.modal .modal-action .btn.planning-btn-dismiss:hover {
-    background: rgb(248 250 252) !important;
-    border-color: rgb(100 116 139) !important;
+    background: rgb(241 245 249) !important;
+    border-color: rgb(0 0 0) !important;
     color: rgb(15 23 42) !important;
 }
 
 [data-theme='dark'] dialog.modal .btn.planning-btn-dismiss,
 [data-theme='dark'] dialog.modal .modal-action .btn.planning-btn-dismiss {
-    border-color: rgb(100 116 139) !important;
-    color: rgb(226 232 240) !important;
+    border-color: rgb(248 250 252) !important;
+    color: rgb(248 250 252) !important;
 }
 
 [data-theme='dark'] dialog.modal .btn.planning-btn-dismiss:hover,
 [data-theme='dark'] dialog.modal .modal-action .btn.planning-btn-dismiss:hover {
-    background: rgb(30 41 59) !important;
+    background: rgb(51 65 85) !important;
+    border-color: rgb(248 250 252) !important;
     color: rgb(255 255 255) !important;
 }
 

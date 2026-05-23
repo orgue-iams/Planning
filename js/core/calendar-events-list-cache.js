@@ -32,6 +32,32 @@ export function invalidateCalendarListCache() {
     cache.clear();
 }
 
+/**
+ * Précharge en arrière-plan les fenêtres adjacentes (semaine précédente / suivante).
+ * @param {Date} start
+ * @param {Date} end
+ * @param {object | null | undefined} currentUser
+ * @param {string} scopeKey
+ */
+export function warmAdjacentCalendarListCaches(start, end, currentUser, scopeKey = '') {
+    if (!currentUser?.id) return;
+    const span = end.getTime() - start.getTime();
+    if (!Number.isFinite(span) || span <= 0) return;
+    const windows = [
+        [new Date(start.getTime() - span), new Date(start.getTime())],
+        [new Date(end.getTime()), new Date(end.getTime() + span)]
+    ];
+    void import('../core/planning-events-db.js').then(({ fetchPlanningEventsForFullCalendar }) => {
+        for (const [s, e] of windows) {
+            const key = calendarListCacheKey(s.toISOString(), e.toISOString(), scopeKey);
+            if (getCalendarListCache(key)) continue;
+            void fetchPlanningEventsForFullCalendar(s, e, currentUser)
+                .then((rows) => setCalendarListCache(key, cloneCachedCalendarRows(rows)))
+                .catch(() => {});
+        }
+    });
+}
+
 /** Copie défensive pour FullCalendar / appelants (évite les mutations sur l’objet mis en cache). */
 export function cloneCachedCalendarRows(rows) {
     const list = Array.isArray(rows) ? rows : [];

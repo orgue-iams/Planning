@@ -1241,16 +1241,17 @@
     min-width: 0;
 }
 
-#modal_directory_users .directory-user-card__contact {
+#modal_directory_users .directory-admin-user-card--layout-v4 .directory-user-card__contact {
     justify-self: end;
     text-align: right;
+    align-items: flex-end;
     padding-right: 0.35rem;
 }
 
-#modal_directory_users .directory-user-card__contact {
-    text-align: left;
-    padding: 0;
-    border: none;
+[data-theme='dark'] #modal_directory_users .directory-user-card__name,
+[data-theme='dark'] #modal_directory_users .directory-user-card__name .directory-user-card__prenom,
+[data-theme='dark'] #modal_directory_users .directory-user-card__name .directory-user-card__nom {
+    color: rgb(15 23 42) !important;
 }
 
 #modal_directory_users .directory-user-card__actions {
@@ -1290,10 +1291,14 @@
 }
 
 /* Modale édition fermeture : onglets */
-.fermeture-edit-tabs {
+.fermeture-edit-tabs:not(.hidden) {
     display: flex;
     gap: 0;
     border-bottom: 2px solid rgb(226 232 240);
+}
+
+.fermeture-edit-tabs.hidden {
+    display: none !important;
 }
 
 .fermeture-edit-tabs__btn {
@@ -1332,6 +1337,44 @@
     opacity: 0.45 !important;
     filter: grayscale(0.85);
     pointer-events: none !important;
+}
+
+/* Semaines types : cartes créneaux compactes */
+#modal_semaines_types .st-slot-card__day-label,
+#modal_semaines_types .st-slot-card__headline,
+#modal_semaines_types .st-ro-headline {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+#modal_semaines_types .st-slot-card__hours {
+    font-stretch: condensed;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+}
+
+#modal_semaines_types .st-slot-card__left {
+    width: max-content;
+    max-width: 5.5rem;
+}
+
+#modal_semaines_types .st-slot-card__prof {
+    width: max-content;
+    max-width: 4.5rem;
+}
+
+#modal_semaines_types .st-slot-card,
+#modal_semaines_types .st-slot-card .st-ro-students {
+    color: rgb(30 41 59);
+}
+
+[data-theme='dark'] #modal_semaines_types .st-slot-card,
+[data-theme='dark'] #modal_semaines_types .st-slot-card .gabarit-cours-card__day,
+[data-theme='dark'] #modal_semaines_types .st-slot-card .st-ro-headline,
+[data-theme='dark'] #modal_semaines_types .st-slot-card .st-ro-students,
+[data-theme='dark'] #modal_semaines_types .st-slot-card .st-ro-prof {
+    color: rgb(15 23 42) !important;
 }
 
 @media (max-width: 30rem) {

@@ -8,7 +8,6 @@ import { showToast } from '../utils/toast.js';
 import {
     openPlanningRouteFromDrawer,
     planningRouteTitle,
-    pushPlanningRouteLevel
 } from '../utils/planning-route-dialog.js';
 import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
 import {

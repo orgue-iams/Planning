@@ -75,6 +75,14 @@ export function planningRouteTitle(...segments) {
         .join(' / ');
 }
 
+/** Masque la barre « < … » sans retirer la pile (ex. sous-modale par-dessus). */
+export function setPlanningRouteBarHidden(dialogId, hidden) {
+    const el = document.getElementById(dialogId);
+    if (!(el instanceof HTMLElement)) return;
+    const bar = el.querySelector(':scope > .planning-route-page__bar');
+    bar?.classList.toggle('hidden', hidden);
+}
+
 export function refreshPlanningRouteChrome(dialogId) {
     const stack = routeStacks.get(dialogId);
     if (!stack?.length) return;

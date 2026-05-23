@@ -68,7 +68,7 @@ function directoryUserAgendaLabel(r) {
 function buildDirectoryContactColumn(r, roleKey) {
     const col = document.createElement('div');
     col.className =
-        'directory-user-card__contact text-left min-w-0 flex flex-col gap-0.5 self-stretch justify-center py-0.5';
+        'directory-user-card__contact text-right items-end min-w-0 flex flex-col gap-0.5 self-stretch justify-center py-0.5';
     for (const line of directoryUserContactLines(r)) {
         if (line.includes('@')) {
             const a = document.createElement('a');
