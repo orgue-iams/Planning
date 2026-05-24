@@ -3,11 +3,7 @@
  */
 import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
 import { getPlanningSessionUser } from './session-user.js';
-import {
-    googleCalendarEmbedUrl,
-    googleCalendarSubscribeCopyUrl,
-    googleCalendarSubscribeUrlPreferred
-} from '../utils/google-calendar-url.js';
+import { googleCalendarSubscribeUrlPreferred } from '../utils/google-calendar-url.js';
 import { showToast } from '../utils/toast.js';
 import {
     appendEleveGabaritCoursCard,
@@ -24,35 +20,7 @@ import { fetchPlanningEventsForFullCalendar } from './planning-events-db.js';
 const AGENDA_LABEL_MAIN = 'Orgue IAMS - global';
 const AGENDA_LABEL_PERSONAL = 'Orgue IAMS - Mes créneaux';
 
-const AGENDA_HELP_BASE =
-    'Ajoutez chaque calendrier avec le bouton dédié (un à la fois). « Copier l’URL » sert à une intégration lecture seule dans un site.';
-
-const AGENDA_HELP_SUBSCRIBE =
-    'Global et mes créneaux : fenêtre de confirmation Google (Safari). Après ajout, cochez l’agenda dans le menu ☰ → Autres agendas — renommable ensuite. Secours global : « Copier URL abonnement ».';
-
-const AGENDA_HELP_COLORS =
-    'Couleurs : sur un agenda IAMS abonné (lecture seule), Google Agenda affiche souvent une seule couleur d’agenda (ex. violet), pas les couleurs par type comme sur votre agenda perso nicolas.marestin@… Les couleurs par type restent visibles dans l’app Planning et sur calendar.google.com pour le compte orgue.iams.';
-
 let nextCoursRefreshGen = 0;
-
-async function loadPoolLabelByCalendarId(calendarId) {
-    const id = String(calendarId || '').trim();
-    if (!id) return '';
-    if (!isBackendAuthConfigured()) return id;
-    const sb = getSupabaseClient();
-    if (!sb) return id;
-    const { data } = await sb
-        .from('google_calendar_pool')
-        .select('label')
-        .eq('google_calendar_id', id)
-        .maybeSingle();
-    const label = String(data?.label ?? '').trim();
-    if (label) return label;
-    if (id.includes('@')) {
-        return id.split('@')[0].replace(/\./g, ' ').trim() || id;
-    }
-    return id;
-}
 
 async function loadPersonalPoolRow(userId) {
     if (!isBackendAuthConfigured() || !userId) return { id: '', label: '' };
@@ -74,22 +42,8 @@ function setAgendaEntryName(elId, name) {
     if (el) el.textContent = String(name || '').trim() || '—';
 }
 
-async function copyText(text) {
-    const v = String(text || '').trim();
-    if (!v) {
-        showToast('Aucun lien à copier.', 'error');
-        return;
-    }
-    try {
-        await navigator.clipboard.writeText(v);
-        showToast('Lien copié dans le presse-papiers.');
-    } catch {
-        showToast('Copie impossible.', 'error');
-    }
-}
-
 /** Un seul geste utilisateur = une navigation (évite le blocage popup sur mobile). */
-function openGoogleCalendarSubscribe(url, label, { isMain = false } = {}) {
+function openGoogleCalendarSubscribe(url, label) {
     if (!url) return;
     const a = document.createElement('a');
     a.href = url;
@@ -99,40 +53,16 @@ function openGoogleCalendarSubscribe(url, label, { isMain = false } = {}) {
     document.body.appendChild(a);
     a.click();
     a.remove();
-    const afterAdd = isMain
-        ? ' Confirmez l’ajout dans la fenêtre Google (comme pour mes créneaux), puis cochez l’agenda dans Autres agendas (menu ☰).'
-        : ' Confirmez l’ajout, puis cochez « Planning IAMS … » dans Autres agendas (menu ☰).';
-    showToast(`« ${label} » :${afterAdd}`, 'info', 10000);
+    showToast(`Confirmez l’ajout de « ${label} » dans Google Agenda.`, 'info', 6000);
 }
 
-function bindAgendaSubscribeBtn(btnId, url, label, opts = {}) {
+function bindAgendaSubscribeBtn(btnId, url, label) {
     const btn = document.getElementById(btnId);
     if (!(btn instanceof HTMLButtonElement)) return;
     const hasUrl = Boolean(url);
     btn.classList.toggle('hidden', !hasUrl);
     btn.disabled = !hasUrl;
-    btn.onclick = () => openGoogleCalendarSubscribe(url, label, opts);
-}
-
-function bindAgendaCopyBtn(btnId, url) {
-    const btn = document.getElementById(btnId);
-    if (!(btn instanceof HTMLButtonElement)) return;
-    const hasUrl = Boolean(url);
-    btn.classList.toggle('hidden', !hasUrl);
-    btn.disabled = !hasUrl;
-    btn.onclick = () => void copyText(url);
-}
-
-function buildAgendaHelpText() {
-    return [AGENDA_HELP_BASE, AGENDA_HELP_SUBSCRIBE, AGENDA_HELP_COLORS].join(' ');
-}
-
-function showAgendaHelpAlways() {
-    const help = document.getElementById('drawer-agenda-help-text');
-    if (help) {
-        help.textContent = buildAgendaHelpText();
-        help.classList.remove('hidden');
-    }
+    btn.onclick = () => openGoogleCalendarSubscribe(url, label);
 }
 
 /** @param {object | null} user */
@@ -144,36 +74,29 @@ export async function refreshDrawerAgendas(user) {
         return;
     }
     block.classList.remove('hidden');
-    showAgendaHelpAlways();
 
     const { mainGoogleCalendarId } = getPlanningConfig();
-    const mainUrl = googleCalendarEmbedUrl(mainGoogleCalendarId);
-    const mainSubCopy = googleCalendarSubscribeCopyUrl(mainGoogleCalendarId);
     setAgendaEntryName('drawer-agenda-main-name', AGENDA_LABEL_MAIN);
-    bindAgendaCopyBtn('drawer-agenda-main-btn', mainUrl);
-    bindAgendaCopyBtn('drawer-agenda-main-subscribe-copy-btn', mainSubCopy);
+    bindAgendaSubscribeBtn(
+        'drawer-agenda-subscribe-main-btn',
+        googleCalendarSubscribeUrlPreferred(mainGoogleCalendarId),
+        AGENDA_LABEL_MAIN
+    );
 
     const { id: persId } = await loadPersonalPoolRow(user.id);
-    const persUrl = googleCalendarEmbedUrl(persId);
+    const persSub = googleCalendarSubscribeUrlPreferred(persId);
 
     const persWrap = document.getElementById('drawer-agenda-personal-wrap');
     const persNone = document.getElementById('drawer-agenda-personal-none');
-    if (persUrl) {
+    if (persSub) {
         setAgendaEntryName('drawer-agenda-personal-name', AGENDA_LABEL_PERSONAL);
-        bindAgendaCopyBtn('drawer-agenda-personal-btn', persUrl);
+        bindAgendaSubscribeBtn('drawer-agenda-subscribe-personal-btn', persSub, AGENDA_LABEL_PERSONAL);
         persWrap?.classList.remove('hidden');
         persNone?.classList.add('hidden');
     } else {
         persWrap?.classList.add('hidden');
         persNone?.classList.remove('hidden');
     }
-
-    const mainSub = googleCalendarSubscribeUrlPreferred(mainGoogleCalendarId);
-    const persSub = googleCalendarSubscribeUrlPreferred(persId);
-    const subWrap = document.getElementById('drawer-agenda-subscribe-wrap');
-    subWrap?.classList.toggle('hidden', !mainSub && !persSub);
-    bindAgendaSubscribeBtn('drawer-agenda-subscribe-main-btn', mainSub, AGENDA_LABEL_MAIN, { isMain: true });
-    bindAgendaSubscribeBtn('drawer-agenda-subscribe-personal-btn', persSub, AGENDA_LABEL_PERSONAL);
 }
 
 /** @param {string[]} userIds @returns {Promise<Map<string, { prenom: string, nom: string, display_name?: string }>>} */
