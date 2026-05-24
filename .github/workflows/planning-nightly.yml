@@ -1,4 +1,5 @@
-# Rapport nocturne (digest infra + audit miroirs Google) → planning_error_notify_email
+# Rapport nocturne (digest infra + audit miroirs Google + réparation + e-mail)
+# Pipeline 3 phases — chaque appel Edge reste sous ~150 s (limite idle Supabase).
 name: Planning nightly report
 
 on:
@@ -9,8 +10,10 @@ on:
 jobs:
   nightly:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 45
     steps:
+      - uses: actions/checkout@v4
+
       - name: Check secrets
         run: |
           set -euo pipefail
@@ -23,24 +26,14 @@ jobs:
             exit 1
           fi
 
-      - name: Invoke planning-nightly Edge Function
+      - name: Run nightly pipeline (audit → repair lots → report)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           PLANNING_CRON_SECRET: ${{ secrets.PLANNING_CRON_SECRET }}
+          MAX_REPAIR_BATCHES: '25'
+          REPAIR_BATCH_SIZE: '8'
+          CURL_MAX_TIME: '140'
         run: |
-          set -euo pipefail
-          base="${SUPABASE_URL%/}"
-          res=$(curl -sS -w "\n%{http_code}" -X POST \
-            "${base}/functions/v1/planning-nightly" \
-            -H "Authorization: Bearer ${PLANNING_CRON_SECRET}" \
-            -H "apikey: ${SUPABASE_ANON_KEY}" \
-            -H "Content-Type: application/json" \
-            -d '{}')
-          body=$(echo "$res" | sed '$d')
-          code=$(echo "$res" | tail -n1)
-          echo "HTTP $code"
-          echo "$body"
-          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
-            exit 1
-          fi
+          chmod +x scripts/planning-nightly-ci.sh
+          ./scripts/planning-nightly-ci.sh

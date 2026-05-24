@@ -705,7 +705,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (isReservationModalDirty()) {
             e.preventDefault();
             void (async () => {
-                const { planningConfirm } = await import('./utils/planning-confirm.js');
+                const { planningConfirm } = await import('../utils/planning-confirm.js');
                 if (
                     await planningConfirm('Abandonner les modifications non enregistrées ?', {
                         title: 'Modifications en cours',
@@ -838,7 +838,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('btn-password-cancel')?.addEventListener('click', async () => {
         if (isBackendAuthConfigured() && isSupabasePasswordRecoveryPending()) {
-            const { planningConfirm } = await import('./utils/planning-confirm.js');
+            const { planningConfirm } = await import('../utils/planning-confirm.js');
             if (
                 !(await planningConfirm(
                     'Annuler la réinitialisation ? Vous devrez demander un nouveau lien par e-mail. Le lien déjà reçu ne fonctionnera plus.',

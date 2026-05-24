@@ -1,7 +1,9 @@
 /**
- * Rapport nocturne (cron) : santé, digest erreurs infra, audit miroirs Google, réparation, contrôle final.
- * Mode `ciFailure` : alerte e-mail vers planning_error_notify_email (échec CI GitHub).
- * Auth : Authorization: Bearer <PLANNING_CRON_SECRET>
+ * Rapport nocturne (cron) — pipeline en 3 phases (orchestré par GitHub Actions) :
+ *   1. audit_before — audit initial (rapide)
+ *   2. calendar-bridge cron_repair_google_sync — lots (workflow)
+ *   3. report — contrôle final + e-mail Brevo
+ * Mode ciFailure : alerte e-mail (échec CI GitHub).
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
 
@@ -42,6 +44,66 @@ type CiFailurePayload = {
     sha?: string;
     errorSummary?: string;
 };
+
+type NightlyPhase = 'audit_before' | 'report';
+
+type AuditBeforeSnapshot = {
+    checkedAt: string;
+    horizonDays: number;
+    futureEventsCount: number;
+    poolAssignedCount: number;
+    auditBefore: {
+        missingMain: number;
+        missingPoolOwner: number;
+        mirrorErrors: number;
+        bucketsCount: number;
+    };
+    section3Html: string;
+};
+
+type NightlyPayload = {
+    phase?: NightlyPhase;
+    ciFailure?: CiFailurePayload;
+    auditBefore?: AuditBeforeSnapshot;
+    repairBatches?: Record<string, unknown>[];
+    repairIterations?: number;
+};
+
+function aggregateRepairBatches(batches: Record<string, unknown>[]): Record<string, unknown> {
+    let repairedMain = 0;
+    let repairedPool = 0;
+    let resyncedCalendars = 0;
+    const errors: string[] = [];
+    const detailMap = new Map<string, { label: string; userLabel: string; kind: 'main' | 'pool' }>();
+    let ok = true;
+    for (const b of batches) {
+        repairedMain += Number(b.repairedMain ?? 0);
+        repairedPool += Number(b.repairedPool ?? 0);
+        resyncedCalendars += Number(b.resyncedCalendars ?? 0);
+        if (b.ok === false) ok = false;
+        if (Array.isArray(b.errors)) errors.push(...b.errors.map(String));
+        if (Array.isArray(b.resyncedCalendarsDetail)) {
+            for (const row of b.resyncedCalendarsDetail) {
+                const r = row as { label?: string; userLabel?: string; kind?: string };
+                const key = `${r.kind}:${r.label}:${r.userLabel}`;
+                detailMap.set(key, {
+                    label: String(r.label || ''),
+                    userLabel: String(r.userLabel || ''),
+                    kind: r.kind === 'main' ? 'main' : 'pool'
+                });
+            }
+        }
+    }
+    return {
+        ok: ok && errors.length === 0,
+        repairedMain,
+        repairedPool,
+        resyncedCalendars,
+        resyncedCalendarsDetail: [...detailMap.values()],
+        errors: errors.slice(0, 50),
+        batchCount: batches.length
+    };
+}
 
 type PlanningEventRow = {
     id: string;
@@ -551,24 +613,100 @@ Deno.serve(async (req) => {
         return json({ ok: false, error: 'planning_error_notify_email non configuré' }, 400);
     }
 
-    let payload: { ciFailure?: CiFailurePayload } = {};
+    let payload: NightlyPayload = {};
     try {
         const ct = req.headers.get('content-type') || '';
         if (ct.includes('application/json')) {
-            payload = await req.json();
+            payload = (await req.json()) as NightlyPayload;
         }
     } catch {
-        /* corps vide = rapport nocturne standard */
+        /* corps vide = phase manquante */
     }
 
     if (payload.ciFailure && typeof payload.ciFailure === 'object') {
         return handleCiFailure(notifyEmail, payload.ciFailure);
     }
 
+    const phase = payload.phase;
+    if (phase === 'audit_before') {
+        return runAuditBeforePhase(admin);
+    }
+    if (phase === 'report') {
+        if (!payload.auditBefore?.checkedAt) {
+            return json({ ok: false, error: 'auditBefore requis pour phase report' }, 400);
+        }
+        return runReportPhase(
+            admin,
+            notifyEmail,
+            payload.auditBefore,
+            Array.isArray(payload.repairBatches) ? payload.repairBatches : [],
+            payload.repairIterations ?? (payload.repairBatches?.length ?? 0)
+        );
+    }
+
+    return json(
+        {
+            ok: false,
+            error: 'phase requise : audit_before | report (ou ciFailure)',
+            hint: 'Le workflow GitHub Actions enchaîne audit → repair (lots) → report.'
+        },
+        400
+    );
+});
+
+async function runAuditBeforePhase(admin: ReturnType<typeof createClient>) {
     const nowIso = new Date().toISOString();
     const horizon = new Date();
     horizon.setDate(horizon.getDate() + AUDIT_HORIZON_DAYS);
     const horizonIso = horizon.toISOString();
+
+    const poolUserIds = await loadPoolUserIds(admin);
+    const calendarDirectory = await loadCalendarDirectory(admin);
+    const futureEvents = await loadFutureEvents(admin, nowIso, horizonIso);
+    const auditBefore = await auditMirrors(admin, futureEvents, poolUserIds);
+    const bucketsBefore = buildAuditBuckets(auditBefore, calendarDirectory);
+
+    const section3Parts = [
+        `<h3>3. Audit miroirs Google (état initial, ${AUDIT_HORIZON_DAYS} jours à venir)</h3>`,
+        `<p>Créneaux analysés en base : <strong>${futureEvents.length}</strong> (max ${MAX_EVENTS_SCAN}).</p>`,
+        `<p>Résumé initial : sans lien <strong>principal</strong> OK : <strong>${auditBefore.missingMain.length}</strong> — sans lien <strong>agenda perso (pool)</strong> : <strong>${auditBefore.missingPoolOwner.length}</strong> — liens en <strong>erreur</strong> : <strong>${auditBefore.mirrorErrors.length}</strong> — agendas en écart : <strong>${bucketsBefore.length}</strong>.</p>`,
+        '<h4>Détail par agenda</h4>',
+        renderAuditByCalendar(
+            bucketsBefore,
+            'Aucune anomalie sur les agendas suivis (principal + pools assignés).'
+        )
+    ];
+
+    const snapshot: AuditBeforeSnapshot = {
+        checkedAt: nowIso,
+        horizonDays: AUDIT_HORIZON_DAYS,
+        futureEventsCount: futureEvents.length,
+        poolAssignedCount: calendarDirectory.poolsByUserId.size,
+        auditBefore: {
+            missingMain: auditBefore.missingMain.length,
+            missingPoolOwner: auditBefore.missingPoolOwner.length,
+            mirrorErrors: auditBefore.mirrorErrors.length,
+            bucketsCount: bucketsBefore.length
+        },
+        section3Html: section3Parts.join('\n')
+    };
+
+    return json({ ok: true, phase: 'audit_before', ...snapshot });
+}
+
+async function runReportPhase(
+    admin: ReturnType<typeof createClient>,
+    notifyEmail: string,
+    auditSnap: AuditBeforeSnapshot,
+    repairBatches: Record<string, unknown>[],
+    repairIterations: number
+) {
+    const nowIso = new Date().toISOString();
+    const horizon = new Date();
+    horizon.setDate(horizon.getDate() + AUDIT_HORIZON_DAYS);
+    const horizonIso = horizon.toISOString();
+
+    const repairResult = aggregateRepairBatches(repairBatches);
 
     const checks: ControlCheck[] = [];
     const bodySections: string[] = [];
@@ -609,6 +747,9 @@ Deno.serve(async (req) => {
     bodySections.push(`<p>Rapport automatique Planning IAMS — ${escapeHtml(nowIso)}</p>`);
     bodySections.push(
         `<p>Destinataire : <strong>${escapeHtml(notifyEmail)}</strong> (<code>planning_error_notify_email</code>).</p>`
+    );
+    bodySections.push(
+        `<p>Audit initial enregistré à <strong>${escapeHtml(auditSnap.checkedAt)}</strong> — réparation en <strong>${repairIterations}</strong> lot(s) cron.</p>`
     );
     bodySections.push(glossaryHtml());
 
@@ -676,78 +817,49 @@ Deno.serve(async (req) => {
         label: 'Créneaux futurs en base',
         description: `planning_event sur ${AUDIT_HORIZON_DAYS} jours (max ${MAX_EVENTS_SCAN} lignes).`,
         status: 'ok',
-        detail: `${futureEvents.length} créneau(x) chargé(s)`
+        detail: `${futureEvents.length} créneau(x) chargé(s) (audit initial : ${auditSnap.futureEventsCount})`
     });
 
-    /* ——— Audit AVANT réparation ——— */
-    const auditBefore = await auditMirrors(admin, futureEvents, poolUserIds);
-    const bucketsBefore = buildAuditBuckets(auditBefore, calendarDirectory);
-
-    const auditBeforeIssueCount =
-        auditBefore.missingMain.length +
-        auditBefore.missingPoolOwner.length +
-        auditBefore.mirrorErrors.length;
-
+    const ab = auditSnap.auditBefore;
     checks.push({
         id: 'audit_main_before',
         label: 'Audit — agenda principal (avant réparation)',
         description:
             'Chaque créneau futur doit avoir un lien Google main OK (cours, travail perso, autres, concerts, fermetures).',
-        status: auditBefore.missingMain.length === 0 ? 'ok' : 'warn',
+        status: ab.missingMain === 0 ? 'ok' : 'warn',
         detail:
-            auditBefore.missingMain.length === 0
-                ? 'Tous les créneaux ont un lien principal OK'
-                : `${auditBefore.missingMain.length} sans lien principal OK`
+            ab.missingMain === 0
+                ? 'Tous les créneaux avaient un lien principal OK'
+                : `${ab.missingMain} sans lien principal OK`
     });
     checks.push({
         id: 'audit_pool_before',
         label: 'Audit — agendas perso pool (avant réparation)',
         description: 'Cours et travail perso des utilisateurs avec un pool assigné.',
-        status: auditBefore.missingPoolOwner.length === 0 ? 'ok' : 'warn',
+        status: ab.missingPoolOwner === 0 ? 'ok' : 'warn',
         detail:
-            auditBefore.missingPoolOwner.length === 0
-                ? 'Tous les liens pool attendus sont OK'
-                : `${auditBefore.missingPoolOwner.length} sans lien pool_owner OK`
+            ab.missingPoolOwner === 0
+                ? 'Tous les liens pool attendus étaient OK'
+                : `${ab.missingPoolOwner} sans lien pool_owner OK`
     });
     checks.push({
         id: 'audit_mirror_errors_before',
         label: 'Audit — liens en statut d’erreur (avant réparation)',
         description: 'Lignes planning_event_google_mirror avec sync_status ≠ ok.',
-        status: auditBefore.mirrorErrors.length === 0 ? 'ok' : 'warn',
+        status: ab.mirrorErrors === 0 ? 'ok' : 'warn',
         detail:
-            auditBefore.mirrorErrors.length === 0
-                ? 'Aucun lien en erreur'
-                : `${auditBefore.mirrorErrors.length} lien(s) en erreur`
+            ab.mirrorErrors === 0 ? 'Aucun lien en erreur' : `${ab.mirrorErrors} lien(s) en erreur`
     });
 
-    bodySections.push(`<h3>3. Audit miroirs Google (état initial, ${AUDIT_HORIZON_DAYS} jours à venir)</h3>`);
-    bodySections.push(
-        `<p>Créneaux analysés en base : <strong>${futureEvents.length}</strong> (max ${MAX_EVENTS_SCAN}).</p>`
-    );
-    bodySections.push(
-        `<p>Résumé initial : sans lien <strong>principal</strong> OK : <strong>${auditBefore.missingMain.length}</strong> — sans lien <strong>agenda perso (pool)</strong> : <strong>${auditBefore.missingPoolOwner.length}</strong> — liens en <strong>erreur</strong> : <strong>${auditBefore.mirrorErrors.length}</strong> — agendas en écart : <strong>${bucketsBefore.length}</strong>.</p>`
-    );
-    bodySections.push('<h4>Détail par agenda</h4>');
-    bodySections.push(
-        renderAuditByCalendar(
-            bucketsBefore,
-            'Aucune anomalie sur les agendas suivis (principal + pools assignés).'
-        )
-    );
+    bodySections.push(auditSnap.section3Html);
 
-    /* ——— Réparation automatique ——— */
-    let repairResult: Record<string, unknown> = { skipped: true };
-    if (anonKey && cronSecret) {
-        repairResult = await runGoogleRepair(supabaseUrl, cronSecret, anonKey);
-    }
-
-    if (repairResult.skipped) {
+    if (Number(repairResult.batchCount ?? 0) === 0) {
         checks.push({
             id: 'google_repair',
             label: 'Réparation Google (cron_repair_google_sync)',
-            description: 'Création / réalignement des liens puis resync des agendas concernés.',
+            description: 'Lots exécutés par le workflow GitHub Actions.',
             status: 'skip',
-            detail: 'Non lancée : SUPABASE_ANON_KEY ou secret cron manquant'
+            detail: 'Aucun lot de réparation enregistré'
         });
     } else if (repairResult.ok === false) {
         const rErrs = repairResult.errors;
@@ -757,7 +869,7 @@ Deno.serve(async (req) => {
             label: 'Réparation Google (cron_repair_google_sync)',
             description: 'Création / réalignement des liens puis resync des agendas concernés.',
             status: 'error',
-            detail: `Terminée avec erreurs — principal ${repairResult.repairedMain ?? 0}, pool ${repairResult.repairedPool ?? 0}, resync ${repairResult.resyncedCalendars ?? 0}${errN ? `, ${errN} message(s) d’erreur` : ''}`
+            detail: `Terminée avec erreurs — ${repairIterations} lot(s) — principal ${repairResult.repairedMain ?? 0}, pool ${repairResult.repairedPool ?? 0}, resync ${repairResult.resyncedCalendars ?? 0}${errN ? `, ${errN} message(s) d’erreur` : ''}`
         });
     } else {
         checks.push({
@@ -765,16 +877,16 @@ Deno.serve(async (req) => {
             label: 'Réparation Google (cron_repair_google_sync)',
             description: 'Création / réalignement des liens puis resync des agendas concernés.',
             status: 'ok',
-            detail: `Principal ${repairResult.repairedMain ?? 0}, pool ${repairResult.repairedPool ?? 0}, ${repairResult.resyncedCalendars ?? 0} agenda(s) resynchronisé(s)`
+            detail: `${repairIterations} lot(s) — principal ${repairResult.repairedMain ?? 0}, pool ${repairResult.repairedPool ?? 0}, ${repairResult.resyncedCalendars ?? 0} agenda(s) resynchronisé(s)`
         });
     }
 
     bodySections.push('<h3>4. Réparation automatique Google (<code>cron_repair_google_sync</code>)</h3>');
-    if (repairResult.skipped) {
-        bodySections.push('<p>Non lancée (configuration cron incomplète).</p>');
+    if (Number(repairResult.batchCount ?? 0) === 0) {
+        bodySections.push('<p>Aucun lot de réparation exécuté par la CI.</p>');
     } else {
         bodySections.push(
-            `<p>Liens principal créés ou réalignés : <strong>${escapeHtml(String(repairResult.repairedMain ?? 0))}</strong> — liens pool : <strong>${escapeHtml(String(repairResult.repairedPool ?? 0))}</strong> — agendas resynchronisés : <strong>${escapeHtml(String(repairResult.resyncedCalendars ?? 0))}</strong> — statut global : <strong>${repairResult.ok === false ? 'erreurs' : 'OK'}</strong>.</p>`
+            `<p><strong>${repairIterations}</strong> lot(s) cron — liens principal créés ou réalignés : <strong>${escapeHtml(String(repairResult.repairedMain ?? 0))}</strong> — liens pool : <strong>${escapeHtml(String(repairResult.repairedPool ?? 0))}</strong> — agendas resynchronisés : <strong>${escapeHtml(String(repairResult.resyncedCalendars ?? 0))}</strong> — statut global : <strong>${repairResult.ok === false ? 'erreurs' : 'OK'}</strong>.</p>`
         );
         bodySections.push('<h4>Agendas resynchronisés (par nom Planning IAMS et utilisateur)</h4>');
         bodySections.push(renderResyncedCalendars(repairResult));
@@ -844,8 +956,8 @@ Deno.serve(async (req) => {
     const globalOk = checks.every((c) => c.status === 'ok' || c.status === 'skip');
     checks.push({
         id: 'job_execution',
-        label: 'Exécution fonction planning-nightly',
-        description: 'Le job a atteint la fin des traitements (hors envoi e-mail).',
+        label: 'Exécution pipeline nocturne (3 phases)',
+        description: 'Audit + lots repair (CI) + rapport final avec e-mail.',
         status: globalOk && !hasAnomalies ? 'ok' : hasAnomalies ? 'warn' : 'warn',
         detail: globalOk
             ? hasAnomalies
@@ -856,7 +968,7 @@ Deno.serve(async (req) => {
 
     bodySections.push('<h3>6. Synthèse</h3>');
     bodySections.push(
-        `<p>Ordre des traitements : digest journal → audit initial → réparation Google → contrôle final. Le prochain digest ne listera une nouvelle alerte infra que si le <strong>contrôle final</strong> trouve encore des écarts.</p>`
+        `<p>Ordre des traitements : audit initial (phase 1) → réparation Google par lots (phase 2, ${repairIterations} appel(s)) → contrôle final et ce rapport (phase 3). Le prochain digest ne listera une nouvelle alerte infra que si le <strong>contrôle final</strong> trouve encore des écarts.</p>`
     );
     bodySections.push(
         '<p><strong>Périmètre :</strong> workflow GitHub <strong>Planning nightly report</strong> uniquement (pas <code>supabase-keepalive</code> ni les autres crons).</p>'
@@ -897,9 +1009,11 @@ Deno.serve(async (req) => {
             emailCheck.detail =
                 'detail' in sent ? String(sent.detail || sent.error) : String(sent.error);
         }
+        console.error('[planning-nightly] email send failed', sent);
         return json(
             {
                 ok: false,
+                phase: 'report',
                 error: sent.error,
                 detail: 'detail' in sent ? sent.detail : undefined,
                 controls: checks
@@ -926,9 +1040,9 @@ Deno.serve(async (req) => {
                 mirror_error_count: auditAfter.mirrorErrors.length,
                 repair: repairResult,
                 audit_before: {
-                    missing_main: auditBefore.missingMain.length,
-                    missing_pool_owner: auditBefore.missingPoolOwner.length,
-                    mirror_errors: auditBefore.mirrorErrors.length
+                    missing_main: ab.missingMain,
+                    missing_pool_owner: ab.missingPoolOwner,
+                    mirror_errors: ab.mirrorErrors
                 },
                 checked_at: nowIso
             }
@@ -937,27 +1051,25 @@ Deno.serve(async (req) => {
 
     return json({
         ok: true,
+        phase: 'report',
         emailSent: true,
         notifyEmail,
         mode: 'nightly',
-        controls: checks.map((c) => ({
-            id: c.id,
-            label: c.label,
-            status: c.status,
-            detail: c.detail ?? null
-        })),
+        repairIterations,
         pendingErrorsDigested: errIds.length,
-        auditBefore: {
-            missingMain: auditBefore.missingMain.length,
-            missingPoolOwner: auditBefore.missingPoolOwner.length,
-            mirrorErrors: auditBefore.mirrorErrors.length
-        },
+        hasAnomalies,
+        auditBefore: ab,
         auditAfter: {
             missingMain: auditAfter.missingMain.length,
             missingPoolOwner: auditAfter.missingPoolOwner.length,
             mirrorErrors: auditAfter.mirrorErrors.length
         },
-        hasAnomalies,
-        repair: repairResult
+        repair: repairResult,
+        controls: checks.map((c) => ({
+            id: c.id,
+            label: c.label,
+            status: c.status,
+            detail: c.detail ?? null
+        }))
     });
-});
+}

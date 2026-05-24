@@ -104,7 +104,9 @@ type BridgeBody = {
         /** Ligne `planning_event.id` : après upsert Google, enregistrement des miroirs (service_role). */
         planningEventId?: string;
     }>;
-    googleEventId?: string;
+    /** Lots cron : plafonds par appel (défaut 40 si absent). */
+    maxMainRepair?: number;
+    maxPoolRepair?: number;
 };
 
 function jsonResponse(obj: unknown, status = 200) {
@@ -2033,7 +2035,8 @@ function eventNeedsOwnerPoolMirror(slotType: string): boolean {
 async function handleCronRepairGoogleSync(
     supabaseUrl: string,
     serviceKey: string,
-    accessToken: string
+    accessToken: string,
+    options?: { maxMainRepair?: number; maxPoolRepair?: number }
 ): Promise<{
     ok: boolean;
     repairedMain: number;
@@ -2041,6 +2044,7 @@ async function handleCronRepairGoogleSync(
     resyncedCalendars: number;
     resyncedCalendarsDetail: Array<{ label: string; userLabel: string; kind: 'main' | 'pool' }>;
     errors: string[];
+    morePending: boolean;
 }> {
     const base = supabaseUrl.replace(/\/$/, '');
     const hdrs = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
@@ -2108,7 +2112,8 @@ async function handleCronRepairGoogleSync(
             repairedPool: 0,
             resyncedCalendars: 0,
             resyncedCalendarsDetail: [],
-            errors: [`Événements : HTTP ${evRes.status}`]
+            errors: [`Événements : HTTP ${evRes.status}`],
+            morePending: false
         };
     }
     const events = (await evRes.json()) as Array<{
@@ -2163,8 +2168,8 @@ async function handleCronRepairGoogleSync(
 
     let repairedMain = 0;
     let repairedPool = 0;
-    const maxMainRepair = 40;
-    const maxPoolRepair = 40;
+    const maxMainRepair = Math.max(0, Math.min(80, options?.maxMainRepair ?? 40));
+    const maxPoolRepair = Math.max(0, Math.min(80, options?.maxPoolRepair ?? 40));
 
     for (const ev of events || []) {
         if (repairedMain >= maxMainRepair) break;
@@ -2275,7 +2280,8 @@ async function handleCronRepairGoogleSync(
         repairedPool,
         resyncedCalendars,
         resyncedCalendarsDetail,
-        errors
+        errors,
+        morePending: repairedMain >= maxMainRepair || repairedPool >= maxPoolRepair
     };
 }
 
@@ -2362,7 +2368,10 @@ Deno.serve(async (req) => {
                 return jsonResponse({ ok: false, error: 'SERVICE_ROLE_KEY manquante' }, 500);
             }
             const accessToken = await getGoogleAccessToken();
-            const result = await handleCronRepairGoogleSync(supabaseUrl, serviceKey, accessToken);
+            const result = await handleCronRepairGoogleSync(supabaseUrl, serviceKey, accessToken, {
+                maxMainRepair: body.maxMainRepair,
+                maxPoolRepair: body.maxPoolRepair
+            });
             return jsonResponse({ ok: result.ok, mode: 'cron_repair_google_sync', ...result });
         }
 

@@ -339,7 +339,6 @@ async function excludeSinglePeriodicDay(ymd) {
         return;
     }
     const updated = r.period;
-    let eventIds = [...(period.eventIds || [])];
     if (!eventIds.length) eventIds = await fetchEventIdsForAbsencePeriod(updated.id);
     const del = await saveClosureRangeToPlanning(
         {
