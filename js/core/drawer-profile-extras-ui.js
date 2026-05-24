@@ -5,6 +5,7 @@ import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from '.
 import { getPlanningSessionUser } from './session-user.js';
 import {
     googleCalendarEmbedUrl,
+    googleCalendarSubscribeCopyUrl,
     googleCalendarSubscribeUrlPreferred
 } from '../utils/google-calendar-url.js';
 import { showToast } from '../utils/toast.js';
@@ -27,7 +28,7 @@ const AGENDA_HELP_BASE =
     'Ajoutez chaque calendrier avec le bouton dédié (un à la fois). « Copier l’URL » sert à une intégration lecture seule dans un site.';
 
 const AGENDA_HELP_SUBSCRIBE =
-    'Global : abonnement par URL iCal (orgue.iams@gmail.com dans l’adresse, pas le code « b3JndWU… »). Mes créneaux : lien Google natif (Planning IAMS …). Après ajout, cochez l’agenda dans le menu Google Agenda (☰) → Autres agendas — renommable ensuite.';
+    'Global et mes créneaux : fenêtre de confirmation Google (Safari). Après ajout, cochez l’agenda dans le menu ☰ → Autres agendas — renommable ensuite. Secours global : « Copier URL abonnement ».';
 
 const AGENDA_HELP_COLORS =
     'Couleurs : sur un agenda IAMS abonné (lecture seule), Google Agenda affiche souvent une seule couleur d’agenda (ex. violet), pas les couleurs par type comme sur votre agenda perso nicolas.marestin@… Les couleurs par type restent visibles dans l’app Planning et sur calendar.google.com pour le compte orgue.iams.';
@@ -99,8 +100,8 @@ function openGoogleCalendarSubscribe(url, label, { isMain = false } = {}) {
     a.click();
     a.remove();
     const afterAdd = isMain
-        ? ' Validez l’URL iCal (orgue.iams@gmail.com), puis cochez l’agenda dans Autres agendas (menu ☰).'
-        : ' Validez l’ajout, puis cochez « Planning IAMS … » dans Autres agendas (menu ☰).';
+        ? ' Confirmez l’ajout dans la fenêtre Google (comme pour mes créneaux), puis cochez l’agenda dans Autres agendas (menu ☰).'
+        : ' Confirmez l’ajout, puis cochez « Planning IAMS … » dans Autres agendas (menu ☰).';
     showToast(`« ${label} » :${afterAdd}`, 'info', 10000);
 }
 
@@ -147,8 +148,10 @@ export async function refreshDrawerAgendas(user) {
 
     const { mainGoogleCalendarId } = getPlanningConfig();
     const mainUrl = googleCalendarEmbedUrl(mainGoogleCalendarId);
+    const mainSubCopy = googleCalendarSubscribeCopyUrl(mainGoogleCalendarId);
     setAgendaEntryName('drawer-agenda-main-name', AGENDA_LABEL_MAIN);
     bindAgendaCopyBtn('drawer-agenda-main-btn', mainUrl);
+    bindAgendaCopyBtn('drawer-agenda-main-subscribe-copy-btn', mainSubCopy);
 
     const { id: persId } = await loadPersonalPoolRow(user.id);
     const persUrl = googleCalendarEmbedUrl(persId);

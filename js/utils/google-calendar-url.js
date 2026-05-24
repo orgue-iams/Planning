@@ -28,13 +28,35 @@ export function googleCalendarPublicIcalUrl(calendarId) {
 }
 
 /**
- * Abonnement par URL iCal (flux public lisible, ex. …/ical/orgue.iams%40gmail.com/public/basic.ics).
- * Évite le cid base64 (« b3JndWUuaWFtc… ») qui échoue souvent pour l’agenda principal sur Mac / mobile.
+ * Abonnement par URL iCal (page réglages — ne préremplit plus le champ sur Google Agenda récent).
+ * Conservé pour « Copier l’URL d’abonnement » et secours manuel.
  */
 export function googleCalendarSubscribeByIcalUrl(calendarId) {
     const ical = googleCalendarPublicIcalUrl(calendarId);
     if (!ical) return '';
     return `https://calendar.google.com/calendar/r/settings/addbyurl?url=${encodeURIComponent(ical)}`;
+}
+
+/**
+ * Abonnement avec boîte de confirmation Google (comme les pools IAMS).
+ * Format : render?cid=webcal://…/ical/…/public/basic.ics
+ * @see https://github.com/simonw/til/blob/main/ics/google-calendar-ics-subscribe-link.md
+ */
+export function googleCalendarSubscribeByWebcalRenderUrl(calendarId) {
+    const id = String(calendarId || '').trim();
+    if (!id) return '';
+    // @ laissé en clair ici : encodeURIComponent(cid) ne doit encoder qu’une fois (%40, pas %2540).
+    const webcal = `webcal://calendar.google.com/calendar/ical/${id}/public/basic.ics`;
+    return `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(webcal)}`;
+}
+
+/**
+ * cid en clair (adresse e-mail ou id groupe non encodé base64).
+ */
+export function googleCalendarSubscribeUrlPlainCid(calendarId) {
+    const id = String(calendarId || '').trim();
+    if (!id) return '';
+    return `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(id)}`;
 }
 
 /**
@@ -57,8 +79,8 @@ function isGroupGoogleCalendarId(calendarId) {
 
 /**
  * URL d’abonnement adaptée au type d’agenda :
- * - principal (adresse e-mail orgue.iams@…) → iCal lisible ;
- * - pool IAMS (@group.calendar.google.com) → lien cid natif Google.
+ * - principal (adresse e-mail orgue.iams@…) → webcal + render (dialogue de confirmation) ;
+ * - pool IAMS (@group.calendar.google.com) → lien cid base64 natif Google.
  */
 export function googleCalendarSubscribeUrlPreferred(calendarId) {
     const id = String(calendarId || '').trim();
@@ -66,7 +88,16 @@ export function googleCalendarSubscribeUrlPreferred(calendarId) {
     if (isGroupGoogleCalendarId(id)) {
         return googleCalendarSubscribeUrl(id);
     }
-    return googleCalendarSubscribeByIcalUrl(id) || googleCalendarSubscribeUrl(id);
+    return (
+        googleCalendarSubscribeByWebcalRenderUrl(id) ||
+        googleCalendarSubscribeUrlPlainCid(id) ||
+        googleCalendarSubscribeUrl(id)
+    );
+}
+
+/** URL iCal publique à coller manuellement si le lien automatique échoue. */
+export function googleCalendarSubscribeCopyUrl(calendarId) {
+    return googleCalendarPublicIcalUrl(calendarId);
 }
 
 export function googleCalendarEmbedUrl(calendarId, opts) {
