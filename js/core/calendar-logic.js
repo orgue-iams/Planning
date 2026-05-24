@@ -330,11 +330,55 @@ function setReservationModalMutationLock(locked) {
     }
 }
 
+/**
+ * Supprime les doublons visuels (même planningCanonicalId ou même id FC).
+ * Garde l’événement « source base » plutôt que le miroir optimiste en attente.
+ * @param {import('@fullcalendar/core').Calendar | null} calendar
+ * @param {string} [preferCanonicalId]
+ */
+function dedupePlanningEventsByCanonicalId(calendar, preferCanonicalId = '') {
+    if (!calendar?.getEvents) return;
+    const prefer = String(preferCanonicalId || '').trim();
+    /** @type {Map<string, import('@fullcalendar/core').EventApi[]>} */
+    const groups = new Map();
+    for (const ev of calendar.getEvents()) {
+        if (ev.display === 'background') continue;
+        const canon = String(ev.extendedProps?.planningCanonicalId || '').trim();
+        const fcId = String(ev.id ?? '').trim();
+        const key = canon || (String(ev.extendedProps?.planningRowSource || '') === 'supabase' ? fcId : '');
+        if (!key) continue;
+        const list = groups.get(key) || [];
+        list.push(ev);
+        groups.set(key, list);
+    }
+    const scoreEvent = (ev) => {
+        let s = 0;
+        if (String(ev.extendedProps?.planningRowSource || '') === 'supabase') s += 8;
+        if (!ev.extendedProps?.planningQuickPending) s += 4;
+        const canon = String(ev.extendedProps?.planningCanonicalId || '').trim();
+        const fcId = String(ev.id ?? '').trim();
+        if (prefer && (canon === prefer || fcId === prefer)) s += 16;
+        return s;
+    };
+    for (const list of groups.values()) {
+        if (list.length <= 1) continue;
+        list.sort((a, b) => scoreEvent(b) - scoreEvent(a));
+        for (const dup of list.slice(1)) {
+            try {
+                dup.remove();
+            } catch {
+                /* */
+            }
+        }
+    }
+}
+
 /** Rechargement grille (RPC Postgres) : invalide le cache mémoire puis refetch FullCalendar. */
 export async function refetchPlanningGrid(calendar) {
     invalidateCalendarListCache();
     if (calendar && typeof calendar.refetchEvents === 'function') {
         await calendar.refetchEvents();
+        dedupePlanningEventsByCanonicalId(calendar);
     }
 }
 
@@ -3055,7 +3099,7 @@ function applyModalReservationDisplayOnCalendar(calendar, currentUser, p) {
     if (inscrits.length) commonXp.inscrits = inscrits;
 
     if (p.isCreate) {
-        return calendar.addEvent({
+        const added = calendar.addEvent({
             id: p.eventId,
             title: p.title,
             start,
@@ -3064,6 +3108,8 @@ function applyModalReservationDisplayOnCalendar(calendar, currentUser, p) {
             extendedProps: commonXp,
             ...fcDragResizePropsForEventStart(start, currentUser)
         });
+        dedupePlanningEventsByCanonicalId(calendar, p.eventId);
+        return added;
     }
     const live = p.liveEventRef;
     if (!live) return null;
@@ -3082,6 +3128,55 @@ function applyModalReservationDisplayOnCalendar(calendar, currentUser, p) {
         console.warn('[calendar-logic] applyModalReservationDisplayOnCalendar', e);
     }
     return live;
+}
+
+/**
+ * Après création rapide : promeut le créneau optimiste (sans remove + addEvent) pour éviter les doublons au refetch Google.
+ * @param {import('@fullcalendar/core').EventApi | null} created
+ */
+function promoteQuickReservationToPersisted(calendar, currentUser, created, p) {
+    if (created && typeof created.setExtendedProp === 'function') {
+        try {
+            if (typeof created.setProp === 'function') {
+                created.setProp('id', p.eventId);
+            }
+        } catch (e) {
+            console.warn('[calendar-logic] promoteQuickReservationToPersisted setProp id', e);
+        }
+        applyModalReservationDisplayOnCalendar(calendar, currentUser, {
+            isCreate: false,
+            liveEventRef: created,
+            eventId: p.eventId,
+            title: p.title,
+            startIso: p.startIso,
+            endIso: p.endIso,
+            dbSlotType: p.dbSlotType,
+            slotType: p.slotType,
+            ownerEmail: p.ownerEmail,
+            inscritsEmails: p.inscritsEmails,
+            googlePending: p.googlePending
+        });
+        try {
+            created.setExtendedProp('planningQuickPending', false);
+        } catch {
+            /* */
+        }
+        dedupePlanningEventsByCanonicalId(calendar, p.eventId);
+        return created;
+    }
+    return applyModalReservationDisplayOnCalendar(calendar, currentUser, {
+        isCreate: true,
+        liveEventRef: null,
+        eventId: p.eventId,
+        title: p.title,
+        startIso: p.startIso,
+        endIso: p.endIso,
+        dbSlotType: p.dbSlotType,
+        slotType: p.slotType,
+        ownerEmail: p.ownerEmail,
+        inscritsEmails: p.inscritsEmails,
+        googlePending: p.googlePending
+    });
 }
 
 /**
@@ -3236,7 +3331,13 @@ async function runGoogleCalendarSyncInBackground(eventsPayload, calendar = null,
             setGoogleSyncBannerMessage(`Échec synchro Google : ${sync.error || 'échec'}`);
             hideGoogleSyncBanner(5500);
         } else {
-            if (cal) await refetchPlanningGrid(cal);
+            if (cal) {
+                for (const row of eventsPayload) {
+                    const eid = String(row?.planningEventId ?? '').trim();
+                    if (eid) clearModalEventGoogleSyncPending(cal, eid);
+                }
+                dedupePlanningEventsByCanonicalId(cal);
+            }
             if (options.onSyncSuccess) await options.onSyncSuccess(sync);
             hideGoogleSyncBanner(0);
         }
@@ -3664,10 +3765,7 @@ async function finalizeQuickReservationInBackground(
         const quickInscritsEmails = quickInscritsCsv
             ? quickInscritsCsv.split(',').map((x) => String(x).trim()).filter(Boolean)
             : [];
-        if (created) created.remove();
-        applyModalReservationDisplayOnCalendar(calendar, currentUser, {
-            isCreate: true,
-            liveEventRef: null,
+        promoteQuickReservationToPersisted(calendar, currentUser, created, {
             eventId: ur.id,
             title: liveTitle,
             startIso: liveStart.toISOString(),
@@ -5211,10 +5309,23 @@ export async function deleteReservation(calendar, currentEventRef, currentUser) 
         const e0 = liveRef.end instanceof Date ? liveRef.end : new Date(liveRef.end);
         await logEleveTravailVoidIfNeeded(settingsForVoid, { slotStart: s0, slotEnd: e0 });
     }
-    liveRef.remove();
+    if (calendar?.getEvents) {
+        for (const ev of [...calendar.getEvents()]) {
+            if (String(ev.extendedProps?.planningCanonicalId || '').trim() === canonicalId) {
+                try {
+                    ev.remove();
+                } catch {
+                    /* */
+                }
+            }
+        }
+    } else {
+        liveRef.remove();
+    }
     invalidateCalendarListCache();
     if (calendar && typeof calendar.refetchEvents === 'function') {
         await calendar.refetchEvents();
+        dedupePlanningEventsByCanonicalId(calendar);
     }
     document.getElementById('modal_reservation').close();
     showToast('Créneau supprimé.');
