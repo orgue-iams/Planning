@@ -275,6 +275,26 @@ export async function upsertPlanningEventRow(p) {
 }
 
 /**
+ * @param {string} eventId
+ * @returns {Promise<string[]>}
+ */
+export async function fetchPlanningEventEnrollmentUserIds(eventId) {
+    const sb = getSupabaseClient();
+    if (!sb || !isBackendAuthConfigured()) return [];
+    const eid = String(eventId || '').trim();
+    if (!eid) return [];
+    const { data, error } = await sb
+        .from('planning_event_enrollment')
+        .select('student_user_id')
+        .eq('event_id', eid);
+    if (error) {
+        console.warn('[planning-events-db] fetchPlanningEventEnrollmentUserIds', error.message);
+        return [];
+    }
+    return (data || []).map((r) => String(r.student_user_id ?? '').trim()).filter(Boolean);
+}
+
+/**
  * @param {string} canonicalId
  */
 export async function deletePlanningEventRow(canonicalId) {

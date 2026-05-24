@@ -4,7 +4,7 @@
  */
 import { getAccessToken } from './auth-logic.js';
 import { getSupabaseClient, getPlanningConfig, isBackendAuthConfigured } from './supabase-client.js';
-import { bridgeListEvents, bridgeDeleteEvent, bridgeUpsertEvents } from './calendar-bridge.js';
+import { bridgeListEvents, bridgeDeleteEvent, bridgeUpsertEvents, invokeCalendarBridge } from './calendar-bridge.js';
 import {
     upsertPlanningEventRow,
     replacePlanningEventEnrollment,
@@ -54,6 +54,33 @@ export function formatTemplateApplyPartialSummary(partial) {
 
 function sleepMsLocal(ms) {
     return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Après les upserts Google du gabarit : comble les miroirs pool_owner / pool_student manquants
+ * (sync interrompue, quota Google, copie pool non persistée, etc.).
+ * @param {string | null} token
+ * @param {string | undefined} profUserId
+ * @param {(detail: string, done: number, total: number) => void} report
+ * @param {number} grandDone
+ * @param {number} activeGt
+ */
+async function finalizeTemplatePoolMirrors(token, profUserId, report, grandDone, activeGt) {
+    const uid = String(profUserId || '').trim();
+    if (!uid || !token) return { ok: true, skipped: true };
+    report(
+        'Alignement agenda perso (miroirs manquants)…',
+        grandDone,
+        Math.max(activeGt, grandDone + 1)
+    );
+    const r = await invokeCalendarBridge(token, {
+        action: 'ensure_pool_mirrors_for_user',
+        ownerUserId: uid
+    });
+    if (!r.ok && !r.skipped) {
+        return { ok: false, error: r.error || 'Alignement agenda perso impossible.' };
+    }
+    return { ok: true };
 }
 
 function normCalKey(id) {
@@ -755,8 +782,9 @@ export async function runTemplateGoogleBackgroundSync(p) {
         let activeGt = 1;
         let activeTotalDel = 0;
         let activeUpsertTotal = 0;
+        let token = null;
         try {
-            const token = await getAccessToken();
+            token = await getAccessToken();
             if (!token) throw new Error('Session expirée.');
 
             if (dbResult.mode === 'supabase') {
@@ -821,6 +849,15 @@ export async function runTemplateGoogleBackgroundSync(p) {
                     report('Aucune opération Google nécessaire.', 1, 1);
                 }
 
+                const poolFix = await finalizeTemplatePoolMirrors(
+                    token,
+                    ctx.profUserId,
+                    report,
+                    grandDone,
+                    activeGt
+                );
+                if (!poolFix.ok) throw new Error(poolFix.error || 'Alignement agenda perso');
+
                 return {
                     ok: true,
                     stats: { deleteTotal: cleanup.length, upsertTotal: ups.length }
@@ -882,6 +919,15 @@ export async function runTemplateGoogleBackgroundSync(p) {
                 report('Rien à modifier sur Google.', 1, 1);
             }
 
+            const poolFix = await finalizeTemplatePoolMirrors(
+                token,
+                ctx.profUserId,
+                report,
+                grandDone,
+                activeGt
+            );
+            if (!poolFix.ok) throw new Error(poolFix.error || 'Alignement agenda perso');
+
             return { ok: true, stats: { deleteTotal: totalDel, upsertTotal } };
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
@@ -897,6 +943,19 @@ export async function runTemplateGoogleBackgroundSync(p) {
                           upsertTotal: activeUpsertTotal
                       }
                     : undefined;
+            if (partial && upsertsDone > 0 && token) {
+                try {
+                    await finalizeTemplatePoolMirrors(
+                        token,
+                        ctx.profUserId,
+                        report,
+                        grandDone,
+                        activeGt
+                    );
+                } catch {
+                    /* ne pas masquer l'erreur initiale */
+                }
+            }
             if (partial) {
                 return { ok: false, error: human, partial };
             }

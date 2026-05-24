@@ -251,39 +251,20 @@ type GCalEvent = {
 };
 
 /**
- * Couleurs Google Calendar pour refléter fidèlement la grille Planning.
- * On renseigne à la fois colorId (palette Google) et couleurs RGB explicites.
- * @see https://developers.google.com/calendar/api/v3/reference/events#resource
+ * Palette Google Calendar (colorId 1–11) alignée sur css/events.css.
+ * On n’envoie que colorId (pas de RGB) : mieux supporté par l’app Google Agenda (Android/iOS).
+ * @see https://developers.google.com/calendar/api/v3/reference/colors
  */
 function googleColorIdForPlanningType(type: string, opts?: { reservationMine?: boolean }): string {
     const t = String(type || '').trim().toLowerCase();
-    if (t === 'fermeture') return '6'; /* Tangerine — orange */
-    if (t === 'cours' || t === 'maintenance') return '5'; /* Banana — jaune */
-    if (t === 'concert') return '11'; /* Dark purple — Concert */
-    if (t === 'autre') return '1'; /* Lavender — Autre */
+    if (t === 'fermeture') return '6'; /* Tangerine — orange (#ff790a) */
+    if (t === 'cours' || t === 'maintenance') return '5'; /* Banana — jaune (#f6e36a) */
+    if (t === 'concert') return '3'; /* Grape — violet (#8b5cf6) */
+    if (t === 'autre') return '7'; /* Peacock — turquoise (#14b8a6) */
     if (t === 'reservation' || t === 'travail perso') {
-        return opts?.reservationMine ? '2' /* Sage — vert */ : '7'; /* Peacock — bleu */
+        return opts?.reservationMine ? '10' /* Basil — vert (#61c71b) */ : '9'; /* Blueberry — bleu (#68a1e5) */
     }
-    /* défaut = Travail « autres » */
-    return '7'; /* Peacock — bleu */
-}
-
-function googleRgbColorsForPlanningType(
-    type: string,
-    opts?: { reservationMine?: boolean }
-): { backgroundColor: string; foregroundColor: string } {
-    const t = String(type || '').trim().toLowerCase();
-    if (t === 'fermeture') return { backgroundColor: '#ff790a', foregroundColor: '#1e293b' };
-    if (t === 'cours' || t === 'maintenance')
-        return { backgroundColor: '#f6e36a', foregroundColor: '#3f3f1e' };
-    if (t === 'concert') return { backgroundColor: '#a855f7', foregroundColor: '#ffffff' };
-    if (t === 'autre') return { backgroundColor: '#0d9488', foregroundColor: '#ffffff' };
-    if (t === 'reservation' || t === 'travail perso') {
-        return opts?.reservationMine
-            ? { backgroundColor: '#61c71b', foregroundColor: '#0f2910' }
-            : { backgroundColor: '#68a1e5', foregroundColor: '#0f172a' };
-    }
-    return { backgroundColor: '#68a1e5', foregroundColor: '#0f172a' };
+    return '9'; /* défaut = travail « autres » */
 }
 
 function parseInscritsCsv(raw: string | undefined): string[] {
@@ -311,6 +292,28 @@ function parseGoogleEventColorMeta(raw: string): {
         };
     } catch {
         return { colorId: '', backgroundColor: '', foregroundColor: '' };
+    }
+}
+
+/** Force la couleur événement (PATCH minimal — fiable sur mobile). */
+async function patchGoogleEventColorIdOnly(
+    accessToken: string,
+    calendarIdRaw: string,
+    googleEventId: string,
+    colorId: string
+): Promise<void> {
+    const cid = String(colorId || '').trim();
+    const gid = String(googleEventId || '').trim();
+    const cal = resolveCalendarId(calendarIdRaw);
+    if (!cid || !gid || !cal) return;
+    const res = await gcalFetch(
+        accessToken,
+        `/calendars/${encodeURIComponent(cal)}/events/${encodeURIComponent(gid)}`,
+        { method: 'PATCH', body: JSON.stringify({ colorId: cid }) }
+    );
+    if (!res.ok) {
+        const txt = await res.text();
+        console.warn('[calendar-bridge] PATCH colorId only', gid.slice(0, 12), res.status, txt.slice(0, 120));
     }
 }
 
@@ -406,9 +409,6 @@ function googleEventResource(
         ? Boolean(ownerNorm)
         : Boolean(ownerNorm && actorNorm && ownerNorm === actorNorm);
     const colorId = googleColorIdForPlanningType(ev.type, { reservationMine });
-    const { backgroundColor, foregroundColor } = googleRgbColorsForPlanningType(ev.type, {
-        reservationMine
-    });
     const insc = (ev.inscrits ?? '').trim();
     const priv: Record<string, string> = {
         planningType: String(ev.type || 'reservation'),
@@ -433,8 +433,6 @@ function googleEventResource(
         start: { dateTime: ev.start, timeZone: tz },
         end: { dateTime: ev.end, timeZone: tz },
         colorId,
-        backgroundColor,
-        foregroundColor,
         extendedProperties: { private: priv }
     };
     if (reminders) out.reminders = reminders;
@@ -608,8 +606,6 @@ async function createOrUpdatePoolCalendarEventCopy(
         { forPoolCalendarWrite: true }
     );
     const reqColorId = String(poolPayload.colorId ?? '').trim();
-    const reqBg = String(poolPayload.backgroundColor ?? '').trim();
-    const reqFg = String(poolPayload.foregroundColor ?? '').trim();
     const encPool = encodeURIComponent(poolCal);
     const candidates = dedupeGoogleEventIds(poolEventIdCandidates);
     const planningUuid = String(baseFields.planningEventId ?? '').trim();
@@ -618,13 +614,16 @@ async function createOrUpdatePoolCalendarEventCopy(
         const encEid = encodeURIComponent(poolOutId);
         const patchP = await gcalFetch(
             accessToken,
-            `/calendars/${encPool}/events/${encEid}?colorRgbFormat=true`,
+            `/calendars/${encPool}/events/${encEid}`,
             {
             method: 'PATCH',
             body: JSON.stringify(poolPayload)
             }
         );
-        if (patchP.ok) return poolOutId;
+        if (patchP.ok) {
+            await patchGoogleEventColorIdOnly(accessToken, poolCal, poolOutId, reqColorId);
+            return poolOutId;
+        }
         if (patchP.status !== 404) {
             console.error('[calendar-bridge] PATCH miroir pool:', patchP.status, await patchP.text());
             return '';
@@ -638,19 +637,20 @@ async function createOrUpdatePoolCalendarEventCopy(
             const encKeep = encodeURIComponent(keep);
             const patchK = await gcalFetch(
                 accessToken,
-                `/calendars/${encPool}/events/${encKeep}?colorRgbFormat=true`,
+                `/calendars/${encPool}/events/${encKeep}`,
                 {
                     method: 'PATCH',
                     body: JSON.stringify(poolPayload)
                 }
             );
             if (patchK.ok) {
+                await patchGoogleEventColorIdOnly(accessToken, poolCal, keep, reqColorId);
                 const eff = parseGoogleEventColorMeta(await patchK.text());
                 console.log('[calendar-bridge] pool PATCH color', {
                     planningEventId: String(baseFields.planningEventId || '').trim(),
                     type: String(baseFields.type || '').trim(),
                     owner: String(baseFields.owner || '').trim().toLowerCase(),
-                    requested: { colorId: reqColorId, backgroundColor: reqBg, foregroundColor: reqFg },
+                    requestedColorId: reqColorId,
                     effective: eff
                 });
                 for (const extra of found.slice(1)) {
@@ -666,7 +666,7 @@ async function createOrUpdatePoolCalendarEventCopy(
         }
     }
 
-    const insP = await gcalFetch(accessToken, `/calendars/${encPool}/events?colorRgbFormat=true`, {
+    const insP = await gcalFetch(accessToken, `/calendars/${encPool}/events`, {
         method: 'POST',
         body: JSON.stringify(poolPayload)
     });
@@ -684,18 +684,16 @@ async function createOrUpdatePoolCalendarEventCopy(
         console.error('[calendar-bridge] POST miroir pool:', msg + hint404 + hintWriter);
         return '';
     }
+    const poolGid = String(created.id || '').trim();
+    await patchGoogleEventColorIdOnly(accessToken, poolCal, poolGid, reqColorId);
     console.log('[calendar-bridge] pool POST color', {
         planningEventId: String(baseFields.planningEventId || '').trim(),
         type: String(baseFields.type || '').trim(),
         owner: String(baseFields.owner || '').trim().toLowerCase(),
-        requested: { colorId: reqColorId, backgroundColor: reqBg, foregroundColor: reqFg },
-        effective: {
-            colorId: String(created.colorId || '').trim(),
-            backgroundColor: String(created.backgroundColor || '').trim(),
-            foregroundColor: String(created.foregroundColor || '').trim()
-        }
+        requestedColorId: reqColorId,
+        effectiveColorId: String(created.colorId || '').trim()
     });
-    return created.id || '';
+    return poolGid;
 }
 
 type PoolStudentMirrorRow = {
@@ -1051,18 +1049,20 @@ async function persistPlanningMirrorRows(
     }
     const base = supabaseUrl.replace(/\/$/, '');
     const now = new Date().toISOString();
-    const rows: Record<string, unknown>[] = [
-        {
+    const rows: Record<string, unknown>[] = [];
+    const mainGid = String(mainGoogleEventId || '').trim();
+    if (mainGid) {
+        rows.push({
             event_id: planningEventId,
             target: 'main',
             google_calendar_id: mainCalendarId,
-            google_event_id: mainGoogleEventId,
+            google_event_id: mainGid,
             sync_status: 'ok',
             last_error: null,
             sync_generation: gen,
             updated_at: now
-        }
-    ];
+        });
+    }
     if (pool?.googleEventId && pool?.calendarId) {
         rows.push({
             event_id: planningEventId,
@@ -1189,16 +1189,18 @@ async function repairMainMirrorFromDbEvent(
         ...(inscritsCsv ? { inscrits: inscritsCsv } : {})
     };
     const payload = googleEventResource(baseFields, { actorEmail: ownerEmail });
+    const reqColorId = String(payload.colorId ?? '').trim();
     const calEnc = encodeURIComponent(mainCal);
     let mainOutId = String(existingGid || '').trim();
 
     if (mainOutId) {
         const patch = await gcalFetch(
             accessToken,
-            `/calendars/${calEnc}/events/${encodeURIComponent(mainOutId)}?colorRgbFormat=true`,
+            `/calendars/${calEnc}/events/${encodeURIComponent(mainOutId)}`,
             { method: 'PATCH', body: JSON.stringify(payload) }
         );
         if (patch.ok) {
+            await patchGoogleEventColorIdOnly(accessToken, mainCal, mainOutId, reqColorId);
             await patchMirrorRowAfterResync(supabaseUrl, serviceKey, eventId, 'main', null, mainCal, mainOutId);
             return mainOutId;
         }
@@ -1206,7 +1208,7 @@ async function repairMainMirrorFromDbEvent(
         mainOutId = '';
     }
 
-    const ins = await gcalFetch(accessToken, `/calendars/${calEnc}/events?colorRgbFormat=true`, {
+    const ins = await gcalFetch(accessToken, `/calendars/${calEnc}/events`, {
         method: 'POST',
         body: JSON.stringify(payload)
     });
@@ -1216,6 +1218,7 @@ async function repairMainMirrorFromDbEvent(
         const created = JSON.parse(raw) as { id?: string };
         const gid = String(created.id || '').trim();
         if (!gid) return null;
+        await patchGoogleEventColorIdOnly(accessToken, mainCal, gid, reqColorId);
         await patchMirrorRowAfterResync(supabaseUrl, serviceKey, eventId, 'main', null, mainCal, gid);
         return gid;
     } catch {
@@ -1354,6 +1357,287 @@ async function patchMirrorRowAfterResync(
     }
 }
 
+function eventNeedsOwnerPoolMirror(slotType: string): boolean {
+    const bridgeType = planningSlotTypeToBridgeType(slotType);
+    return shouldMirrorToOwnerPersonalPool({
+        type: bridgeType,
+        owner: 'x@y.z'
+    } as NonNullable<BridgeBody['events']>[0]);
+}
+
+async function fetchPoolAssignedUserIdForCalendar(
+    supabaseUrl: string,
+    serviceKey: string,
+    calNorm: string
+): Promise<string | null> {
+    const base = supabaseUrl.replace(/\/$/, '');
+    const hdrs = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
+    const res = await fetch(
+        `${base}/rest/v1/google_calendar_pool?assigned_user_id=not.is.null&select=assigned_user_id,google_calendar_id`,
+        { headers: hdrs }
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{ assigned_user_id?: string; google_calendar_id?: string }>;
+    for (const row of rows || []) {
+        const cal = normalizeGoogleCalendarId(String(row.google_calendar_id || ''));
+        if (cal && sameGoogleCalendarId(cal, calNorm)) {
+            const uid = String(row.assigned_user_id || '').trim();
+            if (uid) return uid;
+        }
+    }
+    return null;
+}
+
+type DbEventRow = {
+    id?: string;
+    title?: string;
+    start_at?: string;
+    end_at?: string;
+    slot_type?: string;
+    owner_email?: string;
+    owner_user_id?: string;
+};
+
+async function fetchPoolCalendarIdForAssignedUser(
+    supabaseUrl: string,
+    serviceKey: string,
+    ownerUserId: string
+): Promise<string | null> {
+    const uid = String(ownerUserId || '').trim();
+    if (!uid) return null;
+    const base = supabaseUrl.replace(/\/$/, '');
+    const hdrs = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
+    const res = await fetch(
+        `${base}/rest/v1/google_calendar_pool?assigned_user_id=eq.${encodeURIComponent(uid)}&select=google_calendar_id`,
+        { headers: hdrs }
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{ google_calendar_id?: string }>;
+    const raw = String(rows?.[0]?.google_calendar_id || '').trim();
+    return raw ? normalizeGoogleCalendarId(raw) : null;
+}
+
+/**
+ * Crée les miroirs pool_owner / pool_student manquants pour l'utilisateur assigné à cet agenda,
+ * puis la resync existante aligne le contenu Google sur ces lignes.
+ */
+async function ensurePoolCalendarMirrorsFromDb(
+    accessToken: string,
+    supabaseUrl: string,
+    serviceKey: string,
+    poolCalNorm: string,
+    assignedUserId: string,
+    mainCalNorm: string
+): Promise<{ repaired: number; errors: string[] }> {
+    const base = supabaseUrl.replace(/\/$/, '');
+    const hdrs = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
+    const nowIso = new Date().toISOString();
+    const horizon = new Date();
+    horizon.setFullYear(horizon.getFullYear() + 1);
+    const horizonIso = horizon.toISOString();
+    const errors: string[] = [];
+    let repaired = 0;
+
+    const evRes = await fetch(
+        `${base}/rest/v1/planning_event?owner_user_id=eq.${encodeURIComponent(assignedUserId)}&end_at=gt.${encodeURIComponent(nowIso)}&start_at=lte.${encodeURIComponent(horizonIso)}&select=id,title,start_at,end_at,slot_type,owner_email,owner_user_id&order=start_at.asc&limit=800`,
+        { headers: hdrs }
+    );
+    const ownerEvents: DbEventRow[] = evRes.ok ? ((await evRes.json()) as DbEventRow[]) : [];
+    if (!evRes.ok) {
+        errors.push(`Événements propriétaire : HTTP ${evRes.status}`);
+    }
+
+    const enrRes = await fetch(
+        `${base}/rest/v1/planning_event_enrollment?student_user_id=eq.${encodeURIComponent(assignedUserId)}&select=event_id`,
+        { headers: hdrs }
+    );
+    const enrRows = enrRes.ok ? ((await enrRes.json()) as Array<{ event_id?: string }>) : [];
+    const enrolledEventIds = [
+        ...new Set(enrRows.map((r) => String(r.event_id || '').trim()).filter(Boolean))
+    ];
+
+    const studentEvents: DbEventRow[] = [];
+    for (let i = 0; i < enrolledEventIds.length; i += 40) {
+        const chunk = enrolledEventIds.slice(i, i + 40);
+        const stEvRes = await fetch(
+            `${base}/rest/v1/planning_event?id=in.(${chunk.map((id) => encodeURIComponent(id)).join(',')})&end_at=gt.${encodeURIComponent(nowIso)}&start_at=lte.${encodeURIComponent(horizonIso)}&select=id,title,start_at,end_at,slot_type,owner_email,owner_user_id`,
+            { headers: hdrs }
+        );
+        if (!stEvRes.ok) continue;
+        const rows = (await stEvRes.json()) as DbEventRow[];
+        for (const ev of rows || []) {
+            const ownerId = String(ev.owner_user_id || '').trim();
+            const slotType = String(ev.slot_type || '').trim().toLowerCase();
+            if (ownerId === assignedUserId) continue;
+            if (slotType !== 'cours') continue;
+            studentEvents.push(ev);
+        }
+    }
+
+    const allEventIds = [
+        ...new Set(
+            [
+                ...(ownerEvents || [])
+                    .filter((ev) => eventNeedsOwnerPoolMirror(String(ev.slot_type || '')))
+                    .map((ev) => String(ev.id || '').trim()),
+                ...studentEvents.map((ev) => String(ev.id || '').trim())
+            ].filter(Boolean)
+        )
+    ];
+
+    const poolOwnerOkOnCal = new Set<string>();
+    const poolStudentOkOnCal = new Set<string>();
+    const mainGidByEvent = new Map<string, string>();
+    const poolOwnerGidByEvent = new Map<string, string>();
+    const poolStudentGidByEvent = new Map<string, string>();
+
+    for (let i = 0; i < allEventIds.length; i += 80) {
+        const chunk = allEventIds.slice(i, i + 80);
+        const mirRes = await fetch(
+            `${base}/rest/v1/planning_event_google_mirror?event_id=in.(${chunk.map((id) => encodeURIComponent(id)).join(',')})&select=event_id,target,target_user_id,sync_status,google_event_id,google_calendar_id`,
+            { headers: hdrs }
+        );
+        if (!mirRes.ok) continue;
+        const mirs = (await mirRes.json()) as Array<{
+            event_id?: string;
+            target?: string;
+            target_user_id?: string | null;
+            sync_status?: string;
+            google_event_id?: string;
+            google_calendar_id?: string;
+        }>;
+        for (const m of mirs || []) {
+            const eid = String(m.event_id || '').trim();
+            if (!eid) continue;
+            const cal = normalizeGoogleCalendarId(String(m.google_calendar_id || ''));
+            const gid = String(m.google_event_id || '').trim();
+            if (m.target === 'main' && m.sync_status === 'ok' && gid) {
+                mainGidByEvent.set(eid, gid);
+            }
+            if (
+                m.target === 'pool_owner' &&
+                cal &&
+                sameGoogleCalendarId(cal, poolCalNorm) &&
+                m.sync_status === 'ok'
+            ) {
+                poolOwnerOkOnCal.add(eid);
+                if (gid) poolOwnerGidByEvent.set(eid, gid);
+            }
+            if (
+                m.target === 'pool_student' &&
+                String(m.target_user_id || '').trim() === assignedUserId &&
+                cal &&
+                sameGoogleCalendarId(cal, poolCalNorm) &&
+                m.sync_status === 'ok'
+            ) {
+                poolStudentOkOnCal.add(eid);
+                if (gid) poolStudentGidByEvent.set(eid, gid);
+            }
+        }
+    }
+
+    for (const ev of ownerEvents || []) {
+        const eventId = String(ev.id || '').trim();
+        const slotType = String(ev.slot_type || '');
+        if (!eventId || !eventNeedsOwnerPoolMirror(slotType)) continue;
+        if (poolOwnerOkOnCal.has(eventId)) continue;
+
+        let mainGid = mainGidByEvent.get(eventId);
+        if (!mainGid) {
+            mainGid =
+                (await repairMainMirrorFromDbEvent(
+                    accessToken,
+                    supabaseUrl,
+                    serviceKey,
+                    ev,
+                    mainCalNorm,
+                    mainGidByEvent.get(eventId)
+                )) || undefined;
+            if (mainGid) mainGidByEvent.set(eventId, mainGid);
+        }
+        if (!mainGid) {
+            errors.push(`Pas de miroir principal pour ${eventId.slice(0, 8)}…`);
+            continue;
+        }
+
+        const bridgeType = planningSlotTypeToBridgeType(slotType);
+        const ownerEmail = String(ev.owner_email || '').trim().toLowerCase();
+        let inscritsCsv = '';
+        if (bridgeType === 'cours') {
+            inscritsCsv = await fetchEnrollmentEmailsCsv(supabaseUrl, serviceKey, eventId);
+        }
+        const baseFields: EventPayloadInput = {
+            title: String(ev.title || '').trim() || 'Créneau',
+            start: String(ev.start_at || ''),
+            end: String(ev.end_at || ''),
+            type: bridgeType,
+            owner: ownerEmail,
+            planningEventId: eventId,
+            ...(inscritsCsv ? { inscrits: inscritsCsv } : {})
+        };
+
+        const gid = await createOrUpdatePoolCalendarEventCopy(
+            accessToken,
+            poolCalNorm,
+            dedupeGoogleEventIds([poolOwnerGidByEvent.get(eventId) ?? '', mainGid]),
+            baseFields
+        );
+        if (!gid) {
+            errors.push(`Échec copie pool (owner) ${eventId.slice(0, 8)}…`);
+            continue;
+        }
+        await patchMirrorRowAfterResync(supabaseUrl, serviceKey, eventId, 'pool_owner', null, poolCalNorm, gid);
+        poolOwnerOkOnCal.add(eventId);
+        repaired += 1;
+        await sleepMs(45);
+    }
+
+    for (const ev of studentEvents) {
+        const eventId = String(ev.id || '').trim();
+        if (!eventId || poolStudentOkOnCal.has(eventId)) continue;
+
+        const bridgeType = planningSlotTypeToBridgeType(String(ev.slot_type || ''));
+        if (bridgeType !== 'cours') continue;
+
+        const ownerEmail = String(ev.owner_email || '').trim().toLowerCase();
+        const inscritsCsv = await fetchEnrollmentEmailsCsv(supabaseUrl, serviceKey, eventId);
+        const baseFields: EventPayloadInput = {
+            title: String(ev.title || '').trim() || 'Créneau',
+            start: String(ev.start_at || ''),
+            end: String(ev.end_at || ''),
+            type: bridgeType,
+            owner: ownerEmail,
+            planningEventId: eventId,
+            ...(inscritsCsv ? { inscrits: inscritsCsv } : {})
+        };
+
+        const gid = await createOrUpdatePoolCalendarEventCopy(
+            accessToken,
+            poolCalNorm,
+            dedupeGoogleEventIds([poolStudentGidByEvent.get(eventId) ?? '']),
+            baseFields
+        );
+        if (!gid) {
+            errors.push(`Échec copie pool (élève) ${eventId.slice(0, 8)}…`);
+            continue;
+        }
+        await patchMirrorRowAfterResync(
+            supabaseUrl,
+            serviceKey,
+            eventId,
+            'pool_student',
+            assignedUserId,
+            poolCalNorm,
+            gid
+        );
+        poolStudentOkOnCal.add(eventId);
+        repaired += 1;
+        await sleepMs(45);
+    }
+
+    return { repaired, errors };
+}
+
 /**
  * Réaligne un agenda Google sur les miroirs + créneaux futurs en base (créneaux dont la fin est après maintenant).
  */
@@ -1467,6 +1751,24 @@ async function resyncGoogleCalendarFutureFromDb(
         return { upserted, removed, errors };
     }
 
+    let ensureRepaired = 0;
+    const ensureErrors: string[] = [];
+    if (mainCalNorm && !sameGoogleCalendarId(calNorm, mainCalNorm)) {
+        const assignedUserId = await fetchPoolAssignedUserIdForCalendar(supabaseUrl, serviceKey, calNorm);
+        if (assignedUserId) {
+            const ensured = await ensurePoolCalendarMirrorsFromDb(
+                accessToken,
+                supabaseUrl,
+                serviceKey,
+                calNorm,
+                assignedUserId,
+                mainCalNorm
+            );
+            ensureRepaired = ensured.repaired;
+            ensureErrors.push(...ensured.errors);
+        }
+    }
+
     const mirRes = await fetch(
         `${base}/rest/v1/planning_event_google_mirror?google_calendar_id=eq.${encodeURIComponent(calNorm)}&select=event_id,target,target_user_id,google_event_id`,
         { headers: hdrs }
@@ -1478,15 +1780,13 @@ async function resyncGoogleCalendarFutureFromDb(
             errors: [`Lecture miroirs : HTTP ${mirRes.status}`]
         };
     }
-    const mirrors = (await mirRes.json()) as Array<{
+    let mirrors = (await mirRes.json()) as Array<{
         event_id?: string;
         target?: string;
         target_user_id?: string | null;
         google_event_id?: string | null;
     }>;
-    if (!Array.isArray(mirrors) || mirrors.length === 0) {
-        return { upserted: 0, removed: 0, errors: [] };
-    }
+    if (!Array.isArray(mirrors)) mirrors = [];
 
     const eventIds = [...new Set(mirrors.map((m) => String(m.event_id || '').trim()).filter(Boolean))];
     const eventById = new Map<
@@ -1530,9 +1830,9 @@ async function resyncGoogleCalendarFutureFromDb(
         }
     }
 
-    let upserted = 0;
+    let upserted = ensureRepaired;
     let removed = 0;
-    const errors: string[] = [];
+    const errors: string[] = [...ensureErrors];
     const validPlanningIds = new Set<string>();
 
     for (const mir of mirrors) {
@@ -1836,8 +2136,6 @@ async function upsertSingleCalendarEvent(
         actorEmail: calendarUser.email || ''
     });
     const reqColorId = String(payload.colorId ?? '').trim();
-    const reqBg = String(payload.backgroundColor ?? '').trim();
-    const reqFg = String(payload.foregroundColor ?? '').trim();
 
     let mainOutId = '';
     const mainCandidates = dedupeGoogleEventIds([mid.main, ev.googleEventId]);
@@ -1848,7 +2146,7 @@ async function upsertSingleCalendarEvent(
             if (attempt > 0) await sleepMs(Math.min(2500, 350 * 2 ** (attempt - 1)));
             const patch = await gcalFetch(
                 accessToken,
-                `/calendars/${calIdUpsert}/events/${encEid}?colorRgbFormat=true`,
+                `/calendars/${calIdUpsert}/events/${encEid}`,
                 {
                     method: 'PATCH',
                     body: JSON.stringify(payload)
@@ -1856,13 +2154,14 @@ async function upsertSingleCalendarEvent(
             );
             const pt = await patch.text();
             if (patch.ok) {
+                await patchGoogleEventColorIdOnly(accessToken, mainCalResolved, tryGid, reqColorId);
                 const eff = parseGoogleEventColorMeta(pt);
                 console.log('[calendar-bridge] main PATCH color', {
                     planningEventId: planningIdMerge,
                     googleEventId: tryGid,
                     type: String(ev.type || '').trim(),
                     owner: String(ev.owner || '').trim().toLowerCase(),
-                    requested: { colorId: reqColorId, backgroundColor: reqBg, foregroundColor: reqFg },
+                    requestedColorId: reqColorId,
                     effective: eff
                 });
                 mainOutId = tryGid;
@@ -1888,7 +2187,7 @@ async function upsertSingleCalendarEvent(
                 if (attempt > 0) await sleepMs(Math.min(2500, 350 * 2 ** (attempt - 1)));
                 const patch = await gcalFetch(
                     accessToken,
-                    `/calendars/${calIdUpsert}/events/${encEid}?colorRgbFormat=true`,
+                    `/calendars/${calIdUpsert}/events/${encEid}`,
                     {
                         method: 'PATCH',
                         body: JSON.stringify(payload)
@@ -1896,13 +2195,14 @@ async function upsertSingleCalendarEvent(
                 );
                 const pt = await patch.text();
                 if (patch.ok) {
+                    await patchGoogleEventColorIdOnly(accessToken, mainCalResolved, keep, reqColorId);
                     const eff = parseGoogleEventColorMeta(pt);
                     console.log('[calendar-bridge] main PATCH(found) color', {
                         planningEventId: planningIdMerge,
                         googleEventId: keep,
                         type: String(ev.type || '').trim(),
                         owner: String(ev.owner || '').trim().toLowerCase(),
-                        requested: { colorId: reqColorId, backgroundColor: reqBg, foregroundColor: reqFg },
+                        requestedColorId: reqColorId,
                         effective: eff
                     });
                     mainOutId = keep;
@@ -1926,7 +2226,7 @@ async function upsertSingleCalendarEvent(
             if (attempt > 0) await sleepMs(Math.min(3000, 400 * 2 ** (attempt - 1)));
             const ins = await gcalFetch(
                 accessToken,
-                `/calendars/${calIdUpsert}/events?colorRgbFormat=true`,
+                `/calendars/${calIdUpsert}/events`,
                 {
                 method: 'POST',
                 body: JSON.stringify(payload)
@@ -1940,19 +2240,17 @@ async function upsertSingleCalendarEvent(
                 throw new Error(raw.slice(0, 200) || `POST HTTP ${ins.status}`);
             }
             if (ins.ok && created.id) {
+                const newGid = String(created.id || '').trim();
+                await patchGoogleEventColorIdOnly(accessToken, mainCalResolved, newGid, reqColorId);
                 console.log('[calendar-bridge] main POST color', {
                     planningEventId: planningIdMerge,
-                    googleEventId: String(created.id || '').trim(),
+                    googleEventId: newGid,
                     type: String(ev.type || '').trim(),
                     owner: String(ev.owner || '').trim().toLowerCase(),
-                    requested: { colorId: reqColorId, backgroundColor: reqBg, foregroundColor: reqFg },
-                    effective: {
-                        colorId: String(created.colorId || '').trim(),
-                        backgroundColor: String(created.backgroundColor || '').trim(),
-                        foregroundColor: String(created.foregroundColor || '').trim()
-                    }
+                    requestedColorId: reqColorId,
+                    effectiveColorId: String(created.colorId || '').trim()
                 });
-                mainOutId = created.id || '';
+                mainOutId = newGid;
                 break;
             }
             lastErr = created.error?.message || `POST événement HTTP ${ins.status}`;
@@ -1962,7 +2260,16 @@ async function upsertSingleCalendarEvent(
         if (!mainOutId) throw new Error(lastErr || 'Création événement impossible');
     }
 
-    const poolPair = await mirrorOwnerPersonalCalendarIfNeeded(
+    let mainCalNorm = '';
+    try {
+        mainCalNorm = normalizeGoogleCalendarId(calendarId());
+    } catch {
+        /* principal non configuré */
+    }
+    const targetCalNorm = normalizeGoogleCalendarId(resolveCalendarId(ev.calendarId ?? body.calendarId));
+    const wroteToMainCal = Boolean(mainCalNorm && targetCalNorm && sameGoogleCalendarId(targetCalNorm, mainCalNorm));
+
+    let poolPair = await mirrorOwnerPersonalCalendarIfNeeded(
         accessToken,
         calendarUser,
         jwt,
@@ -1973,6 +2280,20 @@ async function upsertSingleCalendarEvent(
         mainOutId,
         mid.poolOwner
     );
+    if (
+        !poolPair &&
+        !wroteToMainCal &&
+        targetCalNorm &&
+        shouldMirrorToOwnerPersonalPool({
+            type: String(ev.type || 'reservation'),
+            owner: String(ev.owner || '')
+        } as NonNullable<BridgeBody['events']>[0])
+    ) {
+        poolPair = {
+            poolGoogleEventId: mainOutId,
+            poolCalendarId: targetCalNorm
+        };
+    }
 
     const planningId = String(ev.planningEventId ?? '').trim();
     /* Secret manuel Edge : le dashboard refuse SUPABASE_* → SERVICE_ROLE_KEY (même JWT que la clé service_role). */
@@ -2004,8 +2325,8 @@ async function upsertSingleCalendarEvent(
             supabaseUrl,
             serviceKey,
             planningId,
-            mainCalResolved,
-            mainOutId,
+            mainCalNorm || targetCalNorm,
+            wroteToMainCal ? mainOutId : '',
             poolPair,
             poolStudents
         );
@@ -2021,14 +2342,6 @@ async function upsertSingleCalendarEvent(
         end,
         ...(poolPair?.poolGoogleEventId ? { poolGoogleEventId: poolPair.poolGoogleEventId } : {})
     };
-}
-
-function eventNeedsOwnerPoolMirror(slotType: string): boolean {
-    const bridgeType = planningSlotTypeToBridgeType(slotType);
-    return shouldMirrorToOwnerPersonalPool({
-        type: bridgeType,
-        owner: 'x@y.z'
-    } as NonNullable<BridgeBody['events']>[0]);
 }
 
 /** Cron : crée les miroirs pool_owner manquants puis resync les agendas concernés. */
@@ -2375,6 +2688,34 @@ Deno.serve(async (req) => {
             return jsonResponse({ ok: result.ok, mode: 'cron_repair_google_sync', ...result });
         }
 
+        const serviceOrCronResync =
+            bearerMatchesEdgeServiceRole(jwt) || (Boolean(cronSecret) && jwt === cronSecret);
+        if (serviceOrCronResync && body.action === 'resync_calendar') {
+            const calRaw = String(body.googleCalendarId ?? body.calendarId ?? '').trim();
+            const calNorm = normalizeGoogleCalendarId(calRaw);
+            if (!calNorm) {
+                return jsonResponse({ ok: false, error: 'googleCalendarId requis' }, 400);
+            }
+            const serviceKey = edgeServiceRoleKeyForDb();
+            if (!serviceKey) {
+                return jsonResponse({ ok: false, error: 'SERVICE_ROLE_KEY manquante' }, 500);
+            }
+            const accessToken = await getGoogleAccessToken();
+            const result = await resyncGoogleCalendarFutureFromDb(
+                accessToken,
+                supabaseUrl,
+                serviceKey,
+                calNorm
+            );
+            return jsonResponse({
+                ok: result.errors.length === 0,
+                upserted: result.upserted,
+                removed: result.removed,
+                googleCalendarId: calNorm,
+                ...(result.errors.length ? { errors: result.errors } : {})
+            });
+        }
+
         if (
             bearerMatchesEdgeServiceRole(jwt) &&
             body.action === 'adminWipeCalendarsInRange'
@@ -2488,6 +2829,72 @@ Deno.serve(async (req) => {
                 /* */
             }
             return jsonResponse({ ok: false, error: msg }, 200);
+        }
+
+        if (action === 'ensure_pool_mirrors_for_user') {
+            const ownerUserId = String(body.ownerUserId ?? user.id).trim();
+            if (!ownerUserId) {
+                return jsonResponse({ ok: false, error: 'ownerUserId requis' }, 400);
+            }
+            if (ownerUserId !== user.id) {
+                const adminGate = await assertPlanningAdmin(supabaseUrl, supabaseAnonKey, jwt, user.id);
+                if (!adminGate.ok) {
+                    return jsonResponse({ ok: false, error: adminGate.error }, adminGate.status);
+                }
+            }
+            const serviceKey = (
+                Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
+                Deno.env.get('SERVICE_ROLE_KEY') ??
+                ''
+            ).trim();
+            if (!serviceKey) {
+                return jsonResponse(
+                    { ok: false, error: 'SERVICE_ROLE_KEY manquante pour lire la base.' },
+                    500
+                );
+            }
+            let mainCalNorm = '';
+            try {
+                mainCalNorm = normalizeGoogleCalendarId(calendarId());
+            } catch (e) {
+                return jsonResponse(
+                    {
+                        ok: false,
+                        error: e instanceof Error ? e.message : 'GOOGLE_CALENDAR_ID manquant'
+                    },
+                    500
+                );
+            }
+            const poolCalNorm = await fetchPoolCalendarIdForAssignedUser(
+                supabaseUrl,
+                serviceKey,
+                ownerUserId
+            );
+            if (!poolCalNorm || sameGoogleCalendarId(poolCalNorm, mainCalNorm)) {
+                return jsonResponse({ ok: true, repaired: 0, upserted: 0, skipped: true });
+            }
+            const ensured = await ensurePoolCalendarMirrorsFromDb(
+                accessToken,
+                supabaseUrl,
+                serviceKey,
+                poolCalNorm,
+                ownerUserId,
+                mainCalNorm
+            );
+            const sync = await resyncGoogleCalendarFutureFromDb(
+                accessToken,
+                supabaseUrl,
+                serviceKey,
+                poolCalNorm
+            );
+            const errors = [...ensured.errors, ...sync.errors];
+            return jsonResponse({
+                ok: errors.length === 0,
+                repaired: ensured.repaired,
+                upserted: sync.upserted,
+                removed: sync.removed,
+                ...(errors.length ? { errors } : {})
+            });
         }
 
         if (action === 'resync_calendar') {

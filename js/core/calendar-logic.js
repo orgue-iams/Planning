@@ -30,7 +30,8 @@ import {
     fetchPlanningMainPoolGoogleIdsForEvent,
     planningUserIdForEmail,
     fetchPlanningListElevesActifs,
-    replacePlanningEventEnrollment
+    replacePlanningEventEnrollment,
+    fetchPlanningEventEnrollmentUserIds
 } from './planning-events-db.js';
 import { fetchOrganSchoolSettings, getOrganSchoolSettingsCached } from './organ-settings.js';
 import { openFermetureEditFromCalendarEvent } from './fermeture-edit-ui.js';
@@ -1298,7 +1299,8 @@ export async function syncReservationEventToGoogle(
     calendarEvent,
     calendar = null,
     currentUser = null,
-    previousSnapshot = null
+    previousSnapshot = null,
+    callbacks = {}
 ) {
     if (!calendarEvent || !isBackendAuthConfigured()) {
         return { ok: false, skipped: true };
@@ -1392,6 +1394,23 @@ export async function syncReservationEventToGoogle(
         }
     }
 
+    let prevEnrollIds = [];
+    if (dbSlotType === 'cours') {
+        prevEnrollIds = await fetchPlanningEventEnrollmentUserIds(canonicalId);
+    }
+    /** @type {ReturnType<typeof buildModalSavePrevDbSnapshot> | null} */
+    const prevDbForRollback = previousSnapshot
+        ? {
+              startIso: previousSnapshot.startStr,
+              endIso: previousSnapshot.endStr,
+              title: String(previousSnapshot.title || title).trim() || title,
+              dbSlotType,
+              ownerEmail: String(owner).trim().toLowerCase(),
+              ownerUid,
+              inscritUserIds: prevEnrollIds
+          }
+        : null;
+
     const ur = await upsertPlanningEventRow({
         id: canonicalId,
         startIso,
@@ -1430,7 +1449,20 @@ export async function syncReservationEventToGoogle(
         ...(inscritsCsv ? { inscrits: inscritsCsv } : {})
     };
     showToast('Créneau mis à jour.', 'success');
-    void runGoogleCalendarSyncInBackground([payload], calendar);
+    const liveRef = calendar ? resolveLivePlanningEventRef(calendar, calendarEvent) : calendarEvent;
+    if (liveRef && typeof liveRef.setExtendedProp === 'function') {
+        liveRef.setExtendedProp('planningGoogleSyncPending', calendarBridgeWanted());
+    }
+    voidLaunchReservationGoogleSyncWithRollback(
+        calendar,
+        [payload],
+        {
+            mode: 'edit',
+            eventId: canonicalId,
+            prevDb: prevDbForRollback
+        },
+        callbacks.onGoogleSyncSuccess
+    );
     return { ok: true, skipped: false };
 }
 
@@ -2099,17 +2131,6 @@ export async function handleEventResize(info, currentUser) {
     resizePreviousRange.delete(info.event);
 
     const prevSnap = seriesPrevSnapshotFromEvent(info.oldEvent);
-    const sync = await syncReservationEventToGoogle(
-        info.event,
-        info.view.calendar,
-        currentUser,
-        prevSnap
-    );
-    if (!sync.ok) {
-        info.revert();
-        return;
-    }
-
     const oldEv = info.oldEvent;
     let previousStartIso = '';
     let previousEndIso = '';
@@ -2120,37 +2141,49 @@ export async function handleEventResize(info, currentUser) {
         previousStartIso = prevFromMap.startIso;
         previousEndIso = prevFromMap.endIso;
     }
+    const runResizeNotifications = () => {
+        const oi = ownerInfoFromEvent(info.event, currentUser);
+        const me = String(currentUser?.email ?? '')
+            .trim()
+            .toLowerCase();
+        const newStartIso = info.event.start ? info.event.start.toISOString() : '';
+        const newEndIso = info.event.end ? info.event.end.toISOString() : '';
+        const rangeChanged =
+            Boolean(previousStartIso && previousEndIso && newStartIso && newEndIso) &&
+            (previousStartIso !== newStartIso || previousEndIso !== newEndIso);
 
-    const oi = ownerInfoFromEvent(info.event, currentUser);
-    const me = String(currentUser?.email ?? '')
-        .trim()
-        .toLowerCase();
-    const newStartIso = info.event.start ? info.event.start.toISOString() : '';
-    const newEndIso = info.event.end ? info.event.end.toISOString() : '';
-    const rangeChanged =
-        Boolean(previousStartIso && previousEndIso && newStartIso && newEndIso) &&
-        (previousStartIso !== newStartIso || previousEndIso !== newEndIso);
-
-    if (oi.ownerEmail && oi.ownerEmail !== me && rangeChanged) {
-        notifySlotOwnerAfterThirdPartyEditNonBlocking({
-            currentUser,
-            action: 'modified',
-            targetOwnerEmail: oi.ownerEmail,
-            targetOwnerDisplayName: oi.ownerName,
-            targetOwnerUserId: oi.ownerUserId,
-            slotTitle: info.event.title,
-            slotStart: info.event.start,
-            slotEnd: info.event.end,
-            previousStartIso,
-            previousEndIso
-        });
-    }
-    if (rangeChanged) {
-        notifyEnrolledStudentsAfterCoursChangeNonBlocking(currentUser, info.event, {
-            title: String(info.event.title || '').trim(),
-            startStr: previousStartIso,
-            endStr: previousEndIso
-        });
+        if (oi.ownerEmail && oi.ownerEmail !== me && rangeChanged) {
+            notifySlotOwnerAfterThirdPartyEditNonBlocking({
+                currentUser,
+                action: 'modified',
+                targetOwnerEmail: oi.ownerEmail,
+                targetOwnerDisplayName: oi.ownerName,
+                targetOwnerUserId: oi.ownerUserId,
+                slotTitle: info.event.title,
+                slotStart: info.event.start,
+                slotEnd: info.event.end,
+                previousStartIso,
+                previousEndIso
+            });
+        }
+        if (rangeChanged) {
+            notifyEnrolledStudentsAfterCoursChangeNonBlocking(currentUser, info.event, {
+                title: String(info.event.title || '').trim(),
+                startStr: previousStartIso,
+                endStr: previousEndIso
+            });
+        }
+    };
+    const sync = await syncReservationEventToGoogle(
+        info.event,
+        info.view.calendar,
+        currentUser,
+        prevSnap,
+        { onGoogleSyncSuccess: runResizeNotifications }
+    );
+    if (!sync.ok) {
+        info.revert();
+        return;
     }
 }
 
@@ -2951,12 +2984,224 @@ async function runGoogleMirrorSyncWithBanner(mirrorTargets) {
 }
 
 /**
+ * @param {{ startStr: string, endStr: string, title: string } | null} prevSnapshot
+ * @param {string | null} formBaselineJson
+ * @param {import('@fullcalendar/core').EventApi | null} liveEventRef
+ * @param {string} ownerEmail
+ * @param {string} ownerUid
+ */
+function buildModalSavePrevDbSnapshot(
+    prevSnapshot,
+    formBaselineJson,
+    liveEventRef,
+    ownerEmail,
+    ownerUid
+) {
+    if (!prevSnapshot) return null;
+    let inscritUserIds = [];
+    let dbSlotType = String(liveEventRef?.extendedProps?.planningDbSlotType || '').trim();
+    let title = String(prevSnapshot.title || '').trim() || 'Créneau';
+    if (formBaselineJson) {
+        try {
+            const snap = JSON.parse(formBaselineJson);
+            if (Array.isArray(snap.inscrits)) {
+                inscritUserIds = snap.inscrits.map((x) => String(x).trim()).filter(Boolean);
+            }
+            const motifRaw = String(snap.motif || '').trim();
+            if (motifRaw) {
+                dbSlotType = motifToPlanningDbSlotType(normalizeMotif(motifRaw));
+            }
+            const t = String(snap.title || '').trim();
+            if (t) title = t;
+        } catch {
+            /* baseline illisible */
+        }
+    }
+    if (!dbSlotType) dbSlotType = 'travail perso';
+    return {
+        startIso: prevSnapshot.startStr,
+        endIso: prevSnapshot.endStr,
+        title,
+        dbSlotType,
+        ownerEmail: String(ownerEmail || '').trim().toLowerCase(),
+        ownerUid: String(ownerUid || '').trim(),
+        inscritUserIds
+    };
+}
+
+/**
+ * Affiche le créneau sur la grille après enregistrement modale (sans attendre Google).
+ * @returns {import('@fullcalendar/core').EventApi | null}
+ */
+function applyModalReservationDisplayOnCalendar(calendar, currentUser, p) {
+    if (!calendar?.addEvent) return null;
+    const start = new Date(p.startIso);
+    const end = new Date(p.endIso);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+    const ownerEmail = String(p.ownerEmail || currentUser.email || '').trim().toLowerCase();
+    const inscrits = Array.isArray(p.inscritsEmails)
+        ? p.inscritsEmails.map((x) => String(x).trim().toLowerCase()).filter(Boolean)
+        : [];
+    const commonXp = {
+        planningRowSource: 'supabase',
+        planningCanonicalId: p.eventId,
+        planningGoogleSyncPending: Boolean(p.googlePending),
+        owner: ownerEmail,
+        ownerDisplayName: String(currentUser.name || ownerEmail.split('@')[0] || '').trim(),
+        ownerRole: normalizeRole(currentUser?.role) || '',
+        type: p.slotType,
+        planningDbSlotType: p.dbSlotType
+    };
+    if (inscrits.length) commonXp.inscrits = inscrits;
+
+    if (p.isCreate) {
+        return calendar.addEvent({
+            id: p.eventId,
+            title: p.title,
+            start,
+            end,
+            allDay: false,
+            extendedProps: commonXp,
+            ...fcDragResizePropsForEventStart(start, currentUser)
+        });
+    }
+    const live = p.liveEventRef;
+    if (!live) return null;
+    try {
+        if (typeof live.setDates === 'function') live.setDates(start, end);
+        if (typeof live.setProp === 'function') live.setProp('title', p.title);
+        if (typeof live.setExtendedProp === 'function') {
+            live.setExtendedProp('planningRowSource', 'supabase');
+            live.setExtendedProp('planningCanonicalId', p.eventId);
+            live.setExtendedProp('planningGoogleSyncPending', Boolean(p.googlePending));
+            live.setExtendedProp('type', p.slotType);
+            live.setExtendedProp('planningDbSlotType', p.dbSlotType);
+            live.setExtendedProp('inscrits', inscrits);
+        }
+    } catch (e) {
+        console.warn('[calendar-logic] applyModalReservationDisplayOnCalendar', e);
+    }
+    return live;
+}
+
+/**
+ * @param {{ mode: 'create' | 'edit', eventId: string, prevDb: ReturnType<typeof buildModalSavePrevDbSnapshot> | null }} ctx
+ * @param {import('@fullcalendar/core').Calendar | null} calendar
+ */
+async function rollbackModalSaveAfterGoogleFailure(ctx, calendar) {
+    const createdIds = Array.isArray(ctx.createdIds)
+        ? ctx.createdIds.map((id) => String(id).trim()).filter(Boolean)
+        : [];
+    if (createdIds.length > 0) {
+        for (const id of createdIds) {
+            await deletePlanningEventRow(id);
+        }
+        await refetchPlanningGrid(calendar);
+        return;
+    }
+    const eventId = String(ctx.eventId || '').trim();
+    if (ctx.mode === 'create') {
+        if (!eventId) return;
+        await deletePlanningEventRow(eventId);
+        try {
+            calendar?.getEventById?.(eventId)?.remove();
+        } catch {
+            /* */
+        }
+        return;
+    }
+    const prev = ctx.prevDb;
+    if (!prev) {
+        await refetchPlanningGrid(calendar);
+        return;
+    }
+    const ur = await upsertPlanningEventRow({
+        id: eventId,
+        startIso: prev.startIso,
+        endIso: prev.endIso,
+        title: prev.title,
+        dbSlotType: prev.dbSlotType,
+        ownerEmail: prev.ownerEmail,
+        ownerUserId: prev.ownerUid
+    });
+    if (!ur.ok) {
+        console.warn('[calendar-logic] rollback modale : restauration base', ur.error);
+    }
+    const enr = await replacePlanningEventEnrollment(eventId, prev.inscritUserIds || []);
+    if (!enr.ok) {
+        console.warn('[calendar-logic] rollback modale : inscriptions', enr.error);
+    }
+    await refetchPlanningGrid(calendar);
+}
+
+function showGoogleSyncRollbackToast(error) {
+    showToast(
+        `Synchronisation agenda impossible : ${error}. Modifications annulées.`,
+        'error',
+        9000
+    );
+}
+
+/**
+ * @param {import('@fullcalendar/core').Calendar | null} calendar
+ * @param {Record<string, unknown>[]} payloads
+ * @param {{ mode: 'create' | 'edit', eventId?: string, prevDb?: ReturnType<typeof buildModalSavePrevDbSnapshot> | null, createdIds?: string[] }} rollbackCtx
+ * @param {(() => void | Promise<void>) | undefined} [onSyncSuccess]
+ */
+function voidLaunchReservationGoogleSyncWithRollback(
+    calendar,
+    payloads,
+    rollbackCtx,
+    onSyncSuccess
+) {
+    const needsSync = calendarBridgeWanted() && Array.isArray(payloads) && payloads.length > 0;
+    if (!needsSync) {
+        if (rollbackCtx.eventId) clearModalEventGoogleSyncPending(calendar, rollbackCtx.eventId);
+        for (const id of rollbackCtx.createdIds || []) {
+            clearModalEventGoogleSyncPending(calendar, id);
+        }
+        if (onSyncSuccess) void Promise.resolve(onSyncSuccess());
+        return;
+    }
+    void runGoogleCalendarSyncInBackground(payloads, calendar, {
+        onSyncFailed: async (error) => {
+            await rollbackModalSaveAfterGoogleFailure(rollbackCtx, calendar);
+            showGoogleSyncRollbackToast(error);
+        },
+        onSyncSuccess: async () => {
+            if (rollbackCtx.eventId) clearModalEventGoogleSyncPending(calendar, rollbackCtx.eventId);
+            for (const id of rollbackCtx.createdIds || []) {
+                clearModalEventGoogleSyncPending(calendar, id);
+            }
+            if (onSyncSuccess) await onSyncSuccess();
+        }
+    });
+}
+
+function clearModalEventGoogleSyncPending(calendar, eventId) {
+    const id = String(eventId || '').trim();
+    if (!id || !calendar?.getEventById) return;
+    try {
+        const ev = calendar.getEventById(id);
+        if (ev && typeof ev.setExtendedProp === 'function') {
+            ev.setExtendedProp('planningGoogleSyncPending', false);
+        }
+    } catch {
+        /* */
+    }
+}
+
+/**
  * @param {Record<string, unknown>[]} eventsPayload
  * @param {import('@fullcalendar/core').Calendar | null} [calendar]
+ * @param {{ onSyncFailed?: (error: string) => void | Promise<void>, onSyncSuccess?: (sync: { ok?: boolean, skipped?: boolean }) => void | Promise<void> }} [options]
  */
-async function runGoogleCalendarSyncInBackground(eventsPayload, calendar = null) {
-    if (!calendarBridgeWanted()) return;
+async function runGoogleCalendarSyncInBackground(eventsPayload, calendar = null, options = {}) {
     const cal = calendar || slotWorkflowCalendarRef;
+    if (!calendarBridgeWanted()) {
+        if (options.onSyncSuccess) await options.onSyncSuccess({ ok: true, skipped: true });
+        return { ok: true, skipped: true };
+    }
     const steps = await buildGoogleSyncStepsFromPayload(eventsPayload);
     googleCalendarSyncInFlight += 1;
 
@@ -2979,21 +3224,30 @@ async function runGoogleCalendarSyncInBackground(eventsPayload, calendar = null)
         }, 850);
     }
 
+    /** @type {{ ok: boolean, skipped?: boolean, error?: string }} */
+    let sync = { ok: true, skipped: true };
     try {
-        const sync = await trySyncGoogleCalendar(eventsPayload);
+        sync = await trySyncGoogleCalendar(eventsPayload);
         if (advanceTimer) clearInterval(advanceTimer);
         if (!sync.ok && !sync.skipped) {
+            if (options.onSyncFailed) {
+                await options.onSyncFailed(String(sync.error || 'échec'));
+            }
             setGoogleSyncBannerMessage(`Échec synchro Google : ${sync.error || 'échec'}`);
             hideGoogleSyncBanner(5500);
         } else {
+            if (cal) await refetchPlanningGrid(cal);
+            if (options.onSyncSuccess) await options.onSyncSuccess(sync);
             hideGoogleSyncBanner(0);
         }
-        if (cal) await refetchPlanningGrid(cal);
     } catch (e) {
         if (advanceTimer) clearInterval(advanceTimer);
         console.error(e);
+        const msg = e instanceof Error ? e.message : 'erreur inattendue';
+        if (options.onSyncFailed) await options.onSyncFailed(msg);
         setGoogleSyncBannerMessage('Échec synchro Google : erreur inattendue.');
         hideGoogleSyncBanner(5500);
+        sync = { ok: false, error: msg };
     } finally {
         if (advanceTimer) clearInterval(advanceTimer);
         googleCalendarSyncInFlight = Math.max(0, googleCalendarSyncInFlight - 1);
@@ -3001,6 +3255,7 @@ async function runGoogleCalendarSyncInBackground(eventsPayload, calendar = null)
             syncSlotWorkflowBanner();
         }
     }
+    return sync;
 }
 
 /**
@@ -3296,7 +3551,7 @@ function quickReservationDisplayTitle(currentUser) {
 }
 
 /**
- * Création rapide : 1) Postgres + refetch, 2) agendas Google en arrière-plan.
+ * Création rapide : Postgres puis affichage optimiste ; synchro Google en arrière-plan (rollback si échec).
  * @param {import('@fullcalendar/core').EventApi | null} created
  * @returns {Promise<QuickPersistResult>}
  */
@@ -3392,6 +3647,7 @@ async function finalizeQuickReservationInBackground(
             }
             const enrQ = await replacePlanningEventEnrollment(ur.id, qIds);
             if (!enrQ.ok) {
+                await deletePlanningEventRow(ur.id);
                 if (created) created.remove();
                 dbToast.finish(enrQ.error || 'Inscriptions impossibles.', 'error');
                 return { ok: false, dbId: null, error: enrQ.error || 'Inscriptions impossibles.' };
@@ -3399,21 +3655,32 @@ async function finalizeQuickReservationInBackground(
         } else {
             const enrEmpty = await replacePlanningEventEnrollment(ur.id, []);
             if (!enrEmpty.ok) {
+                await deletePlanningEventRow(ur.id);
                 if (created) created.remove();
                 dbToast.finish(enrEmpty.error || 'Enregistrement impossible.', 'error');
                 return { ok: false, dbId: null, error: enrEmpty.error };
             }
         }
-        if (created && typeof created.setExtendedProp === 'function') {
-            created.setExtendedProp('planningCanonicalId', ur.id);
-            created.setExtendedProp('planningDbSlotType', liveDbSlotType);
-            created.setExtendedProp('planningRowSource', 'supabase');
-            created.setExtendedProp('planningQuickPending', false);
-        }
-        await refetchPlanningGrid(calendar);
+        const quickInscritsEmails = quickInscritsCsv
+            ? quickInscritsCsv.split(',').map((x) => String(x).trim()).filter(Boolean)
+            : [];
         if (created) created.remove();
+        applyModalReservationDisplayOnCalendar(calendar, currentUser, {
+            isCreate: true,
+            liveEventRef: null,
+            eventId: ur.id,
+            title: liveTitle,
+            startIso: liveStart.toISOString(),
+            endIso: liveEnd.toISOString(),
+            dbSlotType: liveDbSlotType,
+            slotType: motifToSlotType(motif),
+            ownerEmail: currentUser.email,
+            inscritsEmails: quickInscritsEmails,
+            googlePending: calendarBridgeWanted()
+        });
         dbToast.finish('Créneau enregistré.', 'success', 2400);
-        void runGoogleCalendarSyncInBackground(
+        voidLaunchReservationGoogleSyncWithRollback(
+            calendar,
             [
                 {
                     planningEventId: ur.id,
@@ -3425,7 +3692,7 @@ async function finalizeQuickReservationInBackground(
                     ...(quickInscritsCsv ? { inscrits: quickInscritsCsv } : {})
                 }
             ],
-            calendar
+            { mode: 'create', eventId: ur.id, prevDb: null }
         );
         return { ok: true, dbId: ur.id, error: null };
     } catch (e) {
@@ -4497,6 +4764,8 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         const bridgeType = planningDbSlotTypeToBridgeType(dbSlotType);
         /** @type {Record<string, unknown>[]} */
         const bridgeEventsDb = [];
+        /** @type {string[]} */
+        const createdIds = [];
         for (const d of days) {
             const startIso = new Date(`${d}T${tRecStart}:00`).toISOString();
             const endIso = new Date(`${d}T${tRecEnd}:00`).toISOString();
@@ -4510,11 +4779,18 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
                 ownerUserId: ownerUid
             });
             if (!ur.ok || !ur.id) {
+                for (const id of createdIds) {
+                    await deletePlanningEventRow(id);
+                }
                 showToast(ur.error || 'Enregistrement base impossible.', 'error');
                 return false;
             }
+            createdIds.push(ur.id);
             const enrollR = await syncPlanningEnrollmentAfterSave(ur.id, dbSlotType);
             if (!enrollR.ok) {
+                for (const id of createdIds) {
+                    await deletePlanningEventRow(id);
+                }
                 showToast(enrollR.error || 'Enregistrement des inscriptions impossible.', 'error');
                 return false;
             }
@@ -4535,22 +4811,21 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         document.getElementById('event-recurring').checked = false;
         resetRecurringFormDefaults();
         setRecurringOptionsVisible(false);
-        void (async () => {
-            try {
-                const syncMultiDb = await trySyncGoogleCalendar(bridgeEventsDb);
-                if (calendarBridgeWanted() && !syncMultiDb.ok && !syncMultiDb.skipped) {
-                    showToast(`Synchronisation agenda : ${syncMultiDb.error || 'échec'}`, 'error');
+        await refetchPlanningGrid(calendar);
+        if (calendarBridgeWanted()) {
+            for (const id of createdIds) {
+                try {
+                    calendar?.getEventById?.(id)?.setExtendedProp?.('planningGoogleSyncPending', true);
+                } catch {
+                    /* */
                 }
-            } catch (e) {
-                console.error(e);
-                showToast('Synchronisation agenda : erreur.', 'error');
             }
-            try {
-                await refetchPlanningGrid(calendar);
-            } catch (e) {
-                console.error(e);
-            }
-        })();
+        }
+        voidLaunchReservationGoogleSyncWithRollback(
+            calendar,
+            bridgeEventsDb,
+            { mode: 'create', eventId: createdIds[0] || '', createdIds }
+        );
         return true;
     }
 
@@ -4704,6 +4979,9 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     }
     const enrollSync = await syncPlanningEnrollmentAfterSave(ur.id, dbSlotType);
     if (!enrollSync.ok) {
+        if (!canonicalExisting && !liveEventRef) {
+            await deletePlanningEventRow(ur.id);
+        }
         showToast(enrollSync.error || 'Enregistrement des inscriptions impossible.', 'error');
         return false;
     }
@@ -4725,96 +5003,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         ...(poolLinkExisting ? { poolGoogleEventId: poolLinkExisting } : {}),
         ...(enrollSync.emailsCsv ? { inscrits: enrollSync.emailsCsv } : {})
     };
-    if (!reservationAutoSaveMode) {
-        document.getElementById('modal_reservation').close();
-    }
-    /** @type {ReturnType<typeof showPersistentToast> | null} */
-    let updateProgressToast = null;
-    if (!reservationAutoSaveMode) {
-        if (liveEventRef) {
-            updateProgressToast = showPersistentToast('Mise à jour…', 'info');
-        } else {
-            showToast('Réservation enregistrée.');
-        }
-    }
-    if (liveEventRef) {
-        const localInscritsEmails =
-            dbSlotType === 'cours'
-                ? getReservationInscritsSelection()
-                      .emailsCsv.split(',')
-                      .map((x) => String(x).trim())
-                      .filter(Boolean)
-                : [];
-        try {
-            if (typeof liveEventRef.setDates === 'function') {
-                liveEventRef.setDates(new Date(startStr), new Date(endStr));
-            }
-        } catch (e) {
-            console.warn('[calendar-logic] setDates après sauvegarde modale', e);
-        }
-        if (typeof liveEventRef.setProp === 'function') {
-            liveEventRef.setProp('title', title);
-        }
-        if (typeof liveEventRef.setExtendedProp === 'function') {
-            liveEventRef.setExtendedProp('type', slotType);
-            liveEventRef.setExtendedProp('planningDbSlotType', dbSlotType);
-            liveEventRef.setExtendedProp('inscrits', localInscritsEmails);
-        }
-    }
-    refreshReservationModalEventRef(
-        calendar,
-        liveEventRef || eventRef,
-        ur.id || canonicalExisting || staleCanonicalId
-    );
-    const oiBeforeRefetch =
-        liveEventRef && prevSnapshot ? ownerInfoFromEvent(liveEventRef, currentUser) : null;
-    if (prevSnapshot && oiBeforeRefetch) {
-        const changed =
-            prevSnapshot.title !== title ||
-            prevSnapshot.startStr !== startIso ||
-            prevSnapshot.endStr !== endIso ||
-            prevSnapshot.type !== slotType;
-        const actor = String(currentUser.email).trim().toLowerCase();
-        const ownerLower = String(ownerForBridge || '').trim().toLowerCase();
-        if (changed && ownerLower && ownerLower !== actor) {
-            notifySlotOwnerAfterThirdPartyEditNonBlocking({
-                currentUser,
-                action: 'modified',
-                targetOwnerEmail: oiBeforeRefetch.ownerEmail,
-                targetOwnerDisplayName: oiBeforeRefetch.ownerName,
-                targetOwnerUserId: oiBeforeRefetch.ownerUserId,
-                slotTitle: title,
-                slotStart: startIso,
-                slotEnd: endIso,
-                previousStartIso: prevSnapshot.startStr,
-                previousEndIso: prevSnapshot.endStr
-            });
-        }
-        if (changed && dbSlotType === 'cours' && inscritsEmailsForNotify.length) {
-            notifyEnrolledStudentsOnCoursEditNonBlocking({
-                currentUser,
-                slotTitle: title,
-                slotStart: startIso,
-                slotEnd: endIso,
-                previousStartIso: prevSnapshot.startStr,
-                previousEndIso: prevSnapshot.endStr,
-                inscritEmails: inscritsEmailsForNotify,
-                ownerEmail: ownerForBridge
-            });
-        }
-    }
-    try {
-        await refetchPlanningGrid(calendar);
-        refreshReservationModalEventRef(
-            calendar,
-            reservationModalEventRef,
-            ur.id || canonicalExisting || staleCanonicalId
-        );
-    } catch (e) {
-        console.error(e);
-    } finally {
-        updateProgressToast?.finish('Réservation mise à jour.', 'success');
-    }
+
     let googlePayloadUnchanged =
         Boolean(prevSnapshot) &&
         prevSnapshot.title === title &&
@@ -4838,9 +5027,105 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
             googlePayloadUnchanged = false;
         }
     }
-    if (!googlePayloadUnchanged) {
-        void runGoogleCalendarSyncInBackground([payloadDb], calendar);
+
+    const isModalCreate = !liveEventRef;
+    const modalSaveMode = isModalCreate ? 'create' : 'edit';
+    const ownerEmailNorm = String(slotOwnerEmail || currentUser.email || '').trim().toLowerCase();
+    const prevDbForRollback = liveEventRef
+        ? buildModalSavePrevDbSnapshot(
+              prevSnapshot,
+              reservationModalFormBaseline,
+              liveEventRef,
+              ownerEmailNorm,
+              ownerUid
+          )
+        : null;
+    const needsGoogleSync = !googlePayloadUnchanged && calendarBridgeWanted();
+
+    if (!reservationAutoSaveMode) {
+        document.getElementById('modal_reservation').close();
     }
+    if (!reservationAutoSaveMode && isModalCreate) {
+        showToast('Réservation enregistrée.');
+    }
+
+    const localInscritsEmails =
+        dbSlotType === 'cours'
+            ? getReservationInscritsSelection()
+                  .emailsCsv.split(',')
+                  .map((x) => String(x).trim())
+                  .filter(Boolean)
+            : [];
+
+    applyModalReservationDisplayOnCalendar(calendar, currentUser, {
+        isCreate: isModalCreate,
+        liveEventRef,
+        eventId: ur.id,
+        title,
+        startIso,
+        endIso,
+        dbSlotType,
+        slotType,
+        ownerEmail: ownerEmailNorm,
+        inscritsEmails: localInscritsEmails,
+        googlePending: needsGoogleSync
+    });
+
+    refreshReservationModalEventRef(calendar, liveEventRef || eventRef, ur.id);
+    reservationModalFormBaseline = null;
+    reservationModalEventPropsBaseline = null;
+
+    const oiBeforeNotify =
+        liveEventRef && prevSnapshot ? ownerInfoFromEvent(liveEventRef, currentUser) : null;
+    const runModalSaveNotifications = () => {
+        if (!prevSnapshot || !oiBeforeNotify) return;
+        const changed =
+            prevSnapshot.title !== title ||
+            prevSnapshot.startStr !== startIso ||
+            prevSnapshot.endStr !== endIso;
+        const actor = String(currentUser.email).trim().toLowerCase();
+        const ownerLower = String(ownerForBridge || '').trim().toLowerCase();
+        if (changed && ownerLower && ownerLower !== actor) {
+            notifySlotOwnerAfterThirdPartyEditNonBlocking({
+                currentUser,
+                action: 'modified',
+                targetOwnerEmail: oiBeforeNotify.ownerEmail,
+                targetOwnerDisplayName: oiBeforeNotify.ownerName,
+                targetOwnerUserId: oiBeforeNotify.ownerUserId,
+                slotTitle: title,
+                slotStart: startIso,
+                slotEnd: endIso,
+                previousStartIso: prevSnapshot.startStr,
+                previousEndIso: prevSnapshot.endStr
+            });
+        }
+        if (changed && dbSlotType === 'cours' && inscritsEmailsForNotify.length) {
+            notifyEnrolledStudentsOnCoursEditNonBlocking({
+                currentUser,
+                slotTitle: title,
+                slotStart: startIso,
+                slotEnd: endIso,
+                previousStartIso: prevSnapshot.startStr,
+                previousEndIso: prevSnapshot.endStr,
+                inscritEmails: inscritsEmailsForNotify,
+                ownerEmail: ownerForBridge
+            });
+        }
+    };
+
+    const rollbackCtx = {
+        mode: /** @type {'create' | 'edit'} */ (modalSaveMode),
+        eventId: ur.id,
+        prevDb: prevDbForRollback
+    };
+
+    voidLaunchReservationGoogleSyncWithRollback(
+        calendar,
+        needsGoogleSync ? [payloadDb] : [],
+        rollbackCtx,
+        runModalSaveNotifications
+    );
+
     return true;
     } finally {
         saveReservationInFlight = false;

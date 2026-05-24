@@ -367,54 +367,56 @@ function initCalendarAndRevealUi() {
                 return;
             }
             const prevSnap = seriesPrevSnapshotFromEvent(info.oldEvent);
+            const runDropNotifications = () => {
+                const oi = ownerInfoFromEvent(info.event, currentUser);
+                const me = String(currentUser?.email ?? '')
+                    .trim()
+                    .toLowerCase();
+                if (
+                    oi.ownerEmail &&
+                    oi.ownerEmail !== me &&
+                    info.oldEvent?.start &&
+                    info.oldEvent?.end
+                ) {
+                    void maybeNotifySlotOwnerAfterThirdPartyEdit({
+                        currentUser,
+                        action: 'moved',
+                        targetOwnerEmail: oi.ownerEmail,
+                        targetOwnerDisplayName: oi.ownerName,
+                        targetOwnerUserId: oi.ownerUserId,
+                        slotTitle: info.event.title,
+                        slotStart: info.event.start,
+                        slotEnd: info.event.end,
+                        previousStartIso: info.oldEvent.start.toISOString(),
+                        previousEndIso: info.oldEvent.end.toISOString()
+                    }).catch((err) => console.warn('[slot-notify] drop non bloquant', err));
+                }
+                const prevTitle = String(info.oldEvent?.title || '').trim();
+                const rangeChangedDrop =
+                    Boolean(info.oldEvent?.start && info.oldEvent?.end && info.event.start && info.event.end) &&
+                    (info.oldEvent.start.toISOString() !== info.event.start.toISOString() ||
+                        info.oldEvent.end.toISOString() !== info.event.end.toISOString() ||
+                        prevTitle !== String(info.event.title || '').trim());
+                if (rangeChangedDrop) {
+                    notifyEnrolledStudentsAfterCoursChangeNonBlocking(currentUser, info.event, {
+                        title: prevTitle,
+                        startStr: info.oldEvent.start.toISOString(),
+                        endStr: info.oldEvent.end.toISOString()
+                    });
+                }
+            };
             const sync = await syncReservationEventToGoogle(
                 info.event,
                 info.view.calendar,
                 currentUser,
-                prevSnap
+                prevSnap,
+                { onGoogleSyncSuccess: runDropNotifications }
             );
             if (!sync.ok) {
                 info.revert();
                 return;
             }
             applyDragResizePropsToFcEvent(info.event, currentUser);
-            const oi = ownerInfoFromEvent(info.event, currentUser);
-            const me = String(currentUser?.email ?? '')
-                .trim()
-                .toLowerCase();
-            if (
-                oi.ownerEmail &&
-                oi.ownerEmail !== me &&
-                info.oldEvent?.start &&
-                info.oldEvent?.end
-            ) {
-                void maybeNotifySlotOwnerAfterThirdPartyEdit({
-                    currentUser,
-                    action: 'moved',
-                    targetOwnerEmail: oi.ownerEmail,
-                    targetOwnerDisplayName: oi.ownerName,
-                    targetOwnerUserId: oi.ownerUserId,
-                    slotTitle: info.event.title,
-                    slotStart: info.event.start,
-                    slotEnd: info.event.end,
-                    previousStartIso: info.oldEvent.start.toISOString(),
-                    previousEndIso: info.oldEvent.end.toISOString()
-                }).catch((err) => console.warn('[slot-notify] drop non bloquant', err));
-            }
-            const prevTitle = String(info.oldEvent?.title || '').trim();
-            const rangeChangedDrop =
-                Boolean(info.oldEvent?.start && info.oldEvent?.end && info.event.start && info.event.end) &&
-                (info.oldEvent.start.toISOString() !== info.event.start.toISOString() ||
-                    info.oldEvent.end.toISOString() !== info.event.end.toISOString() ||
-                    prevTitle !== String(info.event.title || '').trim());
-            if (rangeChangedDrop) {
-                notifyEnrolledStudentsAfterCoursChangeNonBlocking(currentUser, info.event, {
-                    title: prevTitle,
-                    startStr: info.oldEvent.start.toISOString(),
-                    endStr: info.oldEvent.end.toISOString()
-                });
-            }
-            await refetchPlanningGrid(info.view.calendar);
         },
         onEventResize: (info) => {
             if (!canCurrentUserEditEvent(currentUser, info.event)) {
