@@ -3,7 +3,10 @@
  */
 import { getPlanningConfig, getSupabaseClient, isBackendAuthConfigured } from './supabase-client.js';
 import { getPlanningSessionUser } from './session-user.js';
-import { googleCalendarEmbedUrl, googleCalendarSubscribeUrl } from '../utils/google-calendar-url.js';
+import {
+    googleCalendarEmbedUrl,
+    googleCalendarSubscribeUrlPreferred
+} from '../utils/google-calendar-url.js';
 import { showToast } from '../utils/toast.js';
 import {
     appendEleveGabaritCoursCard,
@@ -20,8 +23,14 @@ import { fetchPlanningEventsForFullCalendar } from './planning-events-db.js';
 const AGENDA_LABEL_MAIN = 'Orgue IAMS - global';
 const AGENDA_LABEL_PERSONAL = 'Orgue IAMS - Mes créneaux';
 
-const AGENDA_HELP =
-    'Ajoutez chaque calendrier avec le bouton dédié (un à la fois, pour éviter le blocage des fenêtres sur mobile). Dans Google Agenda, vous pouvez renommer l’agenda après ajout. « Copier l’URL » sert à une intégration lecture seule.';
+const AGENDA_HELP_BASE =
+    'Ajoutez chaque calendrier avec le bouton dédié (un à la fois). « Copier l’URL » sert à une intégration lecture seule dans un site.';
+
+const AGENDA_HELP_SUBSCRIBE =
+    'Global : abonnement par URL iCal (orgue.iams@gmail.com dans l’adresse, pas le code « b3JndWU… »). Mes créneaux : lien Google natif (Planning IAMS …). Après ajout, cochez l’agenda dans le menu Google Agenda (☰) → Autres agendas — renommable ensuite.';
+
+const AGENDA_HELP_COLORS =
+    'Couleurs : sur un agenda IAMS abonné (lecture seule), Google Agenda affiche souvent une seule couleur d’agenda (ex. violet), pas les couleurs par type comme sur votre agenda perso nicolas.marestin@… Les couleurs par type restent visibles dans l’app Planning et sur calendar.google.com pour le compte orgue.iams.';
 
 let nextCoursRefreshGen = 0;
 
@@ -79,7 +88,7 @@ async function copyText(text) {
 }
 
 /** Un seul geste utilisateur = une navigation (évite le blocage popup sur mobile). */
-function openGoogleCalendarSubscribe(url, label) {
+function openGoogleCalendarSubscribe(url, label, { isMain = false } = {}) {
     if (!url) return;
     const a = document.createElement('a');
     a.href = url;
@@ -89,16 +98,19 @@ function openGoogleCalendarSubscribe(url, label) {
     document.body.appendChild(a);
     a.click();
     a.remove();
-    showToast(`Si besoin, validez l’ajout de « ${label} » dans Google Agenda.`, 'info', 7000);
+    const afterAdd = isMain
+        ? ' Validez l’URL iCal (orgue.iams@gmail.com), puis cochez l’agenda dans Autres agendas (menu ☰).'
+        : ' Validez l’ajout, puis cochez « Planning IAMS … » dans Autres agendas (menu ☰).';
+    showToast(`« ${label} » :${afterAdd}`, 'info', 10000);
 }
 
-function bindAgendaSubscribeBtn(btnId, url, label) {
+function bindAgendaSubscribeBtn(btnId, url, label, opts = {}) {
     const btn = document.getElementById(btnId);
     if (!(btn instanceof HTMLButtonElement)) return;
     const hasUrl = Boolean(url);
     btn.classList.toggle('hidden', !hasUrl);
     btn.disabled = !hasUrl;
-    btn.onclick = () => openGoogleCalendarSubscribe(url, label);
+    btn.onclick = () => openGoogleCalendarSubscribe(url, label, opts);
 }
 
 function bindAgendaCopyBtn(btnId, url) {
@@ -110,10 +122,14 @@ function bindAgendaCopyBtn(btnId, url) {
     btn.onclick = () => void copyText(url);
 }
 
+function buildAgendaHelpText() {
+    return [AGENDA_HELP_BASE, AGENDA_HELP_SUBSCRIBE, AGENDA_HELP_COLORS].join(' ');
+}
+
 function showAgendaHelpAlways() {
     const help = document.getElementById('drawer-agenda-help-text');
     if (help) {
-        help.textContent = AGENDA_HELP;
+        help.textContent = buildAgendaHelpText();
         help.classList.remove('hidden');
     }
 }
@@ -149,11 +165,11 @@ export async function refreshDrawerAgendas(user) {
         persNone?.classList.remove('hidden');
     }
 
-    const mainSub = googleCalendarSubscribeUrl(mainGoogleCalendarId);
-    const persSub = googleCalendarSubscribeUrl(persId);
+    const mainSub = googleCalendarSubscribeUrlPreferred(mainGoogleCalendarId);
+    const persSub = googleCalendarSubscribeUrlPreferred(persId);
     const subWrap = document.getElementById('drawer-agenda-subscribe-wrap');
     subWrap?.classList.toggle('hidden', !mainSub && !persSub);
-    bindAgendaSubscribeBtn('drawer-agenda-subscribe-main-btn', mainSub, AGENDA_LABEL_MAIN);
+    bindAgendaSubscribeBtn('drawer-agenda-subscribe-main-btn', mainSub, AGENDA_LABEL_MAIN, { isMain: true });
     bindAgendaSubscribeBtn('drawer-agenda-subscribe-personal-btn', persSub, AGENDA_LABEL_PERSONAL);
 }
 

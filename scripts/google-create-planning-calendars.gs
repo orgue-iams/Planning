@@ -217,6 +217,20 @@ function makeAllPlanningIamsCalendarsPublicReader() {
   }
 }
 
+/**
+ * Rend public en lecture l’agenda principal orgue.iams (calendrier par défaut du compte).
+ * Nécessaire pour l’abonnement « Orgue IAMS - global » depuis le profil Planning (lien iCal / cid).
+ * À exécuter une fois sur script.google.com connecté en orgue.iams@…
+ */
+function makeMainOrgCalendarPublicReader() {
+  var cal = CalendarApp.getDefaultCalendar();
+  if (!cal) {
+    throw new Error('Calendrier par défaut introuvable pour le compte courant.');
+  }
+  insertPublicReaderAcl_(cal.getId(), String(cal.getName() || 'Agenda principal'));
+  Logger.log('Agenda principal public : ' + cal.getId());
+}
+
 function createPlanningSecondaryCalendars() {
   if (END_NUM < START_NUM) {
     throw new Error('END_NUM doit être >= START_NUM');
