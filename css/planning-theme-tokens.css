@@ -620,13 +620,6 @@ dialog.modal .btn.btn-warning:not(.btn-ghost) {
     word-break: break-word;
 }
 
-/* Petites capitales : menu tiroir + cartes annuaire uniquement */
-.planning-drawer__profile-name,
-.directory-user-card__name {
-    font-variant-caps: small-caps;
-    letter-spacing: 0.03em;
-}
-
 /* Annuaire : prénom + nom visibles (retour à la ligne si besoin) */
 .directory-user-card__name {
     display: block;

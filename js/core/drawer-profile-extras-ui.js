@@ -414,6 +414,7 @@ export async function refreshDrawerNextCours(user) {
             .toLowerCase()
     };
 
+    const plannedCards = [];
     for (const line of enrollments) {
         const nextEv = findNextEventForTemplateLine(upcoming, line, {
             ...matchCtx,
@@ -440,8 +441,9 @@ export async function refreshDrawerNextCours(user) {
             colorClass = getPlanningEventColorClass(nextEv, user);
         }
 
-        appendEleveGabaritCoursCard(gabaritHost, {
-            dayOfWeek: line.day_of_week,
+        plannedCards.push({
+            sortTs: nextEv?.start ? new Date(String(nextEv.start)).getTime() : Number.POSITIVE_INFINITY,
+            dayOfWeek: Number(line.day_of_week) || 0,
             startTime,
             endTime,
             dateSubline,
@@ -453,6 +455,29 @@ export async function refreshDrawerNextCours(user) {
             ownerNom: line.ownerNom,
             ownerUserId,
             planningColorClass: colorClass
+        });
+    }
+
+    plannedCards.sort((a, b) => {
+        if (a.sortTs !== b.sortTs) return a.sortTs - b.sortTs;
+        if (a.dayOfWeek !== b.dayOfWeek) return a.dayOfWeek - b.dayOfWeek;
+        return String(a.startTime || '').localeCompare(String(b.startTime || ''));
+    });
+
+    for (const card of plannedCards) {
+        appendEleveGabaritCoursCard(gabaritHost, {
+            dayOfWeek: card.dayOfWeek,
+            startTime: card.startTime,
+            endTime: card.endTime,
+            dateSubline: card.dateSubline,
+            title: card.title,
+            slotType: card.slotType,
+            studentsLine: card.studentsLine,
+            ownerLabel: card.ownerLabel,
+            ownerPrenom: card.ownerPrenom,
+            ownerNom: card.ownerNom,
+            ownerUserId: card.ownerUserId,
+            planningColorClass: card.planningColorClass
         });
     }
 

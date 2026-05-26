@@ -357,12 +357,16 @@ function setReservationModalMutationLock(locked) {
 }
 
 /**
- * Supprime les doublons visuels (même planningCanonicalId ou même id FC).
+ * Supprime les doublons visuels.
+ * Priorité :
+ * - même `planningCanonicalId`
+ * - sinon même signature logique (propriétaire + plage + titre + type), utile
+ *   quand un créneau optimiste coexiste brièvement avec sa ligne chargée depuis la base.
  * Garde l’événement « source base » plutôt que le miroir optimiste en attente.
  * @param {import('@fullcalendar/core').Calendar | null} calendar
  * @param {string} [preferCanonicalId]
  */
-function dedupePlanningEventsByCanonicalId(calendar, preferCanonicalId = '') {
+export function dedupePlanningEventsByCanonicalId(calendar, preferCanonicalId = '') {
     if (!calendar?.getEvents) return;
     const prefer = String(preferCanonicalId || '').trim();
     /** @type {Map<string, import('@fullcalendar/core').EventApi[]>} */
@@ -371,7 +375,28 @@ function dedupePlanningEventsByCanonicalId(calendar, preferCanonicalId = '') {
         if (ev.display === 'background') continue;
         const canon = String(ev.extendedProps?.planningCanonicalId || '').trim();
         const fcId = String(ev.id ?? '').trim();
-        const key = canon || (String(ev.extendedProps?.planningRowSource || '') === 'supabase' ? fcId : '');
+        const owner = String(ev.extendedProps?.owner || '')
+            .trim()
+            .toLowerCase();
+        const startIso =
+            ev.start instanceof Date && !Number.isNaN(ev.start.getTime()) ? ev.start.toISOString() : '';
+        const endIso =
+            ev.end instanceof Date && !Number.isNaN(ev.end.getTime()) ? ev.end.toISOString() : '';
+        const title = String(ev.title || '').trim().toLowerCase();
+        const dbType = String(
+            ev.extendedProps?.planningDbSlotType || ev.extendedProps?.type || ''
+        )
+            .trim()
+            .toLowerCase();
+        const allDay = ev.allDay ? 'all-day' : 'timed';
+        const logicalKey =
+            owner && startIso && endIso
+                ? `${owner}|${startIso}|${endIso}|${title}|${dbType}|${allDay}`
+                : '';
+        const key =
+            canon ||
+            logicalKey ||
+            (String(ev.extendedProps?.planningRowSource || '') === 'supabase' ? fcId : '');
         if (!key) continue;
         const list = groups.get(key) || [];
         list.push(ev);
@@ -1649,7 +1674,7 @@ async function applyGeneratedSeriesScopeIfNeeded(p) {
         !isPrivilegedUser(currentUser) ||
         !prevSnapshot
     ) {
-        return { action: 'continue', detachTemplateLink: false };
+        return { action: 'continue', detachTemplateLink: false, detachSeriesLink: false };
     }
     const prevDbType = String(liveEventRef?.extendedProps?.planningDbSlotType || '').trim().toLowerCase();
     const titleTrim = String(title || '').trim();
@@ -1658,23 +1683,27 @@ async function applyGeneratedSeriesScopeIfNeeded(p) {
         prevSnapshot.startStr !== startIso ||
         prevSnapshot.endStr !== endIso ||
         prevDbType !== String(dbSlotType || '').trim().toLowerCase();
-    if (!changed) return { action: 'continue', detachTemplateLink: false };
+    if (!changed) return { action: 'continue', detachTemplateLink: false, detachSeriesLink: false };
 
     const [series] = await fetchPlanningEventSeriesByIds([seriesId]);
-    if (!series?.id) return { action: 'continue', detachTemplateLink: false };
+    if (!series?.id) {
+        return { action: 'continue', detachTemplateLink: false, detachSeriesLink: false };
+    }
     const seriesExceptionMap = await fetchPlanningSeriesExceptionsBySeriesIds([series.id]);
     const existingSeriesExceptions = seriesExceptionMap.get(series.id) || [];
     const scope = await openCoursSeriesScopeModal();
     if (scope === null) return 'cancelled';
     if (scope === 'single') {
-        return { action: 'continue', detachTemplateLink: false };
+        return { action: 'continue', detachTemplateLink: false, detachSeriesLink: true };
     }
 
     const rows = await fetchPlanningRowsForSeries(series);
-    if (!rows.length) return { action: 'continue', detachTemplateLink: false };
+    if (!rows.length) return { action: 'continue', detachTemplateLink: false, detachSeriesLink: false };
     const currentIndex = rows.findIndex((row) => String(row.id || '').trim() === canonicalExisting);
     const currentRow = currentIndex >= 0 ? rows[currentIndex] : null;
-    if (!currentRow) return { action: 'continue', detachTemplateLink: false };
+    if (!currentRow) {
+        return { action: 'continue', detachTemplateLink: false, detachSeriesLink: false };
+    }
 
     const ownerEmail = String(slotOwnerEmail || currentUser.email || '').trim().toLowerCase();
     const occurrenceLimit = series.occurrenceLimit;
@@ -1849,7 +1878,7 @@ async function maybeApplyCoursSeriesScopeBeforePersist(p) {
         !isPrivilegedUser(currentUser) ||
         !prevSnapshot
     ) {
-        return { action: 'continue', detachTemplateLink: false };
+        return { action: 'continue', detachTemplateLink: false, detachSeriesLink: false };
     }
 
     const titleTrim = String(title || '').trim();
@@ -1860,7 +1889,7 @@ async function maybeApplyCoursSeriesScopeBeforePersist(p) {
         prevSnapshot.endStr !== endIso;
 
     if (!timeOrTitleChanged) {
-        return { action: 'continue', detachTemplateLink: false };
+        return { action: 'continue', detachTemplateLink: false, detachSeriesLink: false };
     }
 
     const scope = await openCoursSeriesScopeModal();
@@ -1886,7 +1915,7 @@ async function maybeApplyCoursSeriesScopeBeforePersist(p) {
         });
         return seriesDone ? 'handled' : 'cancelled';
     }
-    return { action: 'continue', detachTemplateLink: true };
+    return { action: 'continue', detachTemplateLink: true, detachSeriesLink: false };
 }
 
 /**
@@ -1968,6 +1997,7 @@ export async function syncReservationEventToGoogle(
     }
 
     let detachTemplateLink = false;
+    let detachSeriesLink = false;
     if (currentUser && previousSnapshot) {
         const liveRef = calendar ? resolveLivePlanningEventRef(calendar, calendarEvent) : calendarEvent;
         const seriesResult = await maybeApplyCoursSeriesScopeBeforePersist({
@@ -1993,6 +2023,7 @@ export async function syncReservationEventToGoogle(
         if (seriesResult === 'handled') return { ok: true, skipped: false };
         if (seriesResult?.action === 'continue') {
             detachTemplateLink = Boolean(seriesResult.detachTemplateLink);
+            detachSeriesLink = Boolean(seriesResult.detachSeriesLink);
         }
     }
 
@@ -2021,7 +2052,8 @@ export async function syncReservationEventToGoogle(
         dbSlotType,
         ownerEmail: owner,
         ownerUserId: ownerUid,
-        ...(detachTemplateLink ? { sourceTemplateLineId: null } : {})
+        ...(detachTemplateLink ? { sourceTemplateLineId: null } : {}),
+        ...(detachSeriesLink ? { seriesId: null, seriesPosition: null } : {})
     });
     if (!ur.ok || !ur.id) {
         showToast(ur.error || 'Enregistrement base impossible.', 'error');
@@ -2029,6 +2061,10 @@ export async function syncReservationEventToGoogle(
     }
     if (detachTemplateLink && typeof calendarEvent.setExtendedProp === 'function') {
         calendarEvent.setExtendedProp('planningSourceTemplateLineId', '');
+    }
+    if (detachSeriesLink && typeof calendarEvent.setExtendedProp === 'function') {
+        calendarEvent.setExtendedProp('planningSeriesId', '');
+        calendarEvent.setExtendedProp('planningSeriesPosition', null);
     }
 
     const bridgeType = planningDbSlotTypeToBridgeType(dbSlotType);
@@ -2065,6 +2101,9 @@ export async function syncReservationEventToGoogle(
         },
         callbacks.onGoogleSyncSuccess
     );
+    if (calendar) {
+        await refetchPlanningGrid(calendar);
+    }
     return { ok: true, skipped: false };
 }
 
@@ -3442,13 +3481,13 @@ const GOOGLE_SYNC_MAIN_LABEL = 'Calendrier principal orgue IAMS';
 function formatGoogleSyncBannerLine(calendarLabel) {
     const raw = String(calendarLabel || '').trim();
     if (!raw || raw === GOOGLE_SYNC_MAIN_LABEL) {
-        return `Synchro agendas Google : '${GOOGLE_SYNC_MAIN_LABEL}'`;
+        return GOOGLE_SYNC_MAIN_LABEL;
     }
     const paren = raw.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
     if (paren) {
-        return `Synchro agendas Google : '${paren[1].trim()}' - ${paren[2].trim()}`;
+        return `${paren[1].trim()} - ${paren[2].trim()}`;
     }
-    return `Synchro agendas Google : '${raw}'`;
+    return raw;
 }
 
 /**
@@ -3458,9 +3497,8 @@ function formatGoogleSyncBannerLine(calendarLabel) {
  */
 function googleSyncInProgressMessage(stepIndex, total, calendarLabel) {
     const line = formatGoogleSyncBannerLine(calendarLabel);
-    if (total <= 1) return line;
-    const pct = Math.min(100, Math.max(0, Math.round(((stepIndex + 1) / total) * 100)));
-    return `${line} — ${pct}%`;
+    if (total <= 1) return `Synchronisation Google en cours : ${line}`;
+    return `Synchronisation Google en cours (${stepIndex + 1}/${total}) : ${line}`;
 }
 
 function formatPoolCalendarLabel(meta) {
@@ -3749,7 +3787,16 @@ function buildModalSavePrevDbSnapshot(
         dbSlotType,
         ownerEmail: String(ownerEmail || '').trim().toLowerCase(),
         ownerUid: String(ownerUid || '').trim(),
-        inscritUserIds
+        inscritUserIds,
+        sourceTemplateLineId: String(
+            liveEventRef?.extendedProps?.planningSourceTemplateLineId || ''
+        ).trim() || null,
+        seriesId: String(liveEventRef?.extendedProps?.planningSeriesId || '').trim() || null,
+        seriesPosition:
+            Number.isFinite(Number(liveEventRef?.extendedProps?.planningSeriesPosition)) &&
+            Number(liveEventRef?.extendedProps?.planningSeriesPosition) >= 1
+                ? Number(liveEventRef.extendedProps.planningSeriesPosition)
+                : null
     };
 }
 
@@ -3899,7 +3946,10 @@ async function rollbackModalSaveAfterGoogleFailure(ctx, calendar) {
         title: prev.title,
         dbSlotType: prev.dbSlotType,
         ownerEmail: prev.ownerEmail,
-        ownerUserId: prev.ownerUid
+        ownerUserId: prev.ownerUid,
+        sourceTemplateLineId: prev.sourceTemplateLineId ?? undefined,
+        seriesId: prev.seriesId ?? undefined,
+        seriesPosition: prev.seriesPosition ?? undefined
     });
     if (!ur.ok) {
         console.warn('[calendar-logic] rollback modale : restauration base', ur.error);
@@ -4886,13 +4936,11 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
             },
             { signal: modalSignal }
         );
-        const onTimeFieldChange = () => {
+        const onStartFieldChange = () => {
             syncReservationModalTimeOptions(calendarForClip, reservationModalEventRef);
         };
-        startEl?.addEventListener('change', onTimeFieldChange, { signal: modalSignal });
-        startEl?.addEventListener('input', onTimeFieldChange, { signal: modalSignal });
-        endEl?.addEventListener('change', onTimeFieldChange, { signal: modalSignal });
-        endEl?.addEventListener('input', onTimeFieldChange, { signal: modalSignal });
+        startEl?.addEventListener('change', onStartFieldChange, { signal: modalSignal });
+        startEl?.addEventListener('input', onStartFieldChange, { signal: modalSignal });
     } else {
         dateEl?.addEventListener(
             'change',
@@ -5920,6 +5968,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     }
 
     let detachTemplateLink = false;
+    let detachSeriesLink = false;
     if (liveEventRef && canonicalExisting && prevSnapshot) {
         const seriesResult = await maybeApplyCoursSeriesScopeBeforePersist({
             calendar,
@@ -5944,6 +5993,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         if (seriesResult === 'handled') return true;
         if (seriesResult?.action === 'continue') {
             detachTemplateLink = Boolean(seriesResult.detachTemplateLink);
+            detachSeriesLink = Boolean(seriesResult.detachSeriesLink);
         }
     }
 
@@ -5955,7 +6005,8 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         dbSlotType,
         ownerEmail: slotOwnerEmail || currentUser.email,
         ownerUserId: ownerUid,
-        ...(detachTemplateLink ? { sourceTemplateLineId: null } : {})
+        ...(detachTemplateLink ? { sourceTemplateLineId: null } : {}),
+        ...(detachSeriesLink ? { seriesId: null, seriesPosition: null } : {})
     });
     if (!ur.ok || !ur.id) {
         showToast(ur.error || 'Enregistrement base impossible.', 'error');
@@ -5963,6 +6014,10 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     }
     if (detachTemplateLink && liveEventRef && typeof liveEventRef.setExtendedProp === 'function') {
         liveEventRef.setExtendedProp('planningSourceTemplateLineId', '');
+    }
+    if (detachSeriesLink && liveEventRef && typeof liveEventRef.setExtendedProp === 'function') {
+        liveEventRef.setExtendedProp('planningSeriesId', '');
+        liveEventRef.setExtendedProp('planningSeriesPosition', null);
     }
     const enrollSync = await syncPlanningEnrollmentAfterSave(ur.id, dbSlotType);
     if (!enrollSync.ok) {
@@ -6113,6 +6168,9 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         rollbackCtx,
         runModalSaveNotifications
     );
+    if (calendar) {
+        await refetchPlanningGrid(calendar);
+    }
 
     return true;
     } finally {

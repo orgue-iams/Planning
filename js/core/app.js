@@ -39,6 +39,7 @@ import {
     notifyEnrolledStudentsAfterCoursChangeNonBlocking,
     ownerInfoFromEvent,
     refetchPlanningGrid,
+    dedupePlanningEventsByCanonicalId,
     isReservationMutationInFlight,
     reservationModalMayCloseNow,
     isReservationModalDirty,
@@ -225,6 +226,7 @@ function syncCalendarDefaultSlotDataset(user) {
 function refreshHeaderUser(user) {
     const drawerName = document.getElementById('drawer-profile-name');
     const drawerRole = document.getElementById('drawer-profile-role');
+    const drawerUsersTitle = document.getElementById('menu-drawer-section-users-courses-title');
     const shell = document.getElementById('app-shell');
     syncCalendarDefaultSlotDataset(user);
     if (!user?.email) {
@@ -237,6 +239,7 @@ function refreshHeaderUser(user) {
         document.getElementById('menu-item-semaines-types-wrap')?.classList.add('hidden');
         syncFermeturesMenuVisibility(null);
         document.getElementById('menu-item-statistics-wrap')?.classList.add('hidden');
+        if (drawerUsersTitle) drawerUsersTitle.textContent = 'Utilisateurs / Cours';
         shell?.classList.remove('planning-shell--weekstrip');
         document.getElementById('btn-admin-clear-week')?.classList.add('hidden');
         syncPlanningDrawerGroupedSections();
@@ -251,6 +254,7 @@ function refreshHeaderUser(user) {
     }
     const r = String(user.role || '').toLowerCase();
     const staff = isBackendAuthConfigured() && (r === 'prof' || r === 'admin');
+    if (drawerUsersTitle) drawerUsersTitle.textContent = r === 'eleve' ? 'Utilisateurs' : 'Utilisateurs / Cours';
     document.getElementById('menu-item-display-prefs-wrap')?.classList.remove('hidden');
     document.getElementById('menu-item-profile-wrap')?.classList.remove('hidden');
     document.getElementById('menu-item-logout-wrap')?.classList.remove('hidden');
@@ -463,6 +467,7 @@ function initCalendarAndRevealUi() {
             applyPlanningPortraitSlotFit(calendarEl);
         };
         handlers.onEventsSet = () => {
+            dedupePlanningEventsByCanonicalId(calendar);
             updatePlanningSundayColumnVisibility(calendar, getPlanningSessionUser());
         };
         handlers.onDatesSet();

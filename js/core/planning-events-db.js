@@ -268,6 +268,12 @@ export async function upsertPlanningEventRow(p) {
             is_all_day: row.is_all_day,
             updated_at: row.updated_at
         };
+        if ('source_template_line_id' in row) {
+            updateRow.source_template_line_id = row.source_template_line_id;
+        }
+        if ('gabarit_week_type' in row) {
+            updateRow.gabarit_week_type = row.gabarit_week_type;
+        }
         if ('absence_period_id' in row) updateRow.absence_period_id = row.absence_period_id;
         if ('series_id' in row) updateRow.series_id = row.series_id;
         if ('series_position' in row) updateRow.series_position = row.series_position;
