@@ -61,8 +61,7 @@ export async function eleveTravailWouldExceedWeeklyCap(settings, addMinutes, wee
     }
     const row = Array.isArray(data) ? data[0] : data;
     const active = Number(row?.active_minutes ?? 0) || 0;
-    const voided = Number(row?.void_minutes ?? 0) || 0;
-    let used = active + voided;
+    let used = active;
     if (excludeEventId) {
         const { data: ev } = await sb
             .from('planning_event')
@@ -80,7 +79,7 @@ export async function eleveTravailWouldExceedWeeklyCap(settings, addMinutes, wee
     if (used + addMinutes > capMin) {
         return {
             ok: false,
-            message: `Plafond hebdomadaire travail perso : ${capH} h maximum (incluant les créneaux déjà réservés${settings.eleve_count_voided_travail_toward_cap ? ' ou annulés dans la semaine' : ''}).`
+            message: `Plafond hebdomadaire travail perso : ${capH} h maximum.`
         };
     }
     return { ok: true };
@@ -90,19 +89,7 @@ export async function eleveTravailWouldExceedWeeklyCap(settings, addMinutes, wee
  * @param {{ slotStart: Date, slotEnd: Date }} p
  */
 export async function logEleveTravailVoidIfNeeded(settings, p) {
-    if (!settings?.eleve_count_voided_travail_toward_cap) return { ok: true };
-    const sb = getSupabaseClient();
-    if (!sb) return { ok: false };
-    const ms = Math.max(0, p.slotEnd.getTime() - p.slotStart.getTime());
-    const voided = Math.max(1, Math.round(ms / 60000));
-    const { error } = await sb.from('planning_eleve_travail_void_log').insert({
-        slot_start_at: p.slotStart.toISOString(),
-        slot_end_at: p.slotEnd.toISOString(),
-        voided_minutes: voided
-    });
-    if (error) {
-        console.warn('[planning-eleve-quota] void log', error.message);
-        return { ok: false, error: error.message };
-    }
+    void settings;
+    void p;
     return { ok: true };
 }

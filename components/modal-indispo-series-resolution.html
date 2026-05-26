@@ -1,0 +1,34 @@
+<dialog id="modal_indispo_series_resolution" class="modal" tabindex="-1">
+    <div class="modal-box p-5 w-[96%] max-w-lg rounded-2xl border border-slate-200 shadow-2xl">
+        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest">
+            Indispo et séries
+        </h3>
+        <p id="indispo-series-resolution-text" class="text-[11px] text-slate-600 mb-3 leading-snug">
+            Cette indispo recouvre des occurrences périodiques.
+        </p>
+        <div class="space-y-2 text-[11px] text-slate-800">
+            <label class="flex gap-2 items-start cursor-pointer">
+                <input type="radio" name="indispo-series-resolution" value="shift" class="mt-0.5" checked />
+                <span
+                    ><strong>Supprimer et décaler la série</strong> — les occurrences touchées sautent, puis la suite
+                    est repoussée d'une semaine par occurrence impactée.</span
+                >
+            </label>
+            <label class="flex gap-2 items-start cursor-pointer">
+                <input type="radio" name="indispo-series-resolution" value="delete" class="mt-0.5" />
+                <span
+                    ><strong>Supprimer seulement les occurrences touchées</strong> — la série garde son rythme actuel,
+                    seules les occurrences recouvertes sont retirées.</span
+                >
+            </label>
+        </div>
+        <div class="modal-action mt-4 pt-3 border-t border-slate-100 flex justify-end gap-2">
+            <button type="button" id="indispo-series-resolution-cancel" class="btn btn-ghost btn-sm font-black text-[11px]">
+                Annuler
+            </button>
+            <button type="button" id="indispo-series-resolution-ok" class="btn btn-primary btn-sm font-black text-[11px]">
+                Continuer
+            </button>
+        </div>
+    </div>
+</dialog>

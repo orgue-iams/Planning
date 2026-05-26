@@ -33,8 +33,22 @@ import {
     replacePlanningEventEnrollment,
     fetchPlanningEventEnrollmentUserIds
 } from './planning-events-db.js';
-import { fetchOrganSchoolSettings, getOrganSchoolSettingsCached } from './organ-settings.js';
+import {
+    fetchOrganSchoolSettings,
+    getOrganSchoolSettingsCached,
+    getSchoolYearBoundsFromSettings
+} from './organ-settings.js';
 import { openFermetureEditFromCalendarEvent } from './fermeture-edit-ui.js';
+import {
+    createPlanningEventSeries,
+    createPlanningSeriesException,
+    deletePlanningEventSeries,
+    fetchPlanningEventSeriesByIds,
+    fetchPlanningSeriesExceptionsBySeriesIds,
+    updatePlanningEventSeries
+} from './planning-series-db.js';
+import { buildPlanningEventRowsFromSeries } from './planning-series-engine.js';
+import { openIndispoSeriesResolutionModal } from './indispo-series-resolution-ui.js';
 import {
     eleveBookingTooFarInFuture,
     eleveTravailWouldExceedWeeklyCap,
@@ -94,6 +108,7 @@ let reservationModalEventPropsBaseline = null;
 let reservationModalCalendarRef = null;
 /** @type {import('@fullcalendar/core').EventApi | null} */
 let reservationModalEventRef = null;
+const SHOW_LEGACY_FERMETURE_EDIT_UI = false;
 /** Libellé propriétaire pour l’en-tête modale (Prénom Nom). */
 let reservationModalOwnerLabelRef = '';
 /** Durée initiale du créneau à l’ouverture de la modale (ajustement fin si début change). */
@@ -125,8 +140,13 @@ function snapshotReservationModalFormState() {
         motif: val('event-motif-select'),
         title: val('event-title-input'),
         date: val('event-date-start'),
+        dateEnd: val('event-date-end'),
         start: val('event-start'),
         end: val('event-end'),
+        repeatMode: val('event-repeat-mode'),
+        repeatEndMode: val('event-repeat-end-mode'),
+        repeatUntil: val('event-repeat-until'),
+        repeatCount: val('event-repeat-count'),
         recurring: chk('event-recurring'),
         recurStart: val('event-recur-period-start'),
         recurEnd: val('event-recur-period-end'),
@@ -158,8 +178,13 @@ function applyReservationModalFormSnapshot(json) {
     setVal('event-motif-select', snap.motif);
     setVal('event-title-input', snap.title);
     setVal('event-date-start', snap.date);
+    setVal('event-date-end', snap.dateEnd || snap.date || '');
     setVal('event-start', snap.start);
     setVal('event-end', snap.end);
+    setVal('event-repeat-mode', snap.repeatMode || 'once');
+    setVal('event-repeat-end-mode', snap.repeatEndMode || 'until');
+    setVal('event-repeat-until', snap.repeatUntil || '');
+    setVal('event-repeat-count', snap.repeatCount || '');
     setChk('event-recurring', snap.recurring);
     setVal('event-recur-period-start', snap.recurStart);
     setVal('event-recur-period-end', snap.recurEnd);
@@ -188,6 +213,7 @@ function applyReservationModalFormSnapshot(json) {
     syncReservationModalLiveEventRef();
     updateReservationInscritsWrapVisibility(reservationModalUserRef, reservationModalCanEditRef);
     refreshReservationInscritsSummary();
+    setRecurringOptionsVisible();
     syncReservationDateWeekdayLabel();
     updateReservationModalHeadline(reservationModalEventRef);
     if (reservationModalCalendarRef?.getEvents) {
@@ -1122,10 +1148,10 @@ function applyReservationMotifVisibility(currentUser, event, canEditEvent) {
 
 function allowedMotifsForRole(role) {
     const r = normalizeRole(role);
-    if (r === 'admin') return [...RESERVATION_MOTIFS];
+    if (r === 'admin') return RESERVATION_MOTIFS.filter((m) => m !== 'Indispo');
     if (r === 'prof') return RESERVATION_MOTIFS.filter((m) => m !== 'Fermeture');
     if (r === 'eleve') return ['Travail'];
-    return RESERVATION_MOTIFS.filter((m) => m !== 'Fermeture');
+    return RESERVATION_MOTIFS.filter((m) => m !== 'Fermeture' && m !== 'Indispo');
 }
 
 /**
@@ -1147,6 +1173,7 @@ function defaultMotifForRole(role) {
 function slotTypeToMotif(slotType) {
     const s = String(slotType || '').trim().toLowerCase();
     if (s === 'fermeture') return 'Fermeture';
+    if (s === 'indispo') return 'Indispo';
     if (s === 'concert') return 'Concert';
     if (s === 'autre') return 'Autre';
     if (s === 'cours' || s === 'maintenance') return 'Cours';
@@ -1258,6 +1285,519 @@ export function seriesPrevSnapshotFromEvent(eventLike) {
     };
 }
 
+async function fetchPlanningRowsForSeries(series) {
+    const start = new Date(String(series?.startAtFirst || ''));
+    const end = new Date(`${String(series?.untilYmd || '').slice(0, 10)}T23:59:59`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
+    const sid = String(series?.id || '').trim();
+    if (!sid) return [];
+    const rows = await fetchPlanningEventRowsInRange(start, end);
+    return rows
+        .filter((row) => String(row.series_id || '').trim() === sid)
+        .sort((a, b) => new Date(String(a.start_at || '')).getTime() - new Date(String(b.start_at || '')).getTime());
+}
+
+function shiftIsoByDeltaMs(iso, deltaMs) {
+    const d = new Date(String(iso || ''));
+    if (Number.isNaN(d.getTime())) return '';
+    return new Date(d.getTime() + deltaMs).toISOString();
+}
+
+function rowOverlapsIsoRange(row, startIso, endIso) {
+    const rowStartMs = new Date(String(row?.start_at || '')).getTime();
+    const rowEndMs = new Date(String(row?.end_at || '')).getTime();
+    const startMs = new Date(String(startIso || '')).getTime();
+    const endMs = new Date(String(endIso || '')).getTime();
+    return Number.isFinite(rowStartMs) && Number.isFinite(rowEndMs) && startMs < rowEndMs && rowStartMs < endMs;
+}
+
+function isBlockingRowForSeriesOwner(row, ownerUid) {
+    const slotType = String(row?.slot_type || '').trim().toLowerCase();
+    if (slotType === 'fermeture') return true;
+    if (slotType !== 'indispo') return false;
+    return String(row?.owner_user_id || '').trim() === String(ownerUid || '').trim();
+}
+
+async function planSeriesAutoPauseExceptions(p) {
+    const {
+        ownerUid,
+        startIso,
+        endIso,
+        untilYmd,
+        frequencyInterval,
+        occurrenceLimit
+    } = p;
+    const horizonEnd = new Date(`${String(untilYmd || '').slice(0, 10)}T23:59:59`);
+    if (Number.isNaN(horizonEnd.getTime())) {
+        return { ok: false, error: 'Date de fin de série invalide.', plannedExceptions: [], plannedCount: 0 };
+    }
+    const existingRows = await fetchPlanningEventRowsInRange(new Date(startIso), horizonEnd);
+    const intervalDays = Number(frequencyInterval) === 2 ? 14 : 7;
+    const intervalMs = intervalDays * 24 * 60 * 60 * 1000;
+    const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+    const max = Number.isFinite(Number(occurrenceLimit)) && Number(occurrenceLimit) >= 1
+        ? Math.trunc(Number(occurrenceLimit))
+        : Number.POSITIVE_INFINITY;
+    /** @type {Array<{ occurrenceStartAt: string, exceptionKind: string, payload: object }>} */
+    const plannedExceptions = [];
+    let plannedCount = 0;
+    let candidateStartIso = String(startIso || '');
+    let candidateEndIso = String(endIso || '');
+    let safety = 0;
+    while (
+        new Date(candidateStartIso).getTime() <= horizonEnd.getTime() &&
+        plannedCount < max &&
+        safety < 2000
+    ) {
+        safety += 1;
+        const overlaps = existingRows.filter((row) => rowOverlapsIsoRange(row, candidateStartIso, candidateEndIso));
+        const blocking = overlaps.filter((row) => isBlockingRowForSeriesOwner(row, ownerUid));
+        if (blocking.length) {
+            plannedExceptions.push({
+                occurrenceStartAt: candidateStartIso,
+                exceptionKind: 'skip',
+                payload: {
+                    shiftWeeks: 1,
+                    reason: blocking.some((row) => String(row.slot_type || '').trim().toLowerCase() === 'fermeture')
+                        ? 'fermeture'
+                        : 'indispo'
+                }
+            });
+            candidateStartIso = shiftIsoByDeltaMs(candidateStartIso, oneWeekMs);
+            candidateEndIso = shiftIsoByDeltaMs(candidateEndIso, oneWeekMs);
+            continue;
+        }
+        const conflict = overlaps[0] || null;
+        if (conflict) {
+            return {
+                ok: false,
+                error: `Conflit détecté le ${String(conflict.start_at || '').slice(0, 10)} avec un créneau existant.`,
+                plannedExceptions,
+                plannedCount
+            };
+        }
+        plannedCount += 1;
+        candidateStartIso = shiftIsoByDeltaMs(candidateStartIso, intervalMs);
+        candidateEndIso = shiftIsoByDeltaMs(candidateEndIso, intervalMs);
+    }
+    return { ok: true, error: null, plannedExceptions, plannedCount };
+}
+
+async function recreateGeneratedSeriesOccurrences(p) {
+    const {
+        calendar,
+        currentUser,
+        ownerUid,
+        ownerEmail,
+        dbSlotType,
+        title,
+        bridgeType,
+        seriesId,
+        rowSpecs,
+        deleteCanonicalIds
+    } = p;
+    const toDelete = [...new Set((deleteCanonicalIds || []).map((id) => String(id || '').trim()).filter(Boolean))];
+    if (toDelete.length) {
+        const del = await deletePlanningEventsByCanonicalIds(toDelete);
+        if (!del.ok) return { ok: false, error: del.error || 'Suppression des occurrences impossible.' };
+    }
+    /** @type {string[]} */
+    const createdIds = [];
+    /** @type {Record<string, unknown>[]} */
+    const bridgeEventsDb = [];
+    for (const row of rowSpecs || []) {
+        const ur = await upsertPlanningEventRow({
+            id: null,
+            startIso: row.startIso,
+            endIso: row.endIso,
+            title,
+            dbSlotType,
+            ownerEmail,
+            ownerUserId: ownerUid,
+            seriesId,
+            seriesPosition: row.seriesPosition,
+            isAllDay: Boolean(row.isAllDay)
+        });
+        if (!ur.ok || !ur.id) {
+            for (const id of createdIds) await deletePlanningEventRow(id);
+            return { ok: false, error: ur.error || 'Création des occurrences impossible.' };
+        }
+        createdIds.push(ur.id);
+        const enrollR = await syncPlanningEnrollmentAfterSave(ur.id, dbSlotType);
+        if (!enrollR.ok) {
+            for (const id of createdIds) await deletePlanningEventRow(id);
+            return { ok: false, error: enrollR.error || 'Enregistrement des inscriptions impossible.' };
+        }
+        if (dbSlotType !== 'indispo') {
+            bridgeEventsDb.push({
+                planningEventId: ur.id,
+                title,
+                start: row.startIso,
+                end: row.endIso,
+                type: bridgeType,
+                owner: ownerEmail,
+                ...(enrollR.emailsCsv ? { inscrits: enrollR.emailsCsv } : {})
+            });
+        }
+    }
+    await refetchPlanningGrid(calendar);
+    if (calendarBridgeWanted() && bridgeEventsDb.length > 0) {
+        voidLaunchReservationGoogleSyncWithRollback(
+            calendar,
+            bridgeEventsDb,
+            { mode: 'create', eventId: createdIds[0] || '', createdIds }
+        );
+    }
+    if (!reservationAutoSaveMode) {
+        document.getElementById('modal_reservation')?.close();
+    }
+    showToast('Série mise à jour.');
+    return { ok: true };
+}
+
+async function resolveGeneratedSeriesOverlapsForIndispo(p) {
+    const {
+        calendar,
+        currentUser,
+        overlaps,
+        indispoStartIso,
+        indispoEndIso
+    } = p;
+    const seriesIds = [
+        ...new Set(
+            (overlaps || [])
+                .map((row) => String(row.series_id || '').trim())
+                .filter(Boolean)
+        )
+    ];
+    if (!seriesIds.length) {
+        return {
+            ok: true,
+            deleteIds: overlaps.map((row) => String(row.id || '').trim()).filter(Boolean)
+        };
+    }
+    const choice = await openIndispoSeriesResolutionModal({
+        impactedSeriesCount: seriesIds.length,
+        impactedOccurrenceCount: overlaps.length
+    });
+    if (!choice) return { ok: false, cancelled: true, deleteIds: [] };
+
+    const seriesRows = await fetchPlanningEventSeriesByIds(seriesIds);
+    const seriesById = new Map(seriesRows.map((row) => [row.id, row]));
+    const nonSeriesDeleteIds = overlaps
+        .filter((row) => !String(row.series_id || '').trim())
+        .map((row) => String(row.id || '').trim())
+        .filter(Boolean);
+
+    if (choice === 'delete') {
+        for (const row of overlaps) {
+            const sid = String(row.series_id || '').trim();
+            if (!sid) continue;
+            const created = await createPlanningSeriesException(
+                String(row.start_at || ''),
+                'skip',
+                { reason: 'indispo' },
+                String(currentUser?.id || '').trim(),
+                sid
+            );
+            if (!created.ok) {
+                return { ok: false, error: created.error || 'Création exception série impossible.', deleteIds: [] };
+            }
+        }
+        return {
+            ok: true,
+            deleteIds: overlaps.map((row) => String(row.id || '').trim()).filter(Boolean)
+        };
+    }
+
+    for (const sid of seriesIds) {
+        const series = seriesById.get(sid);
+        if (!series?.id) continue;
+        const rows = await fetchPlanningRowsForSeries(series);
+        if (!rows.length) continue;
+        const impactedRows = rows.filter((row) => {
+            const rowStartMs = new Date(String(row.start_at || '')).getTime();
+            const rowEndMs = new Date(String(row.end_at || '')).getTime();
+            const blockStartMs = new Date(indispoStartIso).getTime();
+            const blockEndMs = new Date(indispoEndIso).getTime();
+            return blockStartMs < rowEndMs && rowStartMs < blockEndMs;
+        });
+        if (!impactedRows.length) continue;
+        const firstImpacted = impactedRows[0];
+        const firstIndex = rows.findIndex((row) => String(row.id || '').trim() === String(firstImpacted.id || '').trim());
+        if (firstIndex < 0) continue;
+        const prevRow = firstIndex > 0 ? rows[firstIndex - 1] : null;
+        const remainingCount =
+            Number.isFinite(Number(series.occurrenceLimit)) && series.occurrenceLimit != null
+                ? Math.max(1, Number(series.occurrenceLimit) - firstIndex)
+                : null;
+        const shiftDays = Math.max(1, impactedRows.length) * 7;
+        const shiftMs = shiftDays * 24 * 60 * 60 * 1000;
+        const newStartIso = shiftIsoByDeltaMs(String(firstImpacted.start_at || ''), shiftMs);
+        const newEndIso = shiftIsoByDeltaMs(String(firstImpacted.end_at || ''), shiftMs);
+        const previewRows = buildPlanningEventRowsFromSeries({
+            seriesId: series.id,
+            ownerUserId: series.ownerUserId,
+            ownerEmail: series.ownerEmail,
+            slotType: series.slotType,
+            title: series.title,
+            startIso: newStartIso,
+            endIso: newEndIso,
+            untilYmd: series.untilYmd,
+            occurrenceLimit: remainingCount,
+            frequencyInterval: series.frequencyInterval
+        });
+        const previewDeleteIds = new Set(rows.slice(firstIndex).map((row) => String(row.id || '').trim()));
+        const horizonEnd = new Date(`${String(series.untilYmd || '').slice(0, 10)}T23:59:59`);
+        const existingRows = await fetchPlanningEventRowsInRange(new Date(newStartIso), horizonEnd);
+        const conflict = previewRows.find((row) => {
+            const rowStartMs = new Date(row.startIso).getTime();
+            const rowEndMs = new Date(row.endIso).getTime();
+            return existingRows.some((existing) => {
+                if (previewDeleteIds.has(String(existing.id || '').trim())) return false;
+                const existingStartMs = new Date(String(existing.start_at || '')).getTime();
+                const existingEndMs = new Date(String(existing.end_at || '')).getTime();
+                return rowStartMs < existingEndMs && existingStartMs < rowEndMs;
+            });
+        });
+        if (conflict) {
+            return {
+                ok: false,
+                error: `Décalage impossible : conflit détecté le ${String(conflict.startIso || '').slice(0, 10)}.`,
+                deleteIds: []
+            };
+        }
+        if (prevRow) {
+            const upd = await updatePlanningEventSeries(series.id, {
+                untilYmd: String(prevRow.start_at || '').slice(0, 10),
+                occurrenceLimit:
+                    Number.isFinite(Number(series.occurrenceLimit)) && series.occurrenceLimit != null
+                        ? firstIndex
+                        : null
+            });
+            if (!upd.ok) return { ok: false, error: upd.error || 'Mise à jour de série impossible.', deleteIds: [] };
+        } else {
+            const del = await deletePlanningEventSeries(series.id);
+            if (!del.ok) return { ok: false, error: del.error || 'Suppression de série impossible.', deleteIds: [] };
+        }
+        const newSeriesRes = await createPlanningEventSeries({
+            ownerUserId: series.ownerUserId,
+            ownerEmail: series.ownerEmail,
+            slotType: series.slotType,
+            title: series.title,
+            startAtFirst: newStartIso,
+            untilYmd: series.untilYmd,
+            occurrenceLimit: remainingCount,
+            frequencyInterval: series.frequencyInterval
+        });
+        if (!newSeriesRes.ok || !newSeriesRes.series?.id) {
+            return { ok: false, error: newSeriesRes.error || 'Décalage de série impossible.', deleteIds: [] };
+        }
+        const newRows = buildPlanningEventRowsFromSeries({
+            seriesId: newSeriesRes.series.id,
+            ownerUserId: series.ownerUserId,
+            ownerEmail: series.ownerEmail,
+            slotType: series.slotType,
+            title: series.title,
+            startIso: newStartIso,
+            endIso: newEndIso,
+            untilYmd: series.untilYmd,
+            occurrenceLimit: remainingCount,
+            frequencyInterval: series.frequencyInterval,
+            skipOccurrenceStartIsoSet: new Set()
+        });
+        const recreated = await recreateGeneratedSeriesOccurrences({
+            calendar,
+            currentUser,
+            ownerUid: series.ownerUserId,
+            ownerEmail: series.ownerEmail,
+            dbSlotType: series.slotType,
+            title: series.title,
+            bridgeType: planningDbSlotTypeToBridgeType(series.slotType),
+            seriesId: newSeriesRes.series.id,
+            rowSpecs: newRows,
+            deleteCanonicalIds: rows.slice(firstIndex).map((row) => String(row.id || '').trim())
+        });
+        if (!recreated.ok) {
+            await deletePlanningEventSeries(newSeriesRes.series.id);
+            return { ok: false, error: recreated.error || 'Décalage de série impossible.', deleteIds: [] };
+        }
+    }
+    return { ok: true, deleteIds: nonSeriesDeleteIds };
+}
+
+async function applyGeneratedSeriesScopeIfNeeded(p) {
+    const {
+        calendar,
+        currentUser,
+        liveEventRef,
+        canonicalExisting,
+        dbSlotType,
+        prevSnapshot,
+        title,
+        startIso,
+        endIso,
+        ownerUid,
+        slotOwnerEmail,
+        bridgeType
+    } = p;
+    const seriesId = String(liveEventRef?.extendedProps?.planningSeriesId || '').trim();
+    if (
+        !liveEventRef ||
+        !canonicalExisting ||
+        !seriesId ||
+        !isPrivilegedUser(currentUser) ||
+        !prevSnapshot
+    ) {
+        return { action: 'continue', detachTemplateLink: false };
+    }
+    const prevDbType = String(liveEventRef?.extendedProps?.planningDbSlotType || '').trim().toLowerCase();
+    const titleTrim = String(title || '').trim();
+    const changed =
+        String(prevSnapshot.title || '').trim() !== titleTrim ||
+        prevSnapshot.startStr !== startIso ||
+        prevSnapshot.endStr !== endIso ||
+        prevDbType !== String(dbSlotType || '').trim().toLowerCase();
+    if (!changed) return { action: 'continue', detachTemplateLink: false };
+
+    const [series] = await fetchPlanningEventSeriesByIds([seriesId]);
+    if (!series?.id) return { action: 'continue', detachTemplateLink: false };
+    const seriesExceptionMap = await fetchPlanningSeriesExceptionsBySeriesIds([series.id]);
+    const existingSeriesExceptions = seriesExceptionMap.get(series.id) || [];
+    const scope = await openCoursSeriesScopeModal();
+    if (scope === null) return 'cancelled';
+    if (scope === 'single') {
+        return { action: 'continue', detachTemplateLink: false };
+    }
+
+    const rows = await fetchPlanningRowsForSeries(series);
+    if (!rows.length) return { action: 'continue', detachTemplateLink: false };
+    const currentIndex = rows.findIndex((row) => String(row.id || '').trim() === canonicalExisting);
+    const currentRow = currentIndex >= 0 ? rows[currentIndex] : null;
+    if (!currentRow) return { action: 'continue', detachTemplateLink: false };
+
+    const ownerEmail = String(slotOwnerEmail || currentUser.email || '').trim().toLowerCase();
+    const occurrenceLimit = series.occurrenceLimit;
+    const frequencyInterval = Number(series.frequencyInterval) === 2 ? 2 : 1;
+    const intervalDays = frequencyInterval * 7;
+
+    if (scope === 'future') {
+        const deleteRows = rows.slice(currentIndex);
+        const prevRow = currentIndex > 0 ? rows[currentIndex - 1] : null;
+        const remainingCount =
+            Number.isFinite(Number(occurrenceLimit)) && occurrenceLimit != null
+                ? Math.max(1, Number(occurrenceLimit) - currentIndex)
+                : null;
+        if (prevRow) {
+            await updatePlanningEventSeries(series.id, {
+                untilYmd: String(prevRow.start_at || '').slice(0, 10),
+                occurrenceLimit:
+                    Number.isFinite(Number(occurrenceLimit)) && occurrenceLimit != null
+                        ? currentIndex
+                        : null
+            });
+        } else {
+            await deletePlanningEventSeries(series.id);
+        }
+        const newSeriesRes = await createPlanningEventSeries({
+            ownerUserId: ownerUid,
+            ownerEmail,
+            slotType: dbSlotType,
+            title,
+            startAtFirst: startIso,
+            untilYmd: series.untilYmd,
+            occurrenceLimit: remainingCount,
+            frequencyInterval
+        });
+        if (!newSeriesRes.ok || !newSeriesRes.series?.id) {
+            showToast(newSeriesRes.error || 'Scission de série impossible.', 'error');
+            return 'cancelled';
+        }
+        const newRows = buildPlanningEventRowsFromSeries({
+            seriesId: newSeriesRes.series.id,
+            ownerUserId: ownerUid,
+            ownerEmail,
+            slotType: dbSlotType,
+            title,
+            startIso,
+            endIso,
+            untilYmd: series.untilYmd,
+            occurrenceLimit: remainingCount,
+            frequencyInterval,
+            seriesExceptions: existingSeriesExceptions
+        });
+        const recreated = await recreateGeneratedSeriesOccurrences({
+            calendar,
+            currentUser,
+            ownerUid,
+            ownerEmail,
+            dbSlotType,
+            title,
+            bridgeType,
+            seriesId: newSeriesRes.series.id,
+            rowSpecs: newRows,
+            deleteCanonicalIds: deleteRows.map((row) => String(row.id || '').trim())
+        });
+        if (!recreated.ok) {
+            await deletePlanningEventSeries(newSeriesRes.series.id);
+            showToast(recreated.error || 'Mise à jour de série impossible.', 'error');
+            return 'cancelled';
+        }
+        return 'handled';
+    }
+
+    const deltaMs = new Date(startIso).getTime() - new Date(currentRow.start_at).getTime();
+    const newFirstStartIso = shiftIsoByDeltaMs(series.startAtFirst, deltaMs);
+    const durationMs = new Date(endIso).getTime() - new Date(startIso).getTime();
+    const newFirstEndIso = shiftIsoByDeltaMs(newFirstStartIso, durationMs);
+    const newSeriesRes = await createPlanningEventSeries({
+        ownerUserId: ownerUid,
+        ownerEmail,
+        slotType: dbSlotType,
+        title,
+        startAtFirst: newFirstStartIso,
+        untilYmd: series.untilYmd,
+        occurrenceLimit,
+        frequencyInterval
+    });
+    if (!newSeriesRes.ok || !newSeriesRes.series?.id) {
+        showToast(newSeriesRes.error || 'Réécriture de série impossible.', 'error');
+        return 'cancelled';
+    }
+    const newRows = buildPlanningEventRowsFromSeries({
+        seriesId: newSeriesRes.series.id,
+        ownerUserId: ownerUid,
+        ownerEmail,
+        slotType: dbSlotType,
+        title,
+        startIso: newFirstStartIso,
+        endIso: newFirstEndIso,
+        untilYmd: series.untilYmd,
+        occurrenceLimit,
+        frequencyInterval,
+        seriesExceptions: existingSeriesExceptions
+    });
+    const recreated = await recreateGeneratedSeriesOccurrences({
+        calendar,
+        currentUser,
+        ownerUid,
+        ownerEmail,
+        dbSlotType,
+        title,
+        bridgeType,
+        seriesId: newSeriesRes.series.id,
+        rowSpecs: newRows,
+        deleteCanonicalIds: rows.map((row) => String(row.id || '').trim())
+    });
+    if (!recreated.ok) {
+        await deletePlanningEventSeries(newSeriesRes.series.id);
+        showToast(recreated.error || 'Réécriture de série impossible.', 'error');
+        return 'cancelled';
+    }
+    await deletePlanningEventSeries(series.id);
+    return 'handled';
+}
+
 /**
  * Cours liés au gabarit : propose « ce créneau » / « ce créneau et les suivants » (comme Google Agenda).
  * @returns {Promise<'cancelled' | 'handled' | { action: 'continue', detachTemplateLink: boolean }>}
@@ -1282,6 +1822,24 @@ async function maybeApplyCoursSeriesScopeBeforePersist(p) {
         bridgeType,
         slotType
     } = p;
+
+    const generatedSeriesResult = await applyGeneratedSeriesScopeIfNeeded({
+        calendar,
+        currentUser,
+        liveEventRef,
+        canonicalExisting,
+        dbSlotType,
+        prevSnapshot,
+        title,
+        startIso,
+        endIso,
+        ownerUid,
+        slotOwnerEmail,
+        bridgeType
+    });
+    if (generatedSeriesResult === 'handled' || generatedSeriesResult === 'cancelled') {
+        return generatedSeriesResult;
+    }
 
     if (
         !liveEventRef ||
@@ -1768,6 +2326,7 @@ export function getPlanningEventColorClass(eventLike, currentUser, options = {})
         const role = normalizeRole(currentUser?.role);
         if ((role === 'eleve' || role === 'prof') && !ownerEmail) {
             if (type === 'fermeture' || dbSlot === 'fermeture') return 'event-fermeture';
+            if (type === 'indispo' || dbSlot === 'indispo') return 'event-fermeture';
             if (isCoursSlot) return 'event-cours';
             if (type === 'concert') return 'event-concert';
             if (type === 'autre') return 'event-autre';
@@ -1776,6 +2335,7 @@ export function getPlanningEventColorClass(eventLike, currentUser, options = {})
     }
 
     if (type === 'fermeture' || dbSlot === 'fermeture') return 'event-fermeture';
+    if (type === 'indispo' || dbSlot === 'indispo') return 'event-fermeture';
     const meRole = normalizeRole(currentUser?.role);
     if (isCoursSlot && meRole === 'prof' && isMine) {
         return 'event-cours-enrolled';
@@ -2142,9 +2702,15 @@ function overlapToastMessage(conflict) {
     const isFerm =
         String(xp?.type || '').toLowerCase() === 'fermeture' ||
         String(xp?.planningDbSlotType || '').trim().toLowerCase() === 'fermeture';
+    const isIndispo =
+        String(xp?.type || '').toLowerCase() === 'indispo' ||
+        String(xp?.planningDbSlotType || '').trim().toLowerCase() === 'indispo';
     const tf = (d) => formatWeekdayDayTimeFr24(d);
     if (isFerm && r) {
         return `Période de fermeture « ${t} » (${tf(r.start)} – ${tf(r.end)}). Choisissez un autre horaire.`;
+    }
+    if (isIndispo && r) {
+        return `Indispo « ${t} » (${tf(r.start)} – ${tf(r.end)}). Choisissez un autre horaire.`;
     }
     if (!r) return `Ce créneau chevauche une autre réservation : « ${t} ».`;
     return `Chevauchement avec « ${t} » (${tf(r.start)} – ${tf(r.end)}). Choisissez un autre horaire.`;
@@ -2231,27 +2797,100 @@ export async function handleEventResize(info, currentUser) {
     }
 }
 
-export function setRecurringOptionsVisible(recurringChecked) {
-    document.getElementById('event-recurring-body')?.classList.toggle('hidden', !recurringChecked);
-    document.getElementById('wrap-datetime-simple')?.classList.toggle('hidden', !!recurringChecked);
-    if (!recurringChecked) {
-        document.getElementById('recur-dow-grid')?.classList.add('hidden');
-    } else {
-        const custom = document.getElementById('recur-mode-days')?.checked;
-        document.getElementById('recur-dow-grid')?.classList.toggle('hidden', !custom);
+function defaultSeriesUntilYmd(startYmd = '') {
+    const { endYmd } = getSchoolYearBoundsFromSettings(getOrganSchoolSettingsCached());
+    if (endYmd) return endYmd;
+    const start = /^\d{4}-\d{2}-\d{2}$/.test(String(startYmd || ''))
+        ? new Date(`${startYmd}T00:00:00`)
+        : new Date();
+    const d = new Date(start);
+    d.setFullYear(d.getFullYear() + 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function repeatModeFromForm() {
+    const raw = String(document.getElementById('event-repeat-mode')?.value || 'once').trim();
+    if (raw === 'weekly' || raw === 'biweekly') return raw;
+    return 'once';
+}
+
+function repeatEndModeFromForm() {
+    return String(document.getElementById('event-repeat-end-mode')?.value || 'until').trim() === 'count'
+        ? 'count'
+        : 'until';
+}
+
+function isMotifFermeture(motif) {
+    return String(motif || '').trim() === 'Fermeture';
+}
+
+function isMotifIndispo(motif) {
+    return String(motif || '').trim() === 'Indispo';
+}
+
+function reservationUsesDateEndRange(motif) {
+    return isMotifFermeture(motif) || isMotifIndispo(motif);
+}
+
+function syncReservationRangeModeUi(currentUser, eventRef = null, canEditEvent = true) {
+    const motif = getReservationMotifFromForm(currentUser, eventRef);
+    const showDateEnd = reservationUsesDateEndRange(motif);
+    const hideHours = isMotifFermeture(motif);
+    const dateEndWrap = document.getElementById('wrap-reservation-date-end');
+    const hoursWrap = document.getElementById('wrap-reservation-hours');
+    const recurWrap = document.getElementById('event-recurring-wrap');
+    if (dateEndWrap) {
+        dateEndWrap.classList.toggle('hidden', !showDateEnd);
+        dateEndWrap.setAttribute('aria-hidden', showDateEnd ? 'false' : 'true');
     }
+    if (hoursWrap) {
+        hoursWrap.classList.toggle('hidden', hideHours);
+        hoursWrap.setAttribute('aria-hidden', hideHours ? 'true' : 'false');
+    }
+    if (recurWrap) {
+        const canRepeat = isPrivilegedUser(currentUser) && !eventRef && !showDateEnd;
+        recurWrap.classList.toggle('hidden', !canRepeat);
+        recurWrap.setAttribute('aria-hidden', canRepeat ? 'false' : 'true');
+        const repeatModeEl = document.getElementById('event-repeat-mode');
+        const repeatEndModeEl = document.getElementById('event-repeat-end-mode');
+        const repeatUntilEl = document.getElementById('event-repeat-until');
+        const repeatCountEl = document.getElementById('event-repeat-count');
+        if (repeatModeEl instanceof HTMLSelectElement) {
+            repeatModeEl.disabled = !canRepeat || !canEditEvent;
+            if (!canRepeat) repeatModeEl.value = 'once';
+        }
+        if (repeatEndModeEl instanceof HTMLSelectElement) repeatEndModeEl.disabled = !canRepeat || !canEditEvent;
+        if (repeatUntilEl instanceof HTMLInputElement) repeatUntilEl.disabled = !canRepeat || !canEditEvent;
+        if (repeatCountEl instanceof HTMLInputElement) repeatCountEl.disabled = !canRepeat || !canEditEvent;
+    }
+    setRecurringOptionsVisible();
+}
+
+export function setRecurringOptionsVisible() {
+    const recurring = repeatModeFromForm() !== 'once';
+    document.getElementById('event-repeat-options')?.classList.toggle('hidden', !recurring);
+    const endMode = repeatEndModeFromForm();
+    document.getElementById('event-repeat-until-wrap')?.classList.toggle(
+        'hidden',
+        !recurring || endMode !== 'until'
+    );
+    document.getElementById('event-repeat-count-wrap')?.classList.toggle(
+        'hidden',
+        !recurring || endMode !== 'count'
+    );
 }
 
 function resetRecurringFormDefaults() {
-    const all = document.getElementById('recur-mode-all');
-    const days = document.getElementById('recur-mode-days');
-    if (all) all.checked = true;
-    if (days) days.checked = false;
-    for (let i = 0; i <= 6; i++) {
-        const cb = document.getElementById(`recur-dow-${i}`);
-        if (cb) cb.checked = i >= 1 && i <= 5;
-    }
-    document.getElementById('recur-dow-grid')?.classList.add('hidden');
+    const mode = document.getElementById('event-repeat-mode');
+    const endMode = document.getElementById('event-repeat-end-mode');
+    const until = document.getElementById('event-repeat-until');
+    const count = document.getElementById('event-repeat-count');
+    if (mode instanceof HTMLSelectElement) mode.value = 'once';
+    if (endMode instanceof HTMLSelectElement) endMode.value = 'until';
+    const startYmd = String(document.getElementById('event-date-start')?.value || '').slice(0, 10);
+    if (until instanceof HTMLInputElement) until.value = defaultSeriesUntilYmd(startYmd);
+    if (count instanceof HTMLInputElement) count.value = '';
+    setRecurringOptionsVisible();
 }
 
 function selectedDowSet() {
@@ -3027,6 +3666,47 @@ async function runGoogleMirrorSyncWithBanner(mirrorTargets) {
     }
 }
 
+async function deletePlanningEventsByCanonicalIds(canonicalIds) {
+    const ids = [...new Set((canonicalIds || []).map((id) => String(id || '').trim()).filter(Boolean))];
+    if (!ids.length) return { ok: true, deleted: 0 };
+    /** @type {Array<{ calendarId: string; googleEventId: string; target?: string; targetUserId?: string }>} */
+    const mirrorTargets = [];
+    for (const id of ids) {
+        const targets = await fetchPlanningMirrorTargetsForDelete(id);
+        if (Array.isArray(targets) && targets.length) mirrorTargets.push(...targets);
+    }
+    if (mirrorTargets.length) {
+        const mirrorSync = await runGoogleMirrorSyncWithBanner(mirrorTargets);
+        if (!mirrorSync.ok && !mirrorSync.skipped) {
+            return { ok: false, error: mirrorSync.error || 'Suppression Google impossible.', deleted: 0 };
+        }
+    }
+    for (const id of ids) {
+        const del = await deletePlanningEventRow(id);
+        if (!del.ok) return { ok: false, error: del.error || 'Suppression base impossible.', deleted: 0 };
+    }
+    return { ok: true, error: null, deleted: ids.length };
+}
+
+async function fetchPlanningRowsOverlappingRange(startIso, endIso, excludeCanonicalId = '') {
+    const start = new Date(String(startIso || ''));
+    const end = new Date(String(endIso || ''));
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end.getTime() <= start.getTime()) {
+        return [];
+    }
+    const rows = await fetchPlanningEventRowsInRange(start, end);
+    const excludeId = String(excludeCanonicalId || '').trim();
+    const startMs = start.getTime();
+    const endMs = end.getTime();
+    return rows.filter((row) => {
+        const rowId = String(row.id || '').trim();
+        if (excludeId && rowId === excludeId) return false;
+        const rowStartMs = new Date(row.start_at).getTime();
+        const rowEndMs = new Date(row.end_at).getTime();
+        return Number.isFinite(rowStartMs) && Number.isFinite(rowEndMs) && startMs < rowEndMs && rowStartMs < endMs;
+    });
+}
+
 /**
  * @param {{ startStr: string, endStr: string, title: string } | null} prevSnapshot
  * @param {string | null} formBaselineJson
@@ -3094,7 +3774,8 @@ function applyModalReservationDisplayOnCalendar(calendar, currentUser, p) {
         ownerDisplayName: String(currentUser.name || ownerEmail.split('@')[0] || '').trim(),
         ownerRole: normalizeRole(currentUser?.role) || '',
         type: p.slotType,
-        planningDbSlotType: p.dbSlotType
+        planningDbSlotType: p.dbSlotType,
+        planningIsAllDay: Boolean(p.isAllDay)
     };
     if (inscrits.length) commonXp.inscrits = inscrits;
 
@@ -3104,7 +3785,7 @@ function applyModalReservationDisplayOnCalendar(calendar, currentUser, p) {
             title: p.title,
             start,
             end,
-            allDay: false,
+            allDay: Boolean(p.isAllDay),
             extendedProps: commonXp,
             ...fcDragResizePropsForEventStart(start, currentUser)
         });
@@ -3114,7 +3795,7 @@ function applyModalReservationDisplayOnCalendar(calendar, currentUser, p) {
     const live = p.liveEventRef;
     if (!live) return null;
     try {
-        if (typeof live.setDates === 'function') live.setDates(start, end);
+        if (typeof live.setDates === 'function') live.setDates(start, end, { allDay: Boolean(p.isAllDay) });
         if (typeof live.setProp === 'function') live.setProp('title', p.title);
         if (typeof live.setExtendedProp === 'function') {
             live.setExtendedProp('planningRowSource', 'supabase');
@@ -3122,6 +3803,7 @@ function applyModalReservationDisplayOnCalendar(calendar, currentUser, p) {
             live.setExtendedProp('planningGoogleSyncPending', Boolean(p.googlePending));
             live.setExtendedProp('type', p.slotType);
             live.setExtendedProp('planningDbSlotType', p.dbSlotType);
+            live.setExtendedProp('planningIsAllDay', Boolean(p.isAllDay));
             live.setExtendedProp('inscrits', inscrits);
         }
     } catch (e) {
@@ -3511,6 +4193,14 @@ export function buildReservationFormFields(currentUser, event) {
         titleInput.value = String(event?.title || '').trim();
         return;
     }
+    if (dbTypeEarly === 'indispo' || typEarly === 'indispo') {
+        sel.innerHTML = '';
+        sel.add(new Option(motifDisplayLabel('Indispo'), 'Indispo', true, true));
+        sel.value = 'Indispo';
+        sel.disabled = true;
+        titleInput.value = String(event?.title || '').trim();
+        return;
+    }
 
     const allowed = allowedMotifsForReservationModal(currentUser, event);
     sel.innerHTML = '';
@@ -3526,6 +4216,7 @@ export function buildReservationFormFields(currentUser, event) {
               if (dbType === 'cours') return 'Cours';
               if (dbType === 'concert') return 'Concert';
               if (dbType === 'autre') return 'Autre';
+              if (dbType === 'indispo') return 'Indispo';
               if (dbType === 'fermeture') return 'Fermeture';
               if (dbType === 'travail perso') return 'Travail';
               // Repli si l’événement ne porte pas planningDbSlotType (cas inattendu).
@@ -3559,6 +4250,7 @@ function reservationEventDescriptif(event) {
     if (dbType === 'cours') motif = 'Cours';
     else if (dbType === 'concert') motif = 'Concert';
     else if (dbType === 'autre') motif = 'Autre';
+    else if (dbType === 'indispo') motif = 'Indispo';
     else if (dbType === 'fermeture') motif = 'Fermeture';
     else if (dbType === 'travail perso') motif = 'Travail';
     else motif = slotTypeToMotif(event.extendedProps?.type);
@@ -4037,7 +4729,7 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         const isFermetureClick =
             String(xpF.planningDbSlotType || '').toLowerCase() === 'fermeture' ||
             String(xpF.type || '').toLowerCase() === 'fermeture';
-        if (isFermetureClick) {
+        if (SHOW_LEGACY_FERMETURE_EDIT_UI && isFermetureClick) {
             await openFermetureEditFromCalendarEvent(event);
             return;
         }
@@ -4182,6 +4874,12 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         dateEl?.addEventListener(
             'change',
             () => {
+                const endDateEl = document.getElementById('event-date-end');
+                if (endDateEl instanceof HTMLInputElement) {
+                    if (!endDateEl.value || endDateEl.value < String(dateEl?.value || '')) {
+                        endDateEl.value = String(dateEl?.value || '');
+                    }
+                }
                 syncReservationDateWeekdayLabel();
                 updateReservationModalHeadline(reservationModalEventRef);
                 syncReservationModalTimeOptions(calendarForClip, reservationModalEventRef);
@@ -4199,6 +4897,12 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         dateEl?.addEventListener(
             'change',
             () => {
+                const endDateEl = document.getElementById('event-date-end');
+                if (endDateEl instanceof HTMLInputElement) {
+                    if (!endDateEl.value || endDateEl.value < String(dateEl?.value || '')) {
+                        endDateEl.value = String(dateEl?.value || '');
+                    }
+                }
                 syncReservationDateWeekdayLabel();
                 updateReservationModalHeadline(reservationModalEventRef);
             },
@@ -4223,60 +4927,70 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         { signal: modalSignal }
     );
 
-    const rpStart = document.getElementById('event-recur-period-start');
-    const rpEnd = document.getElementById('event-recur-period-end');
-    if (rpStart && rpEnd) {
-        rpStart.value = dateStartVal;
-        rpEnd.value = dateStartVal;
-    }
-    const rsEl = document.getElementById('event-recur-start');
-    const reEl = document.getElementById('event-recur-end');
-    if (rsEl && reEl) {
-        setSelectTime(rsEl, startInstant);
-        setSelectTime(reEl, endInstant);
-    }
-
     const recurWrap = document.getElementById('event-recurring-wrap');
-    const recurCb = document.getElementById('event-recurring');
     /** Réservation sur plusieurs jours : création, admin / prof uniquement. */
+    const dateEndEl = document.getElementById('event-date-end');
+    if (dateEndEl instanceof HTMLInputElement) {
+        const endYmdFromEvent =
+            event?.allDay && event?.end
+                ? (() => {
+                      const dt = event.end instanceof Date ? new Date(event.end) : new Date(event.end);
+                      if (Number.isNaN(dt.getTime())) return dateStartVal;
+                      dt.setDate(dt.getDate() - 1);
+                      return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+                  })()
+                : event?.end
+                  ? (() => {
+                        const dt = event.end instanceof Date ? event.end : new Date(event.end);
+                        if (Number.isNaN(dt.getTime())) return dateStartVal;
+                        return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+                    })()
+                  : dateStartVal;
+        dateEndEl.value = endYmdFromEvent || dateStartVal;
+        dateEndEl.disabled = !canEditEvent;
+    }
     const showRecurring = isPrivilegedUser(currentUser) && !event;
-    if (recurWrap) {
-        if (showRecurring) {
-            recurWrap.classList.remove('hidden');
-            recurWrap.removeAttribute('aria-hidden');
-        } else {
-            recurWrap.classList.add('hidden');
-            recurWrap.setAttribute('aria-hidden', 'true');
-        }
+    const repeatModeEl = document.getElementById('event-repeat-mode');
+    const repeatEndModeEl = document.getElementById('event-repeat-end-mode');
+    const repeatUntilEl = document.getElementById('event-repeat-until');
+    const repeatCountEl = document.getElementById('event-repeat-count');
+    if (repeatModeEl instanceof HTMLSelectElement) {
+        repeatModeEl.disabled = !showRecurring;
     }
-    if (recurCb) {
-        if (!showRecurring) {
-            recurCb.checked = false;
-            recurCb.disabled = true;
-        } else {
-            recurCb.disabled = false;
-            recurCb.checked = false;
-            resetRecurringFormDefaults();
-        }
+    if (repeatEndModeEl instanceof HTMLSelectElement) {
+        repeatEndModeEl.disabled = !showRecurring;
     }
-    setRecurringOptionsVisible(!!recurCb?.checked && showRecurring);
+    if (repeatUntilEl instanceof HTMLInputElement) {
+        repeatUntilEl.disabled = !showRecurring;
+    }
+    if (repeatCountEl instanceof HTMLInputElement) {
+        repeatCountEl.disabled = !showRecurring;
+    }
+    if (showRecurring) {
+        resetRecurringFormDefaults();
+    } else {
+        const untilYmd = defaultSeriesUntilYmd(dateStartVal);
+        if (repeatModeEl instanceof HTMLSelectElement) repeatModeEl.value = 'once';
+        if (repeatEndModeEl instanceof HTMLSelectElement) repeatEndModeEl.value = 'until';
+        if (repeatUntilEl instanceof HTMLInputElement) repeatUntilEl.value = untilYmd;
+        if (repeatCountEl instanceof HTMLInputElement) repeatCountEl.value = '';
+    }
+    syncReservationRangeModeUi(currentUser, event, canEditEvent);
 
     // Sécurité : Verrouillage si le créneau appartient à quelqu'un d'autre
     const fields = [
         'event-motif-select',
         'event-title-input',
         'event-date-start',
+        'event-date-end',
         'event-date-display-label',
         'event-date-picker-btn',
         'event-start',
         'event-end',
-        'event-recurring',
-        'event-recur-period-start',
-        'event-recur-period-end',
-        'event-recur-start',
-        'event-recur-end',
-        'recur-mode-all',
-        'recur-mode-days',
+        'event-repeat-mode',
+        'event-repeat-end-mode',
+        'event-repeat-until',
+        'event-repeat-count',
         'reservation-slot-owner-email',
         'event-inscrits-select'
     ];
@@ -4342,7 +5056,8 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         );
     }
     if (btnEditFermeture instanceof HTMLButtonElement) {
-        const showFermetureEdit = isFermetureSlot && canEditFermeturePeriod && isReadOnlyView;
+        const showFermetureEdit =
+            SHOW_LEGACY_FERMETURE_EDIT_UI && isFermetureSlot && canEditFermeturePeriod && isReadOnlyView;
         btnEditFermeture.classList.toggle('hidden', !showFermetureEdit);
         btnEditFermeture.disabled = !showFermetureEdit;
     }
@@ -4359,9 +5074,31 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     document.getElementById('event-motif-select')?.addEventListener('change', refreshHeadlineOnly, {
         signal: modalSignal
     });
+    document.getElementById('event-motif-select')?.addEventListener(
+        'change',
+        () => syncReservationRangeModeUi(currentUser, reservationModalEventRef, canEditEvent),
+        { signal: modalSignal }
+    );
     document.getElementById('event-title-input')?.addEventListener('input', refreshHeadlineOnly, {
         signal: modalSignal
     });
+    document.getElementById('event-repeat-mode')?.addEventListener(
+        'change',
+        () => {
+            const until = document.getElementById('event-repeat-until');
+            const startYmd = String(document.getElementById('event-date-start')?.value || '').slice(0, 10);
+            if (until instanceof HTMLInputElement && !until.value) {
+                until.value = defaultSeriesUntilYmd(startYmd);
+            }
+            setRecurringOptionsVisible();
+        },
+        { signal: modalSignal }
+    );
+    document.getElementById('event-repeat-end-mode')?.addEventListener(
+        'change',
+        () => setRecurringOptionsVisible(),
+        { signal: modalSignal }
+    );
 
     btnEditFermeture?.addEventListener(
         'click',
@@ -4800,58 +5537,46 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         currentUser,
         liveEventRef || eventRef
     );
-    const recurOn =
-        isPrivilegedUser(currentUser) &&
-        document.getElementById('event-recurring')?.checked &&
-        !liveEventRef;
+    const repeatMode = isPrivilegedUser(currentUser) && !liveEventRef ? repeatModeFromForm() : 'once';
+    const recurOn = repeatMode !== 'once';
 
     if (recurOn) {
-        const periodStart = document.getElementById('event-recur-period-start')?.value;
-        const periodEnd = document.getElementById('event-recur-period-end')?.value;
-        const tRecStart = document.getElementById('event-recur-start')?.value;
-        const tRecEnd = document.getElementById('event-recur-end')?.value;
-        if (!periodStart || !periodEnd) {
-            showToast('Indiquez le jour de début et le jour de fin de la période.', 'error');
+        if (slotType === 'fermeture' || slotType === 'indispo') {
+            showToast('La périodicité est réservée aux cours, travail perso, concert et autre.', 'error');
             return false;
         }
-        if (periodStart > periodEnd) {
-            showToast('Le jour de fin de période doit être le même jour ou après le jour de début.', 'error');
+        const dateStart = document.getElementById('event-date-start')?.value;
+        const tStart = document.getElementById('event-start')?.value;
+        const tEnd = document.getElementById('event-end')?.value;
+        if (!dateStart || !tStart || !tEnd) {
+            showToast('Veuillez renseigner le jour et les heures de début et de fin.', 'error');
             return false;
         }
-        if (!tRecStart || !tRecEnd) {
-            showToast('Indiquez la plage horaire (de … à …).', 'error');
+        const startIso = new Date(`${dateStart}T${tStart}:00`).toISOString();
+        const endIso = new Date(`${dateStart}T${tEnd}:00`).toISOString();
+        if (new Date(endIso).getTime() <= new Date(startIso).getTime()) {
+            showToast('L’heure de fin doit être après l’heure de début.', 'error');
             return false;
         }
-        if (clockMinutes(tRecEnd) <= clockMinutes(tRecStart)) {
-            showToast(
-                'Pour une récurrence, l’heure de fin doit être le même jour après l’heure de début (pas de passage après minuit).',
-                'error'
-            );
+        const repeatEndMode = repeatEndModeFromForm();
+        const repeatUntilInput = String(document.getElementById('event-repeat-until')?.value || '').slice(0, 10);
+        const repeatCountRaw = String(document.getElementById('event-repeat-count')?.value || '').trim();
+        const repeatCount = Number.parseInt(repeatCountRaw, 10);
+        const untilYmd =
+            repeatEndMode === 'until'
+                ? repeatUntilInput
+                : defaultSeriesUntilYmd(dateStart);
+        if (repeatEndMode === 'until' && !untilYmd) {
+            showToast('La date de fin est obligatoire pour une série périodique.', 'error');
             return false;
         }
-        const allPeriod = document.getElementById('recur-mode-all')?.checked;
-        const pattern = allPeriod ? 'all' : 'custom';
-        let dowSet = null;
-        if (!allPeriod) {
-            dowSet = selectedDowSet();
-            if (dowSet.size === 0) {
-                showToast('Cochez au moins un jour de la semaine.', 'error');
-                return false;
-            }
-        }
-        const days = enumerateRecurringDays(periodStart, periodEnd, pattern, dowSet);
-        if (days.length === 0) {
-            showToast('Aucun jour ne correspond aux choix sur cette période.', 'error');
+        if (untilYmd && untilYmd < dateStart) {
+            showToast('La date de fin doit être le même jour ou après la première occurrence.', 'error');
             return false;
         }
-        for (const d of days) {
-            const sStr = `${d}T${tRecStart}:00`;
-            const eStr = `${d}T${tRecEnd}:00`;
-            const c = findOverlappingCalendarEvent(calendar, new Date(sStr), new Date(eStr), null);
-            if (c) {
-                showToast(overlapToastMessage(c), 'error');
-                return false;
-            }
+        if (repeatEndMode === 'count' && (!Number.isFinite(repeatCount) || repeatCount < 1)) {
+            showToast('Indiquez un nombre d’occurrences valide.', 'error');
+            return false;
         }
         const ownerUid = await planningUserIdForEmail(slotOwnerEmail || currentUser.email);
         if (!ownerUid) {
@@ -4860,43 +5585,100 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         }
         const dbSlotType = motifToPlanningDbSlotType(motif);
         const bridgeType = planningDbSlotTypeToBridgeType(dbSlotType);
+        const seriesRes = await createPlanningEventSeries({
+            ownerUserId: ownerUid,
+            ownerEmail: slotOwnerEmail || currentUser.email,
+            slotType: dbSlotType,
+            title,
+            startAtFirst: startIso,
+            untilYmd,
+            occurrenceLimit: repeatEndMode === 'count' ? repeatCount : null,
+            frequencyInterval: repeatMode === 'biweekly' ? 2 : 1
+        });
+        if (!seriesRes.ok || !seriesRes.series?.id) {
+            showToast(seriesRes.error || 'Création de la série impossible.', 'error');
+            return false;
+        }
+        const planRes = await planSeriesAutoPauseExceptions({
+            ownerUid,
+            startIso,
+            endIso,
+            untilYmd,
+            occurrenceLimit: repeatEndMode === 'count' ? repeatCount : null,
+            frequencyInterval: repeatMode === 'biweekly' ? 2 : 1
+        });
+        if (!planRes.ok) {
+            await deletePlanningEventSeries(seriesRes.series.id);
+            showToast(planRes.error || 'Préparation de la série impossible.', 'error');
+            return false;
+        }
+        for (const ex of planRes.plannedExceptions) {
+            const created = await createPlanningSeriesException(
+                ex.occurrenceStartAt,
+                ex.exceptionKind,
+                ex.payload,
+                String(currentUser?.id || '').trim(),
+                seriesRes.series.id
+            );
+            if (!created.ok) {
+                await deletePlanningEventSeries(seriesRes.series.id);
+                showToast(created.error || 'Création des pauses de série impossible.', 'error');
+                return false;
+            }
+        }
+        const rows = buildPlanningEventRowsFromSeries({
+            seriesId: seriesRes.series.id,
+            ownerUserId: ownerUid,
+            ownerEmail: slotOwnerEmail || currentUser.email,
+            slotType: dbSlotType,
+            title,
+            startIso,
+            endIso,
+            untilYmd,
+            occurrenceLimit: repeatEndMode === 'count' ? repeatCount : null,
+            frequencyInterval: repeatMode === 'biweekly' ? 2 : 1,
+            seriesExceptions: planRes.plannedExceptions
+        });
+        if (!rows.length) {
+            await deletePlanningEventSeries(seriesRes.series.id);
+            showToast('Aucune occurrence à créer sur la période demandée.', 'error');
+            return false;
+        }
         /** @type {Record<string, unknown>[]} */
         const bridgeEventsDb = [];
         /** @type {string[]} */
         const createdIds = [];
-        for (const d of days) {
-            const startIso = new Date(`${d}T${tRecStart}:00`).toISOString();
-            const endIso = new Date(`${d}T${tRecEnd}:00`).toISOString();
+        for (const row of rows) {
             const ur = await upsertPlanningEventRow({
                 id: null,
-                startIso,
-                endIso,
+                startIso: row.startIso,
+                endIso: row.endIso,
                 title,
                 dbSlotType,
                 ownerEmail: slotOwnerEmail || currentUser.email,
-                ownerUserId: ownerUid
+                ownerUserId: ownerUid,
+                seriesId: seriesRes.series.id,
+                seriesPosition: row.seriesPosition
             });
             if (!ur.ok || !ur.id) {
-                for (const id of createdIds) {
-                    await deletePlanningEventRow(id);
-                }
+                for (const id of createdIds) await deletePlanningEventRow(id);
+                await deletePlanningEventSeries(seriesRes.series.id);
                 showToast(ur.error || 'Enregistrement base impossible.', 'error');
                 return false;
             }
             createdIds.push(ur.id);
             const enrollR = await syncPlanningEnrollmentAfterSave(ur.id, dbSlotType);
             if (!enrollR.ok) {
-                for (const id of createdIds) {
-                    await deletePlanningEventRow(id);
-                }
+                for (const id of createdIds) await deletePlanningEventRow(id);
+                await deletePlanningEventSeries(seriesRes.series.id);
                 showToast(enrollR.error || 'Enregistrement des inscriptions impossible.', 'error');
                 return false;
             }
             bridgeEventsDb.push({
                 planningEventId: ur.id,
                 title,
-                start: startIso,
-                end: endIso,
+                start: row.startIso,
+                end: row.endIso,
                 type: bridgeType,
                 owner: slotOwnerEmail || currentUser.email,
                 ...(enrollR.emailsCsv ? { inscrits: enrollR.emailsCsv } : {})
@@ -4904,11 +5686,14 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         }
         if (!reservationAutoSaveMode) {
             document.getElementById('modal_reservation').close();
-            showToast(`${days.length} créneau${days.length > 1 ? 'x' : ''} enregistré${days.length > 1 ? 's' : ''}.`);
+            const pausesCount = planRes.plannedExceptions.length;
+            showToast(
+                pausesCount > 0
+                    ? `${rows.length} créneau${rows.length > 1 ? 'x' : ''} périodique${rows.length > 1 ? 's' : ''} enregistré${rows.length > 1 ? 's' : ''} (${pausesCount} pause${pausesCount > 1 ? 's' : ''} sur fermeture/indispo).`
+                    : `${rows.length} créneau${rows.length > 1 ? 'x' : ''} périodique${rows.length > 1 ? 's' : ''} enregistré${rows.length > 1 ? 's' : ''}.`
+            );
         }
-        document.getElementById('event-recurring').checked = false;
         resetRecurringFormDefaults();
-        setRecurringOptionsVisible(false);
         await refetchPlanningGrid(calendar);
         if (calendarBridgeWanted()) {
             for (const id of createdIds) {
@@ -4919,41 +5704,76 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
                 }
             }
         }
-        voidLaunchReservationGoogleSyncWithRollback(
-            calendar,
-            bridgeEventsDb,
-            { mode: 'create', eventId: createdIds[0] || '', createdIds }
-        );
+        if (bridgeEventsDb.length > 0) {
+            voidLaunchReservationGoogleSyncWithRollback(
+                calendar,
+                bridgeEventsDb,
+                { mode: 'create', eventId: createdIds[0] || '', createdIds }
+            );
+        }
         return true;
     }
 
-    const dateStart = document.getElementById('event-date-start').value;
-    const tStart = document.getElementById('event-start').value;
-    const tEnd = document.getElementById('event-end').value;
+    const dateStart = String(document.getElementById('event-date-start')?.value || '').slice(0, 10);
+    const dateEndInput = String(document.getElementById('event-date-end')?.value || '').slice(0, 10);
+    const tStart = String(document.getElementById('event-start')?.value || '').trim();
+    const tEnd = String(document.getElementById('event-end')?.value || '').trim();
+    const usesDateRange = reservationUsesDateEndRange(motif);
+    const dateEnd = usesDateRange ? dateEndInput || dateStart : dateStart;
 
-    if (!dateStart || !tStart || !tEnd) {
-        showToast('Veuillez renseigner le jour et les heures de début et de fin.', 'error');
+    if (!dateStart) {
+        showToast('Veuillez renseigner le jour de début.', 'error');
+        return false;
+    }
+    if (usesDateRange && !dateEnd) {
+        showToast('Veuillez renseigner la date de fin.', 'error');
+        return false;
+    }
+    if (dateEnd < dateStart) {
+        showToast('La date de fin doit être le même jour ou après le début.', 'error');
         return false;
     }
 
-    const startStr = `${dateStart}T${tStart}:00`;
-    const endStr = `${dateStart}T${tEnd}:00`;
+    const dbSlotType = lockedDbSlotType || motifToPlanningDbSlotType(motif);
+    const bridgeType = planningDbSlotTypeToBridgeType(dbSlotType);
+    let startStr = '';
+    let endStr = '';
+    let isAllDaySingle = false;
+
+    if (dbSlotType === 'fermeture') {
+        if (normalizeRole(currentUser?.role) !== 'admin') {
+            showToast('Seuls les administrateurs peuvent créer des fermetures.', 'error');
+            return false;
+        }
+        startStr = `${dateStart}T00:00:00`;
+        const endExclusive = new Date(`${dateEnd}T00:00:00`);
+        endExclusive.setDate(endExclusive.getDate() + 1);
+        endStr = `${endExclusive.getFullYear()}-${String(endExclusive.getMonth() + 1).padStart(2, '0')}-${String(endExclusive.getDate()).padStart(2, '0')}T00:00:00`;
+        isAllDaySingle = true;
+    } else if (dbSlotType === 'indispo') {
+        if (normalizeRole(currentUser?.role) !== 'prof') {
+            showToast('Le type indispo est réservé aux professeurs.', 'error');
+            return false;
+        }
+        if (!tStart || !tEnd) {
+            showToast('Veuillez renseigner les heures de début et de fin.', 'error');
+            return false;
+        }
+        startStr = `${dateStart}T${tStart}:00`;
+        endStr = `${dateEnd}T${tEnd}:00`;
+    } else {
+        if (!tStart || !tEnd) {
+            showToast('Veuillez renseigner le jour et les heures de début et de fin.', 'error');
+            return false;
+        }
+        startStr = `${dateStart}T${tStart}:00`;
+        endStr = `${dateStart}T${tEnd}:00`;
+    }
 
     const startMs = new Date(startStr).getTime();
     const endMs = new Date(endStr).getTime();
     if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) {
         showToast('La date et heure de fin doivent être après le début.', 'error');
-        return false;
-    }
-
-    const conflictSingle = findOverlappingCalendarEvent(
-        calendar,
-        new Date(startStr),
-        new Date(endStr),
-        liveEventRef
-    );
-    if (conflictSingle) {
-        showToast(overlapToastMessage(conflictSingle), 'error');
         return false;
     }
 
@@ -4989,13 +5809,6 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     const gid = liveEventRef ? bridgeGoogleIdFromFcEvent(liveEventRef) : '';
     const poolLinkExisting = String(liveEventRef?.extendedProps?.poolGoogleEventId ?? '').trim();
 
-    const ownerUid = await planningUserIdForEmail(slotOwnerEmail || currentUser.email);
-    if (!ownerUid) {
-        showToast('Impossible de résoudre le compte du propriétaire du créneau.', 'error');
-        return false;
-    }
-    const dbSlotType = lockedDbSlotType || motifToPlanningDbSlotType(motif);
-    const bridgeType = planningDbSlotTypeToBridgeType(dbSlotType);
     const startIso = new Date(startStr).toISOString();
     const endIso = new Date(endStr).toISOString();
     let canonicalExisting = liveEventRef
@@ -5003,6 +5816,71 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         : staleCanonicalId;
     if (!canonicalExisting && quickPersistResult?.dbId) {
         canonicalExisting = quickPersistResult.dbId;
+    }
+    const ownerUid = await planningUserIdForEmail(slotOwnerEmail || currentUser.email);
+    if (!ownerUid) {
+        showToast('Impossible de résoudre le compte du propriétaire du créneau.', 'error');
+        return false;
+    }
+    if (dbSlotType !== 'fermeture' && dbSlotType !== 'indispo') {
+        const conflictSingle = findOverlappingCalendarEvent(
+            calendar,
+            new Date(startStr),
+            new Date(endStr),
+            liveEventRef
+        );
+        if (conflictSingle) {
+            showToast(overlapToastMessage(conflictSingle), 'error');
+            return false;
+        }
+    }
+    if (dbSlotType === 'fermeture' || dbSlotType === 'indispo') {
+        const overlapsRaw = await fetchPlanningRowsOverlappingRange(startIso, endIso, canonicalExisting);
+        const overlaps =
+            dbSlotType === 'fermeture'
+                ? overlapsRaw
+                : overlapsRaw.filter((row) => String(row.owner_user_id || '').trim() === String(ownerUid).trim());
+        if (overlaps.length) {
+            if (dbSlotType === 'indispo') {
+                const seriesResolution = await resolveGeneratedSeriesOverlapsForIndispo({
+                    calendar,
+                    currentUser,
+                    overlaps,
+                    indispoStartIso: startIso,
+                    indispoEndIso: endIso
+                });
+                if (!seriesResolution.ok) {
+                    if (seriesResolution.cancelled) return false;
+                    showToast(seriesResolution.error || 'Traitement des séries touchées impossible.', 'error');
+                    return false;
+                }
+                if (seriesResolution.deleteIds.length) {
+                    const deleteRes = await deletePlanningEventsByCanonicalIds(seriesResolution.deleteIds);
+                    if (!deleteRes.ok) {
+                        showToast(deleteRes.error || 'Suppression des créneaux recouverts impossible.', 'error');
+                        return false;
+                    }
+                }
+            } else {
+                const { planningConfirm } = await import('../utils/planning-confirm.js');
+                const ok = await planningConfirm(
+                    `Cette fermeture supprimera ${overlaps.length} créneau${overlaps.length > 1 ? 'x' : ''} sur la période choisie. Continuer ?`,
+                    {
+                        title: 'Confirmer la fermeture',
+                        confirmLabel: 'Continuer',
+                        danger: true
+                    }
+                );
+                if (!ok) return false;
+                const deleteRes = await deletePlanningEventsByCanonicalIds(
+                    overlaps.map((row) => String(row.id || '').trim())
+                );
+                if (!deleteRes.ok) {
+                    showToast(deleteRes.error || 'Suppression des créneaux recouverts impossible.', 'error');
+                    return false;
+                }
+            }
+        }
     }
     const capModal = await validateEleveTravailPersistCap(
         {
@@ -5029,6 +5907,17 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         liveEventRef && canonicalExisting
             ? String(liveEventRef.extendedProps?.planningSourceTemplateLineId || '').trim()
             : '';
+    const currentSeriesId =
+        liveEventRef && canonicalExisting
+            ? String(liveEventRef.extendedProps?.planningSeriesId || '').trim()
+            : '';
+    if (currentSeriesId && (dbSlotType === 'fermeture' || dbSlotType === 'indispo')) {
+        showToast(
+            'Une occurrence périodique ne peut pas être transformée en fermeture ou indispo. Créez ce blocage séparément.',
+            'error'
+        );
+        return false;
+    }
 
     let detachTemplateLink = false;
     if (liveEventRef && canonicalExisting && prevSnapshot) {
@@ -5138,7 +6027,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
               ownerUid
           )
         : null;
-    const needsGoogleSync = !googlePayloadUnchanged && calendarBridgeWanted();
+    const needsGoogleSync = dbSlotType !== 'indispo' && !googlePayloadUnchanged && calendarBridgeWanted();
 
     if (!reservationAutoSaveMode) {
         document.getElementById('modal_reservation').close();
@@ -5166,6 +6055,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
         slotType,
         ownerEmail: ownerEmailNorm,
         inscritsEmails: localInscritsEmails,
+        isAllDay: isAllDaySingle,
         googlePending: needsGoogleSync
     });
 

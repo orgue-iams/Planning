@@ -59,7 +59,7 @@ export async function fetchOrganSchoolSettings() {
             eleve_booking_horizon_enabled: false,
             eleve_booking_horizon_amount: null,
             eleve_booking_horizon_unit: 'days',
-            eleve_count_voided_travail_toward_cap: true,
+            eleve_count_voided_travail_toward_cap: false,
             eleve_forbid_delete_after_slot_start: true,
             eleve_booking_tolerance_days: 0,
             template_apply_closure_ranges: []
@@ -155,11 +155,7 @@ export async function saveOrganSchoolSettingsAdmin(row) {
             })(),
             eleve_booking_horizon_unit:
                 String(row.eleve_booking_horizon_unit || 'days') === 'weeks' ? 'weeks' : 'days',
-            eleve_count_voided_travail_toward_cap: Boolean(
-                row.eleve_count_voided_travail_toward_cap ??
-                    getOrganSchoolSettingsCached()?.eleve_count_voided_travail_toward_cap ??
-                    true
-            ),
+            eleve_count_voided_travail_toward_cap: false,
             eleve_forbid_delete_after_slot_start: Boolean(row.eleve_forbid_delete_after_slot_start),
             eleve_booking_tolerance_days: Math.max(
                 0,

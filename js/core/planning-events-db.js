@@ -12,6 +12,7 @@ import {
 /** Alignement types base → extendedProps.type (couleurs / bridge historique). */
 export function slotTypeToPlanningExtendedType(slotType) {
     const s = String(slotType || '').trim();
+    if (s === 'indispo') return 'indispo';
     if (s === 'fermeture') return 'fermeture';
     if (s === 'cours') return 'cours';
     if (s === 'concert') return 'concert';
@@ -30,6 +31,7 @@ export function planningDbSlotTypeForEventUpdate(ev) {
     const explicit = String(ev?.extendedProps?.planningDbSlotType || '').trim();
     if (explicit) return explicit;
     const t = String(ev?.extendedProps?.type || '').trim();
+    if (t === 'indispo') return 'indispo';
     if (t === 'fermeture') return 'fermeture';
     if (t === 'cours') return 'cours';
     if (t === 'concert') return 'concert';
@@ -77,10 +79,16 @@ export function mapPlanningDbRowToFcEvent(row, _currentUser) {
             planningSourceTemplateLineId: row.source_template_line_id
                 ? String(row.source_template_line_id)
                 : '',
+            planningSeriesId: row.series_id ? String(row.series_id).trim() : '',
+            planningSeriesPosition:
+                Number.isFinite(Number(row.series_position)) && Number(row.series_position) >= 1
+                    ? Number(row.series_position)
+                    : null,
             planningGabaritWeekType: (() => {
                 const w = String(row.gabarit_week_type || '').trim().toUpperCase();
                 return w === 'A' || w === 'B' ? w : '';
             })(),
+            planningIsAllDay: Boolean(row.is_all_day),
             planningAbsencePeriodId: row.absence_period_id
                 ? String(row.absence_period_id).trim()
                 : ''
@@ -206,7 +214,11 @@ export async function planningUserIdForEmail(email) {
  *   ownerEmail: string,
  *   ownerUserId: string,
  *   sourceTemplateLineId?: string | null,
- *   gabaritWeekType?: 'A' | 'B' | '' | null
+ *   gabaritWeekType?: 'A' | 'B' | '' | null,
+ *   absencePeriodId?: string | null,
+ *   seriesId?: string | null,
+ *   seriesPosition?: number | null,
+ *   isAllDay?: boolean
  * }} p
  */
 export async function upsertPlanningEventRow(p) {
@@ -222,6 +234,7 @@ export async function upsertPlanningEventRow(p) {
         slot_type: p.dbSlotType,
         owner_email,
         owner_user_id: p.ownerUserId,
+        is_all_day: Boolean(p.isAllDay),
         updated_at: new Date().toISOString()
     };
     const tplId = p.sourceTemplateLineId !== undefined ? String(p.sourceTemplateLineId || '').trim() : undefined;
@@ -236,6 +249,14 @@ export async function upsertPlanningEventRow(p) {
         const ap = String(p.absencePeriodId || '').trim();
         row.absence_period_id = ap || null;
     }
+    if (p.seriesId !== undefined) {
+        const sid = String(p.seriesId || '').trim();
+        row.series_id = sid || null;
+    }
+    if (p.seriesPosition !== undefined) {
+        const pos = Number(p.seriesPosition);
+        row.series_position = Number.isFinite(pos) && pos >= 1 ? Math.trunc(pos) : null;
+    }
     const existingId = p.id ? String(p.id).trim() : '';
     if (existingId) {
         /** Mise à jour seule (évite upsert + politique INSERT RLS sur lignes existantes). */
@@ -244,8 +265,12 @@ export async function upsertPlanningEventRow(p) {
             end_at: row.end_at,
             title: row.title,
             slot_type: row.slot_type,
+            is_all_day: row.is_all_day,
             updated_at: row.updated_at
         };
+        if ('absence_period_id' in row) updateRow.absence_period_id = row.absence_period_id;
+        if ('series_id' in row) updateRow.series_id = row.series_id;
+        if ('series_position' in row) updateRow.series_position = row.series_position;
         const { data, error } = await sb
             .from('planning_event')
             .update(updateRow)

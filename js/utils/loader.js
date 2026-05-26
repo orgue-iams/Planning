@@ -23,6 +23,7 @@ export async function loadUIComponents() {
         { id: 'app-modals', file: 'components/modal-statistics.html', append: true },
         { id: 'app-modals', file: 'components/modal-directory-users.html', append: true },
         { id: 'app-modals', file: 'components/modal-cours-series-scope.html', append: true },
+        { id: 'app-modals', file: 'components/modal-indispo-series-resolution.html', append: true },
         { id: 'app-modals', file: 'components/modal-semaines-slot-edit.html', append: true }
     ];
 

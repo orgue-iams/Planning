@@ -517,7 +517,7 @@ export async function refreshDrawerNextCours(user) {
         empty?.classList.remove('hidden');
         empty.textContent = enrollments.length
             ? 'Aucune date de cours planifiée pour le moment.'
-            : 'Aucun cours inscrit dans les semaines types.';
+            : 'Aucun cours périodique enregistré.';
     } else {
         empty?.classList.add('hidden');
     }

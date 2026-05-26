@@ -283,6 +283,7 @@ let lastAnalysis = null;
 /** True tant que la synchro Google du gabarit (étape 2) n’est pas terminée. */
 let stGoogleSyncInFlight = false;
 let stUiBound = false;
+const SHOW_LEGACY_SEMAINES_TYPES_UI = false;
 /** @type {HTMLElement | null} */
 let stDnDRow = null;
 /** @type {Map<string, object>} */
@@ -1143,6 +1144,11 @@ function defaultApplyEndYmd() {
 }
 
 async function openSemainesTypesModal(user) {
+    if (!SHOW_LEGACY_SEMAINES_TYPES_UI) {
+        void user;
+        showToast("L'ancien écran Semaines A/B est masqué.", 'info');
+        return;
+    }
     const dlg = document.getElementById('modal_semaines_types');
     if (!dlg) return;
     if (!isProf(user)) {
@@ -1977,6 +1983,10 @@ export function initSemainesTypesUi() {
         'click',
         (e) => {
             e.preventDefault();
+            if (!SHOW_LEGACY_SEMAINES_TYPES_UI) {
+                showToast("L'ancien écran Semaines A/B est masqué.", 'info');
+                return;
+            }
             const u = getPlanningSessionUser();
             if (!u?.id) return;
             if (!isProf(u)) {

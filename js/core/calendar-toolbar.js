@@ -11,6 +11,7 @@ let headerOffsetObserver = null;
 let headerOffsetSyncInited = false;
 let headerOffsetRaf = 0;
 let lastHeaderOffsetBottom = 0;
+const SHOW_LEGACY_WEEK_CYCLE_BADGE = false;
 
 /** Aligne le padding de #app-shell sur la hauteur réelle du bandeau fixe (évite le masquage des en-têtes FC). */
 export function syncPlanningAppHeaderOffset() {
@@ -127,6 +128,7 @@ function toolbarPeriodBaseTitle(view) {
  * @param {import('@fullcalendar/core').CalendarApi} calendar
  */
 function toolbarWeekCycleLabel(calendar) {
+    if (!SHOW_LEGACY_WEEK_CYCLE_BADGE) return '';
     const u = getPlanningSessionUser();
     if (!isProf(u)) return '';
     const view = calendar.view;

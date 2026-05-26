@@ -4,7 +4,7 @@
  * - YY : incrément fonctionnel (évolutions utilisateur)
  * - ZZ : correctif debug / hotfix
  */
-export const APP_VERSION = 'v00.01.22';
+export const APP_VERSION = 'v00.02.01';
 
 /** Nom du cache service worker (lié à la version). */
 export const CACHE_NAME = `planning-cache-${APP_VERSION}`;

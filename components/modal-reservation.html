@@ -18,7 +18,12 @@
                     </div>
                 </label>
 
-                <div class="form-control">
+                <label id="wrap-reservation-date-end" class="form-control block hidden" for="event-date-end">
+                    <span class="label-text font-bold text-[11px] uppercase text-slate-500 py-0">Date de fin</span>
+                    <input type="date" id="event-date-end" class="planning-field input input-bordered input-sm w-full" />
+                </label>
+
+                <div id="wrap-reservation-hours" class="form-control">
                     <span class="label-text font-bold text-[11px] uppercase text-slate-500 block mb-1">Horaires</span>
                     <div class="flex flex-wrap items-center gap-2">
                         <select id="event-start" aria-label="Heure de début" class="select select-sm w-[6.5rem] font-mono bg-white dark:bg-slate-900"></select>
@@ -39,7 +44,36 @@
                     <input id="event-title-input" type="text" maxlength="120" class="input input-sm w-full bg-white dark:bg-slate-900" />
                 </div>
 
-                <div id="event-recurring-wrap" class="hidden" aria-hidden="true"></div>
+                <div id="event-recurring-wrap" class="hidden form-control" aria-hidden="true">
+                    <span class="label-text font-bold text-[11px] uppercase text-slate-500 block mb-1">Répétition</span>
+                    <select id="event-repeat-mode" class="planning-field select select-sm select-bordered w-full" aria-label="Répétition">
+                        <option value="once" selected>Une seule fois</option>
+                        <option value="weekly">Toutes les semaines</option>
+                        <option value="biweekly">Toutes les 2 semaines</option>
+                    </select>
+                    <div id="event-repeat-options" class="hidden mt-2 space-y-2">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <label class="form-control block" for="event-repeat-end-mode">
+                                <span class="label-text font-bold text-[11px] uppercase text-slate-500 py-0">Fin</span>
+                                <select id="event-repeat-end-mode" class="planning-field select select-sm select-bordered w-full" aria-label="Type de fin">
+                                    <option value="until" selected>Date de fin</option>
+                                    <option value="count">Nombre d'occurrences</option>
+                                </select>
+                            </label>
+                            <label id="event-repeat-until-wrap" class="form-control block" for="event-repeat-until">
+                                <span class="label-text font-bold text-[11px] uppercase text-slate-500 py-0">Date de fin</span>
+                                <input id="event-repeat-until" type="date" class="planning-field input input-bordered input-sm w-full" />
+                            </label>
+                            <label id="event-repeat-count-wrap" class="form-control block hidden" for="event-repeat-count">
+                                <span class="label-text font-bold text-[11px] uppercase text-slate-500 py-0">Occurrences</span>
+                                <input id="event-repeat-count" type="number" min="1" step="1" class="planning-field input input-bordered input-sm w-full" />
+                            </label>
+                        </div>
+                        <p class="text-[11px] text-slate-500 leading-snug m-0">
+                            La date de fin est préremplie avec la fin d'année scolaire.
+                        </p>
+                    </div>
+                </div>
                 <div id="wrap-reservation-inscrits" class="hidden form-control" aria-hidden="true">
                     <span class="label-text font-bold text-[11px] uppercase text-slate-500 py-0">Élèves inscrits</span>
                     <p id="reservation-inscrits-summary" class="text-sm text-slate-700 dark:text-slate-200 mt-1 mb-2 leading-snug">Aucun élève (optionnel)</p>

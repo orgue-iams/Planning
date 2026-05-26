@@ -98,6 +98,10 @@ import { initFermetureEditUi, resetFermetureEditUiBindings } from './fermeture-e
 import { initStatisticsUi, resetStatisticsUiBindings } from './statistics-ui.js';
 import { initDirectoryUsersUi, resetDirectoryUsersUiBindings } from './directory-users-ui.js';
 import { initCoursSeriesScopeUi, resetCoursSeriesScopeUiBindings } from './cours-series-scope-ui.js';
+import {
+    initIndispoSeriesResolutionUi,
+    resetIndispoSeriesResolutionUiBindings
+} from './indispo-series-resolution-ui.js';
 import { initConfigUi, resetConfigUiBindings } from './config-ui.js';
 import { installAdminClearWeekDelegatedClick } from './admin-clear-week.js';
 import { refreshProfWeekCycleToolbarUi, clearProfWeekCycleCache } from './week-cycle.js';
@@ -149,6 +153,7 @@ function performLogout() {
     resetStatisticsUiBindings();
     resetDirectoryUsersUiBindings();
     resetCoursSeriesScopeUiBindings();
+    resetIndispoSeriesResolutionUiBindings();
     resetConfigUiBindings();
         resetPlanningDrawerBindings();
         resetDrawerHelpUiBindings();
@@ -185,7 +190,8 @@ function performLogout() {
         'modal_course_students',
         'modal_statistics',
         'modal_directory_users',
-        'modal_cours_series_scope'
+        'modal_cours_series_scope',
+        'modal_indispo_series_resolution'
     ].forEach((id) => document.getElementById(id)?.close());
     const loginDlg = document.getElementById('modal_login');
     void applyLoginBanner();
@@ -251,10 +257,7 @@ function refreshHeaderUser(user) {
     syncCalendarPrefControlsUi();
     document.getElementById('menu-item-directory-wrap')?.classList.toggle('hidden', !isBackendAuthConfigured());
     const auth = isBackendAuthConfigured();
-    document.getElementById('menu-item-semaines-types-wrap')?.classList.toggle(
-        'hidden',
-        !auth || r !== 'prof'
-    );
+    document.getElementById('menu-item-semaines-types-wrap')?.classList.add('hidden');
     syncFermeturesMenuVisibility(user);
     document.getElementById('menu-item-statistics-wrap')?.classList.toggle('hidden', !staff);
     document.getElementById('btn-admin-clear-week')?.classList.toggle('hidden', r !== 'admin');
@@ -607,6 +610,7 @@ function initCalendarAndRevealUi() {
         initStatisticsUi();
         initDirectoryUsersUi();
         initCoursSeriesScopeUi();
+        initIndispoSeriesResolutionUi();
         initConfigUi(currentUser);
         initAdminUsersUi(currentUser);
         initAdminCalendarPoolUi(currentUser);
@@ -818,13 +822,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (hadStoredSupabaseSession && isBackendAuthConfigured()) {
         muteSessionLostEvents(12000);
     }
-    const restored = await tryRestoreSession();
-    if (restored) {
+    const restored = await Promise.race([
+        tryRestoreSession(),
+        new Promise((resolve) => setTimeout(() => resolve('__restore_timeout__'), 4000))
+    ]);
+    if (restored && restored !== '__restore_timeout__') {
         currentUser = restored;
         setPlanningSessionUser(currentUser);
         refreshHeaderUser(currentUser);
         initCalendarAndRevealUi();
         document.getElementById('modal_login')?.close();
+    } else if (restored === '__restore_timeout__') {
+        showToast('Restauration de session trop lente. Merci de vous reconnecter.', 'info', 6000);
     } else if (hadStoredSupabaseSession && isBackendAuthConfigured()) {
         showToast('Votre session a expiré. Merci de vous reconnecter.', 'info', 6000);
     }

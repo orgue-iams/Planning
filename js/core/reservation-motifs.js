@@ -8,6 +8,7 @@ export const RESERVATION_MOTIFS = /** @type {const} */ [
     'Cours',
     'Concert',
     'Autre',
+    'Indispo',
     'Fermeture'
 ];
 
@@ -22,6 +23,7 @@ export function motifDisplayLabel(motif) {
 export function motifToSlotType(motif) {
     const m = String(motif || '').trim();
     if (m === 'Fermeture') return 'fermeture';
+    if (m === 'Indispo') return 'indispo';
     if (m === 'Cours') return 'cours';
     if (m === 'Concert') return 'concert';
     if (m === 'Autre') return 'autre';
@@ -32,6 +34,7 @@ export function motifToSlotType(motif) {
 export function motifToPlanningDbSlotType(motif) {
     const m = String(motif || '').trim();
     if (m === 'Fermeture') return 'fermeture';
+    if (m === 'Indispo') return 'indispo';
     if (m === 'Cours') return 'cours';
     if (m === 'Concert') return 'concert';
     if (m === 'Autre') return 'autre';

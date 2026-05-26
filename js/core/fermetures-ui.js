@@ -38,6 +38,7 @@ import {
 import { openFermetureEdit } from './fermeture-edit-ui.js';
 
 let bound = false;
+const SHOW_LEGACY_FERMETURES_UI = false;
 
 const FERMETURE_CALENDAR_ICON_SVG =
     '<svg class="fermeture-card__cal-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>';
@@ -576,6 +577,12 @@ export function returnToFermeturesListOnly() {
 
 /** @param {object[]} conflicts @param {string} periodId @param {boolean} [fromCalendar] */
 export async function showFermeturesConflictFromApply(conflicts, periodId, fromCalendar = false) {
+    if (!SHOW_LEGACY_FERMETURES_UI) {
+        void conflicts;
+        void periodId;
+        void fromCalendar;
+        return;
+    }
     const u = getPlanningSessionUser();
     if (!canViewClosures(u)) return;
     const dlg = document.getElementById('modal_fermetures');
@@ -596,6 +603,11 @@ export async function showFermeturesConflictFromApply(conflicts, periodId, fromC
 }
 
 export async function openClosureEditByPeriodId(periodId) {
+    if (!SHOW_LEGACY_FERMETURES_UI) {
+        void periodId;
+        showToast("L'ancien écran Fermetures / Indisponibilités est masqué.", 'info');
+        return;
+    }
     const id = String(periodId || '').trim();
     if (!id || id.startsWith('legacy:')) {
         showToast('Cette fermeture historique ne peut pas être modifiée ici.', 'info');
@@ -617,6 +629,10 @@ export async function openClosureEditByPeriodId(periodId) {
 }
 
 export async function openFermeturesModal() {
+    if (!SHOW_LEGACY_FERMETURES_UI) {
+        showToast("L'ancien écran Fermetures / Indisponibilités est masqué.", 'info');
+        return;
+    }
     const u = getPlanningSessionUser();
     if (!canViewClosures(u)) {
         showToast('Indisponibilités : réservé aux professeurs et administrateurs.', 'info');
@@ -628,8 +644,8 @@ export async function openFermeturesModal() {
 }
 
 export function syncFermeturesMenuVisibility(user) {
-    const show = canViewClosures(user);
-    document.getElementById('menu-item-fermetures-wrap')?.classList.toggle('hidden', !show);
+    void user;
+    document.getElementById('menu-item-fermetures-wrap')?.classList.add('hidden');
     syncPlanningDrawerGroupedSections();
 }
 

@@ -1,23 +1,29 @@
 <dialog id="modal_cours_series_scope" class="modal" tabindex="-1">
     <div class="modal-box p-5 w-[96%] max-w-lg rounded-2xl border border-slate-200 shadow-2xl">
-        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest">Modifier le cours</h3>
+        <h3 class="font-black text-xs mb-2 uppercase text-slate-500 border-b pb-2 tracking-widest">Modifier la série</h3>
         <p class="text-[11px] text-slate-600 mb-3 leading-snug">
-            Ce cours est lié à une ligne des <strong>Semaines A/B</strong>. Vous avez changé l’horaire ou le titre. Comme sur Google Agenda, choisissez la portée de la modification.
+            Ce créneau fait partie d'une série périodique. Comme sur Google Agenda, choisissez la portée de la modification.
         </p>
         <div class="space-y-2 text-[11px] text-slate-800">
             <label class="flex gap-2 items-start cursor-pointer">
                 <input type="radio" name="cours-series-scope" value="single" class="mt-0.5" checked />
                 <span
-                    ><strong>Ce créneau uniquement</strong> — exception locale : les autres occurrences et la ligne gabarit
-                    restent inchangées ; les agendas Google des élèves inscrits sont mis à jour pour ce créneau seulement.</span
+                    ><strong>Ce créneau uniquement</strong> — exception locale : les autres occurrences de la série
+                    restent inchangées ; seule cette occurrence est modifiée.</span
                 >
             </label>
             <label class="flex gap-2 items-start cursor-pointer">
                 <input type="radio" name="cours-series-scope" value="future" class="mt-0.5" />
                 <span
-                    ><strong>Ce créneau et les suivants</strong> — tous les cours de la même ligne gabarit à partir de celui-ci
-                    (jusqu’à la fin d’année scolaire). Le gabarit Semaines A/B est aligné ; les agendas Google des élèves
-                    concernés sont resynchronisés pour chaque occurrence.</span
+                    ><strong>Ce créneau et les suivants</strong> — la série est coupée à partir de cette occurrence,
+                    puis recréée avec vos changements pour toute la suite.</span
+                >
+            </label>
+            <label class="flex gap-2 items-start cursor-pointer">
+                <input type="radio" name="cours-series-scope" value="all" class="mt-0.5" />
+                <span
+                    ><strong>Toute la série</strong> — toutes les occurrences de cette série sont réalignées avec vos
+                    changements.</span
                 >
             </label>
         </div>

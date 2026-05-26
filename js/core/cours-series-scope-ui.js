@@ -1,6 +1,6 @@
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
 
-/** @type {((v: 'single' | 'future' | null) => void) | null} */
+/** @type {((v: 'single' | 'future' | 'all' | null) => void) | null} */
 let pendingResolve = null;
 
 /** @type {'ok' | 'cancel' | null} */
@@ -11,6 +11,7 @@ let listenersBound = false;
 function readSelectedScope() {
     const el = document.querySelector('input[name="cours-series-scope"]:checked');
     const v = String(el?.value || 'single').trim();
+    if (v === 'all') return 'all';
     return v === 'future' ? 'future' : 'single';
 }
 
@@ -21,7 +22,7 @@ function finish(value) {
 }
 
 /**
- * @returns {Promise<'single' | 'future' | null>}
+ * @returns {Promise<'single' | 'future' | 'all' | null>}
  */
 export function openCoursSeriesScopeModal() {
     const dlg = document.getElementById('modal_cours_series_scope');
