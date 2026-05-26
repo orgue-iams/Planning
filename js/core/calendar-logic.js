@@ -3501,6 +3501,10 @@ function googleSyncInProgressMessage(stepIndex, total, calendarLabel) {
     return `Synchronisation Google en cours (${stepIndex + 1}/${total}) : ${line}`;
 }
 
+function googleSyncGenericMessage() {
+    return 'Synchronisation Google en cours…';
+}
+
 function formatPoolCalendarLabel(meta) {
     const lab = String(meta.label || 'Planning IAMS').trim();
     const user = String(meta.userLabel || '').trim();
@@ -4029,33 +4033,13 @@ async function runGoogleCalendarSyncInBackground(eventsPayload, calendar = null,
         if (options.onSyncSuccess) await options.onSyncSuccess({ ok: true, skipped: true });
         return { ok: true, skipped: true };
     }
-    const steps = await buildGoogleSyncStepsFromPayload(eventsPayload);
     googleCalendarSyncInFlight += 1;
-
-    let stepIdx = 0;
-    const total = steps.length;
-    const showStep = (i) => {
-        const step = steps[Math.min(i, steps.length - 1)];
-        if (step) setGoogleSyncBannerMessage(googleSyncInProgressMessage(i, total, step.label));
-    };
-    showStep(0);
-
-    /** @type {ReturnType<typeof setInterval> | null} */
-    let advanceTimer = null;
-    if (steps.length > 1) {
-        advanceTimer = setInterval(() => {
-            if (stepIdx < steps.length - 1) {
-                stepIdx += 1;
-                showStep(stepIdx);
-            }
-        }, 850);
-    }
+    setGoogleSyncBannerMessage(googleSyncGenericMessage());
 
     /** @type {{ ok: boolean, skipped?: boolean, error?: string }} */
     let sync = { ok: true, skipped: true };
     try {
         sync = await trySyncGoogleCalendar(eventsPayload);
-        if (advanceTimer) clearInterval(advanceTimer);
         if (!sync.ok && !sync.skipped) {
             if (options.onSyncFailed) {
                 await options.onSyncFailed(String(sync.error || 'échec'));
@@ -4074,7 +4058,6 @@ async function runGoogleCalendarSyncInBackground(eventsPayload, calendar = null,
             hideGoogleSyncBanner(0);
         }
     } catch (e) {
-        if (advanceTimer) clearInterval(advanceTimer);
         console.error(e);
         const msg = e instanceof Error ? e.message : 'erreur inattendue';
         if (options.onSyncFailed) await options.onSyncFailed(msg);
@@ -4082,7 +4065,6 @@ async function runGoogleCalendarSyncInBackground(eventsPayload, calendar = null,
         hideGoogleSyncBanner(5500);
         sync = { ok: false, error: msg };
     } finally {
-        if (advanceTimer) clearInterval(advanceTimer);
         googleCalendarSyncInFlight = Math.max(0, googleCalendarSyncInFlight - 1);
         if (googleCalendarSyncInFlight === 0 && !googleSyncBannerHideTimer) {
             syncSlotWorkflowBanner();

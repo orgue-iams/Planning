@@ -80,6 +80,14 @@ function emailFromSupabaseJwt(accessToken: string): string {
 
 type ServiceAccountCreds = { client_email: string; private_key: string };
 
+let googleAccessTokenCache:
+    | {
+          cacheKey: string;
+          token: string;
+          expiresAtMs: number;
+      }
+    | null = null;
+
 type BridgeBody = {
     action?: string;
     timeMin?: string;
@@ -127,7 +135,10 @@ function parseServiceAccountJson(raw: string): ServiceAccountCreds {
     };
 }
 
-async function accessTokenFromServiceAccount(creds: ServiceAccountCreds, impersonate?: string): Promise<string> {
+async function accessTokenFromServiceAccount(
+    creds: ServiceAccountCreds,
+    impersonate?: string
+): Promise<{ token: string; expiresAtMs: number }> {
     const key = await importPKCS8(creds.private_key, 'RS256');
     const now = Math.floor(Date.now() / 1000);
     const jwtBuilder = new SignJWT({ scope: CAL_SCOPE })
@@ -154,10 +165,13 @@ async function accessTokenFromServiceAccount(creds: ServiceAccountCreds, imperso
     if (!res.ok || !data.access_token) {
         throw new Error(data.error_description || data.error || `Token SA : HTTP ${res.status}`);
     }
-    return data.access_token;
+    return {
+        token: data.access_token,
+        expiresAtMs: Date.now() + 55 * 60 * 1000
+    };
 }
 
-async function accessTokenFromRefreshToken(): Promise<string> {
+async function accessTokenFromRefreshToken(): Promise<{ token: string; expiresAtMs: number }> {
     const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID') ?? '';
     const clientSecret = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET') ?? '';
     const refreshToken = Deno.env.get('GOOGLE_OAUTH_REFRESH_TOKEN') ?? '';
@@ -175,24 +189,49 @@ async function accessTokenFromRefreshToken(): Promise<string> {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body
     });
-    const data = (await res.json()) as { access_token?: string; error?: string; error_description?: string };
+    const data = (await res.json()) as {
+        access_token?: string;
+        expires_in?: number;
+        error?: string;
+        error_description?: string;
+    };
     if (!res.ok || !data.access_token) {
         throw new Error(data.error_description || data.error || `Token OAuth : HTTP ${res.status}`);
     }
-    return data.access_token;
+    const expiresInMs = Math.max(60_000, (Number(data.expires_in) || 3300) * 1000 - 60_000);
+    return {
+        token: data.access_token,
+        expiresAtMs: Date.now() + expiresInMs
+    };
 }
 
 async function getGoogleAccessToken(): Promise<string> {
     const saJson = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON');
     const impersonate = Deno.env.get('GOOGLE_CALENDAR_IMPERSONATE') ?? '';
+    const cacheKey = saJson?.trim() ? `sa:${impersonate.trim() || '-'}` : 'oauth';
+    if (
+        googleAccessTokenCache &&
+        googleAccessTokenCache.cacheKey === cacheKey &&
+        googleAccessTokenCache.expiresAtMs > Date.now()
+    ) {
+        return googleAccessTokenCache.token;
+    }
+    let next;
     if (saJson?.trim()) {
         const creds = parseServiceAccountJson(saJson.trim());
-        return await accessTokenFromServiceAccount(
+        next = await accessTokenFromServiceAccount(
             creds,
             impersonate.trim() ? impersonate : undefined
         );
+    } else {
+        next = await accessTokenFromRefreshToken();
     }
-    return await accessTokenFromRefreshToken();
+    googleAccessTokenCache = {
+        cacheKey,
+        token: next.token,
+        expiresAtMs: next.expiresAtMs
+    };
+    return next.token;
 }
 
 function calendarId(): string {
@@ -1119,12 +1158,16 @@ async function persistPlanningMirrorRows(
         }
     };
 
-    for (const row of rows) {
-        const target = String(row.target || '').trim();
-        if (!target) continue;
-        const filter = `event_id=eq.${encodeURIComponent(planningEventId)}&target=eq.${encodeURIComponent(target)}`;
-        await upsertMirrorRow(row, filter, `main-owner:${target}`);
-    }
+    await Promise.all(
+        rows.map(async (row) => {
+            const target = String(row.target || '').trim();
+            if (!target) return;
+            const filter =
+                `event_id=eq.${encodeURIComponent(planningEventId)}` +
+                `&target=eq.${encodeURIComponent(target)}`;
+            await upsertMirrorRow(row, filter, `main-owner:${target}`);
+        })
+    );
 
     if (poolStudents.length === 0) return;
 
@@ -1139,15 +1182,17 @@ async function persistPlanningMirrorRows(
         sync_generation: gen,
         updated_at: now
     }));
-    for (const row of studentRows) {
-        const targetUserId = String(row.target_user_id || '').trim();
-        if (!targetUserId) continue;
-        const filter =
-            `event_id=eq.${encodeURIComponent(planningEventId)}` +
-            `&target=eq.${encodeURIComponent('pool_student')}` +
-            `&target_user_id=eq.${encodeURIComponent(targetUserId)}`;
-        await upsertMirrorRow(row, filter, `pool-student:${targetUserId.slice(0, 8)}`);
-    }
+    await Promise.all(
+        studentRows.map(async (row) => {
+            const targetUserId = String(row.target_user_id || '').trim();
+            if (!targetUserId) return;
+            const filter =
+                `event_id=eq.${encodeURIComponent(planningEventId)}` +
+                `&target=eq.${encodeURIComponent('pool_student')}` +
+                `&target_user_id=eq.${encodeURIComponent(targetUserId)}`;
+            await upsertMirrorRow(row, filter, `pool-student:${targetUserId.slice(0, 8)}`);
+        })
+    );
 }
 
 function sleepMs(ms: number): Promise<void> {
