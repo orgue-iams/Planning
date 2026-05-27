@@ -115,6 +115,8 @@ type BridgeBody = {
     /** Lots cron : plafonds par appel (défaut 40 si absent). */
     maxMainRepair?: number;
     maxPoolRepair?: number;
+    /** Pipeline nocturne CI : réparer les miroirs sans resync complet (évite timeout ~150 s). */
+    skipResync?: boolean;
 };
 
 function jsonResponse(obj: unknown, status = 200) {
@@ -2394,7 +2396,7 @@ async function handleCronRepairGoogleSync(
     supabaseUrl: string,
     serviceKey: string,
     accessToken: string,
-    options?: { maxMainRepair?: number; maxPoolRepair?: number }
+    options?: { maxMainRepair?: number; maxPoolRepair?: number; skipResync?: boolean }
 ): Promise<{
     ok: boolean;
     repairedMain: number;
@@ -2598,38 +2600,40 @@ async function handleCronRepairGoogleSync(
 
     let resyncedCalendars = 0;
     const mainCalNorm = normalizeGoogleCalendarId(mainCal);
-    for (const cal of calendarsToResync) {
-        const r = await resyncGoogleCalendarFutureFromDb(accessToken, supabaseUrl, serviceKey, cal);
-        if (r.errors.length) errors.push(...r.errors.slice(0, 3));
-        resyncedCalendars += 1;
-        const calNorm = normalizeGoogleCalendarId(cal);
-        if (calNorm && sameGoogleCalendarId(calNorm, mainCalNorm)) {
+    if (!options?.skipResync) {
+        for (const cal of calendarsToResync) {
+            const r = await resyncGoogleCalendarFutureFromDb(accessToken, supabaseUrl, serviceKey, cal);
+            if (r.errors.length) errors.push(...r.errors.slice(0, 3));
+            resyncedCalendars += 1;
+            const calNorm = normalizeGoogleCalendarId(cal);
+            if (calNorm && sameGoogleCalendarId(calNorm, mainCalNorm)) {
+                resyncedCalendarsDetail.push({
+                    label: 'Calendrier principal orgue IAMS',
+                    userLabel: '(tous les créneaux en base)',
+                    kind: 'main'
+                });
+            } else {
+                const meta = poolMetaByCal.get(calNorm);
+                const lab = meta?.label || poolLabelByCal.get(calNorm) || calNorm.slice(0, 24);
+                resyncedCalendarsDetail.push({
+                    label: lab,
+                    userLabel: meta?.userLabel || '(utilisateur non résolu)',
+                    kind: 'pool'
+                });
+            }
+            await sleepMs(120);
+        }
+
+        if (!calendarsToResync.has(mainCal)) {
+            const mainSync = await resyncGoogleCalendarFutureFromDb(accessToken, supabaseUrl, serviceKey, mainCal);
+            if (mainSync.errors.length) errors.push(...mainSync.errors.slice(0, 2));
+            resyncedCalendars += 1;
             resyncedCalendarsDetail.push({
                 label: 'Calendrier principal orgue IAMS',
-                userLabel: '(tous les créneaux en base)',
+                userLabel: '(contrôle orphelins)',
                 kind: 'main'
             });
-        } else {
-            const meta = poolMetaByCal.get(calNorm);
-            const lab = meta?.label || poolLabelByCal.get(calNorm) || calNorm.slice(0, 24);
-            resyncedCalendarsDetail.push({
-                label: lab,
-                userLabel: meta?.userLabel || '(utilisateur non résolu)',
-                kind: 'pool'
-            });
         }
-        await sleepMs(120);
-    }
-
-    if (!calendarsToResync.has(mainCal)) {
-        const mainSync = await resyncGoogleCalendarFutureFromDb(accessToken, supabaseUrl, serviceKey, mainCal);
-        if (mainSync.errors.length) errors.push(...mainSync.errors.slice(0, 2));
-        resyncedCalendars += 1;
-        resyncedCalendarsDetail.push({
-            label: 'Calendrier principal orgue IAMS',
-            userLabel: '(contrôle orphelins)',
-            kind: 'main'
-        });
     }
 
     return {
@@ -2728,7 +2732,8 @@ Deno.serve(async (req) => {
             const accessToken = await getGoogleAccessToken();
             const result = await handleCronRepairGoogleSync(supabaseUrl, serviceKey, accessToken, {
                 maxMainRepair: body.maxMainRepair,
-                maxPoolRepair: body.maxPoolRepair
+                maxPoolRepair: body.maxPoolRepair,
+                skipResync: body.skipResync === true
             });
             return jsonResponse({ ok: result.ok, mode: 'cron_repair_google_sync', ...result });
         }

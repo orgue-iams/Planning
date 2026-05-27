@@ -1,5 +1,5 @@
 # Rapport nocturne (digest infra + audit miroirs Google + réparation + e-mail)
-# Pipeline 3 phases — chaque appel Edge reste sous ~150 s (limite idle Supabase).
+# Pipeline 3 phases — lots de réparation sans resync complet (skipResync), sous ~150 s Edge.
 name: Planning nightly report
 
 on:
@@ -32,7 +32,7 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           PLANNING_CRON_SECRET: ${{ secrets.PLANNING_CRON_SECRET }}
           MAX_REPAIR_BATCHES: '25'
-          REPAIR_BATCH_SIZE: '8'
+          REPAIR_BATCH_SIZE: '4'
           CURL_MAX_TIME: '140'
         run: |
           chmod +x scripts/planning-nightly-ci.sh

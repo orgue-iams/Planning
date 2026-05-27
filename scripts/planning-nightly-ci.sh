@@ -49,7 +49,7 @@ more=true
 while [ "$more" = "true" ] && [ "$batch" -lt "$MAX_REPAIR_BATCHES" ]; do
     batch=$((batch + 1))
     repair_payload=$(jq -n --argjson n "$REPAIR_BATCH_SIZE" \
-        '{action:"cron_repair_google_sync", maxMainRepair:$n, maxPoolRepair:$n}')
+        '{action:"cron_repair_google_sync", maxMainRepair:$n, maxPoolRepair:$n, skipResync:true}')
     invoke_post "$bridge" "$repair_payload" "$WORK_DIR/repair_${batch}.json" "repair_batch_${batch}"
     jq -e '.mode == "cron_repair_google_sync"' "$WORK_DIR/repair_${batch}.json" >/dev/null
     more=$(jq -r '.morePending // false' "$WORK_DIR/repair_${batch}.json")

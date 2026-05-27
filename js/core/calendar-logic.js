@@ -954,7 +954,9 @@ function canCurrentUserEditEventIgnoringPast(currentUser, event) {
     const dbType = String(xp?.planningDbSlotType || '').trim().toLowerCase();
     const typ = String(xp?.type || '').trim().toLowerCase();
     if (dbType === 'fermeture' || typ === 'fermeture') {
-        return meRole === 'admin';
+        const creatorId = String(xp.createdByUserId || '').trim();
+        const myId = String(currentUser.id || '').trim();
+        return meRole === 'admin' || Boolean(creatorId && myId && creatorId === myId);
     }
     if (meRole === 'admin') return true;
 
@@ -1068,7 +1070,8 @@ async function validateEleveTravailPersistCap(eventLike, excludeEventId = null) 
         setQ,
         addMin,
         mondayStartLocal(start),
-        excludeEventId ? String(excludeEventId).trim() : null
+        excludeEventId ? String(excludeEventId).trim() : null,
+        String(owner.ownerUserId || '').trim() || null
     );
     if (!cap.ok) {
         return { ok: false, message: cap.message || 'Quota hebdomadaire dépassé.' };
@@ -4781,9 +4784,8 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     }
     const isPastSlot = Boolean(event && isReservationNonEditablePast(currentUser, event));
     const meRoleOpen = normalizeRole(currentUser?.role);
-    const canEditEvent = !event || canCurrentUserEditEvent(currentUser, event);
+    let canEditEvent = !event || canCurrentUserEditEvent(currentUser, event);
     reservationModalUserRef = currentUser;
-    reservationModalCanEditRef = canEditEvent;
     reservationModalCalendarRef = calendarForClip || null;
     reservationModalEventRef = event || null;
     const owner = ownerInfoFromEvent(event, currentUser);
@@ -5047,7 +5049,6 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     const btnSaveFooter = document.getElementById('btn-reservation-save');
     const btnCloseReadOnly = document.getElementById('btn-reservation-close');
     const btnEditFermeture = document.getElementById('btn-reservation-edit-fermeture');
-    const isReadOnlyView = Boolean(event) && !canEditEvent;
     const xpOpen = safeEventExtendedProps(event) || {};
     const isFermetureSlot =
         String(xpOpen.planningDbSlotType || '').toLowerCase() === 'fermeture' ||
@@ -5070,6 +5071,11 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
             }
         }
     }
+    if (isFermetureSlot && canEditFermeturePeriod) {
+        canEditEvent = true;
+    }
+    reservationModalCanEditRef = canEditEvent;
+    const isReadOnlyView = Boolean(event) && !canEditEvent;
     if (footerWrap) {
         const showFooter = canEditEvent || isReadOnlyView || (isFermetureSlot && canEditFermeturePeriod);
         footerWrap.classList.toggle('hidden', !showFooter);
