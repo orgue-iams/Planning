@@ -181,11 +181,22 @@ header.app-navbar #calendar-toolbar,
 
 /*
  * Première ligne d’en-tête (jours + coin heures) : blanc opaque, au-dessus du fond photo.
- * (Annule le voile 82 % des sticky et le transparent imposé au harness.)
+ * FC pose `background: var(--fc-page-bg-color)` sur `.fc-scrollgrid-section-sticky > *`
+ * (z-index 3). Comme la grille met --fc-page-bg-color à transparent pour laisser voir
+ * la photo, ce sticky restait un voile gris — on rétablit une page-bg opaque ici.
  */
 #calendar .fc-scrollgrid-section-header {
     position: relative;
-    z-index: 3;
+    z-index: 4;
+    --fc-page-bg-color: #fff;
+}
+
+#calendar .fc-scrollgrid-section-header.fc-scrollgrid-section-sticky > *,
+#calendar .fc-scrollgrid-section-header > * {
+    background: #fff !important;
+    background-color: #fff !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
 }
 
 #calendar .fc-scrollgrid-section-header .fc-scroller,
@@ -199,11 +210,18 @@ header.app-navbar #calendar-toolbar,
 #calendar .fc-scrollgrid-section-header .fc-scrollgrid-sync-inner,
 #calendar .fc-scrollgrid-section-header .fc-timegrid-axis,
 #calendar .fc-scrollgrid-section-header .fc-timegrid-axis-frame {
+    background: #fff !important;
     background-color: #fff !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
 }
 
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header {
+    --fc-page-bg-color: rgb(15 23 42);
+}
+
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header.fc-scrollgrid-section-sticky > *,
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header > *,
 [data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-scroller,
 [data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-scroller-harness,
 [data-theme='dark'] #calendar .fc-scrollgrid-section-header table,
@@ -215,6 +233,7 @@ header.app-navbar #calendar-toolbar,
 [data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-scrollgrid-sync-inner,
 [data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-timegrid-axis,
 [data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-timegrid-axis-frame {
+    background: rgb(15 23 42) !important;
     background-color: rgb(15 23 42) !important;
 }
 
