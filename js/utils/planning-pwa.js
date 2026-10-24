@@ -57,6 +57,13 @@ export function syncLoginPwaInstallButton() {
 }
 
 function reloadForServiceWorkerUpdate() {
+    try {
+        const key = 'planning-sw-reload-once';
+        if (sessionStorage.getItem(key) === '1') return;
+        sessionStorage.setItem(key, '1');
+    } catch {
+        /* sessionStorage indisponible */
+    }
     window.location.reload();
 }
 

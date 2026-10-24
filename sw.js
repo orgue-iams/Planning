@@ -1,4 +1,5 @@
 /* Précache : voir APP_VERSION / CACHE_NAME dans js/config/app-version.js */
+/* bust: v00.02.12 — forcer la mise à jour SW quand seul app-version.js change */
 import { CACHE_NAME } from './js/config/app-version.js';
 
 /** Ressources locales (hors CDN) pour démarrage rapide / coquille hors-ligne */
@@ -138,7 +139,11 @@ self.addEventListener('activate', (event) => {
 /** Fichiers de version / SW uniquement (pas la navigation : risque de réponse vide). */
 function isNetworkFirstRequest(url) {
   const path = url.pathname;
-  return path.endsWith('cache-name.js') || path.endsWith('sw.js');
+  return (
+    path.endsWith('cache-name.js') ||
+    path.endsWith('app-version.js') ||
+    path.endsWith('sw.js')
+  );
 }
 
 async function networkFirst(request) {

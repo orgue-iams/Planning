@@ -86,13 +86,17 @@ export function scheduleTimeGridColumnSync(calendarEl) {
 
 /**
  * @param {HTMLElement | null} calendarEl
- * @param {() => void} [beforeSync] ex. `() => calendar.updateSize()` pour orientation / resize fenêtre
+ * @param {() => void} [beforeSync] ex. `() => calendar.updateSize()` — uniquement resize fenêtre / orientation
+ *   (jamais depuis le ResizeObserver de `#calendar` : updateSize → layout → RO → boucle = page blanche).
  * @returns {() => void}
  */
 export function bindTimeGridColumnSync(calendarEl, beforeSync) {
     if (!(calendarEl instanceof HTMLElement)) return () => {};
 
-    const run = () => {
+    const syncColsOnly = () => {
+        scheduleTimeGridColumnSync(calendarEl);
+    };
+    const runWithBeforeSync = () => {
         try {
             if (typeof beforeSync === 'function') beforeSync();
         } catch {
@@ -100,21 +104,30 @@ export function bindTimeGridColumnSync(calendarEl, beforeSync) {
         }
         scheduleTimeGridColumnSync(calendarEl);
     };
-    const ro = new ResizeObserver(() => run());
+    /** Observer : aligner les colonnes seulement (pas de updateSize). */
+    let roRaf = 0;
+    const ro = new ResizeObserver(() => {
+        if (roRaf) return;
+        roRaf = requestAnimationFrame(() => {
+            roRaf = 0;
+            syncColsOnly();
+        });
+    });
 
     let orientationTimer = 0;
     const onOrientationChange = () => {
         window.clearTimeout(orientationTimer);
-        orientationTimer = window.setTimeout(() => run(), 180);
+        orientationTimer = window.setTimeout(() => runWithBeforeSync(), 180);
     };
     const onResize = () => {
-        window.requestAnimationFrame(() => run());
+        window.requestAnimationFrame(() => runWithBeforeSync());
     };
 
     ro.observe(calendarEl);
     window.addEventListener('orientationchange', onOrientationChange);
     window.addEventListener('resize', onResize);
     return () => {
+        if (roRaf) cancelAnimationFrame(roRaf);
         ro.disconnect();
         window.removeEventListener('orientationchange', onOrientationChange);
         window.removeEventListener('resize', onResize);

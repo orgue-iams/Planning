@@ -17,17 +17,22 @@ function queuePlanningCalendarLayoutNotify() {
 export function applyPlanningPortraitSlotFit(calendarEl) {
     if (!(calendarEl instanceof HTMLElement) || typeof window === 'undefined') return;
     const mq = window.matchMedia('(max-width: 639px) and (orientation: portrait)');
+    const wasOn = calendarEl.getAttribute('data-planning-portrait-slot-fit') === 'true';
     if (!mq.matches) {
         calendarEl.removeAttribute('data-planning-portrait-slot-fit');
         calendarEl.style.removeProperty('--planning-slot-height-fit');
         calendarEl.style.removeProperty('height');
+        /* Notifier seulement à la transition portrait → autre (évite RO → updateSize → boucle). */
+        if (wasOn) queuePlanningCalendarLayoutNotify();
         return;
     }
     calendarEl.style.removeProperty('--planning-slot-height-fit');
     calendarEl.setAttribute('data-planning-portrait-slot-fit', 'true');
-    requestAnimationFrame(() => {
-        queuePlanningCalendarLayoutNotify();
-    });
+    if (!wasOn) {
+        requestAnimationFrame(() => {
+            queuePlanningCalendarLayoutNotify();
+        });
+    }
 }
 
 /**
