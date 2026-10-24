@@ -3,7 +3,8 @@
 .fc {
     /* ~ largeur « HH:mm » tabular 0.6875rem + ~1 ch de marge de chaque côté (mesure stable ; voir slot-label). */
     --planning-axis-col-width: 2.76rem;
-    --planning-slot-height: 3.6rem;
+    /* Demi-heure (slotDuration 30 min) : 2 slots ≈ ancienne hauteur d’1 h. */
+    --planning-slot-height: 1.8rem;
 }
 
 /* Laisser FullCalendar gérer le tactile (sélection long-press + drag) sans imposer pan-y au parent. */
@@ -134,8 +135,13 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     border-bottom: none !important;
 }
 
-#calendar .fc-timegrid-cols .fc-timegrid-slot {
+/* Filet horizontal sur l’heure pleine seulement (slots mineurs = :30 sans trait). */
+#calendar .fc-timegrid-cols .fc-timegrid-slot:not(.fc-timegrid-slot-minor) {
     border-bottom: 1px solid var(--planning-grid-line, rgb(226 232 240)) !important;
+}
+
+#calendar .fc-timegrid-cols .fc-timegrid-slot.fc-timegrid-slot-minor {
+    border-bottom: none !important;
 }
 
 /* Thème sombre : pas de traits horizontaux entre les heures (test visuel demandé). */
@@ -343,7 +349,7 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
  */
 @media (max-width: 639px) and (orientation: portrait) {
     .fc {
-        --planning-slot-height: 2.55rem;
+        --planning-slot-height: 1.275rem;
     }
 
     #calendar .fc-timegrid-slot,

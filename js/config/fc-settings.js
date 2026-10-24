@@ -101,8 +101,12 @@ export const getCalendarConfig = (handlers, currentUser) => {
 
         slotMinTime,
         slotMaxTime,
-        /* Grille visuelle : une ligne par heure. Interaction (sélection, glisser) : pas 30 min. */
-        slotDuration: '01:00:00',
+        /*
+         * Slots natifs 30 min (hit-test / sélection précis, ex. départ à xx:30).
+         * Libellés d’axe : une heure sur deux via slotLabelInterval (aspect « une ligne / heure »).
+         */
+        slotDuration: '00:30:00',
+        slotLabelInterval: '01:00:00',
         snapDuration: '00:30:00',
         allDaySlot: false,
         height: '100%',

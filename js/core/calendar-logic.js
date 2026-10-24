@@ -4617,11 +4617,11 @@ export async function quickCreateFromSelection(calendar, selectInfo, currentUser
         const snapMs = snapDurationMs(calendar);
         const selMs = rangeEnd.getTime() - rangeStart.getTime();
         /*
-         * selectMinDistance:0 fait qu’un « clic » ouvre souvent une sélection d’une case snap (30 min)
-         * et supprime dateClick : même règle métier que le clic simple (1 h si libre, sinon réduction).
+         * selectMinDistance:0 : un « clic » donne souvent une seule case snap (~30 min) et remplace dateClick.
+         * On ne réécrit alors qu’une sélection ≈ 1 case (pas un vrai glisser 1 h / 1 h 30 / 2 h 30…).
          */
-        const maxProposeMs = DEFAULT_NEW_RESERVATION_DURATION_MS + snapMs + 1000;
-        if (selMs <= maxProposeMs) {
+        const clickLikeMaxMs = snapMs + 1500;
+        if (selMs > 0 && selMs <= clickLikeMaxMs) {
             const prop = await resolveQuickCreateRangeOrToast(rangeStart, calendar, currentUser);
             if (!prop) {
                 calendar.unselect();

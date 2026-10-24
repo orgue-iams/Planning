@@ -41,8 +41,8 @@
     inset: 0;
     z-index: 0;
     pointer-events: none;
+    /* Pas de backdrop-filter : il se compose mal avec le sticky des jours (voile gris). */
     background: rgba(248, 250, 252, 0.72);
-    backdrop-filter: saturate(0.7) blur(0.5px);
 }
 
 #calendar.planning-calendar-transparent > .fc {
@@ -56,7 +56,6 @@
 
 [data-theme='dark'] #calendar.planning-calendar-transparent::after {
     background: rgba(15, 23, 42, 0.38);
-    backdrop-filter: saturate(0.8) blur(0.5px);
 }
 
 @media (max-width: 639px) and (orientation: portrait) {
@@ -170,13 +169,13 @@ header.app-navbar #calendar-toolbar,
  * La ligne d’en-tête (header + sticky) est exclue : elle est en blanc opaque plus bas.
  */
 #calendar .fc-scrollgrid-section-sticky:not(.fc-scrollgrid-section-header) > * {
-    background: rgb(255 255 255 / 0.82) !important;
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
+    background: rgb(255 255 255 / 0.92) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
 }
 
 [data-theme='dark'] #calendar .fc-scrollgrid-section-sticky:not(.fc-scrollgrid-section-header) > * {
-    background: rgba(15, 23, 42, 0.88) !important;
+    background: rgba(15, 23, 42, 0.94) !important;
 }
 
 /*
@@ -186,8 +185,6 @@ header.app-navbar #calendar-toolbar,
  * la photo, ce sticky restait un voile gris — on rétablit une page-bg opaque ici.
  */
 #calendar .fc-scrollgrid-section-header {
-    position: relative;
-    z-index: 4;
     --fc-page-bg-color: #fff;
 }
 
@@ -197,6 +194,9 @@ header.app-navbar #calendar-toolbar,
     background-color: #fff !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
+    /* Au-dessus du voile #calendar::after et du corps timegrid. */
+    z-index: 5 !important;
+    isolation: isolate;
 }
 
 #calendar .fc-scrollgrid-section-header .fc-scroller,
