@@ -22,7 +22,7 @@ export function clearProfWeekCycleCache() {
     cachedProfWeekCycle = null;
 }
 
-/** Lundi 00:00 local de la semaine calendaire contenant `d` (firstDay lundi = même convention que FC). */
+/** Lundi 00:00 local de la semaine scolaire contenant `d` (indépendant de FC `firstDay`, qui est dimanche). */
 export function mondayOfLocalWeek(d) {
     const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
     const dow = (x.getDay() + 6) % 7;

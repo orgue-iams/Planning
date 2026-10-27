@@ -368,6 +368,56 @@ th.fc-timegrid-slot-label.fc-scrollgrid-shrink,
     }
 }
 
+/*
+ * Nom utilisateur (N. Nom) : overlay sur la ligne des jours, aligné sur l’axe « 09:00 ».
+ * Position / max-width posés en JS pour ne pas couvrir « lun. ».
+ */
+#calendar .planning-user-axis-label {
+    position: absolute;
+    z-index: 8;
+    display: flex;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    pointer-events: none;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: 0.01em;
+    color: #334155;
+    overflow: hidden;
+}
+
+#calendar .planning-user-axis-label[hidden] {
+    display: none !important;
+}
+
+/* Largeur bornée en JS ; --stack = retour après le prénom si trop long. */
+#calendar .planning-user-axis-label__text {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    white-space: nowrap;
+}
+
+#calendar .planning-user-axis-label__text--stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    white-space: normal;
+    line-height: 1.15;
+}
+
+#calendar .planning-user-axis-label__prenom,
+#calendar .planning-user-axis-label__nom {
+    white-space: nowrap;
+}
+
+[data-theme='dark'] #calendar .planning-user-axis-label {
+    color: rgb(203 213 225);
+}
+
 /* En-têtes colonnes jours : ligne 1 = jour, ligne 2 = numéro dans un rond (toutes largeurs). */
 .fc .fc-day-head-gcal {
     display: flex;

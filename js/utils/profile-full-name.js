@@ -20,3 +20,23 @@ export function parseDisplayNameToNomPrenom(displayName) {
     if (parts.length === 1) return { nom: parts[0], prenom: '' };
     return { nom: parts[parts.length - 1], prenom: parts.slice(0, -1).join(' ') };
 }
+
+/**
+ * Libellé axe calendrier : initiale du prénom + nom (« N. Marestin »).
+ * @param {{ prenom?: unknown, nom?: unknown, display_name?: unknown, name?: unknown } | null | undefined} user
+ * @returns {{ prenomShort: string, nom: string, full: string } | null}
+ */
+export function formatUserAxisNameParts(user) {
+    let prenom = String(user?.prenom ?? '').trim();
+    let nom = String(user?.nom ?? '').trim();
+    if (!prenom && !nom) {
+        const fromDisplay = parseDisplayNameToNomPrenom(user?.display_name || user?.name);
+        prenom = fromDisplay.prenom;
+        nom = fromDisplay.nom;
+    }
+    const letter = prenom ? prenom.charAt(0).toLocaleUpperCase('fr-FR') : '';
+    const prenomShort = letter ? `${letter}.` : '';
+    if (!prenomShort && !nom) return null;
+    const full = [prenomShort, nom].filter(Boolean).join(' ');
+    return { prenomShort, nom, full };
+}

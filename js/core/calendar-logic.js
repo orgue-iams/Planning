@@ -2191,7 +2191,6 @@ export async function maybeNotifySlotOwnerAfterThirdPartyEdit({
         if (errCode === 'EMAIL_NOT_CONFIGURED') {
             hint = ' Messagerie non configurée côté serveur (Brevo / expéditeur).';
         } else if (errCode === 'BREVO_SEND_FAILED' && detail) {
-            hint = ` Voir console (F12) pour le détail Brevo.`;
             console.warn('[slot-notify] Brevo', detail);
             // Diagnostic serveur (sans exposer la clé) pour confirmer le secret réellement lu côté function.
             void invokeSlotNotify({

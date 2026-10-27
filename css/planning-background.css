@@ -14,35 +14,20 @@
 }
 
 /*
- * Photo de fond sur la zone calendrier (#calendar), sous FullCalendar (.fc > z-index 1).
- * Plus fiable que les seuls .fc-timegrid-col-bg (vues / rendu FC variables).
+ * Photo de fond : JAMAIS en ::before/::after sur #calendar.
+ * Safari compose `filter` / `opacity` / `isolation` des pseudos du parent
+ * par-dessus la ligne sticky des jours → bandeau grisé. Le fond vit uniquement
+ * sous le corps timegrid (descendant, pas ancêtre du header).
  */
 #calendar.planning-calendar-transparent {
     position: relative;
-    isolation: isolate;
+    /* Pas d’isolation ici : elle créait un contexte qui grisait le sticky Safari. */
 }
 
-#calendar.planning-calendar-transparent::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    background-color: #e2e8f0;
-    background-image: url('../images/planning-bg.png');
-    background-size: cover;
-    background-position: center;
-    filter: grayscale(0.45) brightness(1.08) contrast(0.9) saturate(0.75);
-}
-
+#calendar.planning-calendar-transparent::before,
 #calendar.planning-calendar-transparent::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    /* Pas de backdrop-filter : il se compose mal avec le sticky des jours (voile gris). */
-    background: rgba(248, 250, 252, 0.72);
+    content: none !important;
+    display: none !important;
 }
 
 #calendar.planning-calendar-transparent > .fc {
@@ -50,28 +35,48 @@
     z-index: 1;
 }
 
-[data-theme='dark'] #calendar.planning-calendar-transparent::before {
-    filter: invert(1) hue-rotate(180deg) grayscale(0.35) contrast(0.92) brightness(1.02);
+/* Voile + photo derrière les créneaux uniquement (pas sous les noms de jours). */
+#calendar.planning-calendar-transparent .fc-timegrid-body,
+#calendar.planning-calendar-transparent .fc-daygrid-body {
+    position: relative;
+    z-index: 0;
+    background-color: #e2e8f0 !important;
+    background-image:
+        linear-gradient(rgba(248, 250, 252, 0.62), rgba(248, 250, 252, 0.62)),
+        url('../images/planning-bg.png') !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
 }
 
-[data-theme='dark'] #calendar.planning-calendar-transparent::after {
-    background: rgba(15, 23, 42, 0.38);
+[data-theme='dark'] #calendar.planning-calendar-transparent .fc-timegrid-body,
+[data-theme='dark'] #calendar.planning-calendar-transparent .fc-daygrid-body {
+    background-color: #0f172a !important;
+    background-image:
+        linear-gradient(rgba(15, 23, 42, 0.55), rgba(15, 23, 42, 0.55)),
+        url('../images/planning-bg.png') !important;
 }
 
 @media (max-width: 639px) and (orientation: portrait) {
-    #calendar.planning-calendar-transparent::before {
-        background-position: top center;
+    #calendar.planning-calendar-transparent .fc-timegrid-body,
+    #calendar.planning-calendar-transparent .fc-daygrid-body {
+        background-position: top center !important;
     }
 }
 
 /* Contenu au-dessus du fond (barre d’outils dans l’en-tête fixe ; grille + légende dans #app-shell) */
 header.app-navbar #calendar-toolbar,
-#app-shell.planning-app-shell > #calendar,
 #app-shell.planning-app-shell > #planning-calendar-zoom-host,
 #app-shell.planning-app-shell > #planning-slot-workflow-banner,
 #app-shell.planning-app-shell > #planning-legend {
     position: relative;
     z-index: 0;
+}
+
+/* Au-dessus du fond page ; ne pas forcer z-index:0 (Safari aplatissait le sticky jours). */
+#app-shell.planning-app-shell > #calendar {
+    position: relative;
+    z-index: 1;
 }
 
 /* Barre d’outils + légende : lisibles sur le fond */
@@ -154,7 +159,6 @@ header.app-navbar #calendar-toolbar,
 }
 
 #calendar .fc-scrollgrid table,
-#calendar .fc-timegrid-body,
 #calendar .fc-timegrid-slots,
 #calendar .fc-timegrid-cols,
 #calendar .fc-timegrid-col-frame,
@@ -179,13 +183,12 @@ header.app-navbar #calendar-toolbar,
 }
 
 /*
- * Première ligne d’en-tête (jours + coin heures) : blanc opaque, au-dessus du fond photo.
- * FC pose `background: var(--fc-page-bg-color)` sur `.fc-scrollgrid-section-sticky > *`
- * (z-index 3). Comme la grille met --fc-page-bg-color à transparent pour laisser voir
- * la photo, ce sticky restait un voile gris — on rétablit une page-bg opaque ici.
+ * Ligne des jours : blanc opaque (aucun fond photo derrière).
+ * FC : sticky > * utilise --fc-page-bg-color (sinon transparent → voile).
  */
 #calendar .fc-scrollgrid-section-header {
     --fc-page-bg-color: #fff;
+    background: #fff !important;
 }
 
 #calendar .fc-scrollgrid-section-header.fc-scrollgrid-section-sticky > *,
@@ -194,9 +197,7 @@ header.app-navbar #calendar-toolbar,
     background-color: #fff !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
-    /* Au-dessus du voile #calendar::after et du corps timegrid. */
     z-index: 5 !important;
-    isolation: isolate;
 }
 
 #calendar .fc-scrollgrid-section-header .fc-scroller,
@@ -209,7 +210,8 @@ header.app-navbar #calendar-toolbar,
 #calendar .fc-scrollgrid-section-header .fc-col-header-cell-cushion,
 #calendar .fc-scrollgrid-section-header .fc-scrollgrid-sync-inner,
 #calendar .fc-scrollgrid-section-header .fc-timegrid-axis,
-#calendar .fc-scrollgrid-section-header .fc-timegrid-axis-frame {
+#calendar .fc-scrollgrid-section-header .fc-timegrid-axis-frame,
+#calendar .fc-scrollgrid-section-header .fc-day-head-gcal {
     background: #fff !important;
     background-color: #fff !important;
     backdrop-filter: none !important;
@@ -218,6 +220,7 @@ header.app-navbar #calendar-toolbar,
 
 [data-theme='dark'] #calendar .fc-scrollgrid-section-header {
     --fc-page-bg-color: rgb(15 23 42);
+    background: rgb(15 23 42) !important;
 }
 
 [data-theme='dark'] #calendar .fc-scrollgrid-section-header.fc-scrollgrid-section-sticky > *,
@@ -232,7 +235,8 @@ header.app-navbar #calendar-toolbar,
 [data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-col-header-cell-cushion,
 [data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-scrollgrid-sync-inner,
 [data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-timegrid-axis,
-[data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-timegrid-axis-frame {
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-timegrid-axis-frame,
+[data-theme='dark'] #calendar .fc-scrollgrid-section-header .fc-day-head-gcal {
     background: rgb(15 23 42) !important;
     background-color: rgb(15 23 42) !important;
 }

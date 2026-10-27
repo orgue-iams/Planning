@@ -6,6 +6,7 @@ import { getProfWeekCycleForToolbar, weekCycleLabelForDate } from './week-cycle.
 import { isProf } from './auth-logic.js';
 import { getPlanningSessionUser } from './session-user.js';
 import { syncDrawerViewSelection, togglePlanningDrawer } from './planning-drawer-ui.js';
+import { formatUserAxisNameParts } from '../utils/profile-full-name.js';
 
 let headerOffsetObserver = null;
 let headerOffsetSyncInited = false;
@@ -177,6 +178,163 @@ function isPlanningCornerHudViewport() {
 const CORNER_MENU_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" class="planning-fc-corner-hud__menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>';
 
+const USER_AXIS_LABEL_ID = 'planning-user-axis-label';
+let userAxisLabelRaf = 0;
+let userAxisLabelResizeBound = false;
+
+/**
+ * Glyph bounds d’un nœud texte (plus fiable que getBoundingClientRect sur un span étiré).
+ * @param {Element | null} el
+ */
+function textGlyphRect(el) {
+    if (!(el instanceof Element)) return null;
+    try {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const r = range.getBoundingClientRect();
+        if (r.width < 1 && r.height < 1) return null;
+        return r;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Nom abrégé de l’utilisateur connecté, calé sur la ligne des jours / l’axe « 09:00 »,
+ * en overlay au-dessus de la grille (sans empiéter sur « lun. »).
+ */
+export function syncPlanningUserAxisLabel() {
+    const calEl = document.getElementById('calendar');
+    if (!(calEl instanceof HTMLElement)) return;
+
+    const existing = document.getElementById(USER_AXIS_LABEL_ID);
+    const hide = () => {
+        if (existing) existing.hidden = true;
+    };
+
+    /* Paysage étroit : le coin est déjà occupé par le HUD menu / période. */
+    if (isPlanningCornerHudViewport()) {
+        hide();
+        return;
+    }
+
+    const parts = formatUserAxisNameParts(getPlanningSessionUser());
+    if (!parts) {
+        hide();
+        return;
+    }
+
+    const axisCell = calEl.querySelector(
+        '.fc-scrollgrid-section-header td.fc-timegrid-axis, .fc-scrollgrid-section-header th.fc-timegrid-axis'
+    );
+    if (!(axisCell instanceof HTMLElement)) {
+        hide();
+        return;
+    }
+
+    const headerSection = calEl.querySelector('.fc-scrollgrid-section-header');
+    const slotCushion =
+        calEl.querySelector('.fc-timegrid-slot-label-cushion') ||
+        calEl.querySelector('.fc-timegrid-slot-label');
+    const firstDow = calEl.querySelector(
+        '.fc-scrollgrid-section-header .fc-col-header-cell:not(.fc-timegrid-axis) .fc-day-head-gcal__dow'
+    );
+
+    const calRect = calEl.getBoundingClientRect();
+    const axisRect = axisCell.getBoundingClientRect();
+    const headerRect = headerSection?.getBoundingClientRect() || axisRect;
+    const slotRect = slotCushion?.getBoundingClientRect();
+    const dowGlyph = textGlyphRect(firstDow);
+
+    const left = Math.max(
+        0,
+        (slotRect ? slotRect.left : axisRect.left + 4) - calRect.left
+    );
+    const top = Math.max(0, headerRect.top - calRect.top);
+    const height = Math.max(axisRect.height, headerRect.height);
+    const rightLimit = dowGlyph
+        ? dowGlyph.left - calRect.left - 6
+        : axisRect.right - calRect.left - 2;
+    const maxWidth = Math.max(0, rightLimit - left);
+    if (maxWidth < 12) {
+        hide();
+        return;
+    }
+
+    let el = existing;
+    if (!(el instanceof HTMLElement)) {
+        el = document.createElement('div');
+        el.id = USER_AXIS_LABEL_ID;
+        el.className = 'planning-user-axis-label';
+        el.setAttribute('aria-hidden', 'true');
+        el.innerHTML = '<span class="planning-user-axis-label__text"></span>';
+        calEl.appendChild(el);
+    }
+
+    const textEl = el.querySelector('.planning-user-axis-label__text');
+    if (textEl) {
+        textEl.replaceChildren();
+        textEl.classList.remove('planning-user-axis-label__text--stack');
+        if (parts.prenomShort) {
+            const p = document.createElement('span');
+            p.className = 'planning-user-axis-label__prenom';
+            p.textContent = parts.prenomShort;
+            textEl.appendChild(p);
+        }
+        if (parts.prenomShort && parts.nom) {
+            textEl.appendChild(document.createTextNode(' '));
+        }
+        if (parts.nom) {
+            const n = document.createElement('span');
+            n.className = 'planning-user-axis-label__nom';
+            n.textContent = parts.nom;
+            textEl.appendChild(n);
+        }
+    }
+    el.title = parts.full;
+    el.hidden = false;
+    const w = Math.round(maxWidth * 100) / 100;
+    el.style.left = `${Math.round(left * 100) / 100}px`;
+    el.style.top = `${Math.round(top * 100) / 100}px`;
+    el.style.height = `${Math.round(height * 100) / 100}px`;
+    el.style.width = `${w}px`;
+    el.style.maxWidth = `${w}px`;
+
+    /* Si « N. Nom » dépasse la place avant « lun. », empiler après le prénom. */
+    if (textEl && parts.prenomShort && parts.nom) {
+        const probe = document.createElement('span');
+        probe.style.cssText =
+            'position:absolute;visibility:hidden;pointer-events:none;white-space:nowrap;font:inherit;letter-spacing:inherit';
+        probe.textContent = parts.full;
+        el.appendChild(probe);
+        const needsStack = probe.offsetWidth > w - 1;
+        probe.remove();
+        textEl.classList.toggle('planning-user-axis-label__text--stack', needsStack);
+        if (needsStack) {
+            /* Plus d’espace littéral entre les deux lignes. */
+            [...textEl.childNodes]
+                .filter((n) => n.nodeType === Node.TEXT_NODE)
+                .forEach((n) => n.remove());
+        }
+    }
+}
+
+export function schedulePlanningUserAxisLabelSync() {
+    if (typeof window === 'undefined') return;
+    if (userAxisLabelRaf) cancelAnimationFrame(userAxisLabelRaf);
+    userAxisLabelRaf = requestAnimationFrame(() => {
+        userAxisLabelRaf = 0;
+        syncPlanningUserAxisLabel();
+        /* 2ᵉ frame : après sync colonnes FC / sticky. */
+        requestAnimationFrame(() => syncPlanningUserAxisLabel());
+    });
+    if (!userAxisLabelResizeBound) {
+        userAxisLabelResizeBound = true;
+        window.addEventListener('resize', schedulePlanningUserAxisLabelSync);
+        window.addEventListener('planning-app-header-resized', schedulePlanningUserAxisLabelSync);
+    }
+}
+
 /**
  * Coin gauche de l’en-tête FullCalendar (paysage étroit) : menu + mois/période + semaine A/B.
  * @param {import('@fullcalendar/core').CalendarApi | null} calendar
@@ -184,6 +342,7 @@ const CORNER_MENU_SVG =
 export function syncPlanningGridCornerHud(calendar) {
     const calEl = document.getElementById('calendar');
     const axisCell = calEl?.querySelector('.fc-scrollgrid-section-header td.fc-timegrid-axis');
+    schedulePlanningUserAxisLabelSync();
     if (!calEl || !axisCell || !(axisCell instanceof HTMLElement)) return;
 
     if (!calendar || !isPlanningCornerHudViewport()) {

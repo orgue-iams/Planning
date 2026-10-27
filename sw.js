@@ -1,5 +1,5 @@
 /* Précache : voir APP_VERSION / CACHE_NAME dans js/config/app-version.js */
-/* bust: v00.02.12 — forcer la mise à jour SW quand seul app-version.js change */
+/* bust: v00.02.17 — toast e-mail sans mention console F12 */
 import { CACHE_NAME } from './js/config/app-version.js';
 
 /** Ressources locales (hors CDN) pour démarrage rapide / coquille hors-ligne */

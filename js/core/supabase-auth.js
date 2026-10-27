@@ -6,7 +6,7 @@ import { formatProfileFullName } from '../utils/profile-full-name.js';
 /**
  * Construit l’objet utilisateur applicatif à partir d’une session Supabase + ligne `profiles`.
  * @param {import('https://esm.sh/@supabase/supabase-js@2.49.8').Session} session
- * @returns {Promise<{ name: string, email: string, role: string, id: string, telephone?: string, directory_share_email?: boolean, directory_share_phone?: boolean, directory_share_calendar?: boolean, planning_show_sunday?: boolean } | null>}
+ * @returns {Promise<{ name: string, nom?: string, prenom?: string, display_name?: string, email: string, role: string, id: string, telephone?: string, directory_share_email?: boolean, directory_share_phone?: boolean, directory_share_calendar?: boolean, planning_show_sunday?: boolean } | null>}
  */
 export async function fetchAppUserFromSession(session) {
     const supabase = getSupabaseClient();
@@ -41,6 +41,9 @@ export async function fetchAppUserFromSession(session) {
 
     return {
         name,
+        nom: String(data?.nom ?? meta.nom ?? '').trim(),
+        prenom: String(data?.prenom ?? meta.prenom ?? '').trim(),
+        display_name: String(data?.display_name ?? '').trim() || name,
         email,
         role,
         id: session.user.id,

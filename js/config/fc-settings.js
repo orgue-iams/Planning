@@ -95,7 +95,13 @@ export const getCalendarConfig = (handlers, currentUser) => {
         initialView: 'timeGridWeek',
         headerToolbar: false,
         locale: 'fr',
-        firstDay: 1,
+        /*
+         * Semaine affichée : dimanche → samedi (dimanche en 1ʳᵉ colonne s’il est visible).
+         * Un dimanche, même avec dimanche masqué, la grille montre déjà lun→sam de la semaine qui commence
+         * (pas la semaine calendaire « lundi passé → samedi »).
+         * Métier A/B / quotas : toujours ancrés sur le lundi (week-cycle, mondayStartLocal) — indépendant de firstDay.
+         */
+        firstDay: 0,
         /* Dimanche masqué par défaut en semaine ; ré-affiché si créneaux pertinents (voir calendar-sunday-column.js). */
         hiddenDays: [0],
 
