@@ -1991,8 +1991,10 @@ async function assertPlanningAdmin(
         return { ok: false, status: 403, error: 'Profil indisponible' };
     }
     const arr = (await res.json()) as Array<{ role?: string }>;
-    const role = arr[0]?.role;
-    if (role !== 'admin') {
+    const role = String(arr[0]?.role ?? '')
+        .trim()
+        .toLowerCase();
+    if (role !== 'admin_technique' && role !== 'admin_iams' && role !== 'admin') {
         return { ok: false, status: 403, error: 'Forbidden: admin only' };
     }
     return { ok: true };

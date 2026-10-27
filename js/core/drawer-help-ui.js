@@ -1,7 +1,6 @@
 /**
- * Sous-menu Aide dans le tiroir principal.
+ * Sous-menu Contact dans le tiroir principal.
  */
-import { APP_VERSION } from '../config/app-version.js';
 import { getOrganSchoolSettingsCached, fetchOrganSchoolSettings } from './organ-settings.js';
 import { closePlanningDrawer } from './planning-drawer-ui.js';
 import { getPlanningSessionUser } from './session-user.js';
@@ -32,11 +31,6 @@ export function showMainDrawerPanel() {
     document.getElementById('planning-drawer-help-panel')?.setAttribute('aria-hidden', 'true');
     document.getElementById('planning-drawer-main-scroll')?.classList.remove('hidden');
     setDrawerHelpView(false);
-}
-
-function refreshHelpContent() {
-    const ver = document.getElementById('drawer-help-version');
-    if (ver) ver.textContent = APP_VERSION;
 }
 
 function helpMessagePlain(ed) {
@@ -129,7 +123,6 @@ export function initDrawerHelpUi() {
         e.preventDefault();
         void (async () => {
             await fetchOrganSchoolSettings();
-            refreshHelpContent();
             showHelpPanel();
         })();
     });
@@ -181,10 +174,20 @@ export function initDrawerHelpUi() {
                 actorDisplayName: String(u?.name || u?.email || '').trim() || actorEmail
             });
             if (!res.ok || res.emailSent === false) {
-                showToast(res.error || 'Envoi impossible.', 'error', 10000);
+                const err = String(res.error || '');
+                let msg = 'Envoi impossible. Réessayez plus tard.';
+                if (err === 'EMAIL_NOT_CONFIGURED') {
+                    msg = 'Messagerie non configurée côté serveur. Merci de prévenir l’administrateur.';
+                } else if (err === 'BREVO_SEND_FAILED') {
+                    msg = 'L’e-mail n’a pas pu être envoyé. Réessayez plus tard ou contactez l’administrateur.';
+                    if (res.detail) console.warn('[contact] Brevo', res.detail);
+                } else if (err) {
+                    msg = `Envoi impossible (${err}).`;
+                }
+                showToast(msg, 'error', 10000);
                 return;
             }
-            showToast('Message envoyé au support.');
+            showToast('Message envoyé.');
             clearHelpForm();
             showMainDrawerPanel();
             closePlanningDrawer();

@@ -1,7 +1,7 @@
 /**
  * Modale Configuration (année scolaire + plage chapelle + règles élèves). Réservée aux administrateurs.
  */
-import { isAdmin } from './auth-logic.js';
+import { isAdminTechnique } from './auth-logic.js';
 import { isBackendAuthConfigured } from './supabase-client.js';
 import {
     fetchOrganSchoolSettings,
@@ -168,7 +168,7 @@ function minutesFromHHmm(hhmm) {
 
 async function persistConfigIfAdmin() {
     const u = getPlanningSessionUser();
-    if (!isAdmin(u)) return;
+    if (!isAdminTechnique(u)) return;
 
     const snap = currentConfigSnapshot();
     if (snap === configInitialSnapshot) return;
@@ -247,7 +247,7 @@ function scheduleConfigPersist() {
 }
 
 function applyConfigFieldAccess() {
-    const admin = isAdmin(getPlanningSessionUser());
+    const admin = isAdminTechnique(getPlanningSessionUser());
     document.getElementById('config-planning-notify-wrap')?.classList.toggle('hidden', !admin);
 
     for (const id of ['config-school-start', 'config-school-end', 'config-chapel-min', 'config-chapel-max']) {
@@ -279,7 +279,7 @@ function applyConfigFieldAccess() {
 }
 
 export function initConfigUi(currentUser) {
-    const show = isBackendAuthConfigured() && isAdmin(currentUser);
+    const show = isBackendAuthConfigured() && isAdminTechnique(currentUser);
     document.getElementById('menu-item-config-wrap')?.classList.toggle('hidden', !show);
     syncPlanningDrawerGroupedSections();
     if (!show || bound) return;
@@ -290,7 +290,7 @@ export function initConfigUi(currentUser) {
 
     document.getElementById('menu-item-config')?.addEventListener('click', (ev) => {
         ev.preventDefault();
-        if (!isAdmin(getPlanningSessionUser())) {
+        if (!isAdminTechnique(getPlanningSessionUser())) {
             showToast('Réservé aux administrateurs.', 'error');
             return;
         }

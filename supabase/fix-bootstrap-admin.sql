@@ -14,7 +14,7 @@ drop function if exists public.enforce_admin_role_update() cascade;
 
 -- 3) Promouvoir ton compte (UUID = Authentication → Users → colonne UID)
 update public.profiles
-set role = 'admin'
+set role = 'admin_technique'
 where id = 'COLLE_ICI_L_UUID';
 
 -- 4) Vérifier

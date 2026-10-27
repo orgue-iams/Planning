@@ -47,6 +47,9 @@ import {
     setSlotWorkflowCalendar
 } from './calendar-logic.js';
 import {
+    isProf,
+    isAdminTechnique,
+    isAdmin,
     clearLoginFormError,
     login,
     logout,
@@ -69,7 +72,10 @@ import {
     markSupabasePasswordRecoveryPending,
     isSupabasePasswordRecoveryPending,
     shouldResumeSupabasePasswordRecovery,
-    roleLabelFr
+    roleLabelFr,
+    isAdmin,
+    isAdminTechnique,
+    isProf
 } from './auth-logic.js';
 import { initMessagesUi, resetMessagesUiBindings } from './messages-ui.js';
 import { destroyPlanningQuillMount } from '../utils/planning-quill.js';
@@ -104,7 +110,6 @@ import {
     resetIndispoSeriesResolutionUiBindings
 } from './indispo-series-resolution-ui.js';
 import { initConfigUi, resetConfigUiBindings } from './config-ui.js';
-import { installAdminClearWeekDelegatedClick } from './admin-clear-week.js';
 import { refreshProfWeekCycleToolbarUi, clearProfWeekCycleCache } from './week-cycle.js';
 import { fetchOrganSchoolSettings, getChapelSlotBounds, invalidateOrganSchoolSettingsCache } from './organ-settings.js';
 import { APP_VERSION } from '../config/app-version.js';
@@ -241,7 +246,6 @@ function refreshHeaderUser(user) {
         document.getElementById('menu-item-statistics-wrap')?.classList.add('hidden');
         if (drawerUsersTitle) drawerUsersTitle.textContent = 'Utilisateurs / Cours';
         shell?.classList.remove('planning-shell--weekstrip');
-        document.getElementById('btn-admin-clear-week')?.classList.add('hidden');
         syncPlanningDrawerGroupedSections();
         syncPlanningFabCreate(null);
         return;
@@ -253,7 +257,8 @@ function refreshHeaderUser(user) {
         drawerRole.textContent = rl || String(user.role || '').trim() || '—';
     }
     const r = String(user.role || '').toLowerCase();
-    const staff = isBackendAuthConfigured() && (r === 'prof' || r === 'admin');
+    const staff = isBackendAuthConfigured() && (isProf(user) || isAdmin(user));
+    const canSeeStats = isBackendAuthConfigured() && (isProf(user) || isAdminTechnique(user));
     if (drawerUsersTitle) drawerUsersTitle.textContent = r === 'eleve' ? 'Utilisateurs' : 'Utilisateurs / Cours';
     document.getElementById('menu-item-display-prefs-wrap')?.classList.remove('hidden');
     document.getElementById('menu-item-profile-wrap')?.classList.remove('hidden');
@@ -263,8 +268,7 @@ function refreshHeaderUser(user) {
     const auth = isBackendAuthConfigured();
     document.getElementById('menu-item-semaines-types-wrap')?.classList.add('hidden');
     syncFermeturesMenuVisibility(user);
-    document.getElementById('menu-item-statistics-wrap')?.classList.toggle('hidden', !staff);
-    document.getElementById('btn-admin-clear-week')?.classList.toggle('hidden', r !== 'admin');
+    document.getElementById('menu-item-statistics-wrap')?.classList.toggle('hidden', !canSeeStats);
     if (r !== 'eleve') {
         shell?.classList.remove('planning-shell--weekstrip');
     }
@@ -687,7 +691,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     applyPlanningFcTextScaleFromStorage();
     await loadUIComponents();
     initPlanningAppHeaderOffsetSync();
-    installAdminClearWeekDelegatedClick(() => calendar, () => currentUser);
 
     const loginV = document.getElementById('login-version-badge');
     const headerBuild = document.getElementById('header-build-version');

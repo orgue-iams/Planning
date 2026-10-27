@@ -384,7 +384,7 @@
     color: #0f172a !important;
 }
 
-/* Grille 3 colonnes + séparateurs verticaux (tiroir « prochains cours », profil « Mes cours »). */
+/* Grille 3 colonnes + séparateurs verticaux (tiroir « prochains cours », profil « Cours suivis »). */
 .planning-drawer__next-cours .st-slot-card.st-slot-card--eleve-view,
 #profile-cours-list.planning-drawer__next-cours .st-slot-card.st-slot-card--eleve-view {
     display: grid;

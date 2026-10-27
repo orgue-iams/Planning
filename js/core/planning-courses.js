@@ -1,3 +1,4 @@
+import { isAdminRole } from './planning-roles.js';
 /**
  * Cours (événements type=cours) : filtrage par rôle / inscriptions, plages de dates.
  */
@@ -31,7 +32,7 @@ export function filterCoursEventsForUser(events, user) {
     const role = String(user?.role ?? '').toLowerCase();
     const cours = events.filter((ev) => String(ev?.extendedProps?.type ?? '').toLowerCase() === 'cours');
     if (!me) return [];
-    if (role === 'admin') return cours;
+    if (isAdminRole(role)) return cours;
     if (role === 'prof') {
         return cours.filter((ev) => String(ev?.extendedProps?.owner ?? '').trim().toLowerCase() === me);
     }

@@ -10,8 +10,7 @@
             <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2.5">
                 <dt class="text-[10px] font-bold uppercase text-slate-500 tracking-wide leading-none">E-mail</dt>
                 <dd class="m-0 min-w-0">
-                    <input type="email" id="profile-email-input" class="input input-xs input-bordered w-full min-w-0 text-[11px] h-8" autocomplete="email" />
-                    <p id="profile-email-hint" class="text-[9px] text-slate-500 mt-1 hidden">Vérifiez votre boîte e-mail si une confirmation est demandée par Supabase.</p>
+                    <input type="email" id="profile-email-input" class="input input-xs input-bordered w-full min-w-0 text-[11px] h-8" autocomplete="email" readonly disabled aria-readonly="true" />
                 </dd>
             </div>
             <div class="grid grid-cols-[5.75rem_1fr] gap-x-3 items-center min-h-[2.75rem] py-2.5">
@@ -91,7 +90,7 @@
             </div>
         </dl>
         <div id="profile-section-cours" class="hidden mt-4 pt-4 border-t border-slate-200">
-            <p class="text-[10px] font-bold uppercase text-slate-600 tracking-wide m-0 mb-2">Mes cours</p>
+            <p class="text-[10px] font-bold uppercase text-slate-600 tracking-wide m-0 mb-2">Cours suivis</p>
             <div id="profile-cours-list" class="planning-drawer__next-cours profile-cours-list min-w-0"></div>
             <p id="profile-cours-empty" class="planning-drawer__hint hidden">Aucun cours périodique enregistré.</p>
         </div>

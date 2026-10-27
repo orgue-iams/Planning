@@ -1,5 +1,5 @@
 /* Précache : voir APP_VERSION / CACHE_NAME dans js/config/app-version.js */
-/* bust: v00.02.17 — toast e-mail sans mention console F12 */
+/* bust: v00.02.19 — admin_technique / admin_iams, tri utilisateurs */
 import { CACHE_NAME } from './js/config/app-version.js';
 
 /** Ressources locales (hors CDN) pour démarrage rapide / coquille hors-ligne */

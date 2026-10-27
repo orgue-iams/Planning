@@ -12,6 +12,11 @@ import {
     clearCorruptedLocalAuthSession
 } from './supabase-client.js';
 import { showToast } from '../utils/toast.js';
+import {
+    isAdminRole,
+    isAdminTechniqueRole,
+    normalizePlanningRole
+} from './planning-roles.js';
 
 export { isBackendAuthConfigured, getRememberMePreference } from './supabase-client.js';
 import { fetchAppUserFromSession } from './supabase-auth.js';
@@ -69,21 +74,36 @@ export const PASSWORD_POLICY_LINES = [
 ];
 
 export function isPrivilegedUser(user) {
-    return !!(user && (user.role === 'admin' || user.role === 'prof'));
+    if (!user) return false;
+    const r = normalizePlanningRole(user.role);
+    return isAdminRole(r) || r === 'prof';
 }
 
 /** Compte enseignant (seuls les profs voient le libellé semaine A/B personnel sur le planning). */
 export function isProf(user) {
-    return !!(user && user.role === 'prof');
+    return !!(user && normalizePlanningRole(user.role) === 'prof');
 }
 
+/** Admin technique ou Admin IAMS. */
 export function isAdmin(user) {
-    return !!(user && user.role === 'admin');
+    return !!(user && isAdminRole(user.role));
+}
+
+/** Admin technique uniquement (config planning / stats réservées). */
+export function isAdminTechnique(user) {
+    return !!(user && isAdminTechniqueRole(user.role));
 }
 
 export function roleLabelFr(role) {
-    const m = { admin: 'Admin', prof: 'Prof', eleve: 'Élève' };
-    return m[role] || role || '';
+    const r = normalizePlanningRole(role);
+    const m = {
+        admin_technique: 'Admin technique',
+        admin_iams: 'Admin IAMS',
+        admin: 'Admin technique',
+        prof: 'Prof',
+        eleve: 'Élève'
+    };
+    return m[r] || m[role] || role || '';
 }
 
 export function clearLoginFormError() {

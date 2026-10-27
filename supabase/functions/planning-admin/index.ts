@@ -9,15 +9,21 @@ import { normalizeGoogleCalendarId } from '../_shared/normalize_google_calendar_
 const MIN_PASSWORD_LEN = 6;
 
 /** Aligné sur public.profiles.role (check SQL). */
-const PLANNING_ROLES = ['admin', 'prof', 'eleve'] as const;
+const PLANNING_ROLES = ['admin_technique', 'admin_iams', 'prof', 'eleve'] as const;
 
 function isPlanningRole(r: string): boolean {
     return (PLANNING_ROLES as readonly string[]).includes(r.toLowerCase());
 }
 
 function normalizePlanningRole(r: string): (typeof PLANNING_ROLES)[number] {
-    const x = r.toLowerCase();
+    let x = r.toLowerCase().trim();
+    if (x === 'admin') x = 'admin_technique';
     return isPlanningRole(x) ? (x as (typeof PLANNING_ROLES)[number]) : 'eleve';
+}
+
+function isAdminRole(r: string): boolean {
+    const x = normalizePlanningRole(r);
+    return x === 'admin_technique' || x === 'admin_iams';
 }
 
 function planningFullName(nom: string, prenom: string): string {
@@ -38,10 +44,21 @@ function readNomPrenom(body: Record<string, unknown>): { nom: string; prenom: st
     return { nom, prenom };
 }
 
+function roleSortRank(role: unknown): number {
+    const r = normalizePlanningRole(String(role ?? ''));
+    if (r === 'admin_technique') return 1;
+    if (r === 'admin_iams') return 2;
+    if (r === 'prof') return 3;
+    return 4;
+}
+
 function sortUsersForAdminList<
-    T extends { nom?: string | null; prenom?: string | null; email?: string | null }
+    T extends { role?: string | null; nom?: string | null; prenom?: string | null; email?: string | null }
 >(users: T[]): T[] {
     return [...users].sort((a, b) => {
+        const ra = roleSortRank(a.role);
+        const rb = roleSortRank(b.role);
+        if (ra !== rb) return ra - rb;
         const an = String(a.nom ?? '').trim().toLowerCase();
         const bn = String(b.nom ?? '').trim().toLowerCase();
         if (an !== bn) return an.localeCompare(bn, 'fr');
@@ -199,7 +216,7 @@ async function requirePlanningPrivileged(
     });
     const { data: row } = await userClient.from('profiles').select('role').eq('id', user.id).maybeSingle();
     const role = String(row?.role ?? '').toLowerCase();
-    if (role !== 'admin' && role !== 'prof') {
+    if (!isAdminRole(role) && normalizePlanningRole(role) !== 'prof') {
         return { error: 'Forbidden: admin or prof only' };
     }
     return { user: { id: user.id, email: user.email } };
@@ -219,7 +236,7 @@ async function requirePlanningAdmin(authHeader: string | null, anonKey: string, 
         .select('role')
         .eq('id', gate.user.id)
         .maybeSingle();
-    if (row?.role !== 'admin') return { error: 'Forbidden: planning admin only' };
+    if (!isAdminRole(String(row?.role ?? ''))) return { error: 'Forbidden: planning admin only' };
     return gate;
 }
 

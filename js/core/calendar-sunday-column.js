@@ -1,3 +1,4 @@
+import { isAdminRole } from './planning-roles.js';
 /**
  * Colonne dimanche en vue semaine : préférence profil (`planning_show_sunday`) ou masquage automatique
  * selon les créneaux « à nous » (prof/admin : propriétaires ; élève : hors fermeture).
@@ -60,7 +61,7 @@ export function updatePlanningSundayColumnVisibility(calendar, currentUser) {
             showSunday = true;
             break;
         }
-        if ((role === 'prof' || role === 'admin') && isMine(ev)) {
+        if ((role === 'prof' || isAdminRole(role)) && isMine(ev)) {
             showSunday = true;
             break;
         }

@@ -1,3 +1,4 @@
+import { isAdminRole } from './planning-roles.js';
 /**
  * Périodes d'absence / fermeture (brouillon → application).
  */
@@ -52,7 +53,7 @@ function mapDbPeriod(row, profileById) {
     const label =
         [prof?.prenom, prof?.nom].filter(Boolean).join(' ').trim() ||
         String(prof?.display_name || '').trim() ||
-        (role === 'admin' ? 'Administration' : 'Professeur');
+        (isAdminRole(role) ? 'Administration' : 'Professeur');
     return {
         id,
         createdByUserId,

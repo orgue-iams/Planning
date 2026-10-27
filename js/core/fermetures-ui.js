@@ -1,3 +1,4 @@
+import { isAdminRole } from './planning-roles.js';
 /**
  * Indisponibilités / fermetures : périodes brouillon → application (créneaux + décalage prof).
  */
@@ -110,7 +111,7 @@ function formatFrRange(startYmd, endYmd) {
 }
 
 function closureCardToneClass(range) {
-    if (range?.creatorRole === 'admin') return 'fermeture-card--admin';
+    if (isAdminRole(range?.creatorRole)) return 'fermeture-card--admin';
     if (range?.creatorRole === 'prof') return 'fermeture-card--prof';
     return '';
 }
@@ -238,7 +239,7 @@ function buildClosureCard(range, index) {
     creator.className =
         'fermeture-card__creator text-[11px] font-normal text-slate-800 m-0 leading-snug break-words';
     creator.textContent =
-        range.creatorLabel || (range.creatorRole === 'admin' ? 'Administration' : 'Professeur');
+        range.creatorLabel || (isAdminRole(range.creatorRole) ? 'Administration' : 'Professeur');
     center.appendChild(creator);
     const badge = document.createElement('span');
     badge.className = `fermeture-card__badge ${isDraft ? 'fermeture-card__badge--draft' : 'fermeture-card__badge--applied'}`;

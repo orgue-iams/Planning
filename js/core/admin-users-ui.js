@@ -5,7 +5,12 @@ import { isAdmin, PASSWORD_MIN_LENGTH, PASSWORD_POLICY_LINES } from './auth-logi
 import { isBackendAuthConfigured } from './supabase-client.js';
 import { planningAdminInvoke } from './admin-api.js';
 import { showToast } from '../utils/toast.js';
-import { PLANNING_ROLE_OPTIONS, normalizePlanningRole, isPlanningRole } from './planning-roles.js';
+import {
+    PLANNING_ROLE_OPTIONS,
+    normalizePlanningRole,
+    isPlanningRole,
+    compareUsersByRoleThenName
+} from './planning-roles.js';
 import { getPlanningSessionUser } from './session-user.js';
 import { googleCalendarEmbedUrl } from '../utils/google-calendar-url.js';
 import { openPlanningRouteDialog } from '../utils/planning-route-dialog.js';
@@ -359,17 +364,7 @@ async function saveAdminUsersTableAndClose(usersAdminDlg) {
 }
 
 function sortUsersByName(users) {
-    return [...users].sort((a, b) => {
-        const an = String(a.nom ?? '').trim().toLowerCase();
-        const bn = String(b.nom ?? '').trim().toLowerCase();
-        if (an !== bn) return an.localeCompare(bn, 'fr');
-        const ap = String(a.prenom ?? '').trim().toLowerCase();
-        const bp = String(b.prenom ?? '').trim().toLowerCase();
-        if (ap !== bp) return ap.localeCompare(bp, 'fr');
-        return String(a.email ?? '')
-            .toLowerCase()
-            .localeCompare(String(b.email ?? '').toLowerCase(), 'fr');
-    });
+    return [...users].sort(compareUsersByRoleThenName);
 }
 
 function isAdminListUserActive(u) {

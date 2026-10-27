@@ -4,7 +4,7 @@
 
 import { showToast } from '../utils/toast.js';
 import { getRulesText } from '../utils/messaging.js';
-import { isPrivilegedUser } from './auth-logic.js';
+import { isAdmin, isPrivilegedUser } from './auth-logic.js';
 import { isBackendAuthConfigured } from './supabase-client.js';
 import { fetchOrganRulesRemote, saveOrganRulesRemote } from '../utils/org-content.js';
 import {
@@ -196,7 +196,7 @@ export function initMessagesUi(_ignored) {
             resetRulesQuill();
             rulesQuill = createPlanningQuill(rulesMount, {
                 placeholder: 'Saisissez les consignes…',
-                adminFontStepper: getPlanningSessionUser()?.role === 'admin',
+                adminFontStepper: isAdmin(getPlanningSessionUser()),
                 disableFontSizeButtons: true
             });
             const raw = String(text ?? '');

@@ -12,7 +12,7 @@ import { bridgeDeleteEvent, invokeCalendarBridge } from './calendar-bridge.js';
 import { invalidateCalendarListCache } from './calendar-events-list-cache.js';
 import { getPlanningConfig, getSupabaseClient } from './supabase-client.js';
 import { invokeSlotNotify } from './slot-notify-api.js';
-import { isPlanningRole } from './planning-roles.js';
+import { isAdminRole, isPlanningRole, normalizePlanningRole } from './planning-roles.js';
 import {
     RESERVATION_MOTIFS,
     normalizeMotif,
@@ -445,8 +445,7 @@ function escapeHtml(text) {
 }
 
 function normalizeRole(role) {
-    const r = String(role || '').toLowerCase();
-    return isPlanningRole(r) ? r : '';
+    return normalizePlanningRole(role);
 }
 
 /** Références modale réservation (listener motif → affichage inscrits). */
@@ -457,7 +456,7 @@ let reservationInscritsUiBound = false;
 
 function canManageReservationInscrits(currentUser) {
     const r = normalizeRole(currentUser?.role);
-    return r === 'admin' || r === 'prof';
+    return isAdminRole(r) || r === 'prof';
 }
 
 function getReservationInscritsSelection() {
@@ -956,9 +955,9 @@ function canCurrentUserEditEventIgnoringPast(currentUser, event) {
     if (dbType === 'fermeture' || typ === 'fermeture') {
         const creatorId = String(xp.createdByUserId || '').trim();
         const myId = String(currentUser.id || '').trim();
-        return meRole === 'admin' || Boolean(creatorId && myId && creatorId === myId);
+        return isAdminRole(meRole) || Boolean(creatorId && myId && creatorId === myId);
     }
-    if (meRole === 'admin') return true;
+    if (isAdminRole(meRole)) return true;
 
     const ownerRoleDb = normalizeRole(xp.ownerRole || xp.owner_role || '');
     if (meRole === 'prof' && ownerRoleDb === 'eleve') return true;
@@ -975,12 +974,12 @@ function canCurrentUserEditEventIgnoringPast(currentUser, event) {
         ownerEmailEarly &&
         ownerEmailEarly !== myEmailEarly &&
         orEarly !== 'prof' &&
-        orEarly !== 'admin' &&
+        !isAdminRole(orEarly) &&
         (orEarly === 'eleve' ||
             ownerIsEleveForReservation(event, currentUser) ||
             dbType === 'travail perso' ||
             typ === 'reservation');
-    if (meRole === 'prof' && creatorRole === 'admin' && creatorId !== myId && !editingStudentSlotForProf) {
+    if (meRole === 'prof' && isAdminRole(creatorRole) && creatorId !== myId && !editingStudentSlotForProf) {
         return false;
     }
 
@@ -994,7 +993,7 @@ function canCurrentUserEditEventIgnoringPast(currentUser, event) {
         const or = (owner.ownerRole || roleFromOwnerEmail(owner.ownerEmail)).toLowerCase();
         if (ownerEmail && ownerEmail === myEmail) return true;
         if (or === 'prof' && ownerEmail && ownerEmail !== myEmail) return false;
-        if (or === 'admin') return false;
+        if (isAdminRole(or)) return false;
         if (or === 'eleve' || ownerIsEleveForReservation(event, currentUser)) return true;
         if (profOrAdminEditingEleveSlot(currentUser, event)) return true;
         if (
@@ -1002,7 +1001,7 @@ function canCurrentUserEditEventIgnoringPast(currentUser, event) {
             ownerEmail &&
             ownerEmail !== myEmail &&
             or !== 'prof' &&
-            or !== 'admin'
+            !isAdminRole(or)
         ) {
             return true;
         }
@@ -1020,7 +1019,7 @@ export function canCurrentUserEditEvent(currentUser, event) {
 function roleFromOwnerEmail(email) {
     const e = String(email || '').toLowerCase();
     if (!e) return '';
-    if (e === 'admin@iams.fr') return 'admin';
+    if (e === 'admin@iams.fr') return 'admin_technique';
     if (e.startsWith('prof')) return 'prof';
     if (e.startsWith('eleve') || e.startsWith('élève')) return 'eleve';
     return '';
@@ -1037,7 +1036,7 @@ function ownerIsEleveForReservation(event, currentUser) {
 function profOrAdminEditingEleveSlot(currentUser, event) {
     if (!event) return false;
     const r = normalizeRole(currentUser?.role);
-    if (r !== 'prof' && r !== 'admin') return false;
+    if (r !== 'prof' && !isAdminRole(r)) return false;
     return ownerIsEleveForReservation(event, currentUser);
 }
 
@@ -1112,7 +1111,7 @@ function isReservationOwnedByCurrentUser(event, currentUser) {
 function shouldHideReservationMotifForPrivilegedEditor(currentUser, event) {
     if (!event || !currentUser) return false;
     const r = normalizeRole(currentUser?.role);
-    if (r !== 'prof' && r !== 'admin') return false;
+    if (r !== 'prof' && !isAdminRole(r)) return false;
     if (!isTravailPersoReservationEvent(event)) return false;
     return !isReservationOwnedByCurrentUser(event, currentUser);
 }
@@ -1176,7 +1175,7 @@ function applyReservationMotifVisibility(currentUser, event, canEditEvent) {
 
 function allowedMotifsForRole(role) {
     const r = normalizeRole(role);
-    if (r === 'admin') return RESERVATION_MOTIFS.filter((m) => m !== 'Indispo');
+    if (isAdminRole(r)) return RESERVATION_MOTIFS.filter((m) => m !== 'Indispo');
     if (r === 'prof') return RESERVATION_MOTIFS.filter((m) => m !== 'Fermeture');
     if (r === 'eleve') return ['Travail'];
     return RESERVATION_MOTIFS.filter((m) => m !== 'Fermeture' && m !== 'Indispo');
@@ -5055,7 +5054,7 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
     const absencePeriodId = String(xpOpen.planningAbsencePeriodId || '').trim();
     let canEditFermeturePeriod = false;
     if (isFermetureSlot && absencePeriodId && isBackendAuthConfigured()) {
-        if (normalizeRole(currentUser?.role) === 'admin') {
+        if (isAdminRole(currentUser?.role)) {
             canEditFermeturePeriod = true;
         } else {
             const sbAp = getSupabaseClient();
@@ -5102,7 +5101,7 @@ export async function openModal(start, end, event, currentUser, calendarForClip 
         Boolean(event) &&
         canEditEvent &&
         canCurrentUserEditEventIgnoringPast(currentUser, event) &&
-        (!isPastSlot || meRoleOpen === 'admin' || meRoleOpen === 'prof');
+        (!isPastSlot || isAdminRole(meRoleOpen) || meRoleOpen === 'prof');
     document.getElementById('reservation-delete-wrap')?.classList.toggle('hidden', !showDelete);
 
     const refreshHeadlineOnly = () => updateReservationModalHeadline(reservationModalEventRef);
@@ -5776,7 +5775,7 @@ export async function saveReservation(calendar, currentUser, currentEventRef) {
     let isAllDaySingle = false;
 
     if (dbSlotType === 'fermeture') {
-        if (normalizeRole(currentUser?.role) !== 'admin') {
+        if (!isAdminRole(currentUser?.role)) {
             showToast('Seuls les administrateurs peuvent créer des fermetures.', 'error');
             return false;
         }
@@ -6178,7 +6177,7 @@ export async function deleteReservation(calendar, currentEventRef, currentUser) 
     const liveRef = resolveLivePlanningEventRef(calendar, currentEventRef);
     const rMeDel = normalizeRole(currentUser.role);
     if (isReservationNonEditablePast(currentUser, liveRef)) {
-        if (rMeDel !== 'admin' && rMeDel !== 'prof') {
+        if (!isAdminRole(rMeDel) && rMeDel !== 'prof') {
             showToast('Les créneaux passés ne sont pas modifiables.', 'error');
             return;
         }

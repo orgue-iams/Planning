@@ -8,7 +8,7 @@
 -- 2) Remplace la valeur ci-dessous, puis Run.
 
 update public.profiles
-set role = 'admin'
+set role = 'admin_technique'
 where id = 'COLLE_ICI_L_UUID_DE_TON_UTILISATEUR';
 
 -- Vérification :

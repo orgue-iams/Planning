@@ -147,7 +147,7 @@
                 <span class="planning-drawer__link-icon planning-drawer__link-icon--stroke-green" aria-hidden="true">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </span>
-                Aide
+                Contact
             </button>
         </div>
 
@@ -165,16 +165,12 @@
         <div class="planning-drawer__block planning-drawer__block--help-head">
             <button type="button" id="drawer-help-back" class="planning-drawer__close-btn planning-drawer__help-back" aria-label="Retour au menu principal">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="planning-drawer__close-icon" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
-                <span>Aide</span>
+                <span>Contact</span>
             </button>
         </div>
         <div class="planning-drawer__block planning-drawer__block--help-body space-y-5 mt-4">
-            <p class="planning-ui-menu planning-ui-menu--secondary text-slate-800 m-0 mb-6">
-                <span class="planning-ui-menu planning-ui-menu--caption text-slate-600 tracking-wide">Version</span>
-                <span id="drawer-help-version" class="font-mono tabular-nums ml-1"></span>
-            </p>
             <form id="drawer-help-contact-form" class="drawer-help-contact space-y-2" method="get" action="#">
-                <p class="planning-ui-menu planning-ui-menu--caption text-slate-700 m-0 mb-2">Nous contacter</p>
+                <p class="planning-ui-menu planning-ui-menu--caption text-slate-700 m-0 mb-2">Merci d'utiliser ce formulaire afin de signaler tout souci de fonctionnement technique du planning</p>
                 <label class="block">
                     <span class="planning-ui-menu planning-ui-menu--caption text-slate-600 dark:text-slate-400">Objet</span>
                     <input type="text" id="drawer-help-subject" name="subject" class="planning-field input input-bordered input-sm w-full mt-0.5 text-[11px] text-slate-800 dark:text-slate-100" maxlength="200" placeholder="Ex. titre du message" autocomplete="off" />
@@ -192,7 +188,7 @@
                     </div>
                 </label>
                 <div class="drawer-help-submit-wrap pt-2">
-                    <button type="submit" class="btn btn-sm planning-btn-accent font-semibold text-[11px] w-full">Envoyer par e-mail</button>
+                    <button type="submit" class="btn btn-sm planning-btn-accent font-semibold text-[11px] w-full">Envoyer</button>
                 </div>
             </form>
             <a id="drawer-help-mailto-anchor" class="hidden" href="#" aria-hidden="true"></a>

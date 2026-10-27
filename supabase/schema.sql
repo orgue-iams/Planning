@@ -6,7 +6,7 @@ create table if not exists public.profiles (
     nom text not null default '',
     prenom text not null default '',
     display_name text,
-    role text not null default 'eleve' check (role in ('admin', 'prof', 'eleve')),
+    role text not null default 'eleve' check (role in ('admin_technique', 'admin_iams', 'prof', 'eleve')),
     reservation_types jsonb not null default '{"labels":[],"favoriteLabel":""}'::jsonb,
     updated_at timestamptz default now()
 );

@@ -12,7 +12,6 @@ import {
 import { getPlanningSessionUser } from './session-user.js';
 import { showToast } from '../utils/toast.js';
 import { planningAdminInvoke } from './admin-api.js';
-import { isPlanningRole } from './planning-roles.js';
 import {
     openPlanningRouteFromDrawer,
     planningRouteTitle,
@@ -20,12 +19,21 @@ import {
     popPlanningRouteLevel,
     setPlanningRouteBackHandler
 } from '../utils/planning-route-dialog.js';
-import { normalizePlanningRole, PLANNING_ROLE_OPTIONS } from './planning-roles.js';
+import {
+    compareUsersByRoleThenName,
+    isAdminRole,
+    isPlanningRole,
+    normalizePlanningRole,
+    PLANNING_ROLE_OPTIONS
+} from './planning-roles.js';
 import { focusPlanningDialogRoot } from '../utils/focus-planning-dialog.js';
 import { createPlanningIconDeleteButton } from '../utils/planning-delete-btn.js';
 import { planningConfirm } from '../utils/planning-confirm.js';
 
 let bound = false;
+/** @type {AbortController | null} */
+let directoryUiAbort = null;
+let directoryPasswordApplyInFlight = false;
 /** @type {object | null} */
 let editingUser = null;
 /** @type {object | null} */
@@ -44,7 +52,7 @@ const DIRECTORY_CALENDAR_ICON_SVG =
 
 function directoryRoleCardClass(role) {
     const key = normalizePlanningRole(role);
-    if (key === 'admin') return 'directory-admin-user-card--role-admin';
+    if (isAdminRole(key)) return 'directory-admin-user-card--role-admin';
     if (key === 'prof') return 'directory-admin-user-card--role-prof';
     return 'directory-admin-user-card--role-eleve';
 }
@@ -344,12 +352,7 @@ function renderPrivilegedDirectoryCards(users) {
     const root = document.createElement('div');
     root.className = 'directory-users-stack space-y-1.5 min-w-0';
 
-    const sorted = [...users].sort((a, b) =>
-        `${String(a.nom || '')} ${String(a.prenom || '')}`.localeCompare(
-            `${String(b.nom || '')} ${String(b.prenom || '')}`,
-            'fr'
-        )
-    );
+    const sorted = [...users].sort(compareUsersByRoleThenName);
     applyDirectoryNameColumnWidth(root, sorted);
 
     const sessionUser = getPlanningSessionUser();
@@ -416,7 +419,7 @@ async function loadDirectoryIntoModal() {
     }
 
     const rows = (Array.isArray(data) ? data : []).filter(isDirectoryUserActive);
-    const admins = rows.filter((r) => String(r.role || '').toLowerCase() === 'admin');
+    const admins = rows.filter((r) => isAdminRole(r.role));
     const profs = rows.filter((r) => String(r.role || '').toLowerCase() === 'prof');
     const eleves = rows.filter((r) => String(r.role || '').toLowerCase() === 'eleve');
     renderDirectoryUnified(unified, admins, profs, eleves);
@@ -501,22 +504,27 @@ async function confirmLeaveDirectoryEditIfNeeded() {
 }
 
 async function applyDirectoryEditPassword() {
-    if (!editingUser?.id) return;
-    const f = readDirectoryEditForm();
-    if (!f.password) {
-        showToast('Indiquez un mot de passe.', 'error');
-        return;
-    }
-    if (f.password.length < PASSWORD_MIN_LENGTH) {
-        showToast(`Mot de passe : au moins ${PASSWORD_MIN_LENGTH} caractères.`, 'error');
-        return;
-    }
+    if (!editingUser?.id || directoryPasswordApplyInFlight) return;
+    directoryPasswordApplyInFlight = true;
     try {
-        await planningAdminInvoke('set_password', { user_id: editingUser.id, password: f.password });
-        setDirectoryPasswordMaskedUi();
-        showToast('Mot de passe mis à jour.', 'success');
-    } catch (err) {
-        showToast(err instanceof Error ? err.message : String(err), 'error');
+        const f = readDirectoryEditForm();
+        if (!f.password) {
+            showToast('Indiquez un mot de passe.', 'error');
+            return;
+        }
+        if (f.password.length < PASSWORD_MIN_LENGTH) {
+            showToast(`Mot de passe : au moins ${PASSWORD_MIN_LENGTH} caractères.`, 'error');
+            return;
+        }
+        try {
+            await planningAdminInvoke('set_password', { user_id: editingUser.id, password: f.password });
+            setDirectoryPasswordMaskedUi();
+            showToast('Mot de passe mis à jour.', 'success');
+        } catch (err) {
+            showToast(err instanceof Error ? err.message : String(err), 'error');
+        }
+    } finally {
+        directoryPasswordApplyInFlight = false;
     }
 }
 
@@ -801,82 +809,120 @@ async function deleteDirectoryUser(userId) {
 
 export function resetDirectoryUsersUiBindings() {
     bound = false;
+    directoryUiAbort?.abort();
+    directoryUiAbort = null;
     editingUser = null;
     editSnapshot = null;
     privilegedUsersCache = null;
+    directoryPasswordApplyInFlight = false;
 }
 
 export function initDirectoryUsersUi() {
     if (bound) return;
     bound = true;
+    directoryUiAbort?.abort();
+    directoryUiAbort = new AbortController();
+    const { signal } = directoryUiAbort;
 
-    document.getElementById('menu-item-directory')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        const dlg = document.getElementById('modal_directory_users');
-        if (!dlg) {
-            showToast('Fenêtre annuaire indisponible. Rechargez la page.', 'error');
-            return;
-        }
-        showDirectoryListPanel();
-        const u = getPlanningSessionUser();
-        const privileged = isDirectoryPrivileged(u);
-        syncDirectoryAddUserFab();
-        const status = document.getElementById('directory-users-status');
-        if (!openPlanningRouteFromDrawer('modal_directory_users', 'Utilisateurs', 'Menu')) {
-            return;
-        }
-        if (privileged && privilegedUsersCache?.length) {
-            const tableWrap = document.getElementById('directory-admin-users-wrap');
-            document.getElementById('directory-readonly-unified')?.classList.add('hidden');
-            tableWrap?.classList.remove('hidden');
-            renderPrivilegedDirectoryCards(privilegedUsersCache);
-            if (status) status.textContent = '';
-            void loadPrivilegedDirectoryIntoModal();
-        } else {
-            if (status) status.textContent = 'Chargement…';
-            void (privileged ? loadPrivilegedDirectoryIntoModal() : loadDirectoryIntoModal());
-        }
-    });
+    document.getElementById('menu-item-directory')?.addEventListener(
+        'click',
+        (e) => {
+            e.preventDefault();
+            const dlg = document.getElementById('modal_directory_users');
+            if (!dlg) {
+                showToast('Fenêtre annuaire indisponible. Rechargez la page.', 'error');
+                return;
+            }
+            showDirectoryListPanel();
+            const u = getPlanningSessionUser();
+            const privileged = isDirectoryPrivileged(u);
+            syncDirectoryAddUserFab();
+            const status = document.getElementById('directory-users-status');
+            if (!openPlanningRouteFromDrawer('modal_directory_users', 'Utilisateurs', 'Menu')) {
+                return;
+            }
+            if (privileged && privilegedUsersCache?.length) {
+                const tableWrap = document.getElementById('directory-admin-users-wrap');
+                document.getElementById('directory-readonly-unified')?.classList.add('hidden');
+                tableWrap?.classList.remove('hidden');
+                renderPrivilegedDirectoryCards(privilegedUsersCache);
+                if (status) status.textContent = '';
+                void loadPrivilegedDirectoryIntoModal();
+            } else {
+                if (status) status.textContent = 'Chargement…';
+                void (privileged ? loadPrivilegedDirectoryIntoModal() : loadDirectoryIntoModal());
+            }
+        },
+        { signal }
+    );
 
-    document.getElementById('directory-add-user-btn')?.addEventListener('click', () => {
-        openDirectoryUserCreate();
-    });
+    document.getElementById('directory-add-user-btn')?.addEventListener(
+        'click',
+        () => {
+            openDirectoryUserCreate();
+        },
+        { signal }
+    );
 
     document.querySelectorAll('input[name="directory-user-create-mode"]').forEach((el) => {
-        el.addEventListener('change', () => syncDirectoryCreatePasswordField());
+        el.addEventListener('change', () => syncDirectoryCreatePasswordField(), { signal });
     });
-    document.getElementById('directory-create-submit')?.addEventListener('click', () => {
-        void submitDirectoryCreateUser();
-    });
+    document.getElementById('directory-create-submit')?.addEventListener(
+        'click',
+        () => {
+            void submitDirectoryCreateUser();
+        },
+        { signal }
+    );
 
     const bindBlur = (id, field) => {
-        document.getElementById(id)?.addEventListener('blur', () => void saveDirectoryField(field));
+        document.getElementById(id)?.addEventListener('blur', () => void saveDirectoryField(field), {
+            signal
+        });
     };
     bindBlur('directory-edit-nom', 'identity');
     bindBlur('directory-edit-prenom', 'identity');
     bindBlur('directory-edit-phone', 'identity');
     bindBlur('directory-edit-email', 'email');
-    document.getElementById('directory-edit-role')?.addEventListener('change', () =>
-        void saveDirectoryField('role')
+    document.getElementById('directory-edit-role')?.addEventListener(
+        'change',
+        () => void saveDirectoryField('role'),
+        { signal }
     );
-    document.getElementById('directory-edit-password-apply')?.addEventListener('click', () => {
-        void applyDirectoryEditPassword();
-    });
-    getDirectoryEditPasswordEl()?.addEventListener('focus', () => {
-        if (directoryPasswordMasked) resetDirectoryEditPasswordField();
-    });
+    document.getElementById('directory-edit-password-apply')?.addEventListener(
+        'click',
+        () => {
+            void applyDirectoryEditPassword();
+        },
+        { signal }
+    );
+    getDirectoryEditPasswordEl()?.addEventListener(
+        'focus',
+        () => {
+            if (directoryPasswordMasked) resetDirectoryEditPasswordField();
+        },
+        { signal }
+    );
 
     const directoryDlg = document.getElementById('modal_directory_users');
-    directoryDlg?.addEventListener('cancel', (e) => {
-        if (!editingUser || !isDirectoryPasswordPending()) return;
-        e.preventDefault();
-        void (async () => {
-            if (await confirmLeaveDirectoryEditIfNeeded()) {
-                directoryDlg.close();
-            }
-        })();
-    });
-    directoryDlg?.addEventListener('close', () => {
-        showDirectoryListPanel();
-    });
+    directoryDlg?.addEventListener(
+        'cancel',
+        (e) => {
+            if (!editingUser || !isDirectoryPasswordPending()) return;
+            e.preventDefault();
+            void (async () => {
+                if (await confirmLeaveDirectoryEditIfNeeded()) {
+                    directoryDlg.close();
+                }
+            })();
+        },
+        { signal }
+    );
+    directoryDlg?.addEventListener(
+        'close',
+        () => {
+            showDirectoryListPanel();
+        },
+        { signal }
+    );
 }

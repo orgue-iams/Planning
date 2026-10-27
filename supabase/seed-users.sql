@@ -15,7 +15,7 @@ declare
             'email', 'admin@iams.fr',
             'password', 'admin1234',
             'display_name', 'Admin IAMS',
-            'role', 'admin'
+            'role', 'admin_technique'
         ),
         jsonb_build_object(
             'email', 'eleve1@iams.fr',
@@ -69,7 +69,10 @@ begin
         v_display_name := coalesce(nullif(trim(v_item ->> 'display_name'), ''), split_part(v_email, '@', 1));
         v_role := lower(coalesce(v_item ->> 'role', 'eleve'));
 
-        if v_role not in ('admin', 'prof', 'eleve') then
+        if v_role = 'admin' then
+            v_role := 'admin_technique';
+        end if;
+        if v_role not in ('admin_technique', 'admin_iams', 'prof', 'eleve') then
             v_role := 'eleve';
         end if;
 

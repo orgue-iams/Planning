@@ -203,7 +203,11 @@ Deno.serve(async (req) => {
         }
 
         const apiKey = normalizeBrevoApiKey(Deno.env.get('BREVO_API_KEY'));
-        const fromEmail = normalizeSecretValue(Deno.env.get('NOTIFY_FROM_EMAIL'));
+        const fromEmailRaw = normalizeSecretValue(Deno.env.get('NOTIFY_FROM_EMAIL'));
+        const fromEmail = fromEmailRaw.toLowerCase().includes('@') &&
+                !fromEmailRaw.toLowerCase().includes('group.calendar.google.com')
+            ? fromEmailRaw
+            : '';
         const fromName = (Deno.env.get('NOTIFY_FROM_NAME') ?? 'Planning Orgue IAMS').trim();
 
         if (!apiKey || !fromEmail) {
@@ -211,7 +215,9 @@ Deno.serve(async (req) => {
                 ok: false,
                 emailSent: false,
                 error: 'EMAIL_NOT_CONFIGURED',
-                detail: 'Secrets BREVO_API_KEY et NOTIFY_FROM_EMAIL requis'
+                detail: !apiKey
+                    ? 'Secret BREVO_API_KEY manquant'
+                    : 'NOTIFY_FROM_EMAIL doit être une adresse e-mail expéditeur vérifiée chez Brevo (pas un ID calendrier Google)'
             });
         }
 

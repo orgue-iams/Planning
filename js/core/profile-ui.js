@@ -3,7 +3,6 @@
  */
 import {
     roleLabelFr,
-    updateCurrentUserEmail,
     updateCurrentUserPasswordSimple,
     PASSWORD_MIN_LENGTH
 } from './auth-logic.js';
@@ -51,7 +50,6 @@ function hasProfileFieldChangesVsBaseline() {
     const cur = readProfileFormState();
     return (
         cur.name !== profileBaseline.name ||
-        cur.email !== profileBaseline.email ||
         cur.phone !== profileBaseline.phone ||
         cur.shareEmail !== profileBaseline.shareEmail ||
         cur.sharePhone !== profileBaseline.sharePhone ||
@@ -114,7 +112,6 @@ async function fillProfileModal(user) {
     if (emailInput instanceof HTMLInputElement) {
         emailInput.value = user.email || '';
     }
-    document.getElementById('profile-email-hint')?.classList.add('hidden');
 
     let tel = String(user.telephone ?? '').trim();
     let shareEmail = user.directory_share_email !== false;
@@ -195,16 +192,6 @@ export async function persistProfileFields() {
                 directory_share_phone: form.sharePhone,
                 planning_show_sunday: form.showSunday
             });
-        }
-        const previousEmail = String(u.email || '').trim().toLowerCase();
-        const nextEmail = String(form.email || '').trim().toLowerCase();
-        if (nextEmail && nextEmail !== previousEmail) {
-            const emailRes = await updateCurrentUserEmail(form.email);
-            if (!emailRes.ok) {
-                showToast(emailRes.error || 'Impossible de modifier l’e-mail.', 'error');
-                return;
-            }
-            document.getElementById('profile-email-hint')?.classList.remove('hidden');
         }
         syncProfileBaselineFromForm();
         document.dispatchEvent(new CustomEvent('planning-profile-saved'));
@@ -316,12 +303,7 @@ export function initProfileUi(currentUser) {
         document.dispatchEvent(new CustomEvent('planning-profile-saved'));
     };
 
-    for (const id of [
-        'profile-display-name-input',
-        'profile-email-input',
-        'profile-share-email',
-        'profile-share-phone'
-    ]) {
+    for (const id of ['profile-display-name-input', 'profile-share-email', 'profile-share-phone']) {
         const el = document.getElementById(id);
         el?.addEventListener('input', scheduleProfileFieldsPersist);
         el?.addEventListener('change', scheduleProfileFieldsPersist);
@@ -342,5 +324,4 @@ export function initProfileUi(currentUser) {
     document.getElementById('profile-display-name-input')?.addEventListener('blur', () =>
         void persistProfileFields()
     );
-    document.getElementById('profile-email-input')?.addEventListener('blur', () => void persistProfileFields());
 }
